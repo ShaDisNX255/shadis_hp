@@ -1,0 +1,19 @@
+{
+    "listservers":{
+        "main":"https://www.keristero.xyz/server_list/"
+    },
+    "advertisements":[
+        {
+            "unique_server_id":"shadishp",
+            "name":"ShaDisHP",
+            "description":"A HomePage to just sit back and relax. Has a functioning Cyber Train. Updated weekly!",
+            "tags":[],
+            "address":"70.124.9.221:3000",
+            "data":"",
+            "icon":"advertisement.png",
+            "color":"rgb(72,255,0)",
+            "advertise_map":true,
+            "default_area_id":"default"
+        }
+    ]
+}
