@@ -272,7 +272,7 @@
 </data>
  </layer>
  <objectgroup id="12" name="Object Layer 4" offsetx="0" offsety="-48">
-  <object id="88" name="ShaDisHP" type="Passenger Train" x="1072" y="496">
+  <object id="88" name="ShaDisHP" type="Passenger Train" x="1072" y="464">
    <properties>
     <property name="Color" value="Green"/>
     <property name="Direction" value="Up Left"/>
@@ -290,18 +290,15 @@
     <property name="1 Area" value="keristero.xyz:8769,default,MainTrain"/>
     <property name="1 Name" value="Gravy Yum Server"/>
     <property name="1 Type" value="Server"/>
-    <property name="2 Area" value="96.60.137.203:8766,default,train"/>
-    <property name="2 Name" value="Tist Twins Navi Gym Server"/>
+    <property name="2 Area" value="165.227.139.229:8765,default,train"/>
+    <property name="2 Name" value="The Block Server"/>
     <property name="2 Type" value="Server"/>
-    <property name="3 Area" value="165.227.139.229:8765,default,train"/>
-    <property name="3 Name" value="The Block Server"/>
+    <property name="3 Area" value="96.60.137.203:8767,default,train"/>
+    <property name="3 Name" value="Undernet Server"/>
     <property name="3 Type" value="Server"/>
-    <property name="4 Area" value="96.60.137.203:8767,default,train"/>
-    <property name="4 Name" value="Undernet Server"/>
+    <property name="4 Area" value="159.223.165.219:3000,default,MainTrain"/>
+    <property name="4 Name" value="BN3 ACDC Station"/>
     <property name="4 Type" value="Server"/>
-    <property name="5 Area" value="159.223.165.219:3000,default,MainTrain"/>
-    <property name="5 Name" value="BN3 ACDC Station"/>
-    <property name="5 Type" value="Server"/>
     <property name="Train" value="ShaDisHP"/>
    </properties>
    <point/>
