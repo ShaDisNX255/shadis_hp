@@ -290,7 +290,7 @@
     <property name="1 Area" value="keristero.xyz:8769,default,MainTrain"/>
     <property name="1 Name" value="Gravy Yum Server"/>
     <property name="1 Type" value="Server"/>
-    <property name="2 Area" value="165.227.139.229:8765,default,train"/>
+    <property name="2 Area" value="165.227.139.229:1928,default,train"/>
     <property name="2 Name" value="The Block Server"/>
     <property name="2 Type" value="Server"/>
     <property name="3 Area" value="96.60.137.203:8767,default,train"/>
