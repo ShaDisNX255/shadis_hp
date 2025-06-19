@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.11" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="50" height="50" tilewidth="64" tileheight="32" infinite="0" nextlayerid="13" nextobjectid="108">
+<map version="1.11" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="50" height="50" tilewidth="64" tileheight="32" infinite="0" nextlayerid="13" nextobjectid="132">
  <properties>
   <property name="Background" value="custom"/>
   <property name="Background Animation" value="/server/assets/custom/backgrounds/home/kottouhinyanodennou.animation"/>
@@ -38,6 +38,11 @@
  </tileset>
  <tileset firstgid="61" source="../assets/indy-trains/platforms.tsx"/>
  <tileset firstgid="65" source="../assets/indy-trains/Cyber_Rail.tsx"/>
+ <tileset firstgid="66" source="../assets/tiles/Bus Stop.tsx"/>
+ <tileset firstgid="67" source="../assets/tiles/coffee.tsx"/>
+ <tileset firstgid="71" source="../assets/tiles/vendmach.tsx"/>
+ <tileset firstgid="87" source="../assets/tiles/Toy_Robo.tsx"/>
+ <tileset firstgid="225" source="../assets/tiles/UndernetStatue.tsx"/>
  <layer id="1" name="Tile Layer 1" width="50" height="50">
   <data encoding="csv">
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -63,9 +68,9 @@
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483674,2147483674,2147483674,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,10,11,10,11,10,11,10,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,11,8,9,8,9,8,11,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,10,9,6,7,6,9,10,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,11,8,7,5,7,8,11,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,10,9,6,7,6,9,10,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,8,7,0,0,10,9,6,7,6,9,10,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8,131,8,13,13,11,8,7,5,7,8,11,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,8,7,0,0,10,9,6,7,6,9,10,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,11,8,9,8,9,8,11,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,10,11,10,11,10,11,10,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -98,7 +103,7 @@
     <property name="Direction" value="Up Left"/>
    </properties>
   </object>
-  <object id="22" name="ShaDis BBS" type="BBS" gid="18" x="656" y="768" width="48" height="69">
+  <object id="22" name="ShaDis BBS" type="BBS" gid="18" x="656" y="720" width="48" height="69">
    <properties>
     <property name="BBS" type="bool" value="true"/>
     <property name="Color" type="color" value="#ff55ffff"/>
@@ -106,6 +111,12 @@
     <property name="Post Limit" type="int" value="30"/>
    </properties>
   </object>
+  <object id="117" gid="32" x="576" y="736" width="64" height="37"/>
+  <object id="110" gid="67" x="720" y="688" width="33" height="54"/>
+  <object id="111" gid="67" x="864" y="688" width="33" height="54"/>
+  <object id="124" gid="225" x="640" y="800" width="78" height="92"/>
+  <object id="125" gid="44" x="544" y="736" width="64" height="32"/>
+  <object id="126" gid="40" x="576" y="768" width="64" height="37"/>
  </objectgroup>
  <layer id="6" name="Tile Layer 2" width="50" height="50" offsetx="0" offsety="-16">
   <data encoding="csv">
@@ -303,5 +314,9 @@
    </properties>
    <point/>
   </object>
+  <object id="108" gid="66" x="704" y="528" width="16" height="53"/>
+  <object id="112" gid="71" x="512" y="544" width="128" height="128"/>
+  <object id="113" gid="81" x="896" y="496" width="128" height="128"/>
+  <object id="121" gid="85" x="944" y="496" width="128" height="128"/>
  </objectgroup>
 </map>
