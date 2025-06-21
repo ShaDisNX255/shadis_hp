@@ -126,28 +126,28 @@
     <property name="Target Object" value="9"/>
    </properties>
   </object>
-  <object id="61" name="TryAgain" type="Custom Warp" gid="240" x="539" y="763" width="60" height="29">
+  <object id="61" name="TryAgain" type="Custom Warp" gid="240" x="539.5" y="762.5" width="62" height="30">
    <properties>
     <property name="Direction" value="Up Right"/>
     <property name="Target Area" value="rink"/>
     <property name="Target Object" value="9"/>
    </properties>
   </object>
-  <object id="62" name="TryAgain" type="Custom Warp" gid="240" x="539" y="1019" width="60" height="29">
+  <object id="62" name="TryAgain" type="Custom Warp" gid="240" x="539.75" y="1018.25" width="63" height="30">
    <properties>
     <property name="Direction" value="Up Right"/>
     <property name="Target Area" value="rink"/>
     <property name="Target Object" value="9"/>
    </properties>
   </object>
-  <object id="63" name="TryAgain" type="Custom Warp" gid="240" x="603" y="891" width="60" height="29">
+  <object id="63" name="TryAgain" type="Custom Warp" gid="240" x="603.5" y="890.5" width="62" height="30">
    <properties>
     <property name="Direction" value="Up Right"/>
     <property name="Target Area" value="rink"/>
     <property name="Target Object" value="9"/>
    </properties>
   </object>
-  <object id="64" name="TryAgain" type="Custom Warp" gid="240" x="699" y="987" width="60" height="29">
+  <object id="64" name="TryAgain" type="Custom Warp" gid="240" x="699.25" y="986.75" width="61" height="29">
    <properties>
     <property name="Direction" value="Up Right"/>
     <property name="Target Area" value="rink"/>
@@ -182,14 +182,14 @@
     <property name="Target Object" value="9"/>
    </properties>
   </object>
-  <object id="70" name="TryAgain" type="Custom Warp" gid="240" x="571" y="731" width="60" height="29">
+  <object id="70" name="TryAgain" type="Custom Warp" gid="240" x="571.75" y="730.25" width="65" height="31">
    <properties>
     <property name="Direction" value="Up Right"/>
     <property name="Target Area" value="rink"/>
     <property name="Target Object" value="9"/>
    </properties>
   </object>
-  <object id="71" name="TryAgain" type="Custom Warp" gid="240" x="698.5" y="955.5" width="60" height="29">
+  <object id="71" name="TryAgain" type="Custom Warp" gid="240" x="699.25" y="954.75" width="63" height="29">
    <properties>
     <property name="Direction" value="Up Right"/>
     <property name="Target Area" value="rink"/>
@@ -210,7 +210,7 @@
     <property name="Target Object" value="9"/>
    </properties>
   </object>
-  <object id="77" name="TryAgain" type="Custom Warp" gid="240" x="827" y="731" width="60" height="29">
+  <object id="77" name="TryAgain" type="Custom Warp" gid="240" x="823.75" y="728.25" width="65" height="33">
    <properties>
     <property name="Direction" value="Up Right"/>
     <property name="Target Area" value="rink"/>
@@ -238,7 +238,7 @@
     <property name="Target Object" value="9"/>
    </properties>
   </object>
-  <object id="82" name="TryAgain" type="Custom Warp" gid="240" x="922.5" y="795.5" width="60" height="29">
+  <object id="82" name="TryAgain" type="Custom Warp" gid="240" x="918.5" y="789.5" width="62" height="35">
    <properties>
     <property name="Direction" value="Up Right"/>
     <property name="Target Area" value="rink"/>
@@ -252,7 +252,7 @@
     <property name="Target Object" value="9"/>
    </properties>
   </object>
-  <object id="84" name="TryAgain" type="Custom Warp" gid="240" x="731" y="1019" width="60" height="29">
+  <object id="84" name="TryAgain" type="Custom Warp" gid="240" x="731.5" y="1018.5" width="62" height="29">
    <properties>
     <property name="Direction" value="Up Right"/>
     <property name="Target Area" value="rink"/>
@@ -273,7 +273,7 @@
     <property name="Target Object" value="9"/>
    </properties>
   </object>
-  <object id="87" name="TryAgain" type="Custom Warp" gid="240" x="952.5" y="1049.5" width="60" height="31">
+  <object id="87" name="TryAgain" type="Custom Warp" gid="240" x="953.25" y="1048.75" width="63" height="31">
    <properties>
     <property name="Direction" value="Up Right"/>
     <property name="Target Area" value="rink"/>
