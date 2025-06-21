@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.11" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="50" height="50" tilewidth="64" tileheight="32" infinite="0" nextlayerid="13" nextobjectid="132">
+<map version="1.8" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="50" height="50" tilewidth="64" tileheight="32" infinite="0" nextlayerid="13" nextobjectid="145">
  <properties>
   <property name="Background" value="custom"/>
   <property name="Background Animation" value="/server/assets/custom/backgrounds/home/kottouhinyanodennou.animation"/>
@@ -10,39 +10,25 @@
  </properties>
  <tileset firstgid="1" source="../assets/tiles/home_warp.tsx"/>
  <tileset firstgid="6" source="../assets/tiles/Custom_Central_Tiles.tsx"/>
- <tileset firstgid="14" source="../assets/tiles/BBSOldFlipped.tsx"/>
- <tileset firstgid="17" source="../assets/tiles/BBSOldFixed.tsx"/>
- <tileset firstgid="20" source="../assets/tiles/DenTownStairs.tsx"/>
- <tileset firstgid="29" source="../assets/tiles/SnowTileTopper.tsx"/>
- <tileset firstgid="44" source="../assets/tiles/IceTileTopper.tsx"/>
- <tileset firstgid="56" name="hp_warp_blue" tilewidth="114" tileheight="64" tilecount="5" columns="5" objectalignment="bottom">
-  <tileoffset x="0" y="64"/>
-  <image source="../assets/tiles/hp_warp_blue.png" width="570" height="64"/>
-  <tile id="0"/>
-  <tile id="1">
-   <objectgroup draworder="index" id="3">
-    <object id="2" x="37.125" y="16" width="39.625" height="24.375">
-     <ellipse/>
-    </object>
-   </objectgroup>
-   <animation>
-    <frame tileid="1" duration="100"/>
-    <frame tileid="2" duration="100"/>
-    <frame tileid="3" duration="100"/>
-    <frame tileid="4" duration="100"/>
-   </animation>
-  </tile>
-  <tile id="3"/>
-  <tile id="2"/>
-  <tile id="4"/>
+ <tileset firstgid="14" source="../assets/tiles/BBSOldFixed.tsx"/>
+ <tileset firstgid="17" source="../assets/tiles/DenTownStairs.tsx"/>
+ <tileset firstgid="26" source="../assets/tiles/SnowTileTopper.tsx"/>
+ <tileset firstgid="41" source="../assets/tiles/IceTileTopper.tsx"/>
+ <tileset firstgid="53" source="../assets/indy-trains/platforms.tsx"/>
+ <tileset firstgid="57" source="../assets/indy-trains/Cyber_Rail.tsx"/>
+ <tileset firstgid="58" source="../assets/tiles/Bus Stop.tsx"/>
+ <tileset firstgid="59" source="../assets/tiles/coffee.tsx"/>
+ <tileset firstgid="63" source="../assets/tiles/vendmach.tsx"/>
+ <tileset firstgid="79" source="../assets/tiles/UndernetStatue.tsx"/>
+ <tileset firstgid="80" source="../assets/ezlibs-assets/ezcheckpoints/bn5cubegreen_tile.tsx"/>
+ <tileset firstgid="84" source="../../Bn3-main/assets/tiles/warp.tsx"/>
+ <tileset firstgid="90" name="floor" tilewidth="62" tileheight="49" tilecount="3" columns="3" objectalignment="bottom">
+  <tileoffset x="0" y="17"/>
+  <grid orientation="isometric" width="62" height="49"/>
+  <image source="../../Bn3-main/assets/tiles/floor.png" width="186" height="49"/>
  </tileset>
- <tileset firstgid="61" source="../assets/indy-trains/platforms.tsx"/>
- <tileset firstgid="65" source="../assets/indy-trains/Cyber_Rail.tsx"/>
- <tileset firstgid="66" source="../assets/tiles/Bus Stop.tsx"/>
- <tileset firstgid="67" source="../assets/tiles/coffee.tsx"/>
- <tileset firstgid="71" source="../assets/tiles/vendmach.tsx"/>
- <tileset firstgid="87" source="../assets/tiles/Toy_Robo.tsx"/>
- <tileset firstgid="225" source="../assets/tiles/UndernetStatue.tsx"/>
+ <tileset firstgid="93" source="../assets/tiles/hp_warp_blue.tsx"/>
+ <tileset firstgid="98" source="../assets/tiles/SquareWarpsA.tsx"/>
  <layer id="1" name="Tile Layer 1" width="50" height="50">
   <data encoding="csv">
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -59,17 +45,17 @@
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483674,2147483674,2147483674,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483671,2147483671,2147483671,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,10,11,10,11,10,11,10,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,11,8,9,8,9,8,11,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,8,7,0,0,10,9,6,7,6,9,10,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8,131,8,13,13,11,8,7,5,7,8,11,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8,7,8,13,13,11,8,7,5,7,8,11,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,8,7,0,0,10,9,6,7,6,9,10,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,11,8,9,8,9,8,11,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,10,11,10,11,10,11,10,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -97,13 +83,13 @@
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 </data>
  </layer>
- <objectgroup id="3" name="Object">
+ <objectgroup id="3" name="Object" class="Custom Warp">
   <object id="16" name="Home" type="Home Warp" gid="1" x="768" y="768" width="60" height="32">
    <properties>
     <property name="Direction" value="Up Left"/>
    </properties>
   </object>
-  <object id="22" name="ShaDis BBS" type="BBS" gid="18" x="656" y="720" width="48" height="69">
+  <object id="22" name="ShaDis BBS" type="BBS" gid="15" x="656" y="720" width="48" height="69">
    <properties>
     <property name="BBS" type="bool" value="true"/>
     <property name="Color" type="color" value="#ff55ffff"/>
@@ -111,12 +97,25 @@
     <property name="Post Limit" type="int" value="30"/>
    </properties>
   </object>
-  <object id="117" gid="32" x="576" y="736" width="64" height="37"/>
-  <object id="110" gid="67" x="720" y="688" width="33" height="54"/>
-  <object id="111" gid="67" x="864" y="688" width="33" height="54"/>
-  <object id="124" gid="225" x="640" y="800" width="78" height="92"/>
-  <object id="125" gid="44" x="544" y="736" width="64" height="32"/>
-  <object id="126" gid="40" x="576" y="768" width="64" height="37"/>
+  <object id="110" gid="59" x="720" y="688" width="33" height="54"/>
+  <object id="111" gid="59" x="864" y="688" width="33" height="54"/>
+  <object id="139" name="Cube1" type="Checkpoint" gid="80" x="640" y="784" width="53.25" height="56">
+   <properties>
+    <property name="Description" value="This cube impedes your path"/>
+    <property name="Once" type="bool" value="false"/>
+    <property name="Password" value="Test1"/>
+    <property name="Skip Prompt" type="bool" value="false"/>
+    <property name="Unlock Failed Message" value="Thou shall not pass!"/>
+    <property name="Unlocked Message" value="You can pass"/>
+   </properties>
+  </object>
+  <object id="144" name="Rink" type="Custom Warp" gid="118" x="544" y="768" width="64" height="39">
+   <properties>
+    <property name="Direction" value="Down Right"/>
+    <property name="Target Area" value="rink"/>
+    <property name="Target Object" value="4"/>
+   </properties>
+  </object>
  </objectgroup>
  <layer id="6" name="Tile Layer 2" width="50" height="50" offsetx="0" offsety="-16">
   <data encoding="csv">
@@ -139,7 +138,7 @@
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483675,2147483675,2147483675,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483672,2147483672,2147483672,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -193,7 +192,7 @@
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483675,2147483675,2147483675,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483672,2147483672,2147483672,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -248,7 +247,7 @@
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483676,2147483676,2147483676,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483673,2147483673,2147483673,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -304,19 +303,22 @@
     <property name="2 Area" value="165.227.139.229:1928,default,train"/>
     <property name="2 Name" value="The Block Server"/>
     <property name="2 Type" value="Server"/>
-    <property name="3 Area" value="96.60.137.203:8767,default,train"/>
+    <property name="3 Area" value="96.60.137.203:8767,UnderSquare,Undersquare Train"/>
     <property name="3 Name" value="Undernet Server"/>
     <property name="3 Type" value="Server"/>
     <property name="4 Area" value="159.223.165.219:3000,default,MainTrain"/>
     <property name="4 Name" value="BN3 ACDC Station"/>
     <property name="4 Type" value="Server"/>
+    <property name="5 Area" value="96.60.137.203:8768,default,orange line"/>
+    <property name="5 Name" value="Central Station"/>
+    <property name="5 Type" value="Server"/>
     <property name="Train" value="ShaDisHP"/>
    </properties>
    <point/>
   </object>
-  <object id="108" gid="66" x="704" y="528" width="16" height="53"/>
-  <object id="112" gid="71" x="512" y="544" width="128" height="128"/>
-  <object id="113" gid="81" x="896" y="496" width="128" height="128"/>
-  <object id="121" gid="85" x="944" y="496" width="128" height="128"/>
+  <object id="108" gid="58" x="704" y="528" width="16" height="53"/>
+  <object id="112" gid="63" x="512" y="544" width="128" height="128"/>
+  <object id="113" gid="73" x="896" y="496" width="128" height="128"/>
+  <object id="121" gid="77" x="944" y="496" width="128" height="128"/>
  </objectgroup>
 </map>
