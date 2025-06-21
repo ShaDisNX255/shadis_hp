@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.8" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="50" height="50" tilewidth="64" tileheight="32" infinite="0" nextlayerid="4" nextobjectid="92">
+<map version="1.8" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="50" height="50" tilewidth="64" tileheight="32" infinite="0" nextlayerid="4" nextobjectid="93">
  <tileset firstgid="1" source="../assets/tiles/Custom_Central_Tiles.tsx"/>
  <tileset firstgid="9" source="../assets/tiles/Toy_Robo.tsx"/>
  <tileset firstgid="147" source="../assets/tiles/home_warp.tsx"/>
@@ -34,7 +34,7 @@
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,213,213,213,213,7,8,213,7,7,213,8,213,213,213,8,8,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,213,213,213,8,7,8,213,7,7,213,8,213,213,213,8,8,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,221,218,218,218,218,218,218,218,218,218,218,218,218,218,218,218,218,221,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,221,218,7,218,218,218,218,218,218,218,8,218,218,218,218,218,218,221,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,221,7,218,218,218,218,218,218,218,218,218,218,218,218,218,218,218,221,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -306,7 +306,14 @@
     <property name="BBS" type="bool" value="true"/>
     <property name="Color" type="color" value="#ff91ff00"/>
     <property name="Name" value="CongratsBBS"/>
-    <property name="Post Limit" type="int" value="0"/>
+    <property name="Post Limit" type="int" value="999"/>
+   </properties>
+  </object>
+  <object id="92" name="TryAgain" type="Custom Warp" gid="240" x="632.75" y="665.25" width="61" height="32">
+   <properties>
+    <property name="Direction" value="Up Right"/>
+    <property name="Target Area" value="rink"/>
+    <property name="Target Object" value="9"/>
    </properties>
   </object>
  </objectgroup>
