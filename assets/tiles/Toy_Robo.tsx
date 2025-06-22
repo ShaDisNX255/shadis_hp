@@ -1,8 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<tileset version="1.8" tiledversion="1.8.5" name="Toy Robo" tilewidth="80" tileheight="72" tilecount="138" columns="6">
+<tileset version="1.8" tiledversion="1.11.2" name="Toy Robo" tilewidth="80" tileheight="72" tilecount="138" columns="6" objectalignment="top">
  <tileoffset x="-8" y="24"/>
  <image source="Toy_Robo.png" width="480" height="1656"/>
  <tile id="44">
+  <objectgroup draworder="index" id="2">
+   <object id="1" x="40" y="16">
+    <polygon points="0,0 31,16 0,32 -32,16"/>
+   </object>
+  </objectgroup>
   <animation>
    <frame tileid="44" duration="180"/>
    <frame tileid="78" duration="180"/>

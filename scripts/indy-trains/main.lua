@@ -1,14 +1,15 @@
 print("[trains] Starting Indy's Trains")
+
+-- VERSION v1.09 
+
 -- CODER'S NOTE: When using keyframes, your await() must be 1/2 second longer than your duration or the player/bot won't arrive before the next animation starts.
 
+-- ROAD MAP
 
 -- v1.1 features
 -- Cargo Train Enhancements
     -- Add pedestal
     -- Add cargo NPC
--- Animation Smoothing
-    -- We may need to add extra key frames to arrival and departure to smooth arrival speed.
-    -- Jitter is a bit annoying. 
 
 -- v2 features
 -- multi-car cargo trains (a matter of making scalable offset values and handling for cars to animate)
@@ -295,22 +296,25 @@ function summon_arriving_passenger_train(player_id)
         --Animate driver leaving Station
         local keyframes = {{properties={{property="Animation",value="IDLE_"..direction},{property="X",ease="In",value=trainProps["stopX"]+.5+driver_offset_x},{property="Y",ease="In",value=trainProps["stopY"]+.5+driver_offset_y}},duration=0}}
         keyframes[#keyframes+1] = {properties={{property="Animation",value="IDLE_"..direction},{property="X",ease="In",value=trainProps["endX"]+.5+driver_offset_x},{property="Y",ease="In",value=trainProps["endY"]+.5+driver_offset_y}},duration=stop_to_end}
-        keyframes[#keyframes+1] = {properties={{property="Animation",value="IDLE_"..direction},{property="X",ease="In",value=trainProps["endX"]+.5+train_offset_x},{property="Y",ease="In",value=trainProps["endY"]+.5+train_offset_y}},duration=1}
+        keyframes[#keyframes+1] = {properties={{property="Animation",value="IDLE_"..direction},{property="X",ease="In",value=trainProps["endX"]+.5+train_offset_x},{property="Y",ease="In",value=trainProps["endY"]+.5+train_offset_y}},duration=1.5}
         Net.animate_bot_properties(driver_id, keyframes) 
         --Animate car leaving Station
         local keyframes = {{properties={{property="Animation",value="IDLE_"..direction},{property="X",ease="In",value=trainProps["stopX"]+.5+car_offset_x},{property="Y",ease="In",value=trainProps["stopY"]+.5+car_offset_y}},duration=0}}
         keyframes[#keyframes+1] = {properties={{property="Animation",value="IDLE_"..direction},{property="X",ease="In",value=trainProps["endX"]+.5+car_offset_x},{property="Y",ease="In",value=trainProps["endY"]+.5+car_offset_y}},duration=stop_to_end}
-        keyframes[#keyframes+1] = {properties={{property="Animation",value="IDLE_"..direction},{property="X",ease="In",value=trainProps["endX"]+.5+train_offset_x},{property="Y",ease="In",value=trainProps["endY"]+.5+train_offset_y}},duration=1}
+        keyframes[#keyframes+1] = {properties={{property="Animation",value="IDLE_"..direction},{property="X",ease="In",value=trainProps["endX"]+.5+train_offset_x},{property="Y",ease="In",value=trainProps["endY"]+.5+train_offset_y}},duration=1.5}
         Net.animate_bot_properties(car_id, keyframes) 
         --Animate engine leaving Station
         local keyframes = {{properties={{property="Animation",value="IDLE_"..direction},{property="X",ease="In",value=trainProps["stopX"]+.5+train_offset_x},{property="Y",ease="In",value=trainProps["stopY"]+.5+train_offset_y}},duration=0}}
         keyframes[#keyframes+1] = {properties={{property="Animation",value="IDLE_"..direction},{property="X",ease="In",value=trainProps["endX"]+.5+train_offset_x},{property="Y",ease="In",value=trainProps["endY"]+.5+train_offset_y}},duration=stop_to_end}
-        keyframes[#keyframes+1] = {properties={{property="Animation",value="IDLE_"..direction},{property="X",ease="In",value=trainProps["endX"]+.5+train_offset_x},{property="Y",ease="In",value=trainProps["endY"]+.5+train_offset_y}},duration=1}
+        keyframes[#keyframes+1] = {properties={{property="Animation",value="IDLE_"..direction},{property="X",ease="In",value=trainProps["endX"]+.5+train_offset_x},{property="Y",ease="In",value=trainProps["endY"]+.5+train_offset_y}},duration=1.5}
+
         Net.animate_bot_properties(engine_id, keyframes)
         --Animate pedestal leaving Station
         if direction == "DR" or direction == "DL" then
             local keyframes = {{properties={{property="Animation",value="IDLE_"..direction},{property="X",ease="In",value=trainProps["stopX"]+.5+pedestal_offset_x},{property="Y",ease="In",value=trainProps["stopY"]+.5+pedestal_offset_y}},duration=0}}
             keyframes[#keyframes+1] = {properties={{property="Animation",value="IDLE_"..direction},{property="X",ease="In",value=trainProps["endX"]+.5+pedestal_offset_x},{property="Y",ease="In",value=trainProps["endY"]+.5+pedestal_offset_y}},duration=stop_to_end}
+            keyframes[#keyframes+1] = {properties={{property="Animation",value="IDLE_"..direction},{property="X",ease="In",value=trainProps["endX"]+.5+pedestal_offset_x},{property="Y",ease="In",value=trainProps["endY"]+.5+pedestal_offset_y}},duration=1.5}
+
             Net.animate_bot_properties(pedestal_id, keyframes)
         end
         await(Async.sleep(stop_to_end))
@@ -786,6 +790,8 @@ function greet_conductor(bot_id,player_id)
             post_type = "__message"
         elseif string.lower(conductorProps["1 Type"]) == "label" then
             post_type = "__label"
+        elseif string.lower(conductorProps["1 Type"]) == "area" then
+            post_type = "__area"
         end
     else
         post_type = "__area"
@@ -796,6 +802,9 @@ function greet_conductor(bot_id,player_id)
         if conductorProps[(#posts+1).." Type"] then
             if string.lower(conductorProps[(#posts+1).." Type"]) == "server" then
                 post_type = "__server"
+            elseif string.lower(conductorProps[(#posts+1).." Type"]) == "area" then
+                post_type = "__area"
+
             elseif string.lower(conductorProps[(#posts+1).." Type"]) == "label" then
                 post_type = "__label"
             elseif string.lower(conductorProps[(#posts+1).." Type"]) == "message" then
@@ -1041,9 +1050,11 @@ end
 find_trains()
 
 Net:on("actor_interaction", function(event)
-  if string.find(event.actor_id, "conductor-") then
-    greet_conductor(event.actor_id,event.player_id)
-  end
+    if event.button == 0 then 
+        if string.find(event.actor_id, "conductor-") then
+            greet_conductor(event.actor_id,event.player_id)
+        end
+    end
 end)
 
 Net:on("player_disconnect", function(event)
@@ -1067,10 +1078,23 @@ end)
 
 Net:on("player_area_transfer", function(event)
     -- checks if a player is currently ridding a train
-    if passenger_cache[event.player_id]['intransit'] == true then
-        --calls function to grab transferred player, place them on the train, and drop off at platform 
-        passenger_cache[event.player_id]['intransit'] = false
-        summon_arriving_passenger_train(event.player_id)
+    if passenger_cache[event.player_id] then 
+        if passenger_cache[event.player_id]['intransit'] == true then
+            --calls function to grab transferred player, place them on the train, and drop off at platform 
+            passenger_cache[event.player_id]['intransit'] = false
+            summon_arriving_passenger_train(event.player_id)
+        end
+    end
+end)
+
+Net:on("player_join", function(event)
+    -- checks if a player is currently ridding a train
+    if passenger_cache[event.player_id] then 
+        if passenger_cache[event.player_id]['intransit'] == true then
+            --calls function to grab transferred player, place them on the train, and drop off at platform 
+            passenger_cache[event.player_id]['intransit'] = false
+            summon_arriving_passenger_train(event.player_id)
+        end
     end
 end)
 
@@ -1099,7 +1123,7 @@ Net:on("player_request", function(event)
                         track_cache[destination_area][train_name] = {}
                     end 
                     track_cache[destination_area][train_name]['occupied'] = true
-                    summon_arriving_passenger_train(event.player_id)
+                    --summon_arriving_passenger_train(event.player_id)
                 end
                 -- if not we just dump them off at the Home Warp 
         end 

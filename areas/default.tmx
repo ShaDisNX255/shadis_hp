@@ -44,8 +44,8 @@
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,57,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -94,15 +94,15 @@
     <property name="BBS" type="bool" value="true"/>
     <property name="Color" type="color" value="#ff55ffff"/>
     <property name="Name" value="ShaDisBBS"/>
-    <property name="Post Limit" type="int" value="30"/>
+    <property name="Post Limit" type="int" value="300"/>
    </properties>
   </object>
   <object id="110" gid="59" x="720" y="688" width="33" height="54"/>
   <object id="111" gid="59" x="864" y="688" width="33" height="54"/>
   <object id="139" name="Cube1" type="Checkpoint" gid="80" x="640" y="784" width="53.25" height="56">
    <properties>
-    <property name="Description" value="This cube impedes your path"/>
-    <property name="Once" type="bool" value="false"/>
+    <property name="Description" value="This cube is in the way"/>
+    <property name="Once" type="bool" value="true"/>
     <property name="Password" value="Test1"/>
     <property name="Skip Prompt" type="bool" value="false"/>
     <property name="Unlock Failed Message" value="Thou shall not pass!"/>
@@ -244,7 +244,7 @@
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,53,54,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483673,2147483673,2147483673,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -286,16 +286,16 @@
    <properties>
     <property name="Color" value="Green"/>
     <property name="Direction" value="Up Left"/>
-    <property name="End" value="15,14"/>
+    <property name="End" value="15,13"/>
     <property name="Platform Z" value="3"/>
     <property name="Speed" value="1"/>
-    <property name="Start" value="33,14"/>
-    <property name="Stop" value="21,14"/>
+    <property name="Start" value="33,13"/>
+    <property name="Stop" value="21,13"/>
     <property name="Train Z" value="0"/>
    </properties>
    <point/>
   </object>
-  <object id="89" name="ShaDisCond" type="Conductor" x="736" y="528">
+  <object id="89" name="ShaDisCond" type="Conductor" x="732" y="502">
    <properties>
     <property name="1 Area" value="keristero.xyz:8769,default,MainTrain"/>
     <property name="1 Name" value="Gravy Yum Server"/>
@@ -316,7 +316,7 @@
    </properties>
    <point/>
   </object>
-  <object id="108" gid="58" x="704" y="528" width="16" height="53"/>
+  <object id="108" gid="58" x="710" y="516" width="16" height="53"/>
   <object id="112" gid="63" x="512" y="544" width="128" height="128"/>
   <object id="113" gid="73" x="896" y="496" width="128" height="128"/>
   <object id="121" gid="77" x="944" y="496" width="128" height="128"/>
