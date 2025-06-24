@@ -1,0 +1,10 @@
+Name,Rank,ELO,Total Games,Wins,Losses
+D3str0y3d,?,25000,0,0,0
+Wata,?,25000,0,0,0
+Luigi,?,25000,0,0,0
+Shantae,?,25000,0,0,0
+Sil,?,25000,0,0,0
+Anon,?,25000,0,0,0
+Xceed,?,25000,0,0,0
+Ragashii,?,25000,0,0,0
+Zarymura,?,25000,0,0,0
