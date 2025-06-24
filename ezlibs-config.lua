@@ -6,6 +6,6 @@ ezconfig.ITEMS_PATH = './memory/items.json'
 ezconfig.AREA_PATH_FOLDER = './memory/area/'
 ezconfig.PLAYER_PATH_FOLDER = './memory/player/'
 ezconfig.ENCOUNTERS_PATH = './encounters/'
-ezconfig.NPC_ASSET_FOLDER = './assets/ezlibs-assets/eznpcs/'
+ezconfig.NPC_ASSET_FOLDER = '/server/assets/ezlibs-assets/eznpcs/'
 ezconfig.NPC_EVENTS_SCRIPT_PATH = './scripts/events/'
 return ezconfig;
