@@ -118,14 +118,14 @@
     <property name="Target Object" value="4"/>
    </properties>
   </object>
-  <object id="145" name="Prog1" type="NPC" x="735" y="735">
+  <object id="145" name="Welcome Prog" type="NPC" x="735" y="735">
    <properties>
     <property name="Asset Name" value="prog"/>
     <property name="Dialogue Type" value="first"/>
     <property name="Direction" value="Down Left"/>
     <property name="Next 1" type="object" value="153"/>
     <property name="Next Waypoint 1" type="object" value="146"/>
-    <property name="Text 1" value="Hey there, welcome to the ShaDisHP"/>
+    <property name="Text 1" value="Hey there, welcome to the ShaDisHP."/>
     <property name="Wait Time" type="int" value="5"/>
     <property name="Waypoint Type" value="first"/>
    </properties>
@@ -152,7 +152,7 @@
    </properties>
    <point/>
   </object>
-  <object id="150" name="WayPoint4" type="Waypoint" x="736.5" y="737.5">
+  <object id="150" name="WayPoint4" type="Waypoint" x="735" y="735">
    <properties>
     <property name="Next Waypoint 1" type="object" value="146"/>
     <property name="Wait Time" type="int" value="5"/>
@@ -164,9 +164,13 @@
     <property name="Dialogue Type" value="random"/>
     <property name="Text 1" value="We stay crunchy, even in milk!"/>
     <property name="Text 2" value="We update weekly, be sure to check us out often"/>
-    <property name="Text 3" value="Beware of icy tiles..."/>
-    <property name="Text 4" value="Feel free to just relax in here"/>
-    <property name="Text 5" value="Make sure to leave a message on the BBS, we do read all of them"/>
+    <property name="Text 3" value="Beware of icy tiles."/>
+    <property name="Text 4" value="Feel free to just relax in here."/>
+    <property name="Text 5" value="Make sure to leave a message on the BBS, we do read all of them."/>
+    <property name="Text 6" value="I wish there was more furniture, I need to sit down."/>
+    <property name="Text 7" value="Virus free since 1999"/>
+    <property name="Text 8" value="Para Español presione 2"/>
+    <property name="Text 9" value="Fun fact about Luigi, he's been in more than 200 games... I guess you can include this one on there huh?"/>
    </properties>
    <point/>
   </object>
