@@ -46,7 +46,7 @@
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,57,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -340,14 +340,14 @@
 </data>
  </layer>
  <objectgroup id="12" name="Object Layer 4" offsetx="0" offsety="-48">
-  <object id="88" name="ShaDisHP" type="Passenger Train" x="1072" y="464">
+  <object id="88" name="ShaDisHP" type="Passenger Train" x="1184" y="480">
    <properties>
     <property name="Color" value="Green"/>
     <property name="Direction" value="Up Left"/>
-    <property name="End" value="15,13"/>
+    <property name="End" value="8,13"/>
     <property name="Platform Z" value="3"/>
     <property name="Speed" value="1"/>
-    <property name="Start" value="33,13"/>
+    <property name="Start" value="36,13"/>
     <property name="Stop" value="21,13"/>
     <property name="Train Z" value="0"/>
    </properties>
@@ -374,10 +374,22 @@
    </properties>
    <point/>
   </object>
-  <object id="108" name="Bus Stop" gid="58" x="710" y="516" width="16" height="53"/>
-  <object id="112" gid="63" x="512" y="544" width="128" height="128"/>
+  <object id="108" name="Bus Stop" gid="58" x="710" y="516" width="16" height="53">
+   <properties>
+    <property name="Flavor" value="Cyber Metro"/>
+   </properties>
+  </object>
+  <object id="112" gid="63" x="512" y="544" width="128" height="128">
+   <properties>
+    <property name="Flavor" value="You see a trading card vending machine. It seems like all the rare cards are gone..."/>
+   </properties>
+  </object>
   <object id="113" gid="73" x="896" y="496" width="128" height="128"/>
-  <object id="121" gid="77" x="944" y="496" width="128" height="128"/>
+  <object id="121" gid="77" x="944" y="496" width="128" height="128">
+   <properties>
+    <property name="Flavor" value="You see a trading card vending machine. It seems like all the rare cards are gone..."/>
+   </properties>
+  </object>
   <object id="155" gid="2147483786" x="562" y="526" width="35" height="45"/>
   <object id="157" gid="2147483788" x="556.5" y="555.5" width="35" height="45"/>
   <object id="158" name="Merchant Eli" type="NPC" x="548" y="522">
