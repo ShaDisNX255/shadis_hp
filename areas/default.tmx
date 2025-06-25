@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.8" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="50" height="50" tilewidth="64" tileheight="32" infinite="0" nextlayerid="13" nextobjectid="154">
+<map version="1.8" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="50" height="50" tilewidth="64" tileheight="32" infinite="0" nextlayerid="13" nextobjectid="169">
  <properties>
   <property name="Background" value="custom"/>
   <property name="Background Animation" value="/server/assets/custom/backgrounds/home/kottouhinyanodennou.animation"/>
@@ -30,6 +30,7 @@
  </tileset>
  <tileset firstgid="93" source="../assets/tiles/hp_warp_blue.tsx"/>
  <tileset firstgid="98" source="../assets/tiles/SquareWarpsA.tsx"/>
+ <tileset firstgid="138" source="../assets/tiles/vendor_desk.tsx"/>
  <layer id="1" name="Tile Layer 1" width="50" height="50">
   <data encoding="csv">
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -373,5 +374,82 @@
   <object id="112" gid="63" x="512" y="544" width="128" height="128"/>
   <object id="113" gid="73" x="896" y="496" width="128" height="128"/>
   <object id="121" gid="77" x="944" y="496" width="128" height="128"/>
+  <object id="155" gid="2147483786" x="562" y="526" width="35" height="45"/>
+  <object id="157" gid="2147483788" x="556.5" y="555.5" width="35" height="45"/>
+  <object id="158" name="Merchant Eli" type="NPC" x="548" y="522">
+   <properties>
+    <property name="Asset Name" value="heel-navi-exe4_black"/>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Direction" value="Up Right"/>
+    <property name="Next Waypoint 1" type="object" value="159"/>
+    <property name="Text 1" value="Oh don't mind me, I'm just setting up my shop"/>
+    <property name="Wait Time" type="int" value="8"/>
+    <property name="Waypoint Type" value="first"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="159" name="WayPoint1" type="Waypoint" x="549.5" y="566.5">
+   <properties>
+    <property name="Next Waypoint 1" type="object" value="160"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="160" name="Waypoint2" type="Waypoint" x="672.5" y="565.5">
+   <properties>
+    <property name="Next Waypoint 1" type="object" value="161"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="161" name="Waypoint3" type="Waypoint" x="673" y="545">
+   <properties>
+    <property name="Next Waypoint 1" type="object" value="162"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="162" name="Waypoint4" type="Waypoint" x="950.5" y="545.5">
+   <properties>
+    <property name="Next Waypoint 1" type="object" value="163"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="163" name="Waypoint5" type="Waypoint" x="950.5" y="535.5">
+   <properties>
+    <property name="Next Waypoint 1" type="object" value="164"/>
+    <property name="Wait Time" type="int" value="8"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="164" name="Waypoint6" type="Waypoint" x="642" y="536">
+   <properties>
+    <property name="Next Waypoint 1" type="object" value="165"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="165" name="Waypoint7" type="Waypoint" x="642" y="514">
+   <properties>
+    <property name="Next Waypoint 1" type="object" value="166"/>
+    <property name="Wait Time" type="int" value="8"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="166" name="Waypoint8" type="Waypoint" x="643.5" y="566.5">
+   <properties>
+    <property name="Next Waypoint 1" type="object" value="167"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="167" name="Waypoint9" type="Waypoint" x="553.5" y="566.5">
+   <properties>
+    <property name="Next Waypoint 1" type="object" value="168"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="168" name="Waypoint10" type="Waypoint" x="551.5" y="520.5">
+   <properties>
+    <property name="Next Waypoint 1" type="object" value="159"/>
+    <property name="Wait Time" type="int" value="10"/>
+   </properties>
+   <point/>
+  </object>
  </objectgroup>
 </map>
