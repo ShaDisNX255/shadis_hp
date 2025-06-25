@@ -374,7 +374,7 @@
    </properties>
    <point/>
   </object>
-  <object id="108" gid="58" x="710" y="516" width="16" height="53"/>
+  <object id="108" name="Bus Stop" gid="58" x="710" y="516" width="16" height="53"/>
   <object id="112" gid="63" x="512" y="544" width="128" height="128"/>
   <object id="113" gid="73" x="896" y="496" width="128" height="128"/>
   <object id="121" gid="77" x="944" y="496" width="128" height="128"/>
