@@ -151,7 +151,7 @@
     <property name="Target Object" value="9"/>
    </properties>
   </object>
-  <object id="63" name="TryAgain" type="Custom Warp" gid="240" x="603.5" y="890.5" width="62" height="30">
+  <object id="63" name="TryAgain" type="Custom Warp" gid="240" x="600" y="888" width="64" height="33">
    <properties>
     <property name="Direction" value="Up Right"/>
     <property name="Target Area" value="rink"/>
