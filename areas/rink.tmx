@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.8" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="50" height="50" tilewidth="64" tileheight="32" infinite="0" nextlayerid="4" nextobjectid="134">
+<map version="1.8" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="50" height="50" tilewidth="64" tileheight="32" infinite="0" nextlayerid="4" nextobjectid="136">
  <properties>
   <property name="Background" value="custom"/>
   <property name="Background Animation" value="/server/assets/custom/backgrounds/home/suidoukyokunodennou1.animation"/>
@@ -360,47 +360,6 @@
     <property name="Unlocked Message" value="Unlocked!"/>
    </properties>
   </object>
-  <object id="112" name="BlueData Results" type="Mystery Data" x="551" y="427">
-   <properties>
-    <property name="Next 1" type="object" value="114"/>
-    <property name="Next 2" type="object" value="114"/>
-    <property name="Next 3" type="object" value="114"/>
-    <property name="Next 4" type="object" value="115"/>
-    <property name="Next 5" type="object" value="115"/>
-    <property name="Next 6" type="object" value="116"/>
-    <property name="Once" type="bool" value="true"/>
-    <property name="Type" value="random"/>
-   </properties>
-   <point/>
-  </object>
-  <object id="113" type="Mystery Data" gid="253" x="597" y="629" width="14" height="43">
-   <properties>
-    <property name="Next 1" type="object" value="112"/>
-    <property name="Once" type="bool" value="true"/>
-    <property name="Type" value="random"/>
-   </properties>
-  </object>
-  <object id="114" name="1,000" type="Mystery Option" x="626" y="426">
-   <properties>
-    <property name="Amount" value="1000"/>
-    <property name="Type" value="money"/>
-   </properties>
-   <point/>
-  </object>
-  <object id="115" name="5,000" type="Mystery Option" x="578" y="368">
-   <properties>
-    <property name="Amount" value="5000"/>
-    <property name="Type" value="money"/>
-   </properties>
-   <point/>
-  </object>
-  <object id="116" name="10,000" type="Mystery Option" x="531" y="325">
-   <properties>
-    <property name="Amount" value="10000"/>
-    <property name="Type" value="money"/>
-   </properties>
-   <point/>
-  </object>
   <object id="118" name="Cube3" type="Checkpoint" gid="249" x="850.363" y="1523.64" width="77.4531" height="61" visible="0">
    <properties>
     <property name="Description" value="Admin Block, well done on finding this!"/>
@@ -414,8 +373,8 @@
   <object id="119" name="rink2" type="Custom Warp" gid="53" x="928.5" y="1495.5" width="80" height="72" visible="0">
    <properties>
     <property name="Direction" value="Up Left"/>
-    <property name="Target Area" value="rink2"/>
-    <property name="Target Object" value="70"/>
+    <property name="Target Area" value="rink"/>
+    <property name="Target Object" value="98"/>
    </properties>
   </object>
   <object id="120" name="MysteryDataResults" type="Mystery Option" x="797.5" y="525.5">
@@ -534,6 +493,14 @@
    <properties>
     <property name="Next 1" type="object" value="120"/>
     <property name="Type" value="random"/>
+   </properties>
+  </object>
+  <object id="135" type="Mystery Data" gid="253" x="598" y="630" width="14" height="43">
+   <properties>
+    <property name="Amount" type="int" value="8000"/>
+    <property name="Next 1" type="object" value="0"/>
+    <property name="Once" type="bool" value="true"/>
+    <property name="Type" value="money"/>
    </properties>
   </object>
  </objectgroup>
