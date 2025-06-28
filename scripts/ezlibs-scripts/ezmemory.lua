@@ -1,5 +1,4 @@
 local json = require('scripts/ezlibs-scripts/json')
-local CONFIG = require('scripts/ezlibs-scripts/ezconfig')
 local helpers = require('scripts/ezlibs-scripts/helpers')
 local table = require('table')
 local ezmemory = {}
@@ -12,10 +11,10 @@ local item_name_table = {}
 local objects_hidden_till_disconnect_for_player = {}
 local highest_item_id = 1
 
-local players_path = CONFIG.PLAYERS_PATH
-local items_path = CONFIG.ITEMS_PATH
-local area_path_prefix = CONFIG.AREA_PATH_FOLDER
-local player_path_prefix = CONFIG.PLAYER_PATH_FOLDER
+local players_path = './memory/players'
+local items_path = './memory/items'
+local area_path_prefix = './memory/area/'
+local player_path_prefix = './memory/player/'
 
 local memory_loaded_flags = {
     area_memory=false,
@@ -167,7 +166,7 @@ end
 function ezmemory.wait_until_loaded()
     return async(function ()
         while not ezmemory.is_loaded() do
-            await(Async.sleep(1))
+            await(Async.sleep(0.2))
         end
     end)
 end
@@ -486,10 +485,6 @@ end
 function ezmemory.handle_player_disconnect(player_id)
     --clear objects hidden till rejoin for player
     objects_hidden_till_disconnect_for_player = {}
-end
-
-function ezmemory.get_player_list()
-    return player_list
 end
 
 function ezmemory.handle_player_join(player_id)

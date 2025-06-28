@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<tileset version="1.8" tiledversion="1.11.2" name="Toy Robo" tilewidth="80" tileheight="72" tilecount="138" columns="6" objectalignment="top">
+<tileset version="1.8" tiledversion="1.11.2" name="Toy Robo" tilewidth="80" tileheight="72" tilecount="138" columns="6" objectalignment="center">
  <tileoffset x="-8" y="24"/>
  <image source="Toy_Robo.png" width="480" height="1656"/>
  <tile id="44">
@@ -50,6 +50,11 @@
   </properties>
  </tile>
  <tile id="92">
+  <objectgroup draworder="index" id="2">
+   <object id="1" x="40" y="49">
+    <polygon points="0,0 33,-17 0,-34 -33,-17"/>
+   </object>
+  </objectgroup>
   <animation>
    <frame tileid="92" duration="180"/>
    <frame tileid="108" duration="180"/>

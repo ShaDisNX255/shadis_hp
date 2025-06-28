@@ -1,5 +1,4 @@
 local helpers = require('scripts/ezlibs-scripts/helpers')
-local CONFIG = require('scripts/ezlibs-scripts/ezconfig')
 local eztriggers = require('scripts/ezlibs-scripts/eztriggers')
 local ezcache = require('scripts/ezlibs-scripts/ezcache')
 local ezencounters = require('scripts/ezlibs-scripts/ezencounters/main')
@@ -8,15 +7,10 @@ local ezmemory = require('scripts/ezlibs-scripts/ezmemory')
 local ezmystery = require('scripts/ezlibs-scripts/ezmystery')
 local ezweather = require('scripts/ezlibs-scripts/ezweather')
 local ezwarps = require('scripts/ezlibs-scripts/ezwarps/main')
-if CONFIG.EZFARMS_ENABLED then
-    require('scripts/ezlibs-scripts/ezfarms')
-end
-if CONFIG.EZCHRISTMAS_ENABLED then
-    require('scripts/ezlibs-scripts/ezchristmas')
-end
+local ezfarms = require('scripts/ezlibs-scripts/ezfarms')
 local ezcheckpoints = require('scripts/ezlibs-scripts/ezcheckpoints')
 
-local plugins = { ezweather, eznpcs, ezmemory, ezmystery, ezwarps, ezencounters ,eztriggers}
+local plugins = { ezweather, eznpcs, ezmemory, ezmystery, ezwarps, ezencounters, ezfarms ,eztriggers}
 
 local sfx = {
     hurt = '/server/assets/ezlibs-assets/sfx/hurt.ogg',
@@ -179,6 +173,14 @@ Net:on("player_area_transfer", function(event)
     for i, plugin in ipairs(plugins) do
         if plugin.handle_player_transfer then
             plugin.handle_player_transfer(event.player_id)
+        end
+    end
+end)
+
+Net:on("textbox_response", function(event)
+    for i, plugin in ipairs(plugins) do
+        if plugin.handle_textbox_response then
+            plugin.handle_textbox_response(event.player_id, event.response)
         end
     end
 end)
