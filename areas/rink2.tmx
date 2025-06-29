@@ -510,30 +510,30 @@
    </properties>
    <point/>
   </object>
-  <object id="81" name="50" type="Mystery Option" x="800.5" y="273.5">
-   <properties>
-    <property name="Amount" value="50"/>
-    <property name="Type" value="money"/>
-   </properties>
-   <point/>
-  </object>
-  <object id="82" name="100" type="Mystery Option" x="818" y="286">
+  <object id="81" name="100" type="Mystery Option" x="800.5" y="273.5">
    <properties>
     <property name="Amount" value="100"/>
     <property name="Type" value="money"/>
    </properties>
    <point/>
   </object>
-  <object id="83" name="150" type="Mystery Option" x="841.5" y="310.5">
+  <object id="82" name="200" type="Mystery Option" x="818" y="286">
    <properties>
-    <property name="Amount" value="150"/>
+    <property name="Amount" value="200"/>
     <property name="Type" value="money"/>
    </properties>
    <point/>
   </object>
-  <object id="84" name="200" type="Mystery Option" x="855.5" y="326.5">
+  <object id="83" name="300" type="Mystery Option" x="841.5" y="310.5">
    <properties>
-    <property name="Amount" value="200"/>
+    <property name="Amount" value="300"/>
+    <property name="Type" value="money"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="84" name="400" type="Mystery Option" x="855.5" y="326.5">
+   <properties>
+    <property name="Amount" value="400"/>
     <property name="Type" value="money"/>
    </properties>
    <point/>
@@ -553,9 +553,9 @@
    </properties>
    <point/>
   </object>
-  <object id="86" name="500" type="Mystery Option" x="710.5" y="233.5">
+  <object id="86" name="1000" type="Mystery Option" x="710.5" y="233.5">
    <properties>
-    <property name="Amount" value="500"/>
+    <property name="Amount" value="1000"/>
     <property name="Type" value="money"/>
    </properties>
    <point/>
@@ -569,9 +569,9 @@
    </properties>
    <point/>
   </object>
-  <object id="88" name="1000" type="Mystery Option" x="667" y="195">
+  <object id="88" name="2000" type="Mystery Option" x="667" y="195">
    <properties>
-    <property name="Amount" value="1000"/>
+    <property name="Amount" value="2000"/>
     <property name="Type" value="money"/>
    </properties>
    <point/>
@@ -585,16 +585,16 @@
    </properties>
    <point/>
   </object>
-  <object id="90" name="10000" type="Mystery Option" x="636" y="166">
+  <object id="90" name="20000" type="Mystery Option" x="636" y="166">
    <properties>
-    <property name="Amount" value="10000"/>
+    <property name="Amount" value="20000"/>
     <property name="Type" value="money"/>
    </properties>
    <point/>
   </object>
   <object id="91" name="1000000" type="Mystery Option" x="616" y="142">
    <properties>
-    <property name="Amount" value="1000000"/>
+    <property name="Amount" value="2000000"/>
     <property name="Type" value="money"/>
    </properties>
    <point/>
