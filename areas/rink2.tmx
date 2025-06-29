@@ -144,7 +144,7 @@
     <property name="Target Object" value="5"/>
    </properties>
   </object>
-  <object id="19" name="TryAgain2" type="Custom Warp" gid="214" x="897" y="961" width="65" height="32">
+  <object id="19" name="TryAgain2" type="Custom Warp" gid="214" x="897.375" y="960.625" width="66.5" height="34">
    <properties>
     <property name="Direction" value="Up Right"/>
     <property name="Target Area" value="rink2"/>
@@ -298,7 +298,7 @@
     <property name="Target Object" value="5"/>
    </properties>
   </object>
-  <object id="41" name="TryAgain2" type="Custom Warp" gid="214" x="961" y="609" width="65" height="32">
+  <object id="41" name="TryAgain2" type="Custom Warp" gid="214" x="960.625" y="609.375" width="66.5" height="32">
    <properties>
     <property name="Direction" value="Up Right"/>
     <property name="Target Area" value="rink2"/>
@@ -488,7 +488,7 @@
     <property name="Target Object" value="144"/>
    </properties>
   </object>
-  <object id="75" name="TryAgain2" type="Custom Warp" gid="214" x="897" y="673" width="65" height="32">
+  <object id="75" name="TryAgain2" type="Custom Warp" gid="214" x="897.375" y="672.625" width="66.5" height="34">
    <properties>
     <property name="Direction" value="Up Right"/>
     <property name="Target Area" value="rink2"/>
