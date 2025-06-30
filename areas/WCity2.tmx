@@ -443,7 +443,7 @@
    <properties>
     <property name="Dialogue Type" value="first"/>
     <property name="Next 1" type="object" value="60"/>
-    <property name="Text 1" value="Alright, here's how it works. You'll have a 1 in 3 chance of doubling your money. Every time you win, I'll ask if you if you want to quit or continue. "/>
+    <property name="Text 1" value="Alright, here's how it works. You'll have a 1 in 3 chance of tripling your money. Every time you win, I'll ask if you if you want to quit or continue. "/>
    </properties>
    <point/>
   </object>
@@ -470,7 +470,7 @@
     <property name="Dialogue Type" value="question"/>
     <property name="Next 1" type="object" value="63"/>
     <property name="Next 2" type="object" value="65"/>
-    <property name="Text 1" value="You have 10,000 won, do you want to try and double it?"/>
+    <property name="Text 1" value="You have 15,000 won, do you want to try and triple it?"/>
    </properties>
    <point/>
   </object>
@@ -500,9 +500,9 @@
    </properties>
    <point/>
   </object>
-  <object id="66" name="pay 10,000" type="Dialogue" x="419" y="657">
+  <object id="66" name="pay 15,000" type="Dialogue" x="419" y="657">
    <properties>
-    <property name="Amount" type="int" value="10000"/>
+    <property name="Amount" type="int" value="15000"/>
     <property name="Dialogue Type" value="none"/>
     <property name="Event Name" value="Win_Gamble"/>
     <property name="Next 1" type="object" value="67"/>
@@ -521,7 +521,7 @@
     <property name="Dialogue Type" value="question"/>
     <property name="Next 1" type="object" value="72"/>
     <property name="Next 2" type="object" value="69"/>
-    <property name="Text 1" value="You have 20,000 won, do you want to try and double it?"/>
+    <property name="Text 1" value="You have 45,000 won, do you want to try and triple it?"/>
    </properties>
    <point/>
   </object>
@@ -533,9 +533,9 @@
    </properties>
    <point/>
   </object>
-  <object id="70" name="pay 20,000" type="Dialogue" x="423.5" y="664.5">
+  <object id="70" name="pay 45,000" type="Dialogue" x="423.5" y="664.5">
    <properties>
-    <property name="Amount" type="int" value="20000"/>
+    <property name="Amount" type="int" value="45000"/>
     <property name="Dialogue Type" value="none"/>
     <property name="Event Name" value="Win_Gamble"/>
     <property name="Next 1" type="object" value="67"/>
@@ -565,7 +565,7 @@
     <property name="Dialogue Type" value="question"/>
     <property name="Next 1" type="object" value="82"/>
     <property name="Next 2" type="object" value="80"/>
-    <property name="Text 1" value="You have 40,000 won, do you want to try and double it?"/>
+    <property name="Text 1" value="You have 135,000 won, do you want to try and triple it?"/>
    </properties>
    <point/>
   </object>
@@ -577,9 +577,9 @@
    </properties>
    <point/>
   </object>
-  <object id="81" name="pay 40,000" type="Dialogue" x="429.5" y="670.5">
+  <object id="81" name="pay 135,000" type="Dialogue" x="429.5" y="670.5">
    <properties>
-    <property name="Amount" type="int" value="40000"/>
+    <property name="Amount" type="int" value="135000"/>
     <property name="Dialogue Type" value="none"/>
     <property name="Event Name" value="Win_Gamble"/>
     <property name="Next 1" type="object" value="67"/>
@@ -609,7 +609,7 @@
     <property name="Dialogue Type" value="question"/>
     <property name="Next 1" type="object" value="87"/>
     <property name="Next 2" type="object" value="85"/>
-    <property name="Text 1" value="You have 80,000 won, do you want to try and double it?"/>
+    <property name="Text 1" value="You have 405,000 won, do you want to try and triple it?"/>
    </properties>
    <point/>
   </object>
@@ -621,9 +621,9 @@
    </properties>
    <point/>
   </object>
-  <object id="86" name="pay 80,000" type="Dialogue" x="435" y="676">
+  <object id="86" name="pay 405,000" type="Dialogue" x="435" y="676">
    <properties>
-    <property name="Amount" type="int" value="80000"/>
+    <property name="Amount" type="int" value="405000"/>
     <property name="Dialogue Type" value="none"/>
     <property name="Event Name" value="Win_Gamble"/>
     <property name="Next 1" type="object" value="67"/>
@@ -650,10 +650,9 @@
   </object>
   <object id="89" name="Fifth win" type="Dialogue" x="437" y="684">
    <properties>
-    <property name="Dialogue Type" value="question"/>
-    <property name="Next 1" type="object" value="92"/>
-    <property name="Next 2" type="object" value="90"/>
-    <property name="Text 1" value="You have 160,000 won, do you want to try and double it?"/>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="90"/>
+    <property name="Text 1" value="It seems that you're in a very hot streak. I have to end it before you win any more of my money, but feel free to try again."/>
    </properties>
    <point/>
   </object>
@@ -661,56 +660,13 @@
    <properties>
     <property name="Dialogue Type" value="first"/>
     <property name="Next 1" type="object" value="91"/>
-    <property name="Text 1" value="Alright, here's your winnings!"/>
+    <property name="Text 1" value="Here's your winnings"/>
    </properties>
    <point/>
   </object>
-  <object id="91" name="pay 160,000" type="Dialogue" x="440" y="681">
+  <object id="91" name="pay 1,215,000" type="Dialogue" x="440" y="681">
    <properties>
-    <property name="Amount" type="int" value="160000"/>
-    <property name="Dialogue Type" value="none"/>
-    <property name="Event Name" value="Win_Gamble"/>
-    <property name="Next 1" type="object" value="67"/>
-   </properties>
-   <point/>
-  </object>
-  <object id="92" name="sixth" type="Dialogue" x="438.5" y="688.5">
-   <properties>
-    <property name="Dialogue Type" value="first"/>
-    <property name="Next 1" type="object" value="93"/>
-    <property name="Text 1" value="It seems that you're very lucky. Let's make a final bet. If you win this, I'll pay you 500,000! Here goes!"/>
-   </properties>
-   <point/>
-  </object>
-  <object id="93" name="6" type="Dialogue" x="443" y="689">
-   <properties>
-    <property name="Dialogue Type" value="random"/>
-    <property name="Next 3" type="object" value="95"/>
-    <property name="Text 1" value="Sorry, you lose!"/>
-    <property name="Text 2" value="Sorry, you lose!"/>
-    <property name="Text 3" value="Congrats, you win!"/>
-   </properties>
-   <point/>
-  </object>
-  <object id="95" name="Sixth win" type="Dialogue" x="444.5" y="688.5">
-   <properties>
-    <property name="Dialogue Type" value="first"/>
-    <property name="Next 1" type="object" value="96"/>
-    <property name="Text 1" value="You're on a hot streak and I'll have to end it here. If we keep doubling I'll run out of money, this is as high as I'm willing to go"/>
-   </properties>
-   <point/>
-  </object>
-  <object id="96" name="Sixth payout" type="Dialogue" x="446" y="687">
-   <properties>
-    <property name="Dialogue Type" value="first"/>
-    <property name="Next 1" type="object" value="97"/>
-    <property name="Text 1" value="Here you go!"/>
-   </properties>
-   <point/>
-  </object>
-  <object id="97" name="pay 500,000" type="Dialogue" x="447.5" y="685.5">
-   <properties>
-    <property name="Amount" type="int" value="500000"/>
+    <property name="Amount" type="int" value="1215000"/>
     <property name="Dialogue Type" value="none"/>
     <property name="Event Name" value="Win_Gamble"/>
     <property name="Next 1" type="object" value="67"/>
@@ -828,7 +784,7 @@
 </data>
  </layer>
  <objectgroup id="6" name="Object Layer 2" offsetx="0" offsety="-32"/>
- <layer id="7" name="Tile Layer 3" width="50" height="50" visible="0" offsetx="0" offsety="-48">
+ <layer id="7" name="Tile Layer 3" width="50" height="50" offsetx="0" offsety="-48">
   <data encoding="csv">
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
