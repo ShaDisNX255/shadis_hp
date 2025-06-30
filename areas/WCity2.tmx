@@ -1,0 +1,936 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.8" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="50" height="50" tilewidth="64" tileheight="32" infinite="0" nextlayerid="9" nextobjectid="98">
+ <properties>
+  <property name="Background" value="custom"/>
+  <property name="Background Animation" value="/server/assets/custom/backgrounds/wcity/01-generic1.animation"/>
+  <property name="Background Texture" value="/server/assets/custom/backgrounds/wcity/01-generic1.png"/>
+  <property name="Background Vel X" type="float" value="0.45"/>
+  <property name="Background Vel Y" type="float" value="0.25"/>
+  <property name="Mystery Data Maximum" type="int" value="6"/>
+  <property name="Mystery Data Minimum" type="int" value="2"/>
+  <property name="Name" value="WCity2"/>
+  <property name="OctoPVP" value="true"/>
+ </properties>
+ <tileset firstgid="1" source="../assets/tiles/central_arrows2.tsx"/>
+ <tileset firstgid="5" source="../assets/tiles/Custom_Central_Tiles.tsx"/>
+ <tileset firstgid="13" source="../assets/tiles/central_platform.tsx"/>
+ <tileset firstgid="253" source="../assets/tiles/Toy_Robo.tsx"/>
+ <tileset firstgid="391" source="../assets/tiles/HoloPanelz.tsx"/>
+ <tileset firstgid="401" source="../assets/tiles/DenTownStairs.tsx"/>
+ <tileset firstgid="410" source="../assets/tiles/BBSOldFixed.tsx"/>
+ <tileset firstgid="413" source="../assets/ezlibs-assets/ezmystery/GreenMysteryData.tsx"/>
+ <tileset firstgid="421" source="../assets/ezlibs-assets/ezmystery/BlueMysteryData.tsx"/>
+ <layer id="1" name="Tile Layer 0" width="50" height="50">
+  <data encoding="csv">
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,194,195,205,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,193,204,215,0,392,392,392,391,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,203,213,214,0,0,0,0,392,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,391,0,0,392,392,392,392,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,392,392,392,392,0,0,392,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,392,392,392,392,392,392,0,0,0,0,0,0,0,0,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,392,0,0,0,0,0,0,0,0,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,392,0,0,0,0,0,0,0,0,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,64,2147483698,2147483708,2147483668,2147483678,2147483688,64,0,0,0,0,0,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483669,0,0,0,0,0,50,0,0,0,0,0,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,14,15,25,0,2147483679,0,14,15,25,0,60,0,0,0,0,0,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,6,5,6,5,6,5,63,13,24,35,0,2147483689,0,13,24,35,63,6,5,6,5,6,5,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,5,6,0,0,0,0,0,23,33,34,0,2147483699,0,23,33,34,0,2147483709,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,6,5,0,0,0,0,0,0,0,0,0,2147483709,0,0,0,0,0,2147483699,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,5,6,0,0,0,0,0,0,0,0,0,63,51,61,21,31,41,64,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,6,5,6,5,6,5,6,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,60,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,6,5,6,5,6,5,6,5,6,0,0,0,0,0,0,0,0,47,0,0,0,0,0,0,50,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,5,6,5,6,5,6,5,6,5,0,0,0,0,0,0,0,0,40,0,0,0,407,51,61,64,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,6,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,30,0,0,0,0,0,0,60,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,5,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,20,0,0,0,0,0,0,50,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,6,5,0,0,0,0,0,0,0,0,0,0,0,18,21,31,41,51,61,21,31,41,51,61,57,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,6,0,0,0,0,0,0,0,0,0,0,0,20,0,0,20,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,5,0,0,0,0,0,0,0,0,0,0,0,30,0,0,30,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,6,0,0,0,0,0,0,0,0,0,0,0,40,0,0,40,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,5,0,0,0,0,0,0,0,0,0,0,0,50,0,0,50,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,6,0,0,0,0,0,0,0,0,0,0,0,47,0,0,47,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,392,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,194,195,205,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,193,204,215,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,203,213,214,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,235,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,240,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,220,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,224,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,194,195,205,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,193,204,215,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,203,213,214,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+</data>
+ </layer>
+ <objectgroup id="2" name="Object Layer 0">
+  <object id="1" name="To WCity1" type="Radius Warp" x="1103" y="193">
+   <properties>
+    <property name="Activation Radius" type="float" value="0.6"/>
+    <property name="Arrival Animation" value="arrow_up_right_in"/>
+    <property name="Leave Animation" value="arrow_up_right_out"/>
+    <property name="Target Area" value="WCity1"/>
+    <property name="Target Object" value="140"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="5" name="Warp1" type="Custom Warp" gid="345" x="800.5" y="407.5" width="80" height="72">
+   <properties>
+    <property name="Direction" value="Down Right"/>
+    <property name="Target Area" value="WCity2"/>
+    <property name="Target Object" value="6"/>
+   </properties>
+  </object>
+  <object id="6" name="Warp2" type="Custom Warp" gid="345" x="607.5" y="408.5" width="80" height="72">
+   <properties>
+    <property name="Direction" value="Up Left"/>
+    <property name="Target Area" value="WCity2"/>
+    <property name="Target Object" value="5"/>
+   </properties>
+  </object>
+  <object id="7" name="To WCity3" type="Radius Warp" x="177" y="929">
+   <properties>
+    <property name="Activation Radius" type="float" value="0.6"/>
+    <property name="Arrival Animation" value="arrow_down_left_in"/>
+    <property name="Leave Animation" value="arrow_down_left_out"/>
+    <property name="Target Area" value="WCity3"/>
+    <property name="Target Object" value="1"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="9" name="Warp3" type="Custom Warp" gid="345" x="448.5" y="87.5" width="80" height="72">
+   <properties>
+    <property name="Direction" value="Down Right"/>
+    <property name="Target Area" value="WCity2"/>
+    <property name="Target Object" value="10"/>
+   </properties>
+  </object>
+  <object id="10" name="Warp4" type="Custom Warp" gid="345" x="1344" y="1112" width="80" height="72">
+   <properties>
+    <property name="Direction" value="Down Left"/>
+    <property name="Target Area" value="WCity2"/>
+    <property name="Target Object" value="9"/>
+   </properties>
+  </object>
+  <object id="11" name="MysteryDataResults" type="Mystery Option" x="1371" y="744">
+   <properties>
+    <property name="Next 1" type="object" value="12"/>
+    <property name="Next 2" type="object" value="12"/>
+    <property name="Next 3" type="object" value="12"/>
+    <property name="Next 4" type="object" value="13"/>
+    <property name="Next 5" type="object" value="13"/>
+    <property name="Next 6" type="object" value="14"/>
+    <property name="Next 7" type="object" value="14"/>
+    <property name="Next 8" type="object" value="15"/>
+    <property name="Next 9" type="object" value="16"/>
+    <property name="Type" value="random"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="12" name="100" type="Mystery Option" x="1385" y="652">
+   <properties>
+    <property name="Amount" value="100"/>
+    <property name="Type" value="money"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="13" name="150" type="Mystery Option" x="1402.5" y="664.5">
+   <properties>
+    <property name="Amount" value="150"/>
+    <property name="Type" value="money"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="14" name="200" type="Mystery Option" x="1426" y="689">
+   <properties>
+    <property name="Amount" value="200"/>
+    <property name="Type" value="money"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="15" name="250" type="Mystery Option" x="1440" y="705">
+   <properties>
+    <property name="Amount" value="250"/>
+    <property name="Type" value="money"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="16" name="Uncommon" type="Mystery Option" x="1273" y="658">
+   <properties>
+    <property name="Next 1" type="object" value="15"/>
+    <property name="Next 2" type="object" value="15"/>
+    <property name="Next 3" type="object" value="15"/>
+    <property name="Next 4" type="object" value="15"/>
+    <property name="Next 5" type="object" value="15"/>
+    <property name="Next 6" type="object" value="17"/>
+    <property name="Next 7" type="object" value="17"/>
+    <property name="Next 8" type="object" value="17"/>
+    <property name="Next 9" type="object" value="18"/>
+    <property name="Type" value="random"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="17" name="700" type="Mystery Option" x="1295" y="612">
+   <properties>
+    <property name="Amount" value="700"/>
+    <property name="Type" value="money"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="18" name="Rare" type="Mystery Option" x="1227.5" y="613.5">
+   <properties>
+    <property name="Next 1" type="object" value="17"/>
+    <property name="Next 2" type="object" value="19"/>
+    <property name="Next 3" type="object" value="20"/>
+    <property name="Type" value="random"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="19" name="3000" type="Mystery Option" x="1251.5" y="573.5">
+   <properties>
+    <property name="Amount" value="3000"/>
+    <property name="Type" value="money"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="20" name="Ultra Rare" type="Mystery Option" x="1197.5" y="577.5">
+   <properties>
+    <property name="Next 1" type="object" value="21"/>
+    <property name="Next 2" type="object" value="19"/>
+    <property name="Next 3" type="object" value="23"/>
+    <property name="Type" value="random"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="21" name="30000" type="Mystery Option" x="1220.5" y="544.5">
+   <properties>
+    <property name="Amount" value="30000"/>
+    <property name="Type" value="money"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="22" name="1000000" type="Mystery Option" x="1200.5" y="520.5">
+   <properties>
+    <property name="Amount" value="1000000"/>
+    <property name="Type" value="money"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="23" name="Millionaire" type="Mystery Option" x="1175.5" y="543.5">
+   <properties>
+    <property name="Next 1" type="object" value="22"/>
+    <property name="Next 2" type="object" value="21"/>
+    <property name="Type" value="random"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="24" name="GreenMysteryData" type="Mystery Data" gid="413" x="721.5" y="336.5" width="14" height="43">
+   <properties>
+    <property name="Next 1" type="object" value="11"/>
+    <property name="Type" value="random"/>
+   </properties>
+  </object>
+  <object id="26" name="GreenMysteryData" type="Mystery Data" gid="413" x="382.5" y="445.5" width="14" height="43">
+   <properties>
+    <property name="Next 1" type="object" value="11"/>
+    <property name="Type" value="random"/>
+   </properties>
+  </object>
+  <object id="27" name="GreenMysteryData" type="Mystery Data" gid="413" x="149.5" y="726.5" width="14" height="43">
+   <properties>
+    <property name="Next 1" type="object" value="11"/>
+    <property name="Type" value="random"/>
+   </properties>
+  </object>
+  <object id="28" name="GreenMysteryData" type="Mystery Data" gid="413" x="1324" y="1100" width="14" height="43">
+   <properties>
+    <property name="Next 1" type="object" value="11"/>
+    <property name="Type" value="random"/>
+   </properties>
+  </object>
+  <object id="29" name="GreenMysteryData" type="Mystery Data" gid="413" x="429" y="147" width="14" height="43">
+   <properties>
+    <property name="Next 1" type="object" value="11"/>
+    <property name="Type" value="random"/>
+   </properties>
+  </object>
+  <object id="30" name="GreenMysteryData" type="Mystery Data" gid="413" x="658.5" y="881.5" width="14" height="43">
+   <properties>
+    <property name="Next 1" type="object" value="11"/>
+    <property name="Type" value="random"/>
+   </properties>
+  </object>
+  <object id="35" name="HeelNavi" type="NPC" x="1359.5" y="1392.5">
+   <properties>
+    <property name="Asset Name" value="heel-navi-exe4_purple"/>
+    <property name="Dialogue Type" value="itemcheck"/>
+    <property name="Direction" value="Up Right"/>
+    <property name="Item 1" type="object" value="36"/>
+    <property name="Next 1" type="object" value="37"/>
+    <property name="Next 2" type="object" value="38"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="36" name="RKaiser" type="Item" x="1370.5" y="1479.5">
+   <properties>
+    <property name="Description" value="Rare: Rude Kaiser - A: 1800 / D: 1600"/>
+    <property name="Name" value="[R]RKaiser"/>
+    <property name="Price" value="40000"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="37" name="Final dialogue" type="Dialogue" x="1443.5" y="1404.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Text 1" value="Uhh.. you got what you wanted, now leave me alone. (Darn, this guy is tough)"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="38" name="itemcheck" type="Dialogue" x="1445.5" y="1422.5">
+   <properties>
+    <property name="Dialogue Type" value="itemcheck"/>
+    <property name="Item 1" type="object" value="40"/>
+    <property name="Next 1" type="object" value="37"/>
+    <property name="Next 2" type="object" value="41"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="39" name="quest1" type="Item" x="1496" y="1440">
+   <properties>
+    <property name="Description" value="Accepted quest 1"/>
+    <property name="Name" value="quest1"/>
+    <property name="Price" value="0"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="40" name="stolen card" type="Item" x="1492" y="1426">
+   <properties>
+    <property name="Description" value="The Stolen Card"/>
+    <property name="Name" value="stolencard"/>
+    <property name="Price" value="0"/>
+    <property name="Type" value="keyitem"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="41" name="itemcheck" type="Dialogue" x="1443" y="1431">
+   <properties>
+    <property name="Dialogue Type" value="itemcheck"/>
+    <property name="Item 1" type="object" value="39"/>
+    <property name="Next 1" type="object" value="42"/>
+    <property name="Next 2" type="object" value="43"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="42" name="quest received" type="Dialogue" x="1438.5" y="1445.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="44"/>
+    <property name="Text 1" value="Heh heh, I stole a card from this weak Navi."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="43" name="no quest yet" type="Dialogue" x="1457.5" y="1452.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Text 1" value="This spot is great for hiding, don't you think?"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="44" name="initiate quest" type="Dialogue" x="1459.5" y="1464.5">
+   <properties>
+    <property name="Dialogue Type" value="question"/>
+    <property name="Next 1" type="object" value="45"/>
+    <property name="Next 2" type="object" value="46"/>
+    <property name="Text 1" value="What are you looking at? You want to fight?"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="45" name="yes" type="Dialogue" x="1477" y="1479">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="50"/>
+    <property name="Text 1" value="Hahaha! I'll take a card from you too. Come here!"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="46" name="no" type="Dialogue" x="1476.5" y="1465.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Text 1" value="That's what I thought, now scram!"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="50" name="battle" type="Dialogue" x="1490.5" y="1483.5">
+   <properties>
+    <property name="Dialogue Type" value="none"/>
+    <property name="Event Name" value="Heel Navi1"/>
+    <property name="Next 1" type="object" value="51"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="51" name="remove quest" type="Dialogue" x="1499.5" y="1480.5">
+   <properties>
+    <property name="Dialogue Type" value="itemcheck"/>
+    <property name="Item 1" type="object" value="39"/>
+    <property name="Next 1" type="object" value="52"/>
+    <property name="Take Item" value="true"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="52" name="finish" type="Dialogue" x="1505" y="1473">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="53"/>
+    <property name="Text 1" value="Arrrgghhh, you win. Fine, I'll give you back what I stole..."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="53" name="give stolen" type="Dialogue" x="1504.5" y="1461.5">
+   <properties>
+    <property name="Dialogue Type" value="item"/>
+    <property name="Item 1" type="object" value="40"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="54" name="Gambler" type="NPC" x="401" y="625">
+   <properties>
+    <property name="Asset Name" value="heel-navi-exe4_black"/>
+    <property name="Dialogue Type" value="question"/>
+    <property name="Direction" value="Up"/>
+    <property name="Next 1" type="object" value="55"/>
+    <property name="Next 2" type="object" value="56"/>
+    <property name="Text 1" value="A little gambling? It costs $5,000 to try."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="55" name="yes" type="Dialogue" x="407.5" y="650.5">
+   <properties>
+    <property name="Dialogue Type" value="none"/>
+    <property name="Event Name" value="Gambler"/>
+    <property name="Got moneyz" type="object" value="59"/>
+    <property name="No moneyz" type="object" value="58"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="56" name="no" type="Dialogue" x="414" y="650">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Text 1" value="Then scram"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="58" name="no money" type="Dialogue" x="404" y="654">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Text 1" value="You don't even have enough to gamble, scram!"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="59" name="money" type="Dialogue" x="409.5" y="654.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="60"/>
+    <property name="Text 1" value="Alright, here's how it works. You'll have a 1 in 3 chance of doubling your money. Every time you win, I'll ask if you if you want to quit or continue. "/>
+   </properties>
+   <point/>
+  </object>
+  <object id="60" name="first" type="Dialogue" x="411.5" y="658.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="61"/>
+    <property name="Text 1" value="Alright, here we go!"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="61" name="1" type="Dialogue" x="414" y="662">
+   <properties>
+    <property name="Dialogue Type" value="random"/>
+    <property name="Next 3" type="object" value="62"/>
+    <property name="Text 1" value="Sorry, you lose!"/>
+    <property name="Text 2" value="Sorry, you lose!"/>
+    <property name="Text 3" value="Congrats, you win!"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="62" name="First win" type="Dialogue" x="416" y="660">
+   <properties>
+    <property name="Dialogue Type" value="question"/>
+    <property name="Next 1" type="object" value="63"/>
+    <property name="Next 2" type="object" value="65"/>
+    <property name="Text 1" value="You have 10,000 won, do you want to try and double it?"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="63" name="second" type="Dialogue" x="416.5" y="665.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="64"/>
+    <property name="Text 1" value="Alright, here we go!"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="64" name="2" type="Dialogue" x="419" y="669">
+   <properties>
+    <property name="Dialogue Type" value="random"/>
+    <property name="Next 3" type="object" value="68"/>
+    <property name="Text 1" value="Sorry, you lose!"/>
+    <property name="Text 2" value="Sorry, you lose!"/>
+    <property name="Text 3" value="Congrats, you win!"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="65" name="First payout" type="Dialogue" x="417.5" y="658.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="66"/>
+    <property name="Text 1" value="Alright, here's your winnings!"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="66" name="pay 10,000" type="Dialogue" x="419" y="657">
+   <properties>
+    <property name="Amount" type="int" value="10000"/>
+    <property name="Dialogue Type" value="none"/>
+    <property name="Event Name" value="Win_Gamble"/>
+    <property name="Next 1" type="object" value="67"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="67" name="goodbye" type="Dialogue" x="424" y="652">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Text 1" value="Play again sometime"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="68" name="Second win" type="Dialogue" x="420.5" y="667.5">
+   <properties>
+    <property name="Dialogue Type" value="question"/>
+    <property name="Next 1" type="object" value="72"/>
+    <property name="Next 2" type="object" value="69"/>
+    <property name="Text 1" value="You have 20,000 won, do you want to try and double it?"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="69" name="Second payout" type="Dialogue" x="422" y="666">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="70"/>
+    <property name="Text 1" value="Alright, here's your winnings!"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="70" name="pay 20,000" type="Dialogue" x="423.5" y="664.5">
+   <properties>
+    <property name="Amount" type="int" value="20000"/>
+    <property name="Dialogue Type" value="none"/>
+    <property name="Event Name" value="Win_Gamble"/>
+    <property name="Next 1" type="object" value="67"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="72" name="third" type="Dialogue" x="422" y="672">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="73"/>
+    <property name="Text 1" value="Alright, here we go!"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="73" name="3" type="Dialogue" x="425" y="675">
+   <properties>
+    <property name="Dialogue Type" value="random"/>
+    <property name="Next 3" type="object" value="79"/>
+    <property name="Text 1" value="Sorry, you lose!"/>
+    <property name="Text 2" value="Sorry, you lose!"/>
+    <property name="Text 3" value="Congrats, you win!"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="79" name="Third win" type="Dialogue" x="426.5" y="673.5">
+   <properties>
+    <property name="Dialogue Type" value="question"/>
+    <property name="Next 1" type="object" value="82"/>
+    <property name="Next 2" type="object" value="80"/>
+    <property name="Text 1" value="You have 40,000 won, do you want to try and double it?"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="80" name="Third payout" type="Dialogue" x="428" y="672">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="81"/>
+    <property name="Text 1" value="Alright, here's your winnings!"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="81" name="pay 40,000" type="Dialogue" x="429.5" y="670.5">
+   <properties>
+    <property name="Amount" type="int" value="40000"/>
+    <property name="Dialogue Type" value="none"/>
+    <property name="Event Name" value="Win_Gamble"/>
+    <property name="Next 1" type="object" value="67"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="82" name="fourth" type="Dialogue" x="428" y="678">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="83"/>
+    <property name="Text 1" value="Alright, here we go!"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="83" name="4" type="Dialogue" x="431" y="681">
+   <properties>
+    <property name="Dialogue Type" value="random"/>
+    <property name="Next 3" type="object" value="84"/>
+    <property name="Text 1" value="Sorry, you lose!"/>
+    <property name="Text 2" value="Sorry, you lose!"/>
+    <property name="Text 3" value="Congrats, you win!"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="84" name="Fourth win" type="Dialogue" x="432" y="679">
+   <properties>
+    <property name="Dialogue Type" value="question"/>
+    <property name="Next 1" type="object" value="87"/>
+    <property name="Next 2" type="object" value="85"/>
+    <property name="Text 1" value="You have 80,000 won, do you want to try and double it?"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="85" name="Fourth payout" type="Dialogue" x="433.5" y="677.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="86"/>
+    <property name="Text 1" value="Alright, here's your winnings!"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="86" name="pay 80,000" type="Dialogue" x="435" y="676">
+   <properties>
+    <property name="Amount" type="int" value="80000"/>
+    <property name="Dialogue Type" value="none"/>
+    <property name="Event Name" value="Win_Gamble"/>
+    <property name="Next 1" type="object" value="67"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="87" name="fifth" type="Dialogue" x="433.5" y="683.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="88"/>
+    <property name="Text 1" value="Alright, here we go!"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="88" name="5" type="Dialogue" x="436.5" y="686.5">
+   <properties>
+    <property name="Dialogue Type" value="random"/>
+    <property name="Next 3" type="object" value="89"/>
+    <property name="Text 1" value="Sorry, you lose!"/>
+    <property name="Text 2" value="Sorry, you lose!"/>
+    <property name="Text 3" value="Congrats, you win!"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="89" name="Fifth win" type="Dialogue" x="437" y="684">
+   <properties>
+    <property name="Dialogue Type" value="question"/>
+    <property name="Next 1" type="object" value="92"/>
+    <property name="Next 2" type="object" value="90"/>
+    <property name="Text 1" value="You have 160,000 won, do you want to try and double it?"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="90" name="Fifth payout" type="Dialogue" x="438.5" y="682.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="91"/>
+    <property name="Text 1" value="Alright, here's your winnings!"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="91" name="pay 160,000" type="Dialogue" x="440" y="681">
+   <properties>
+    <property name="Amount" type="int" value="160000"/>
+    <property name="Dialogue Type" value="none"/>
+    <property name="Event Name" value="Win_Gamble"/>
+    <property name="Next 1" type="object" value="67"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="92" name="sixth" type="Dialogue" x="438.5" y="688.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="93"/>
+    <property name="Text 1" value="It seems that you're very lucky. Let's make a final bet. If you win this, I'll pay you 500,000! Here goes!"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="93" name="6" type="Dialogue" x="443" y="689">
+   <properties>
+    <property name="Dialogue Type" value="random"/>
+    <property name="Next 3" type="object" value="95"/>
+    <property name="Text 1" value="Sorry, you lose!"/>
+    <property name="Text 2" value="Sorry, you lose!"/>
+    <property name="Text 3" value="Congrats, you win!"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="95" name="Sixth win" type="Dialogue" x="444.5" y="688.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="96"/>
+    <property name="Text 1" value="You're on a hot streak and I'll have to end it here. If we keep doubling I'll run out of money, this is as high as I'm willing to go"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="96" name="Sixth payout" type="Dialogue" x="446" y="687">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="97"/>
+    <property name="Text 1" value="Here you go!"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="97" name="pay 500,000" type="Dialogue" x="447.5" y="685.5">
+   <properties>
+    <property name="Amount" type="int" value="500000"/>
+    <property name="Dialogue Type" value="none"/>
+    <property name="Event Name" value="Win_Gamble"/>
+    <property name="Next 1" type="object" value="67"/>
+   </properties>
+   <point/>
+  </object>
+ </objectgroup>
+ <layer id="3" name="Tile Layer 1" width="50" height="50" offsetx="0" offsety="-16">
+  <data encoding="csv">
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,408,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+</data>
+ </layer>
+ <objectgroup id="4" name="Object Layer 1" offsetx="0" offsety="-16"/>
+ <layer id="5" name="Tile Layer 2" width="50" height="50" offsetx="0" offsety="-32">
+  <data encoding="csv">
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,408,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+</data>
+ </layer>
+ <objectgroup id="6" name="Object Layer 2" offsetx="0" offsety="-32"/>
+ <layer id="7" name="Tile Layer 3" width="50" height="50" visible="0" offsetx="0" offsety="-48">
+  <data encoding="csv">
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,47,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,20,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,30,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,40,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,50,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,60,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,54,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,14,15,15,15,25,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,13,24,24,24,35,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,13,24,24,24,35,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,13,24,24,24,35,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,13,24,24,24,35,45,41,51,61,47,409,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,13,24,24,24,35,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,13,24,24,24,35,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,13,24,24,24,35,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,23,33,33,33,34,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+</data>
+ </layer>
+ <objectgroup id="8" name="Object Layer 3" offsetx="0" offsety="-48">
+  <object id="8" name="WCity2 BBS" type="BBS" gid="411" x="400" y="704" width="48" height="69">
+   <properties>
+    <property name="BBS" type="bool" value="true"/>
+    <property name="Color" type="color" value="#ff00aaff"/>
+    <property name="Name" value="WCity2 BBS"/>
+    <property name="Post Limit" type="int" value="999"/>
+   </properties>
+  </object>
+  <object id="31" name="GreenMysteryData" type="Mystery Data" gid="413" x="435" y="499" width="14" height="43">
+   <properties>
+    <property name="Next 1" type="object" value="11"/>
+    <property name="Type" value="random"/>
+   </properties>
+  </object>
+  <object id="32" type="Mystery Data" gid="421" x="608" y="928" width="14" height="43">
+   <properties>
+    <property name="Amount" type="int" value="7000"/>
+    <property name="Next 1" type="object" value="0"/>
+    <property name="Once" type="bool" value="true"/>
+    <property name="Type" value="money"/>
+   </properties>
+  </object>
+  <object id="33" name="KumoriDragon" type="Mystery Data" gid="421" x="463.5" y="272.5" width="14" height="43">
+   <properties>
+    <property name="Description" value="Common: Kumori Dragon - A: 1500 / D: 1200"/>
+    <property name="Name" value="[C]K.Dragon"/>
+    <property name="Next 1" type="object" value="0"/>
+    <property name="Once" type="bool" value="true"/>
+    <property name="Type" value="item"/>
+   </properties>
+  </object>
+  <object id="48" name="NormalNavi" type="NPC" x="491.5" y="560.5">
+   <properties>
+    <property name="Asset Name" value="normal-navi-bn4_red"/>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Direction" value="Down Right"/>
+    <property name="Text 1" value="I came all the way from Yoka and the road to WCity3 is closed."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="49" name="NormalNavi" type="NPC" x="506.5" y="559.5">
+   <properties>
+    <property name="Asset Name" value="normal-navi-bn4_brown"/>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Direction" value="Up Left"/>
+    <property name="Text 1" value="We're actually here for the convention on WCity3, but it seems the road is closed at this time"/>
+   </properties>
+   <point/>
+  </object>
+ </objectgroup>
+</map>

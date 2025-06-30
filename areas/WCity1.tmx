@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.8" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="75" height="75" tilewidth="64" tileheight="32" infinite="0" nextlayerid="13" nextobjectid="106">
+<map version="1.8" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="75" height="75" tilewidth="64" tileheight="32" infinite="0" nextlayerid="13" nextobjectid="146">
  <properties>
   <property name="Background" value="custom"/>
   <property name="Background Animation" value="/server/assets/custom/backgrounds/wcity/01-generic1.animation"/>
@@ -70,7 +70,7 @@
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,274,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -161,53 +161,203 @@
     <property name="Type" value="random"/>
    </properties>
   </object>
-  <object id="97" name="BlueMysteryData" type="Mystery Data" gid="422" x="988" y="702" width="14" height="43">
+  <object id="106" type="Mystery Data" gid="422" x="1588" y="1396" width="14" height="43">
    <properties>
-    <property name="Next 1" type="object" value="98"/>
+    <property name="Amount" type="int" value="5000"/>
+    <property name="Next 1" type="object" value="0"/>
     <property name="Once" type="bool" value="true"/>
-    <property name="Type" value="random"/>
-   </properties>
-  </object>
-  <object id="98" name="BlueData Results" type="Mystery Data" x="740" y="462">
-   <properties>
-    <property name="Next 1" type="object" value="99"/>
-    <property name="Next 2" type="object" value="99"/>
-    <property name="Next 3" type="object" value="99"/>
-    <property name="Next 4" type="object" value="101"/>
-    <property name="Next 5" type="object" value="101"/>
-    <property name="Next 6" type="object" value="102"/>
-    <property name="Once" type="bool" value="true"/>
-    <property name="Type" value="random"/>
-   </properties>
-   <point/>
-  </object>
-  <object id="99" name="1,000" type="Mystery Option" x="773.5" y="456.5">
-   <properties>
-    <property name="Amount" value="1000"/>
     <property name="Type" value="money"/>
    </properties>
-   <point/>
   </object>
-  <object id="101" name="5000" type="Mystery Option" x="756" y="438">
+  <object id="107" type="Mystery Data" gid="422" x="989" y="701" width="14" height="43">
    <properties>
-    <property name="Amount" value="5000"/>
-    <property name="Type" value="money"/>
-   </properties>
-   <point/>
-  </object>
-  <object id="102" name="10000" type="Mystery Option" x="738" y="420">
-   <properties>
-    <property name="Amount" value="10000"/>
-    <property name="Type" value="money"/>
-   </properties>
-   <point/>
-  </object>
-  <object id="103" name="BlueMysteryData" type="Mystery Data" gid="422" x="1587.5" y="1396.5" width="14" height="43">
-   <properties>
-    <property name="Next 1" type="object" value="98"/>
+    <property name="Amount" type="int" value="8000"/>
+    <property name="Next 1" type="object" value="0"/>
     <property name="Once" type="bool" value="true"/>
-    <property name="Type" value="random"/>
+    <property name="Type" value="money"/>
    </properties>
+  </object>
+  <object id="112" name="NinjaProg" type="NPC" x="1685.5" y="884.5">
+   <properties>
+    <property name="Asset Name" value="darkprog-ninja"/>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Direction" value="Up Left"/>
+    <property name="Next Waypoint 1" type="object" value="114"/>
+    <property name="Text 1" value="Hey there, just doing my job here deleting viruses"/>
+    <property name="Wait Time" type="int" value="10"/>
+    <property name="Waypoint Type" value="first"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="113" type="Waypoint" x="1680" y="1232">
+   <properties>
+    <property name="Next Waypoint 1" type="object" value="114"/>
+    <property name="Wait Time" type="int" value="8"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="114" type="Waypoint" x="1682" y="1008">
+   <properties>
+    <property name="Next Waypoint 1" type="object" value="113"/>
+    <property name="Next Waypoint 2" type="object" value="115"/>
+    <property name="Wait Time" type="int" value="8"/>
+    <property name="Waypoint Type" value="random"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="115" type="Waypoint" x="1679.5" y="816.5">
+   <properties>
+    <property name="Next Waypoint 1" type="object" value="114"/>
+    <property name="Wait Time" type="int" value="8"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="118" name="PurpleNavi" type="NPC" x="1649.5" y="1394.5">
+   <properties>
+    <property name="Asset Name" value="female-navi-exe5_purple"/>
+    <property name="Dialogue Type" value="itemcheck"/>
+    <property name="Direction" value="Down Left"/>
+    <property name="Item 1" type="object" value="134"/>
+    <property name="Next 1" type="object" value="137"/>
+    <property name="Next 2" type="object" value="145"/>
+    <property name="Text 1" value=""/>
+   </properties>
+   <point/>
+  </object>
+  <object id="119" name="question" type="Dialogue" x="1723.5" y="1496.5">
+   <properties>
+    <property name="Dialogue Type" value="question"/>
+    <property name="Next 1" type="object" value="124"/>
+    <property name="Next 2" type="object" value="123"/>
+    <property name="Text 1" value="Would you help me get my card back?"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="121" name="quest1" type="Item" x="1738.5" y="1427.5">
+   <properties>
+    <property name="Description" value="Accepted quest 1"/>
+    <property name="Name" value="quest1"/>
+    <property name="Price" value="0"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="122" name="itemcheck" type="Dialogue" x="1716.5" y="1457.5">
+   <properties>
+    <property name="Dialogue Type" value="itemcheck"/>
+    <property name="Item 1" type="object" value="121"/>
+    <property name="Next 1" type="object" value="129"/>
+    <property name="Next 2" type="object" value="119"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="123" name="no" type="Dialogue" x="1724" y="1556">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Text 1" value="Oh... ok no hard feelings"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="124" name="yes" type="Dialogue" x="1771" y="1515">
+   <properties>
+    <property name="Dialogue Type" value="item"/>
+    <property name="Dont Notify" type="bool" value="true"/>
+    <property name="Item 1" type="object" value="121"/>
+    <property name="Next 1" type="object" value="133"/>
+    <property name="Text 1" value=""/>
+   </properties>
+   <point/>
+  </object>
+  <object id="125" name="final dialogue" type="Dialogue" x="1806" y="1506">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Text 1" value="Thank you! I really appreciate your help"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="128" name="stolen card" type="Item" x="1697.5" y="1408.5">
+   <properties>
+    <property name="Description" value="The Stolen Card"/>
+    <property name="Name" value="stolencard"/>
+    <property name="Price" value="0"/>
+    <property name="Type" value="keyitem"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="129" name="dont have" type="Dialogue" x="1780.5" y="1377.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Text 1" value="I really appreciate your help. The Navi that stole my card went to WCity2"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="132" name="do have" type="Dialogue" x="1783" y="1415">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="135"/>
+    <property name="Text 1" value="Thank you so much! This is my favorite card and I don't want to lose it. As a token of my appreciation, please take this card!"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="133" name="player confirm" type="Dialogue" x="1793.5" y="1526.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Mugshot" value="player"/>
+    <property name="Next 1" type="object" value="125"/>
+    <property name="Text 1" value="Yeah, I'll get you your card back, you can count on me!"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="134" name="RKaiser" type="Item" x="1787.5" y="1446.5">
+   <properties>
+    <property name="Description" value="Rare: Rude Kaiser - A: 1800 / D: 1600"/>
+    <property name="Name" value="[R]RKaiser"/>
+    <property name="Price" value="40000"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="135" name="give card" type="Dialogue" x="1784.5" y="1429.5">
+   <properties>
+    <property name="Dialogue Type" value="item"/>
+    <property name="Item 1" type="object" value="134"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="137" name="Final thanks" type="Dialogue" x="1660.5" y="1449.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Text 1" value="Thanks again for helping me!"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="138" name="Initiate quest" type="Dialogue" x="1679.5" y="1446.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="122"/>
+    <property name="Text 1" value="Some Navi stole my best card and ran off. I'd go after him but I'm afraid of the viruses in the next area"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="140" name="To WCity2" type="Radius Warp" x="1617" y="1533">
+   <properties>
+    <property name="Activation Radius" type="float" value="0.6"/>
+    <property name="Arrival Animation" value="arrow_down_left_in"/>
+    <property name="Leave Animation" value="arrow_down_left_out"/>
+    <property name="Target Area" value="WCity2"/>
+    <property name="Target Object" value="1"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="145" name="stolen check" type="Dialogue" x="1681" y="1421">
+   <properties>
+    <property name="Dialogue Type" value="itemcheck"/>
+    <property name="Item 1" type="object" value="128"/>
+    <property name="Next 1" type="object" value="132"/>
+    <property name="Next 2" type="object" value="138"/>
+    <property name="Text 1" value="true"/>
+   </properties>
+   <point/>
   </object>
  </objectgroup>
  <layer id="5" name="Tile Layer 1" width="75" height="75" offsetx="0" offsety="-16">
@@ -402,7 +552,7 @@
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,1,2,0,0,0,19,20,30,0,0,1,2,1,2,1,2,1,2,1,2,1,2,1,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,2,1,0,0,0,18,29,40,2147483673,68,2,1,0,0,0,0,0,0,0,1,2,1,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,1,2,0,0,0,28,38,39,0,0,1,2,0,0,3,2,3,0,0,2,1,2,1,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,2,1,0,0,0,0,0,0,0,0,2,1,2,1,2,2,2,0,0,1,2,1,2,1,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,2,1,0,0,0,0,0,0,0,0,2,1,2,1,2,2,2,8,0,1,2,1,2,1,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,1,2,0,0,0,0,0,0,0,0,0,0,0,0,3,2,3,0,0,2,1,2,1,2,1,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,2,1,2,1,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,1,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,2,1,2,1,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -774,12 +924,82 @@
    </properties>
    <point/>
   </object>
-  <object id="105" name="BlueMysteryData" type="Mystery Data" gid="422" x="1109" y="627" width="14" height="43">
+  <object id="108" type="Mystery Data" gid="422" x="1106.5" y="627.5" width="14" height="43">
    <properties>
-    <property name="Next 1" type="object" value="98"/>
+    <property name="Amount" type="int" value="5000"/>
+    <property name="Next 1" type="object" value="0"/>
     <property name="Once" type="bool" value="true"/>
-    <property name="Type" value="random"/>
+    <property name="Type" value="money"/>
    </properties>
+  </object>
+  <object id="109" name="NinjaProg" type="NPC" x="817.5" y="914.5">
+   <properties>
+    <property name="Asset Name" value="darkprog-ninja"/>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Direction" value="Down Right"/>
+    <property name="Next Waypoint 1" type="object" value="110"/>
+    <property name="Text 1" value="Hi there, I'm a new type of Prog designed to eliminate viruses. The server owner would actually love it if you delete as many viruses as you can. The server will reward you with moneyz!"/>
+    <property name="Wait Time" type="int" value="10"/>
+    <property name="Waypoint Type" value="first"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="110" type="Waypoint" x="815.5" y="720.5">
+   <properties>
+    <property name="Next Waypoint 1" type="object" value="111"/>
+    <property name="Wait Time" type="int" value="8"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="111" type="Waypoint" x="814" y="1006">
+   <properties>
+    <property name="Next Waypoint 1" type="object" value="110"/>
+    <property name="Wait Time" type="int" value="8"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="139" name="Warp1" type="Custom Warp" gid="368" x="1311.5" y="952.5" width="80" height="72">
+   <properties>
+    <property name="Direction" value="Down Right"/>
+    <property name="Target Area" value="WCity1"/>
+    <property name="Target Object" value="106"/>
+   </properties>
+  </object>
+  <object id="141" name="GreenNavi" type="NPC" x="1056" y="1296">
+   <properties>
+    <property name="Asset Name" value="normal-navi-bn4_green"/>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Direction" value="Up Right"/>
+    <property name="Text 1" value="Did you know that the green mystery data re-generates itself every time you log out? Heh, I'm gonna keep grabbing them"/>
+    <property name="Wait Time" type="int" value="5"/>
+    <property name="Waypoint Type" value="first"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="142" type="Waypoint" x="1136" y="1264">
+   <properties>
+    <property name="Next Waypoint 1" type="object" value="144"/>
+    <property name="Wait Time" type="int" value="6"/>
+    <property name="Waypoint Type" value="first"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="143" type="Waypoint" x="976" y="1264">
+   <properties>
+    <property name="Next Waypoint 1" type="object" value="144"/>
+    <property name="Wait Time" type="int" value="6"/>
+    <property name="Waypoint Type" value="first"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="144" type="Waypoint" x="1056" y="1264">
+   <properties>
+    <property name="Next Waypoint 1" type="object" value="142"/>
+    <property name="Next Waypoint 2" type="object" value="143"/>
+    <property name="Wait Time" type="int" value="6"/>
+    <property name="Waypoint Type" value="random"/>
+   </properties>
+   <point/>
   </object>
  </objectgroup>
  <layer id="9" name="Tile Layer 4" width="75" height="75" offsetx="0" offsety="-64">

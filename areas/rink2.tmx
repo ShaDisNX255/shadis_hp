@@ -585,7 +585,7 @@
    </properties>
    <point/>
   </object>
-  <object id="91" name="1000000" type="Mystery Option" x="616" y="142">
+  <object id="91" name="2,000,000" type="Mystery Option" x="616" y="142">
    <properties>
     <property name="Amount" value="2000000"/>
     <property name="Type" value="money"/>
