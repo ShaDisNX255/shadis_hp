@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.8" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="50" height="50" tilewidth="64" tileheight="32" infinite="0" nextlayerid="13" nextobjectid="215">
+<map version="1.8" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="50" height="50" tilewidth="64" tileheight="32" infinite="0" nextlayerid="13" nextobjectid="206">
  <properties>
   <property name="Background" value="custom"/>
   <property name="Background Animation" value="/server/assets/custom/backgrounds/home/kottouhinyanodennou.animation"/>
@@ -176,11 +176,27 @@
    </properties>
    <point/>
   </object>
+  <object id="174" gid="133" x="784" y="912" width="64" height="64">
+   <properties>
+    <property name="Flavor" value="You see a sign that says: &quot;Stay out, WCity under construction&quot;"/>
+   </properties>
+  </object>
+  <object id="175" gid="134" x="784" y="960" width="64" height="64"/>
   <object id="176" name="WCity1" type="Custom Warp" gid="283" x="772" y="996" width="40" height="28">
    <properties>
     <property name="Direction" value="Up Right"/>
     <property name="Target Area" value="WCity1"/>
     <property name="Target Object" value="1"/>
+   </properties>
+  </object>
+  <object id="178" name="AdminCube" type="Checkpoint" gid="80" x="719" y="653" width="55.625" height="65" visible="0">
+   <properties>
+    <property name="Description" value="Admin Block, well done on finding this!"/>
+    <property name="Once" type="bool" value="true"/>
+    <property name="Password" value="L is Real"/>
+    <property name="Skip Prompt" type="bool" value="false"/>
+    <property name="Unlock Failed Message" value="Incorrect Password"/>
+    <property name="Unlocked Message" value="Unlocked!"/>
    </properties>
   </object>
   <object id="179" name="Luigi.EXE" type="NPC" x="817" y="893">
@@ -386,79 +402,6 @@
     <property name="Name" value="[R]Swdstlk"/>
     <property name="Price" value="35500"/>
     <property name="Type" value="item"/>
-   </properties>
-   <point/>
-  </object>
-  <object id="206" name="WCityProg" type="NPC" x="784" y="896">
-   <properties>
-    <property name="Asset Name" value="prog"/>
-    <property name="Dialogue Type" value="itemcheck"/>
-    <property name="Direction" value="Up Right"/>
-    <property name="Item 1" type="object" value="209"/>
-    <property name="Next 1" type="object" value="210"/>
-    <property name="Next 2" type="object" value="211"/>
-    <property name="Text 1" value=""/>
-   </properties>
-   <point/>
-  </object>
-  <object id="207" name="Cube1" type="Checkpoint" gid="80" x="784" y="928" width="53.25" height="56">
-   <properties>
-    <property name="Description" value="This path leads to WCity"/>
-    <property name="Once" type="bool" value="true"/>
-    <property name="Password" value="Welcome"/>
-    <property name="Skip Prompt" type="bool" value="false"/>
-    <property name="Unlock Failed Message" value="Talk to the prog!"/>
-    <property name="Unlocked Message" value="You can pass"/>
-   </properties>
-  </object>
-  <object id="209" name="hpdialogue" type="Item" x="798.5" y="897.5">
-   <properties>
-    <property name="Description" value="Read the whole dialogue"/>
-    <property name="Name" value="hpdialogue"/>
-    <property name="Price" value="0"/>
-    <property name="Type" value="item"/>
-   </properties>
-   <point/>
-  </object>
-  <object id="210" name="YesItem" type="Dialogue" x="808.5" y="925.5">
-   <properties>
-    <property name="Dialogue Type" value="question"/>
-    <property name="Next 1" type="object" value="211"/>
-    <property name="Next 2" type="object" value="213"/>
-    <property name="Text 1" value="Would you like me to repeat all that information?"/>
-   </properties>
-   <point/>
-  </object>
-  <object id="211" name="NoItem" type="Dialogue" x="813.5" y="922.5">
-   <properties>
-    <property name="Dialogue Type" value="first"/>
-    <property name="Next 1" type="object" value="212"/>
-    <property name="Text 1" value="Hey there, this path leads to WCity. It's an adventure map I've been working on that will receive constant updates. It currently has a whitelist in place so you'll only be able to use certain assets (Navi, chips, cust programs) so make sure to read the Discord server to know more. After you read and agree, you can go through the security block with the password &quot;Welcome&quot;. Enjoy!"/>
-   </properties>
-   <point/>
-  </object>
-  <object id="212" name="itemcheck" type="Dialogue" x="815" y="915">
-   <properties>
-    <property name="Dialogue Type" value="itemcheck"/>
-    <property name="Item 1" type="object" value="209"/>
-    <property name="Next 2" type="object" value="214"/>
-   </properties>
-   <point/>
-  </object>
-  <object id="213" name="Don't repeat" type="Dialogue" x="824" y="940">
-   <properties>
-    <property name="Dialogue Type" value="first"/>
-    <property name="Text 1" value="Alright then, enjoy!"/>
-   </properties>
-   <point/>
-  </object>
-  <object id="214" name="dialoguecomplete" type="Dialogue" x="814.5" y="909.5">
-   <properties>
-    <property name="Dialogue Type" value="item"/>
-    <property name="Dont Notify" type="bool" value="true"/>
-    <property name="Item 1" type="object" value="209"/>
-    <property name="Next 1" type="object" value="133"/>
-    <property name="Text 1" value=""/>
    </properties>
    <point/>
   </object>

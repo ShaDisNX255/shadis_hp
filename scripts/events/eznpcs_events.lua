@@ -29,14 +29,53 @@ local event1 = {
 }
 eznpcs.add_event(event1)
 
+local boss2 = {
+    name="boss2",
+    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    enemies={
+        {name="HeelNavi",rank=1},
+    },
+    obstacles={
+    },
+    positions={
+        {0,0,0,0,0,0},
+        {0,0,0,0,1,0},
+        {0,0,0,0,0,0},
+    },
+    obstacle_positions={
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+    },
+    player_positions={
+        {0,0,0,0,0,0},
+        {0,1,0,0,0,0},
+        {0,0,0,0,0,0},
+    },
+    tiles={
+        {1,1,1,1,1,1},
+        {1,1,1,1,1,1},
+        {1,1,1,1,1,1},
+    },
+    teams={
+        {2,2,2,1,1,1},
+        {2,2,2,1,1,1},
+        {2,2,2,1,1,1},
+    },
+}
+
 local event2 = {
     name="Heel Navi1",
     action=function (npc,player_id,dialogue,relay_object)
         return async(function()
-        Net.initiate_encounter(player_id, "/server/assets/bosses/com_louise_mob_HeelNavi.zip")
-        return dialogue.custom_properties["Next 1"]
-    end)
-end
+        local stats = await(ezencounters.begin_encounter(player_id, boss2))
+            if stats.ran or stats.health == 0 then
+                return dialogue.custom_properties["Battle Lost"]
+            else
+                return dialogue.custom_properties["Battle Won"]
+            end
+        end)
+    end
 }
 eznpcs.add_event(event2)
 

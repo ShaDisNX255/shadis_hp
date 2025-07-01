@@ -376,9 +376,10 @@
   </object>
   <object id="50" name="battle" type="Dialogue" x="1490.5" y="1483.5">
    <properties>
+    <property name="Battle Lost" type="object" value="99"/>
+    <property name="Battle Won" type="object" value="51"/>
     <property name="Dialogue Type" value="none"/>
     <property name="Event Name" value="Heel Navi1"/>
-    <property name="Next 1" type="object" value="51"/>
    </properties>
    <point/>
   </object>
@@ -671,6 +672,13 @@
     <property name="Dialogue Type" value="none"/>
     <property name="Event Name" value="Win_Gamble"/>
     <property name="Next 1" type="object" value="67"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="99" name="battle lost" type="Dialogue" x="1502.25" y="1489.25">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Text 1" value="Hahaha you're too weak!"/>
    </properties>
    <point/>
   </object>
