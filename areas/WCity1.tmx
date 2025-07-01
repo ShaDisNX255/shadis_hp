@@ -10,6 +10,7 @@
   <property name="Mystery Data Minimum" type="int" value="2"/>
   <property name="Name" value="WCity1"/>
   <property name="OctoPVP" value="true"/>
+  <property name="Honor HPMem" type="bool" value="true"/>
  </properties>
  <tileset firstgid="1" source="../assets/tiles/Custom_Central_Tiles.tsx"/>
  <tileset firstgid="9" source="../assets/tiles/hp_warp_blue.tsx"/>
