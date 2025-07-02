@@ -6,11 +6,11 @@
   <property name="Background Texture" value="/server/assets/custom/backgrounds/wcity/01-generic1.png"/>
   <property name="Background Vel X" type="float" value="0.45"/>
   <property name="Background Vel Y" type="float" value="0.25"/>
+  <property name="Honor HPMem" type="bool" value="true"/>
   <property name="Mystery Data Maximum" type="int" value="6"/>
   <property name="Mystery Data Minimum" type="int" value="2"/>
   <property name="Name" value="WCity3"/>
   <property name="OctoPVP" value="true"/>
-  <property name="Honor HPMem" type="bool" value="true"/>
  </properties>
  <tileset firstgid="1" source="../assets/tiles/Custom_Central_Tiles.tsx"/>
  <tileset firstgid="9" source="../assets/tiles/central_arrows2.tsx"/>
@@ -89,7 +89,7 @@
    </properties>
   </object>
   <object id="4" gid="24" x="401" y="385" width="64" height="64"/>
-  <object id="5" name="Jinzy" type="Mystery Data" gid="265" x="402.5" y="329.5" width="14" height="43">
+  <object id="5" name="Jinzo" type="Mystery Data" gid="265" x="402.5" y="329.5" width="14" height="43">
    <properties>
     <property name="Description" value="SRare: Jinzo - A: 2400 / D: 1500"/>
     <property name="Name" value="[SR]Jinzo"/>

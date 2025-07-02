@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.8" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="75" height="75" tilewidth="64" tileheight="32" infinite="0" nextlayerid="13" nextobjectid="146">
+<map version="1.8" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="75" height="75" tilewidth="64" tileheight="32" infinite="0" nextlayerid="13" nextobjectid="153">
  <properties>
   <property name="Background" value="custom"/>
   <property name="Background Animation" value="/server/assets/custom/backgrounds/wcity/01-generic1.animation"/>
   <property name="Background Texture" value="/server/assets/custom/backgrounds/wcity/01-generic1.png"/>
   <property name="Background Vel X" type="float" value="0.45"/>
   <property name="Background Vel Y" type="float" value="0.25"/>
+  <property name="Honor HPMem" type="bool" value="true"/>
   <property name="Mystery Data Maximum" type="int" value="6"/>
   <property name="Mystery Data Minimum" type="int" value="2"/>
   <property name="Name" value="WCity1"/>
   <property name="OctoPVP" value="true"/>
-  <property name="Honor HPMem" type="bool" value="true"/>
  </properties>
  <tileset firstgid="1" source="../assets/tiles/Custom_Central_Tiles.tsx"/>
  <tileset firstgid="9" source="../assets/tiles/hp_warp_blue.tsx"/>
@@ -359,6 +359,14 @@
     <property name="Text 1" value=""/>
    </properties>
    <point/>
+  </object>
+  <object id="147" type="Mystery Data" gid="422" x="1207.5" y="612.5" width="14" height="43">
+   <properties>
+    <property name="Name" value="HPMem"/>
+    <property name="Next 1" type="object" value="0"/>
+    <property name="Once" type="bool" value="true"/>
+    <property name="Type" value="item"/>
+   </properties>
   </object>
  </objectgroup>
  <layer id="5" name="Tile Layer 1" width="75" height="75" offsetx="0" offsety="-16">
@@ -998,6 +1006,54 @@
     <property name="Next Waypoint 1" type="object" value="142"/>
     <property name="Next Waypoint 2" type="object" value="143"/>
     <property name="Wait Time" type="int" value="6"/>
+    <property name="Waypoint Type" value="random"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="148" name="OrangeNavi" type="NPC" x="1040" y="1104">
+   <properties>
+    <property name="Asset Name" value="female-navi-exe4_orange"/>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Direction" value="Up Right"/>
+    <property name="Next Waypoint 1" type="object" value="149"/>
+    <property name="Text 1" value="If you get deleted, your automatic backup will kick in. Isn't it great?"/>
+    <property name="Wait Time" type="int" value="5"/>
+    <property name="Waypoint Type" value="first"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="149" type="Waypoint" x="1168" y="1104">
+   <properties>
+    <property name="Next Waypoint 1" type="object" value="150"/>
+    <property name="Next Waypoint 2" type="object" value="152"/>
+    <property name="Wait Time" type="int" value="5"/>
+    <property name="Waypoint Type" value="random"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="150" type="Waypoint" x="1168" y="1168">
+   <properties>
+    <property name="Next Waypoint 1" type="object" value="149"/>
+    <property name="Next Waypoint 2" type="object" value="151"/>
+    <property name="Wait Time" type="int" value="5"/>
+    <property name="Waypoint Type" value="random"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="151" type="Waypoint" x="1264" y="1168">
+   <properties>
+    <property name="Next Waypoint 1" type="object" value="150"/>
+    <property name="Next Waypoint 2" type="object" value="152"/>
+    <property name="Wait Time" type="int" value="5"/>
+    <property name="Waypoint Type" value="random"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="152" type="Waypoint" x="1264" y="1104">
+   <properties>
+    <property name="Next Waypoint 1" type="object" value="149"/>
+    <property name="Next Waypoint 2" type="object" value="151"/>
+    <property name="Wait Time" type="int" value="5"/>
     <property name="Waypoint Type" value="random"/>
    </properties>
    <point/>
