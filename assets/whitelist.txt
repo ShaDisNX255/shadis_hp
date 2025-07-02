@@ -47,9 +47,11 @@ fcee42c2fe50c4c615e34e9c11f7dfe3 com.OFC.card.EXEPoN-088-CrackOut
 b45ba712c91161f3b0aba2f8ff41da74 com.rune.k1rbyat1na.card.EXE6-060-EnergyBomb
 269d50448aea1c9e50d7ce9ebe6de185 com.rune.k1rbyat1na.card.EXE6-061-MegaEnergyBomb
 c976d03fa4ce445ae67e7ab6bf2ee4b3 hoov.cards.wavearm1
+15371a9cabd3a650c0ef2ba4caf7eb56 com.ipc.card.corn1
 
 ............................class BlockPackageManager............................
 f5b200a5a6defc1d69451ead69a88477 com.OFC.block.EXE6-013-UnderShirt
 
 ...........................class PlayerPackageManager............................
 2c161602ba727287b7bf060d3276c30f com.beaned.navi.megamanbn6_100
+8e5972064e1ed287a9f2fce17115e25c com.scilabs.cossack.player.fortepvp_100
