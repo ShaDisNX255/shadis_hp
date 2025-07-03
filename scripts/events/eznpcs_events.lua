@@ -33,7 +33,7 @@ local boss2 = {
     name="boss2",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     enemies={
-        {name="HeelNavi",rank=1},
+        {name="HeelNavi",rank=2},
     },
     obstacles={
     },
