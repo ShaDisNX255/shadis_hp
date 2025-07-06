@@ -107,3 +107,268 @@ local Win_Gamble = {
 }
 eznpcs.add_event(Win_Gamble)
 
+local boss4 = {
+    name="boss4",
+    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    enemies={
+        {name="ProtomanPoN",rank=2},
+    },
+    obstacles={
+    },
+    positions={
+        {0,0,0,0,0,0},
+        {0,0,0,0,1,0},
+        {0,0,0,0,0,0},
+    },
+    obstacle_positions={
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+    },
+    player_positions={
+        {0,0,0,0,0,0},
+        {0,1,0,0,0,0},
+        {0,0,0,0,0,0},
+    },
+    tiles={
+        {1,1,1,1,1,1},
+        {1,1,1,1,1,1},
+        {1,1,1,1,1,1},
+    },
+    teams={
+        {2,2,2,1,1,1},
+        {2,2,2,1,1,1},
+        {2,2,2,1,1,1},
+    },
+    music={
+        path="bn3_boss.mid"
+    },
+}
+
+local event4 = {
+    name="Proto Battle",
+    action=function (npc,player_id,dialogue,relay_object)
+        return async(function()
+        local stats = await(ezencounters.begin_encounter(player_id, boss4))
+            if stats.ran or stats.health == 0 then
+                return dialogue.custom_properties["Battle Lost"]
+            else
+                return dialogue.custom_properties["Battle Won"]
+            end
+        end)
+    end
+}
+eznpcs.add_event(event4)
+
+local boss5 = {
+    name="boss5",
+    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    enemies={
+        {name="Roll",rank=2},
+    },
+    obstacles={
+    },
+    positions={
+        {0,0,0,0,0,0},
+        {0,0,0,0,1,0},
+        {0,0,0,0,0,0},
+    },
+    obstacle_positions={
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+    },
+    player_positions={
+        {0,0,0,0,0,0},
+        {0,1,0,0,0,0},
+        {0,0,0,0,0,0},
+    },
+    tiles={
+        {1,1,1,1,1,1},
+        {1,1,1,1,1,1},
+        {1,1,1,1,1,1},
+    },
+    teams={
+        {2,2,2,1,1,1},
+        {2,2,2,1,1,1},
+        {2,2,2,1,1,1},
+    },
+    music={
+        path="bn3_boss.mid"
+    },
+}
+
+local event5 = {
+    name="Roll Battle",
+    action=function (npc,player_id,dialogue,relay_object)
+        return async(function()
+        local stats = await(ezencounters.begin_encounter(player_id, boss5))
+            if stats.ran or stats.health == 0 then
+                return dialogue.custom_properties["Battle Lost"]
+            else
+                return dialogue.custom_properties["Battle Won"]
+            end
+        end)
+    end
+}
+eznpcs.add_event(event5)
+
+local boss6 = {
+    name="boss6",
+    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    enemies={
+        {name="GutsManPoN",rank=2},
+    },
+    obstacles={
+    },
+    positions={
+        {0,0,0,0,0,0},
+        {0,0,0,0,1,0},
+        {0,0,0,0,0,0},
+    },
+    obstacle_positions={
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+    },
+    player_positions={
+        {0,0,0,0,0,0},
+        {0,1,0,0,0,0},
+        {0,0,0,0,0,0},
+    },
+    tiles={
+        {1,1,1,1,1,1},
+        {1,1,1,1,1,1},
+        {1,1,1,1,1,1},
+    },
+    teams={
+        {2,2,2,1,1,1},
+        {2,2,2,1,1,1},
+        {2,2,2,1,1,1},
+    },
+    music={
+        path="bn3_boss.mid"
+    },
+}
+
+local event6 = {
+    name="Guts Battle",
+    action=function (npc,player_id,dialogue,relay_object)
+        return async(function()
+        local stats = await(ezencounters.begin_encounter(player_id, boss6))
+            if stats.ran or stats.health == 0 then
+                return dialogue.custom_properties["Battle Lost"]
+            else
+                return dialogue.custom_properties["Battle Won"]
+            end
+        end)
+    end
+}
+eznpcs.add_event(event6)
+
+local boss7 = {
+    name="boss7",
+    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    enemies={
+        {name="GutsManPoN",rank=3},
+    },
+    obstacles={
+    },
+    positions={
+        {0,0,0,0,0,0},
+        {0,0,0,0,1,0},
+        {0,0,0,0,0,0},
+    },
+    obstacle_positions={
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+    },
+    player_positions={
+        {0,0,0,0,0,0},
+        {0,1,0,0,0,0},
+        {0,0,0,0,0,0},
+    },
+    tiles={
+        {1,1,1,1,1,1},
+        {1,1,1,1,1,1},
+        {1,1,1,1,1,1},
+    },
+    teams={
+        {2,2,2,1,1,1},
+        {2,2,2,1,1,1},
+        {2,2,2,1,1,1},
+    },
+    music={
+        path="bn3_boss.mid"
+    },
+}
+
+local event7 = {
+    name="Guts3 Battle",
+    action=function (npc,player_id,dialogue,relay_object)
+        return async(function()
+        local stats = await(ezencounters.begin_encounter(player_id, boss7))
+            if stats.ran or stats.health == 0 then
+                return dialogue.custom_properties["Battle Lost"]
+            else
+                return dialogue.custom_properties["Battle Won"]
+            end
+        end)
+    end
+}
+eznpcs.add_event(event7)
+
+local boss8 = {
+    name="boss8",
+    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    enemies={
+        {name="GregarBeast",rank=1},
+    },
+    obstacles={
+    },
+    positions={
+        {0,0,0,0,0,0},
+        {0,0,0,0,1,0},
+        {0,0,0,0,0,0},
+    },
+    obstacle_positions={
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+    },
+    player_positions={
+        {0,0,0,0,0,0},
+        {0,1,0,0,0,0},
+        {0,0,0,0,0,0},
+    },
+    tiles={
+        {1,1,1,1,1,1},
+        {1,1,1,1,1,1},
+        {1,1,1,1,1,1},
+    },
+    teams={
+        {2,2,2,1,1,1},
+        {2,2,2,1,1,1},
+        {2,2,2,1,1,1},
+    },
+    music={
+        path="bn3_boss.mid"
+    },
+}
+
+local event8 = {
+    name="GregarB Battle",
+    action=function (npc,player_id,dialogue,relay_object)
+        return async(function()
+        local stats = await(ezencounters.begin_encounter(player_id, boss8))
+            if stats.ran or stats.health == 0 then
+                return dialogue.custom_properties["Battle Lost"]
+            else
+                return dialogue.custom_properties["Battle Won"]
+            end
+        end)
+    end
+}
+eznpcs.add_event(event8)
+

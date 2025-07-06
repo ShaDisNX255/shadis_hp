@@ -4,7 +4,6 @@ d2e6ca836f8de25f96351a4a5910d0f0 com.OFC.card.EXE4-148-Attack+10
 f19ac8da5e3db97da4be0db3910d20ca com.OFC.card.EXE6-004-AirShoot
 1ea2339e8b3e8ce1d21b0dfb9f4df8ee com.OFC.card.EXE6-009-SpreadGun1
 b48c6e3336815fe7f45dd80c7ee0b79c com.OFC.card.EXE6-010-SpreadGun2
-46fd045b97190a3b2bacdc017c063ad4 com.OFC.card.EXE6-015-GunDelSol1
 ee8944d83b41d4d0f010316c3acd0faf com.OFC.card.EXE6-018-YoYo
 102acf1aa109a0931d0a9ced8d21b0bb com.OFC.card.EXE6-019-HellsBurner1
 bb8ee65fffa4796d02537f5f5542f2da com.OFC.card.EXE6-029-ThunderBall
@@ -41,13 +40,15 @@ c8bd15a58318f59a7345ca0e0245d1ab com.OFC.card.EXEPoN-066-Boomerang1
 fcee42c2fe50c4c615e34e9c11f7dfe3 com.OFC.card.EXEPoN-088-CrackOut
 76c636597c67c0d35df1d61b04e9283c com.OFC.card.EXEPoN-089-DoubleCrack
 4ba43cf7d5cf248704ccf310d5e465fb com.OFC.card.EXEPoN-090-TripleCrack
-50e74f7522d7e5e690413c9bd4da71b1 com.OFC.card.EXEPoN-100-AreaSteal
 89f93437ac2efae265d9767a7316254e com.OFC.card.EXEPoN-112-Barrier
 494b80fe2f92432fab3607374a8d37e9 com.k1rbyat1na.card.EXE6-222-Roll
 b45ba712c91161f3b0aba2f8ff41da74 com.rune.k1rbyat1na.card.EXE6-060-EnergyBomb
 269d50448aea1c9e50d7ce9ebe6de185 com.rune.k1rbyat1na.card.EXE6-061-MegaEnergyBomb
 c976d03fa4ce445ae67e7ab6bf2ee4b3 hoov.cards.wavearm1
 15371a9cabd3a650c0ef2ba4caf7eb56 com.ipc.card.corn1
+0ed4d163510a0d793c3b07697bda47a2 Areagrab.Unified.Library.162
+1b26e647d692790aa6321b0bdc43353e com.OFC.card.EXE5-012-PulseBeam1
+9079148c0e015a9058b4e6d76bc7389e com.OFC.card.EXE6-015-GunDelSol1
 
 ............................class BlockPackageManager............................
 f5b200a5a6defc1d69451ead69a88477 com.OFC.block.EXE6-013-UnderShirt
