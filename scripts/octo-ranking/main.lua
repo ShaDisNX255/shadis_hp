@@ -136,12 +136,16 @@ Net:on("board_close", function(event)
 	bbs_type[event.player_id] = nil
 end)
 
-Net:on("tile_interaction", function(event)
-	print("interact")
-	--If Left Shoulder pressed
-	print(players_in_ranked_matchmaking)
+Net:on("object_interaction", function(event)
+	--If A / Interact button pressed on object with class "PVP Board" then PVP Menu opens
 
-	if event.button == 1 then
+	local player_area = Net.get_player_area(event.player_id)
+	local object = Net.get_object_by_id(player_area, event.object_id)
+	if object.class ~= "PVP Board" and object.type ~= "PVP Board" then
+		return
+	end
+
+	if event.button == 0 then
 		if pvp_areas[Net.get_player_area(event.player_id)] ~= true then return end
 		bbs_type[event.player_id] = "ServerMenu"
 		local server_menu = {
