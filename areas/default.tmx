@@ -7,6 +7,7 @@
   <property name="Background Vel X" type="float" value="0.35"/>
   <property name="Background Vel Y" type="float" value="0.2"/>
   <property name="Name" value="ShaDis_Home"/>
+  <property name="Song" value="/server/assets/ChillCafe.ogg"/>
  </properties>
  <tileset firstgid="1" source="../assets/tiles/home_warp.tsx"/>
  <tileset firstgid="6" source="../assets/tiles/Custom_Central_Tiles.tsx"/>
