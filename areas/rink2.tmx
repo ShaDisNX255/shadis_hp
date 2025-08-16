@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.8" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="50" height="50" tilewidth="64" tileheight="32" infinite="0" nextlayerid="3" nextobjectid="100">
+<map version="1.8" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="50" height="50" tilewidth="64" tileheight="32" infinite="0" nextlayerid="3" nextobjectid="101">
  <properties>
   <property name="Background" value="custom"/>
   <property name="Background Animation" value="/server/assets/custom/backgrounds/home/suidoukyokunodennou2.animation"/>
@@ -27,13 +27,13 @@
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4,4,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4,8,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4,4,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,8,8,8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -491,13 +491,13 @@
   <object id="80" name="MysteryDataResults" type="Mystery Option" x="786.5" y="365.5">
    <properties>
     <property name="Next 1" type="object" value="81"/>
-    <property name="Next 2" type="object" value="81"/>
-    <property name="Next 3" type="object" value="81"/>
-    <property name="Next 4" type="object" value="82"/>
-    <property name="Next 5" type="object" value="82"/>
-    <property name="Next 6" type="object" value="83"/>
-    <property name="Next 7" type="object" value="83"/>
-    <property name="Next 8" type="object" value="84"/>
+    <property name="Next 2" type="object" value="82"/>
+    <property name="Next 3" type="object" value="82"/>
+    <property name="Next 4" type="object" value="83"/>
+    <property name="Next 5" type="object" value="83"/>
+    <property name="Next 6" type="object" value="85"/>
+    <property name="Next 7" type="object" value="85"/>
+    <property name="Next 8" type="object" value="85"/>
     <property name="Next 9" type="object" value="85"/>
     <property name="Type" value="random"/>
    </properties>
@@ -535,12 +535,12 @@
    <properties>
     <property name="Next 1" type="object" value="84"/>
     <property name="Next 2" type="object" value="84"/>
-    <property name="Next 3" type="object" value="84"/>
-    <property name="Next 4" type="object" value="84"/>
-    <property name="Next 5" type="object" value="84"/>
-    <property name="Next 6" type="object" value="86"/>
-    <property name="Next 7" type="object" value="86"/>
-    <property name="Next 8" type="object" value="86"/>
+    <property name="Next 3" type="object" value="86"/>
+    <property name="Next 4" type="object" value="87"/>
+    <property name="Next 5" type="object" value="87"/>
+    <property name="Next 6" type="object" value="87"/>
+    <property name="Next 7" type="object" value="87"/>
+    <property name="Next 8" type="object" value="87"/>
     <property name="Next 9" type="object" value="87"/>
     <property name="Type" value="random"/>
    </properties>
@@ -555,8 +555,8 @@
   </object>
   <object id="87" name="Rare" type="Mystery Option" x="643" y="235">
    <properties>
-    <property name="Next 1" type="object" value="86"/>
-    <property name="Next 2" type="object" value="88"/>
+    <property name="Next 1" type="object" value="88"/>
+    <property name="Next 2" type="object" value="89"/>
     <property name="Next 3" type="object" value="89"/>
     <property name="Type" value="random"/>
    </properties>
@@ -572,15 +572,15 @@
   <object id="89" name="Ultra Rare" type="Mystery Option" x="613" y="199">
    <properties>
     <property name="Next 1" type="object" value="90"/>
-    <property name="Next 2" type="object" value="88"/>
+    <property name="Next 2" type="object" value="92"/>
     <property name="Next 3" type="object" value="92"/>
     <property name="Type" value="random"/>
    </properties>
    <point/>
   </object>
-  <object id="90" name="20000" type="Mystery Option" x="636" y="166">
+  <object id="90" name="700000" type="Mystery Option" x="636" y="166">
    <properties>
-    <property name="Amount" value="20000"/>
+    <property name="Amount" value="700000"/>
     <property name="Type" value="money"/>
    </properties>
    <point/>
@@ -636,6 +636,13 @@
     <property name="Direction" value="Up Right"/>
     <property name="Target Area" value="rink2"/>
     <property name="Target Object" value="5"/>
+   </properties>
+  </object>
+  <object id="100" name="rink3" type="Custom Warp" gid="179" x="992" y="192" width="64" height="39">
+   <properties>
+    <property name="Direction" value="Down Left"/>
+    <property name="Target Area" value="rink3"/>
+    <property name="Target Object" value="1"/>
    </properties>
   </object>
  </objectgroup>
