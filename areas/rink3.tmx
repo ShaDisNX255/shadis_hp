@@ -7,6 +7,7 @@
   <property name="Background Vel X" type="float" value="0"/>
   <property name="Background Vel Y" type="float" value="0.5"/>
   <property name="Name" value="Ice_Rink3"/>
+  <property name="Song" value="/server/assets/icerink.ogg"/>
  </properties>
  <tileset firstgid="1" source="../assets/tiles/Custom_Central_Tiles.tsx"/>
  <tileset firstgid="9" source="../assets/tiles/ice-tile.tsx"/>

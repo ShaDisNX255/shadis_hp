@@ -7,6 +7,7 @@
   <property name="Background Vel X" type="float" value="0.35"/>
   <property name="Background Vel Y" type="float" value="0.5"/>
   <property name="Name" value="Ice_Rink1"/>
+  <property name="Song" value="/server/assets/icerink.ogg"/>
  </properties>
  <tileset firstgid="1" source="../assets/tiles/Custom_Central_Tiles.tsx"/>
  <tileset firstgid="9" source="../assets/tiles/Toy_Robo.tsx"/>
@@ -426,7 +427,7 @@
     <property name="Next 2" type="object" value="124"/>
     <property name="Next 3" type="object" value="126"/>
     <property name="Next 4" type="object" value="126"/>
-    <property name="Next 5" type="object" value="127"/>
+    <property name="Next 5" type="object" value="126"/>
     <property name="Next 6" type="object" value="127"/>
     <property name="Next 7" type="object" value="127"/>
     <property name="Next 8" type="object" value="127"/>
