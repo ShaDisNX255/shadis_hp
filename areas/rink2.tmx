@@ -579,16 +579,16 @@
    </properties>
    <point/>
   </object>
-  <object id="90" name="700,000" type="Mystery Option" x="636" y="166">
+  <object id="90" name="500,000" type="Mystery Option" x="636" y="166">
    <properties>
-    <property name="Amount" value="700000"/>
+    <property name="Amount" value="500000"/>
     <property name="Type" value="money"/>
    </properties>
    <point/>
   </object>
-  <object id="91" name="2,000,000" type="Mystery Option" x="616" y="142">
+  <object id="91" name="1,000,000" type="Mystery Option" x="616" y="142">
    <properties>
-    <property name="Amount" value="2000000"/>
+    <property name="Amount" value="1000000"/>
     <property name="Type" value="money"/>
    </properties>
    <point/>
