@@ -194,7 +194,7 @@
     <property name="Target Object" value="9"/>
    </properties>
   </object>
-  <object id="70" name="TryAgain" type="Custom Warp" gid="240" x="571.75" y="730.25" width="65" height="31">
+  <object id="70" name="TryAgain" type="Custom Warp" gid="240" x="569" y="729" width="65" height="31">
    <properties>
     <property name="Direction" value="Up Right"/>
     <property name="Target Area" value="rink"/>
@@ -425,10 +425,10 @@
    <properties>
     <property name="Next 1" type="object" value="124"/>
     <property name="Next 2" type="object" value="124"/>
-    <property name="Next 3" type="object" value="126"/>
+    <property name="Next 3" type="object" value="124"/>
     <property name="Next 4" type="object" value="126"/>
     <property name="Next 5" type="object" value="126"/>
-    <property name="Next 6" type="object" value="127"/>
+    <property name="Next 6" type="object" value="126"/>
     <property name="Next 7" type="object" value="127"/>
     <property name="Next 8" type="object" value="127"/>
     <property name="Next 9" type="object" value="127"/>
@@ -475,14 +475,14 @@
    </properties>
    <point/>
   </object>
-  <object id="131" name="1000000" type="Mystery Option" x="627" y="302">
+  <object id="131" name="100,000" type="Mystery Option" x="627" y="302">
    <properties>
-    <property name="Amount" value="1000000"/>
+    <property name="Amount" value="100000"/>
     <property name="Type" value="money"/>
    </properties>
    <point/>
   </object>
-  <object id="132" name="Millionaire" type="Mystery Option" x="602" y="325">
+  <object id="132" name="Rarest" type="Mystery Option" x="602" y="325">
    <properties>
     <property name="Next 1" type="object" value="136"/>
     <property name="Next 2" type="object" value="131"/>
@@ -498,15 +498,15 @@
   </object>
   <object id="135" type="Mystery Data" gid="253" x="598" y="630" width="14" height="43">
    <properties>
-    <property name="Amount" type="int" value="8000"/>
+    <property name="Amount" type="int" value="100000"/>
     <property name="Next 1" type="object" value="0"/>
     <property name="Once" type="bool" value="true"/>
     <property name="Type" value="money"/>
    </properties>
   </object>
-  <object id="136" name="500000" type="Mystery Option" x="639.5" y="316.5">
+  <object id="136" name="50,000" type="Mystery Option" x="639.5" y="316.5">
    <properties>
-    <property name="Amount" value="500000"/>
+    <property name="Amount" value="50000"/>
     <property name="Type" value="money"/>
    </properties>
    <point/>
