@@ -519,10 +519,35 @@ local function open_n_packs(player_id, area_id, pack, mug, n)
     return true
 end
 
+local function short_money(n)
+    n = tonumber(n) or 0
+    local abs = math.abs(n)
+    if abs >= 1e9 then
+        return string.format("$%dB", math.floor(n/1e9 + 0.5))
+    elseif abs >= 1e6 then
+        local v = n/1e6
+        if v >= 10 or v == math.floor(v) then
+            return string.format("$%dM", math.floor(v + 0.5))
+        else
+            return string.format("$%.1fM", v)
+        end
+    elseif abs >= 1e3 then
+        local v = n/1e3
+        if v >= 10 or v == math.floor(v) then
+            return string.format("$%dk", math.floor(v + 0.5))
+        else
+            return string.format("$%.1fk", v)
+        end
+    else
+        return string.format("$%d", n)
+    end
+end
+
 -- 3-option chooser: Buy 1 / Buy 10 / Cancel (B acts as Cancel in quiz); fallback to Yes/No if needed
 local function choose_buy_quantity(player_id, mug, pack)
-    local opt1 = string.format("Buy 1 (%d$)", pack.price or 0)
-    local opt2 = string.format("Buy 10 (%d$)", (pack.price or 0) * 10)
+    local p = tonumber(pack.price or 0)
+    local opt1 = string.format("Buy 1 (%s)",  short_money(p))
+    local opt2 = string.format("Buy 10 (%s)", short_money(p * 10))
     local opt3 = "Cancel"
 
     -- Primary path: 3-option cursor selection
@@ -535,10 +560,12 @@ local function choose_buy_quantity(player_id, mug, pack)
     -- Fallback: two Yes/No prompts (B behaves as No)
     local buy1 = await(Async.question_player(player_id, opt1.."?",
                     mug.texture_path, mug.animation_path))
-    if buy1 == 1 then return 1 end
+    if buy1 then return 1 end
+
     local buy10 = await(Async.question_player(player_id, opt2.."?",
                     mug.texture_path, mug.animation_path))
-    if buy10 == 1 then return 10 end
+    if buy10 then return 10 end
+
     return nil
 end
 
