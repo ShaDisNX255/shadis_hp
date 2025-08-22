@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.8" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="50" height="50" tilewidth="64" tileheight="32" infinite="0" nextlayerid="13" nextobjectid="218">
+<map version="1.8" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="50" height="50" tilewidth="64" tileheight="32" infinite="0" nextlayerid="13" nextobjectid="235">
  <properties>
   <property name="Background" value="custom"/>
   <property name="Background Animation" value="/server/assets/custom/backgrounds/home/kottouhinyanodennou.animation"/>
@@ -463,6 +463,143 @@
    </properties>
    <point/>
   </object>
+  <object id="218" name="Card Pack Seller" type="NPC" x="685.5" y="852.5">
+   <properties>
+    <property name="Asset Name" value="normal-navi-bn4_green"/>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Direction" value="Down Right"/>
+    <property name="Next 1" type="object" value="219"/>
+    <property name="Text 1" value="Hey there, I sell card packs!"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="220" name="Card Pack Trader" type="NPC" x="882" y="852">
+   <properties>
+    <property name="Asset Name" value="normal-navi-bn4_red"/>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Direction" value="Up Left"/>
+    <property name="Next 1" type="object" value="221"/>
+    <property name="Text 1" value="Hey there, I trade cards"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="222" name="Griffore" type="Item" x="606.5" y="879">
+   <properties>
+    <property name="Description" value="Common: Griffore - A: 1200 / D: 1500"/>
+    <property name="Name" value="[C]Griffore"/>
+    <property name="Price" value="0"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="223" name="Armored Lizard" type="Item" x="602.5" y="867">
+   <properties>
+    <property name="Description" value="Common: Armored Lizard - A: 1500 / D: 1200"/>
+    <property name="Name" value="[C]ArmrdLiz"/>
+    <property name="Price" value="2000"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="224" name="Skull Red Bird" type="Item" x="601" y="869">
+   <properties>
+    <property name="Description" value="Common: Skull Red Bird - A: 1550 / D: 1200"/>
+    <property name="Name" value="[C]SkullRBrd"/>
+    <property name="Price" value="0"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="225" name="Mystical Elf" type="Item" x="599" y="871">
+   <properties>
+    <property name="Description" value="Common: Mystical Elf - A: 800 / D: 200"/>
+    <property name="Name" value="[C]MElf"/>
+    <property name="Price" value="0"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="226" name="Mechanicalchaser" type="Item" x="617.5" y="883.5">
+   <properties>
+    <property name="Description" value="Rare: Mechanicalchaser - A: 1850 / D: 800"/>
+    <property name="Name" value="[R]MChsr"/>
+    <property name="Price" value="0"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="227" name="X-Head Cannon" type="Item" x="616" y="885">
+   <properties>
+    <property name="Description" value="Rare: X-Head Cannon - A: 1800 / D: 1500"/>
+    <property name="Name" value="[R]XHCan"/>
+    <property name="Price" value="0"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="228" name="Flame Swordsman" type="Item" x="619" y="882">
+   <properties>
+    <property name="Description" value="Rare: Flame Swordsman - A: 1800 / D: 1600"/>
+    <property name="Name" value="[R]FlameSwm"/>
+    <property name="Price" value="0"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="229" name="SRGaia" type="Item" x="629" y="895">
+   <properties>
+    <property name="Description" value="SRare: Gaia the Fierce Knight - A: 2300 / D: 2100"/>
+    <property name="Name" value="[SR]Gaia"/>
+    <property name="Price" value="0"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="230" name="SRKuriboh" type="Item" x="631" y="893">
+   <properties>
+    <property name="Description" value="SRare: Kuriboh - A: 300 / D: 200"/>
+    <property name="Name" value="[SR]Kuriboh"/>
+    <property name="Price" value="0"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="231" name="Red-Eyes Black Metal Dragon" type="Item" x="633" y="891">
+   <properties>
+    <property name="Description" value="SRare: Red-Eyes Black Metal Dragon - A: 2800 / D: 2400"/>
+    <property name="Name" value="[SR]REBMD"/>
+    <property name="Price" value="0"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="232" name="Summoned Skull" type="Item" x="636" y="898">
+   <properties>
+    <property name="Description" value="URare: Summoned Skull - A: 2500 / D: 1200"/>
+    <property name="Name" value="[UR]S.Skull"/>
+    <property name="Price" value="0"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="233" name="Black Skull Dragon" type="Item" x="637.5" y="896.5">
+   <properties>
+    <property name="Description" value="URare: Black Skull Dragon - A: 3200 / D: 2500"/>
+    <property name="Name" value="[UR]B.Sk.D."/>
+    <property name="Price" value="0"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="234" name="Gold Rare: Summoned Skull" type="Item" x="643.5" y="898.5">
+   <properties>
+    <property name="Description" value="GDRare: Summoned Skull - A: 2500 / D: 1200"/>
+    <property name="Name" value="[GDR]S.Skull"/>
+    <property name="Price" value="0"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
  </objectgroup>
  <layer id="6" name="Tile Layer 2" width="50" height="50" offsetx="0" offsety="-16">
   <data encoding="csv">
@@ -727,6 +864,73 @@
     <property name="Item 7" type="object" value="203"/>
     <property name="Item 8" type="object" value="196"/>
     <property name="Item 9" type="object" value="205"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="219" name="Card pack" type="Dialogue" x="690.5" y="903.5">
+   <properties>
+    <property name="Dialogue Type" value="Pack Shop"/>
+    <property name="Pack Description" value="1st Pack Available"/>
+    <property name="Pack Name" value="Skulled Minions"/>
+    <property name="Pack Price" type="int" value="20000"/>
+    <property name="Pack Rolls" type="int" value="3"/>
+    <property name="common 1" type="object" value="189"/>
+    <property name="common 2" type="object" value="191"/>
+    <property name="common 3" type="object" value="192"/>
+    <property name="common 4" type="object" value="225"/>
+    <property name="common 5" type="object" value="224"/>
+    <property name="common 6" type="object" value="223"/>
+    <property name="common 7" type="object" value="222"/>
+    <property name="common rate" type="int" value="753"/>
+    <property name="gold rare 1" type="object" value="234"/>
+    <property name="gold rare rate" type="int" value="1"/>
+    <property name="rare 1" type="object" value="196"/>
+    <property name="rare 2" type="object" value="194"/>
+    <property name="rare 3" type="object" value="227"/>
+    <property name="rare 4" type="object" value="226"/>
+    <property name="rare 5" type="object" value="228"/>
+    <property name="rare rate" type="int" value="207"/>
+    <property name="super rare 1" type="object" value="229"/>
+    <property name="super rare 2" type="object" value="230"/>
+    <property name="super rare 3" type="object" value="231"/>
+    <property name="super rare rate" type="int" value="30"/>
+    <property name="ultra rare 1" type="object" value="232"/>
+    <property name="ultra rare 2" type="object" value="233"/>
+    <property name="ultra rare 3" type="object" value="199"/>
+    <property name="ultra rare rate" type="int" value="9"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="221" name="Card trader" type="Dialogue" x="978.5" y="893.5">
+   <properties>
+    <property name="Dialogue Type" value="Card Trader"/>
+    <property name="Pack Description" value="I'll take any 10 cards and give you 1 random card back."/>
+    <property name="common 1" type="object" value="189"/>
+    <property name="common 2" type="object" value="191"/>
+    <property name="common 3" type="object" value="192"/>
+    <property name="common 4" type="object" value="225"/>
+    <property name="common 5" type="object" value="224"/>
+    <property name="common 6" type="object" value="223"/>
+    <property name="common 7" type="object" value="222"/>
+    <property name="common rate" type="int" value="157"/>
+    <property name="gold rare 1" type="object" value="234"/>
+    <property name="gold rare rate" type="int" value="3"/>
+    <property name="rare 1" type="object" value="196"/>
+    <property name="rare 2" type="object" value="194"/>
+    <property name="rare 3" type="object" value="227"/>
+    <property name="rare 4" type="object" value="226"/>
+    <property name="rare 5" type="object" value="228"/>
+    <property name="rare rate" type="int" value="753"/>
+    <property name="super rare 1" type="object" value="229"/>
+    <property name="super rare 2" type="object" value="230"/>
+    <property name="super rare 3" type="object" value="231"/>
+    <property name="super rare 4" type="object" value="198"/>
+    <property name="super rare rate" type="int" value="60"/>
+    <property name="ultra rare 1" type="object" value="232"/>
+    <property name="ultra rare 2" type="object" value="233"/>
+    <property name="ultra rare 3" type="object" value="199"/>
+    <property name="ultra rare 4" type="object" value="200"/>
+    <property name="ultra rare rate" type="int" value="27"/>
    </properties>
    <point/>
   </object>

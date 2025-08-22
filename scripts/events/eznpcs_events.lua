@@ -7,6 +7,7 @@ local ezweather = require('scripts/ezlibs-scripts/ezweather')
 local ezwarps = require('scripts/ezlibs-scripts/ezwarps/main')
 local ezencounters = require('scripts/ezlibs-scripts/ezencounters/main')
 local helpers = require('scripts/ezlibs-scripts/helpers')
+local custom = require('scripts/ezlibs-custom/custom')
 
 
 local sfx = {
@@ -371,4 +372,287 @@ local event8 = {
     end
 }
 eznpcs.add_event(event8)
+
+-- Weighted pick helper (number weights)
+local function pick_weighted(entries)
+    local total = 0
+    for _, e in ipairs(entries or {}) do total = total + (tonumber(e.weight) or 0) end
+    if total <= 0 then return nil end
+    local roll, acc = math.random() * total, 0
+    for _, e in ipairs(entries) do
+        acc = acc + (tonumber(e.weight) or 0)
+        if roll <= acc then return e end
+    end
+    return entries[#entries]
+end
+
+-- Case-insensitive props helpers
+local function build_ci_props(dialogue)
+    local ci = {}
+    for k, v in pairs(dialogue.custom_properties or {}) do
+        ci[string.lower(tostring(k))] = v
+    end
+    return ci
+end
+local function get_ci(ci, key) return ci[string.lower(key)] end
+local function extract_seq_ci(ci, prefix_lc)
+    local out, i = {}, 1
+    while true do
+        local v = ci[prefix_lc .. i]
+        if v == nil then break end
+        table.insert(out, v)
+        i = i + 1
+    end
+    return out
+end
+
+-- Parse single pack + rarity groups
+local function read_single_pack(dialogue)
+    local ci = build_ci_props(dialogue)
+
+    local name  = get_ci(ci, "pack name")
+    if not name then return nil end
+    local price = tonumber(get_ci(ci, "pack price")) or 0
+    local rolls = tonumber(get_ci(ci, "pack rolls")) or 1
+    local desc  = get_ci(ci, "pack description") or ("Contains "..rolls.." random card(s).")
+
+    local pools = {
+        { label = "Common",     items = extract_seq_ci(ci, "common "),     rate = tonumber(get_ci(ci, "common rate"))     },
+        { label = "Rare",       items = extract_seq_ci(ci, "rare "),       rate = tonumber(get_ci(ci, "rare rate"))       },
+        { label = "Super Rare", items = extract_seq_ci(ci, "super rare "), rate = tonumber(get_ci(ci, "super rare rate")) },
+        { label = "Ultra Rare", items = extract_seq_ci(ci, "ultra rare "), rate = tonumber(get_ci(ci, "ultra rare rate")) },
+        { label = "Gold Rare",  items = extract_seq_ci(ci, "gold rare "),  rate = tonumber(get_ci(ci, "gold rare rate"))  },
+    }
+
+    -- Default rates if none set
+    local any_rate = false
+    for _, p in ipairs(pools) do
+        if (p.rate or 0) > 0 then any_rate = true break end
+    end
+    if not any_rate then
+        local has_gdr = pools[5].items and #pools[5].items > 0
+        if has_gdr then
+            pools[1].rate, pools[2].rate, pools[3].rate, pools[4].rate, pools[5].rate = 753, 207, 30, 9, 1
+        else
+            pools[1].rate, pools[2].rate, pools[3].rate, pools[4].rate = 70, 25, 4, 1
+        end
+    end
+
+    -- Keep only pools that have items and a positive rate
+    local groups = {}
+    for _, p in ipairs(pools) do
+        if p.items and #p.items > 0 and (p.rate or 0) > 0 then
+            table.insert(groups, { label = p.label, items = p.items, weight = p.rate })
+        end
+    end
+
+    return { name = name, price = price, rolls = rolls, description = desc, groups = groups }
+end
+
+-- Grant items for one pack (spending handled elsewhere)
+local function grant_one_pack(player_id, area_id, pack, names_acc)
+    for _ = 1, (pack.rolls or 1) do
+        local group = pick_weighted(pack.groups or {})
+        if not group then return end
+        local items = group.items
+        if not items or #items == 0 then return end
+        local idx = math.random(1, #items)
+        local obj_id = items[idx]
+        local info = helpers.read_item_information(area_id, obj_id)
+        if info then
+            await(ezmemory.give_item_with_optional_notify(player_id, area_id, obj_id, info, false))
+            table.insert(names_acc, info.name)
+        end
+    end
+end
+
+-- Open exactly one pack: spend, grant, popup
+local function open_one_pack(player_id, area_id, pack, mug)
+    if not ezmemory.spend_player_money(player_id, pack.price or 0) then
+        return false, "You don't have enough money."
+    end
+    local gained = {}
+    grant_one_pack(player_id, area_id, pack, gained)
+    if sfx and sfx.item_get then Net.play_sound_for_player(player_id, sfx.item_get) end
+    await(Async.message_player(
+        player_id,
+        (#gained > 0)
+            and string.format("Opened %s and got:\n- %s", pack.name, table.concat(gained, "\n- "))
+            or string.format("Opened %s... but it was empty?", pack.name),
+        mug.texture_path, mug.animation_path
+    ))
+    return true
+end
+
+-- Open N packs at once: charge upfront; aggregate by name; one popup
+local function open_n_packs(player_id, area_id, pack, mug, n)
+    n = n or 10
+    local total_cost = (pack.price or 0) * n
+    if total_cost < 0 then total_cost = 0 end
+    if not ezmemory.spend_player_money(player_id, total_cost) then
+        return false, "You don't have enough money."
+    end
+
+    local counts, order = {}, {}
+    for _ = 1, n do
+        local names = {}
+        grant_one_pack(player_id, area_id, pack, names)
+        for _, name in ipairs(names) do
+            if not counts[name] then
+                counts[name] = 1
+                table.insert(order, name)
+            else
+                counts[name] = counts[name] + 1
+            end
+        end
+    end
+
+    if sfx and sfx.item_get then Net.play_sound_for_player(player_id, sfx.item_get) end
+
+    local lines = {}
+    for _, name in ipairs(order) do
+        table.insert(lines, string.format("x%d %s", counts[name], name))
+    end
+    local header = string.format("Opened %d x %s and got:", n, pack.name)
+    local body = (#lines > 0) and (header.."\n- "..table.concat(lines, "\n- ")) or (header.."\n(nothing?)")
+    await(Async.message_player(player_id, body, mug.texture_path, mug.animation_path))
+    return true
+end
+
+-- 3-option chooser: Buy 1 / Buy 10 / Cancel (B acts as Cancel in quiz); fallback to Yes/No if needed
+local function choose_buy_quantity(player_id, mug, pack)
+    local opt1 = string.format("Buy 1 (%d$)", pack.price or 0)
+    local opt2 = string.format("Buy 10 (%d$)", (pack.price or 0) * 10)
+    local opt3 = "Cancel"
+
+    -- Primary path: 3-option cursor selection
+    local res = await(Async.quiz_player(player_id, opt1, opt2, opt3, mug.texture_path, mug.animation_path))
+    -- quiz_player returns 0/1/2
+    if res == 0 then return 1 end
+    if res == 1 then return 10 end
+    if res == 2 then return nil end
+
+    -- Fallback: two Yes/No prompts (B behaves as No)
+    local buy1 = await(Async.question_player(player_id, opt1.."?",
+                    mug.texture_path, mug.animation_path))
+    if buy1 == 1 then return 1 end
+    local buy10 = await(Async.question_player(player_id, opt2.."?",
+                    mug.texture_path, mug.animation_path))
+    if buy10 == 1 then return 10 end
+    return nil
+end
+
+local function pack_shop_action(npc, player_id, dialogue, relay_object)
+    return async(function ()
+        local area_id = Net.get_player_area(player_id)
+        local mug = eznpcs.get_dialogue_mugshot(npc, player_id, dialogue)
+        local pack = read_single_pack(dialogue)
+
+        if not pack or not pack.groups or #pack.groups == 0 then
+            await(Async.message_player(player_id, "Sorry, I'm not selling any packs right now.", mug.texture_path, mug.animation_path))
+            return dialogue.custom_properties["Next 1"]
+        end
+
+        -- Intro once
+        local rolls = pack.rolls or 1
+        local suffix = (rolls == 1) and "card" or "cards"
+        await(Async.message_player(
+            player_id,
+            string.format("%s - %d$ (%d %s)\n\n%s", pack.name, pack.price or 0, rolls, suffix, pack.description or ""),
+            mug.texture_path, mug.animation_path
+        ))
+
+        -- First purchase (1/10/Cancel)
+        local qty = choose_buy_quantity(player_id, mug, pack)
+        if not qty then
+            return dialogue.custom_properties["Next 1"]
+        end
+
+        local ok, msg
+        if qty == 1 then
+            ok, msg = open_one_pack(player_id, area_id, pack, mug)
+        else
+            ok, msg = open_n_packs(player_id, area_id, pack, mug, 10)
+        end
+        if not ok then
+            if msg then await(Async.message_player(player_id, msg, mug.texture_path, mug.animation_path)) end
+            return dialogue.custom_properties["Next 1"]
+        end
+
+        -- Loop: offer 1/10/Cancel again
+        while true do
+            local qty2 = choose_buy_quantity(player_id, mug, pack)
+            if not qty2 then break end
+
+            local ok2, msg2
+            if qty2 == 1 then
+                ok2, msg2 = open_one_pack(player_id, area_id, pack, mug)
+            else
+                ok2, msg2 = open_n_packs(player_id, area_id, pack, mug, 10)
+            end
+
+            if not ok2 then
+                if msg2 then await(Async.message_player(player_id, msg2, mug.texture_path, mug.animation_path)) end
+                break
+            end
+        end
+
+        return dialogue.custom_properties["Next 1"]
+    end)
+end
+
+-- Register (exact name)
+eznpcs.add_event{ name = "Pack Shop", action = pack_shop_action }
+
+local function ci_props(dialogue)
+  local ci = {}; for k,v in pairs(dialogue.custom_properties or {}) do ci[string.lower(tostring(k))] = v end; return ci
+end
+local function get(ci,k) return ci[string.lower(k)] end
+local function seq(ci,prefix) local out,i={},1; while true do local v=ci[prefix..i]; if v==nil then break end; out[#out+1]=v; i=i+1 end; return out end
+
+local function read_groups(dialogue)
+  local ci = ci_props(dialogue)
+  local pools = {
+    { label="Common",     items=seq(ci,"common "),     weight=tonumber(get(ci,"common rate"))     },
+    { label="Rare",       items=seq(ci,"rare "),       weight=tonumber(get(ci,"rare rate"))       },
+    { label="Super Rare", items=seq(ci,"super rare "), weight=tonumber(get(ci,"super rare rate")) },
+    { label="Ultra Rare", items=seq(ci,"ultra rare "), weight=tonumber(get(ci,"ultra rare rate")) },
+    { label="Gold Rare",  items=seq(ci,"gold rare "),  weight=tonumber(get(ci,"gold rare rate"))  },
+  }
+  local any=false; for _,p in ipairs(pools) do if (p.weight or 0) > 0 then any=true break end end
+  if not any then
+    local has_gdr = pools[5].items and #pools[5].items > 0
+    if has_gdr then
+      pools[1].weight,pools[2].weight,pools[3].weight,pools[4].weight,pools[5].weight = 753,207,30,9,1
+    else
+      pools[1].weight,pools[2].weight,pools[3].weight,pools[4].weight = 70,25,4,1
+    end
+  end
+  local groups = {}
+  for _,p in ipairs(pools) do
+    if p.items and #p.items>0 and (p.weight or 0)>0 then groups[#groups+1]=p end
+  end
+  return groups
+end
+
+eznpcs.add_event{
+  name = "Card Trader",
+  action = function(npc, player_id, dialogue, relay_object)
+    return async(function()
+      local mug = eznpcs.get_dialogue_mugshot(npc, player_id, dialogue)
+      local groups = read_groups(dialogue)
+      if not groups or #groups == 0 then
+        await(Async.message_player(player_id, "Trader is misconfigured: no return pools.", mug.texture_path, mug.animation_path))
+        return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+      end
+      local desc = (dialogue.custom_properties and (dialogue.custom_properties["pack description"] or dialogue.custom_properties["Pack Description"])) or
+                   "Trade any 10 cards and I'll give you 1 random card."
+      -- Kick off the board-driven picker; the BBS plugin handles the rest
+      custom.start_card_trade(player_id, { desc = desc, groups = groups })
+      -- Optionally show their mug once before opening the board:
+      await(Async.message_player(player_id, "Let's trade - pick exactly 10 cards.", mug.texture_path, mug.animation_path))
+      return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+    end)
+  end
+}
 
