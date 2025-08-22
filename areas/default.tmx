@@ -558,7 +558,7 @@
   <object id="230" name="SRKuriboh" type="Item" x="631" y="893">
    <properties>
     <property name="Description" value="SRare: Kuriboh - A: 300 / D: 200"/>
-    <property name="Name" value="[SR]Kuriboh"/>
+    <property name="Name" value="[SR]Kbo"/>
     <property name="Price" value="0"/>
     <property name="Type" value="item"/>
    </properties>
