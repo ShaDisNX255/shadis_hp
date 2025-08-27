@@ -683,3 +683,14 @@ eznpcs.add_event{
   end
 }
 
+eznpcs.add_event{
+  name = "Card Battle (NPC)",
+  action = function(npc, player_id, dialogue, relay_object)
+    return async(function()
+      local mug = eznpcs.get_dialogue_mugshot(npc, player_id, dialogue)
+      await(Async.message_player(player_id, "Let's duel! I'll build decks from your collection.\n(10 cards; UR/GDR=1, SR≤2, R≤3, C=any)", mug.texture_path, mug.animation_path))
+      custom.start_card_battle(player_id, { npc_name = (dialogue and dialogue.custom_properties and (dialogue.custom_properties["NPC Name"] or dialogue.custom_properties["Npc Name"])) or "NPC Duelist" })
+      return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+    end)
+  end
+}

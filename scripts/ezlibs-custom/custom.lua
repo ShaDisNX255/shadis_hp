@@ -2,6 +2,257 @@ local ezmemory = require('scripts/ezlibs-scripts/ezmemory')
 local helpers  = require('scripts/ezlibs-scripts/helpers')
 
 local custom = {}
+-- Read an item’s info/meta when you might have either "area,id" or just a raw id.
+local META_CACHE = {}  -- memoize misses/hits to avoid log spam
+-- Forward decls so earlier helpers can reference them
+local do_KO            -- assigned later
+local build_cast_posts -- assigned later
+local base_title  -- forward decl so short_name can call it
+local battle_ui_open = battle_ui_open or {}
+do
+  if not _G.__cards_rng_seeded then
+    local t  = os.time()
+    local s  = tonumber(tostring({}):sub(8), 16) or 0  -- address entropy
+    local c  = math.floor((os.clock() % 1) * 1e9)      -- sub-second entropy
+    local seed = (t + s + c) % 2147483647
+    math.randomseed(seed)
+    -- warm up a few calls
+    for i = 1, 5 do math.random() end
+    _G.__cards_rng_seeded = true
+  end
+end
+
+-- ===== Deck persistence (RAM + ezmemory) =====
+local saved_deck_by_pid = saved_deck_by_pid or {}   -- session cache
+local DECK_MEM_KEY      = "miniygo_deck_v2"         -- per-player key in ezmemory
+
+-- Save a counts map { [item_id]=copies, ... } to ezmemory
+local function persist_deck_counts(pid, counts)
+  local secret = helpers.get_safe_player_secret(pid)
+  local pmem   = ezmemory.get_player_memory(secret) or {}
+  pmem[DECK_MEM_KEY] = counts or {}
+  if ezmemory.set_player_memory then        -- common API
+    ezmemory.set_player_memory(secret, pmem)
+  elseif ezmemory.save_player_memory then   -- fallback name seen on some servers
+    ezmemory.save_player_memory(secret, pmem)
+  else
+    -- No writer available; at least keep RAM cache
+  end
+  saved_deck_by_pid[pid] = { counts = counts or {} }
+end
+
+-- Load counts map from ezmemory (or RAM fallback)
+local function load_persisted_deck_counts(pid)
+  if saved_deck_by_pid[pid] and saved_deck_by_pid[pid].counts then
+    return saved_deck_by_pid[pid].counts
+  end
+  local secret = helpers.get_safe_player_secret(pid)
+  local pmem   = ezmemory.get_player_memory(secret) or {}
+  local counts = pmem[DECK_MEM_KEY]
+  if type(counts) == "table" then
+    saved_deck_by_pid[pid] = { counts = counts } -- hydrate RAM cache
+    return counts
+  end
+  return nil
+end
+
+-- Turn a {id=>count} map into a 10-card, fully-statted deck list
+local function materialize_deck_from_counts(pid, counts)
+  local deck = {}
+  for id, n in pairs(counts or {}) do
+    local info  = ezmemory.get_item_info(id)
+    local title = (info and info.name) or tostring(id)
+
+    -- parse stats either from info.description (fast) or from item meta
+    local desc  = info and info.description or ""
+    local ATK   = tonumber(tostring(desc):match("A:%s*(%d+)") or 0) or 0
+    local DEF   = tonumber(tostring(desc):match("D:%s*(%d+)") or 0) or 0
+    if ATK == 0 and DEF == 0 then
+      local meta = read_item_meta_flexible(pid, id)
+      local a, d = parse_atk_def_from_meta(meta)
+      ATK, DEF = a or 0, d or 0
+    end
+
+    for i = 1, math.max(0, math.min(n or 0, 10 - #deck)) do
+      deck[#deck+1] = { id=id, title=title, ATK=ATK, DEF=DEF }
+      if #deck >= 10 then break end
+    end
+    if #deck >= 10 then break end
+  end
+  return deck
+end
+
+-- === ATK/DEF parsing & meta readers (drop-in) ===
+
+local function _split_area_id(raw_id)
+  -- Accept "area,id" or plain id; default area "default"
+  local s = tostring(raw_id or "")
+  local a, i = s:match("^([^,]+),(.+)$")
+  if a and i then return a, i end
+  return "default", s
+end
+
+local function parse_atk_def_from_text(text)
+  if not text or text == "" then return nil, nil end
+  text = tostring(text)
+
+  -- Very tolerant patterns: catch "A: 2500", "ATK 2500", etc.
+  -- Prefer numbers after A: / D:, but fall back to ATK/DEF tokens.
+  local A = text:match("[Aa]%s*[:=]%s*(%d+)")
+  local D = text:match("[Dd]%s*[:=]%s*(%d+)")
+
+  if not A then A = text:match("[Aa][Tt][Kk]%s*[:=]?%s*(%d+)") end
+  if not D then D = text:match("[Dd][Ee][Ff]%s*[:=]?%s*(%d+)") end
+
+  return tonumber(A), tonumber(D)
+end
+
+-- Try to read "Description" custom property, then fall back to item info description
+local function read_item_meta_flexible(pid, raw_id)
+  local area, iid = _split_area_id(raw_id)
+  -- custom property "Description"
+  local ok1, desc_prop = pcall(ezmemory.get_item_custom_property, area, iid, "Description")
+  if ok1 and desc_prop and desc_prop ~= "" then
+    return { description = desc_prop }
+  end
+  -- fallback: info.description
+  local info = ezmemory.get_item_info(iid)
+  if info and info.description and info.description ~= "" then
+    return { description = info.description, name = info.name }
+  end
+  return { description = "" }
+end
+
+local function hydrate_card_from_id(pid, card)
+  -- card.id required; patch card.ATK/DEF in-place if discoverable
+  if not card or not card.id then return card end
+  local meta = read_item_meta_flexible(pid, card.id)
+  local A, D = parse_atk_def_from_text(meta and meta.description or "")
+  if A then card.ATK = A end
+  if D then card.DEF = D end
+  return card
+end
+
+local function rehydrate_deck_stats(pid, deck)
+  if not deck then return end
+  for _, c in ipairs(deck) do
+    hydrate_card_from_id(pid, c)
+  end
+end
+
+-- === Play-by-play announcer ===
+local function battle_announce(st, msg)
+  if st and st.pid then Net.message_player(st.pid, msg) end
+end
+
+-- Totals across rarities for current counts
+local function _rarity_totals(counts, poolmap)
+  local total, urgdr_total, sr_total, r_total, c_total = 0, 0, 0, 0, 0
+  for id, n in pairs(counts or {}) do
+    n = tonumber(n or 0) or 0
+    if n > 0 then
+      total = total + n
+      local row = poolmap[id]
+      local rar = tostring((row and (row.rar or parse_rarity_tag(row.title))) or "C"):upper()
+      if rar == "UR" or rar == "GDR" then urgdr_total = urgdr_total + n
+      elseif rar == "SR" then sr_total = sr_total + n
+      elseif rar == "R"  then r_total  = r_total  + n
+      else c_total = c_total + n
+      end
+    end
+  end
+  return total, urgdr_total, sr_total, r_total, c_total
+end
+
+local function short_name(title)
+  local base = base_title(title or "")
+  -- keep it short (BBS rows are narrow)
+  return base
+end
+
+-- Returns two strings for a given side: subject and possessive.
+-- idx=1 is the human player; idx=2 is the NPC.
+local function labels_for(st, idx)
+  local subj = (idx == 1) and "You" or (st.npc_name or "NPC")
+  local poss = (idx == 1) and "Your" or (subj .. "'s")
+  return subj, poss
+end
+
+-- Format one-liners
+local function fmt_you() return "You" end
+local function fmt_npc(st) return st.npc_name or "NPC" end
+
+-- Decide if our candidate ATK can beat oppATK using at most one affordable spell (by key).
+local function npc_plan_to_beat(oppATK, candATK, hand_after_summon)
+  -- already wins without a spell
+  if candATK > oppATK then return { use = "none" } end
+
+  -- find needed spells by key (no reliance on global SP)
+  local axe, reinforce, shrink
+  if SPELLS and type(SPELLS) == "table" then
+    for _, sp in ipairs(SPELLS) do
+      if sp.key == "axe" then axe = sp
+      elseif sp.key == "reinforce" then reinforce = sp
+      elseif sp.key == "shrink" then shrink = sp
+      end
+    end
+  end
+
+  local function afford(sp) return sp and hand_after_summon >= (sp.cost or 0) end
+
+  if afford(axe) and (candATK + 1000) > oppATK then
+    return { use = "axe" }
+  end
+  if afford(reinforce) and (candATK + 500) > oppATK then
+    return { use = "reinforce" }
+  end
+  if afford(shrink) and candATK > (oppATK - 1000) then
+    return { use = "shrink" }
+  end
+  return nil
+end
+
+-- NPC pays spell cost by discarding from end of hand
+local function npc_pay_cost(st, me_idx, cost)
+  local me = st.players[me_idx]
+  if #me.hand < cost then return false end
+  for i = 1, cost do table.remove(me.hand, #me.hand) end
+  return true
+end
+
+local function read_item_meta_flexible(pid, any_id)
+  local key = tostring(any_id)
+  if META_CACHE[key] ~= nil then
+    return META_CACHE[key] or nil  -- false → cached miss
+  end
+
+  local area = Net.get_player_area(pid)
+  local obj_id = any_id
+  local a, i = key:match("^([^,]+),(%d+)$")
+  if a and i then
+    area   = a
+    obj_id = tonumber(i)
+  end
+
+  local ok, meta = pcall(helpers.read_item_information, area, obj_id)
+  if ok and meta then
+    META_CACHE[key] = meta
+    return meta
+  end
+  META_CACHE[key] = false  -- remember miss (prevents repeated noisy calls)
+  return nil
+end
+local function cleanup_zero_def(state)
+  for idx = 1, 2 do
+    local f = state.players[idx].field
+    if f and f.pos ~= "SET" and (f.curDEF or 0) <= 0 then
+      local _, poss = labels_for(state, idx)
+      local nm = short_name(f.card.title)
+      battle_announce(state, poss .. " " .. nm .. " was destroyed (0 DEF).")
+      do_KO(state, idx)
+    end
+  end
+end
 print("[cards] custom plugin loading...")
 
 -- === YOUR SETUP ===
@@ -46,8 +297,7 @@ local function is_tradable_card(pid, item_id, info)
   if UNTRADABLE_BY_NAME[info.name] then return false end
 
   -- optional: respect an item custom property in the editor: Untradable=true (or untradable/no_trade)
-  local meta = nil
-  pcall(function() meta = helpers.read_item_information(Net.get_player_area(pid), item_id) end)
+  local meta = read_item_meta_flexible(pid, item_id)
   local cp = meta and meta.custom_properties
   if cp and (truthy(cp["Untradable"]) or truthy(cp["untradable"]) or truthy(cp["no_trade"])) then
     return false
@@ -342,6 +592,7 @@ local function open_card_list(pid)
   player_using_card_bbs[pid] = true
   in_actions_menu[pid] = false
   pending_actions_menu[pid] = false
+  table.insert(entries, 1, { id = "__deck_edit__", read = true, title = "Deck Editor" })
   log("opening Card Collection for pid", pid, "count=", #entries)
   Net.open_board(pid, "Card Collection", LIST_BOARD_COLOR, entries)
 end
@@ -687,39 +938,1664 @@ handle_trade_post_selection = function(event)
 end
 
 -- ==========
-Net:on("post_selection", function(event)
-  local pid = event.player_id
-  log("post_selection pid", pid, "post_id", tostring(event.post_id), "in_actions=", in_actions_menu[pid], "in_main=", player_using_card_bbs[pid])
-  if handle_trade_post_selection and handle_trade_post_selection(event) then return end
+----------------------------------------------------------------------
+-- Mini YGO — KO Mode (Monsters-Only, Single Slot) — Battle BBS
+-- Public API: custom.start_card_battle(pid, { npc_name = "Duelist" })
+----------------------------------------------------------------------
 
+-- === Battle constants / IDs ===
+local BATTLE_BOARD_COLOR = { r=255, g=200, b=150 }
+
+local BTL_CANCEL     = "__b_cancel__"
+local BTL_CONCEDE    = "__b_concede__"
+local BTL_NEXT       = "__b_next__"
+local BTL_PREV       = "__b_prev__"
+local BTL_OK         = "__b_ok__"
+local BTL_VIEW_ME  = "__b_view_me__"
+local BTL_VIEW_OPP = "__b_view_opp__"
+local BTL_DSEL_PREFIX = "__b_dsel__"   -- +index (e.g., "__b_dsel__3")
+local BTL_DCONF       = "__b_dok__"
+local BTL_DCANCEL     = "__b_dcancel__"
+
+-- action rows
+local BTL_SUMMON     = "__b_summon__"
+local BTL_SET        = "__b_set__"
+local BTL_CAST       = "__b_cast__"
+local BTL_ATTACK     = "__b_attack__"
+local BTL_END        = "__b_end__"
+local BTL_SWITCH     = "__b_switch__"
+
+-- cast submenus
+local BTL_CAST_PICK  = "__b_cast_pick__:"      -- +spell_key
+local BTL_PAY_PICK   = "__b_pay__:"            -- +item_id
+local BTL_TARGET     = "__b_target__:"         -- +who / +noop
+
+-- guard flags / reopen like Trader
+local battle_by_pid      = battle_by_pid or {}   -- [pid] = state
+local battle_reopen      = battle_reopen or {}   -- [pid] = true to reopen after close
+local battle_refreshing  = battle_refreshing or {}
+
+-- simple helpers
+local function def_bar(cur, max)
+  cur = tonumber(cur or 0) or 0
+  max = tonumber(max or 0) or 0
+  if max <= 0 then return "" end
+  local SLOTS = 6
+  -- round to nearest slot
+  local filled = math.floor((cur * SLOTS + max/2) / max)
+  if filled < 0 then filled = 0 elseif filled > SLOTS then filled = SLOTS end
+  return "[" .. string.rep("=", filled) .. string.rep("-", SLOTS - filled) .. "]"
+end
+-- Do we have a monster on the field?
+local function has_monster(plr)
+  return plr and plr.field ~= nil
+end
+
+-- Any spell currently castable by player idx (by simple cost check)?
+local function any_castable_spell(st, idx)
+  local me = st.players[idx]
+  if not has_monster(me) then return false end
+  local h = #me.hand
+  for _, sp in ipairs(SPELLS) do
+    if h >= (sp.cost or 0) then return true end
+  end
+  return false
+end
+
+-- Look up a spell by key (so AI/UI don’t depend on table index order)
+local function SP(key)
+  for _, sp in ipairs(SPELLS) do
+    if sp.key == key then return sp end
+  end
+  return nil
+end
+
+local function has_monster(plr)
+  return plr and plr.field ~= nil
+end
+-- Return ezmemory item info from a field card (id may be "area,id" or plain id)
+local function item_info_from_field_card(card)
+  if not card or not card.id then return nil end
+  local info = ezmemory.get_item_info(card.id)
+  if info then return info end
+  local a,i = tostring(card.id):match("^([^,]+),(%d+)$")
+  if i then
+    info = ezmemory.get_item_info(tonumber(i))
+    if info then return info end
+  end
+  return nil
+end
+local function can_switch_now(st, me_idx)
+  local f = st.players[me_idx].field
+  if not f then return false end
+  if st.turn_flags.hasSwitched then return false end
+  if f.lockUntilTurn and st.turn_num <= f.lockUntilTurn then return false end
+  if f._enteredTurn and f._enteredTurn == st.turn_num then return false end -- cannot switch same-turn
+  return true  -- allow SET → ATK and ATK ↔ DEF (when legal)
+end
+local function clamp(n, a, b) if n < a then return a elseif n > b then return b else return n end end
+local function deepcopy(t) if type(t)~="table" then return t end local r={} for k,v in pairs(t) do r[k]=deepcopy(v) end return r end
+local function shuffle(arr) for i=#arr,2,-1 do local j=math.random(i) arr[i],arr[j]=arr[j],arr[i] end return arr end
+
+-- === Parse rarity from title like "[SR]Dark Magician" (respects your existing tags) ===
+local function parse_rarity_tag(title)
+  local rar = title and title:match("^%[([A-Za-z]+)%]") or title and title:match("%[([A-Za-z]+)%]")
+  rar = rar and rar:upper() or nil
+  if rar == "URARE" then rar = "UR" end  -- tolerate "URare" in Description vs title tag
+  return rar
+end
+
+-- === Parse ATK/DEF from the card's custom property "Description" ===
+-- Expected examples:
+--   "URare: Dark Magician - A: 2500 / D: 2100"
+--   "SRare: Gaia - A:3000 / D: 1200"
+local function parse_atk_def_from_meta(meta)
+  local d = ""
+  if meta then
+    local cp = meta.custom_properties
+    d = (cp and (cp["Description"] or cp["description"])) or meta.description or ""
+  end
+  d = tostring(d)
+  local a = tonumber(d:match("A:%s*(%d+)") or 0) or 0
+  local b = tonumber(d:match("D:%s*(%d+)") or 0) or 0
+  return a, b
+end
+
+-- === Turn/phase model ===
+-- Single slot per side: field is either nil or { card={...}, pos="ATK"/"DEF"/"SET", curDEF, lockUntilTurn }
+-- "hand" is a list of card entries; "deck" a face-down stack; "grave" list of card entries
+-- Card entry: { id=item_id, title=name, rarity="C|R|SR|UR|GDR", ATK=int, DEF=int }
+local function new_player_state()
+  return { deck={}, hand={}, grave={}, field=nil, KOs=0 }
+end
+
+base_title = function(title)
+  local after = tostring(title or ""):match("%](.*)")
+  if after then after = after:gsub("^%s+",""):gsub("%s+$",""); if after ~= "" then return after end end
+  return (tostring(title or ""):gsub("[%[%]]",""))
+end
+
+-- === Card snapshot of player's collection (name + counts + ids) ===
+local function snapshot_player_collection(pid)
+  local secret = helpers.get_safe_player_secret(pid)
+  local pmem = ezmemory.get_player_memory(secret)
+  local rows = {}  -- { id, title, qty, rar }
+  for item_id, qty in pairs(pmem.items or {}) do
+    if qty and qty > 0 then
+      local info = ezmemory.get_item_info(item_id)
+      if info and info.name and string.find(info.name, "[", 1, true) ~= nil then
+        rows[#rows+1] = { id=item_id, title=info.name, qty=qty, rar=parse_rarity_tag(info.name) }
+      end
+    end
+  end
+  return rows
+end
+
+-- Builds a 10-card deck from the player's collection, respecting:
+-- - Per-title caps: UR/GDR=1, SR<=2, R<=3, C<=owned
+-- - Combined across the deck: at most ONE total among all UR/GDR
+-- Parsing order for stats:
+--   1) ezmemory.get_item_info(id).description
+--   2) read_item_meta_flexible(pid, id) -> custom_properties["Description"/"description"] or meta.description
+local function build_random_deck_from_collection(pid)
+  local pool = snapshot_player_collection(pid)
+  if not pool or #pool == 0 then
+    return nil, "You have no cards in your collection."
+  end
+
+  -- Expand to copies with stats
+  local urgdr, sr, rr, cc = {}, {}, {}, {}
+  for _, row in ipairs(pool) do
+    local qty = row.qty or 0
+    if qty > 0 then
+      local rar = tostring(row.rar or parse_rarity_tag(row.title) or "C"):upper()
+      for i=1,qty do
+        local meta = read_item_meta_flexible(pid, row.id)
+        local A, D = parse_atk_def_from_meta(meta)
+        local copy = { id=row.id, title=row.title, rarity=rar, ATK=A or 0, DEF=D or 0 }
+        if rar == "UR" or rar == "GDR" then
+          -- keep one “candidate” per physical copy, but we will only take 1 total later
+          table.insert(urgdr, copy)
+        elseif rar == "SR" then
+          table.insert(sr, copy)
+        elseif rar == "R" then
+          table.insert(rr, copy)
+        else
+          table.insert(cc, copy)
+        end
+      end
+    end
+  end
+
+  local function pick_many(src, want)
+    local out = {}
+    shuffle(src)
+    for i=1, math.min(want, #src) do out[#out+1] = deepcopy(src[i]) end
+    return out
+  end
+
+  local deck = {}
+  -- UR/GDR: pick at most 1 total
+  if #urgdr > 0 then
+    shuffle(urgdr)
+    deck[#deck+1] = deepcopy(urgdr[1])
+  end
+  -- SR: pick at most 2 total across SR
+  local grab_sr = pick_many(sr, 2)
+  for _,c in ipairs(grab_sr) do deck[#deck+1] = c end
+  -- R: pick at most 3 total across R
+  local grab_r = pick_many(rr, 3)
+  for _,c in ipairs(grab_r) do deck[#deck+1] = c end
+  -- Fill with commons
+  shuffle(cc)
+  local i = 1
+  while #deck < 10 and i <= #cc do
+    deck[#deck+1] = deepcopy(cc[i]); i = i + 1
+  end
+
+  if #deck < 10 then
+    return nil, "Not enough eligible cards to build a 10-card deck under rarity totals (need more Commons or lower-rarity cards)."
+  end
+
+  shuffle(deck)
+  return deck
+end
+
+-- === Core battle math ===
+-- DEF chip H:
+--  - if ATK < 1000 → H = ATK
+--  - if ATK ≥ 1000 → H = floor(ATK/2)
+local function chip_from_atk(ATK)
+  ATK = tonumber(ATK or 0) or 0
+  if ATK < 1000 then
+    return ATK
+  else
+    return math.floor(ATK / 2)
+  end
+end
+
+local function can_attack(state, me_idx)
+  local me, opp = state.players[me_idx], state.players[3 - me_idx]
+  if state.turn_flags.hasAttacked then return false end
+  if state.turn_num == 1 and me_idx == 1 and state.p1AttackLocked then return false end
+  return (me.field and me.field.pos == "ATK") and (opp.field ~= nil)
+end
+
+do_KO = function(state, victim_idx)
+  local vic = state.players[victim_idx]
+  if vic.field then
+    table.insert(vic.grave, vic.field.card)
+    vic.field = nil
+  end
+
+  local killer_idx = 3 - victim_idx
+  local killer     = state.players[killer_idx]
+  killer.KOs = (killer.KOs or 0) + 1
+
+  -- Announce the updated KO total for the player who scored it
+  if battle_announce then
+    local subj = "You"
+    if labels_for then subj = (labels_for(state, killer_idx)) end  -- take the subject ("You" or NPC name)
+    local verb = (subj == "You") and "have" or "has"
+    local ko_word = (killer.KOs == 1) and "KO" or "KOs"
+    battle_announce(state, string.format("%s %s %d %s.", subj, verb, killer.KOs, ko_word))
+  end
+
+  if killer.KOs >= 3 then
+    state.finished = true
+    state.winner   = killer_idx
+  end
+end
+
+local function resolve_attack(state)
+  local me_idx  = state.turn_player
+  local opp_idx = 3 - me_idx
+  local A = state.players[me_idx].field
+  local D = state.players[opp_idx].field
+  if not A or not D then return end
+
+  local atkSubj, atkPoss = labels_for(state, me_idx)
+  local defSubj, defPoss = labels_for(state, opp_idx)
+  local an = short_name(A.card.title)
+  local dn = short_name(D.card.title)
+
+  -- Reveal-on-block for Sets
+  if D.pos == "SET" then
+    D.pos = "DEF"
+    battle_announce(state, "Reveal: " .. defPoss .. " Set is " .. dn .. " [DEF " .. D.curDEF .. "/" .. D.card.DEF .. "]")
+  end
+
+  if D.pos == "ATK" then
+    battle_announce(state, "Attack: " .. atkPoss .. " " .. an .. " (ATK " .. A.card.ATK .. ") vs " ..
+                              defPoss .. " " .. dn .. " (ATK " .. D.card.ATK .. ")")
+    if A.card.ATK > D.card.ATK then
+      battle_announce(state, defPoss .. " " .. dn .. " was destroyed.")
+      do_KO(state, opp_idx)
+    elseif A.card.ATK < D.card.ATK then
+      battle_announce(state, atkPoss .. " " .. an .. " was destroyed.")
+      do_KO(state, me_idx)
+    else
+      battle_announce(state, "Both monsters were destroyed.")
+      do_KO(state, me_idx); do_KO(state, opp_idx)
+    end
+  else
+    -- DEF battle (chip)
+    local H = chip_from_atk(A.card.ATK)
+    if state.turn_flags.megaNext then H = A.card.ATK end
+    if state.turn_flags.rrkNext  then H = H + 1000 end
+
+    battle_announce(state, "Attack: " .. atkPoss .. " " .. an .. " (chip " .. H .. ") vs " ..
+                              defPoss .. " " .. dn .. " [DEF " .. D.curDEF .. "/" .. D.card.DEF .. "]")
+
+    if H >= D.curDEF then
+      battle_announce(state, defPoss .. " " .. dn .. " was destroyed.")
+      do_KO(state, opp_idx)
+    else
+      D.curDEF = math.max(0, D.curDEF - H)
+      battle_announce(state, defPoss .. " " .. dn .. " DEF reduced to " .. D.curDEF .. "/" .. D.card.DEF)
+      A.pos = "DEF" -- Counter-Set only if defender survived
+    end
+
+    -- Megamorph after-battle: attacker goes to DEF if still on field
+    if state.turn_flags.megaNext then
+      local meF = state.players[me_idx].field
+      if meF then meF.pos = "DEF" end
+    end
+  end
+
+  state.turn_flags.hasAttacked = true
+  state.turn_flags.megaNext = false
+  state.turn_flags.rrkNext  = false
+  cleanup_zero_def(state)
+end
+
+-- === Spells ===
+-- Hand acts as mana: discard N cards to pay cost (does not touch player’s real inventory)
+SPELLS = {
+  -- cost 1
+  { key="reinforce", name="Reinforcements (+500 ATK this turn)", cost=1, who="meATK",
+    apply=function(state, me_idx)
+      local f = state.players[me_idx].field
+      if f and f.pos == "ATK" then
+        f._tempATK = (f._tempATK or 0) + 500
+        f.card.ATK = f.card.ATK + 500
+        state.turn_flags._undoATK = (state.turn_flags._undoATK or 0) + 500
+        return "Your monster gets +500 ATK this turn."
+      end
+      return "No face-up ATK monster to buff."
+    end },
+
+  { key="chip500", name="Shield Crush (Chip -500 DEF)", cost=1, who="oppDEF",
+    apply=function(state, me_idx)
+      local opp = state.players[3 - me_idx]
+      if opp.field and opp.field.pos == "DEF" then
+        opp.field.curDEF = math.max(0, opp.field.curDEF - 500)
+        return "Opponent DEF -500 (persistent)."
+      end
+      return "No valid face-up DEF target."
+    end },
+
+  { key="cease1", name="Ceasefire (Reveal Set)", cost=1, who="oppSET",
+    apply=function(state, me_idx)
+      local opp = state.players[3 - me_idx]
+      if opp.field and opp.field.pos == "SET" then
+        opp.field.pos = "DEF"
+        return "Revealed opponent’s Set monster (now face-up DEF)."
+      end
+      return "No Set monster to reveal."
+    end },
+
+  -- cost 2
+  { key="axe", name="Axe of Despair (+1000 ATK this turn)", cost=2, who="meATK",
+    apply=function(state, me_idx)
+      local f = state.players[me_idx].field
+      if f and f.pos == "ATK" then
+        f._tempATK = (f._tempATK or 0) + 1000
+        f.card.ATK = f.card.ATK + 1000
+        state.turn_flags._undoATK = (state.turn_flags._undoATK or 0) + 1000
+        return "Your monster gets +1000 ATK this turn."
+      end
+      return "No face-up ATK monster to buff."
+    end },
+
+  { key="shield1000", name="Shield Crush (-1000 DEF)", cost=2, who="oppDEF",
+    apply=function(state, me_idx)
+      local opp = state.players[3 - me_idx]
+      if opp.field and opp.field.pos == "DEF" then
+        opp.field.curDEF = math.max(0, opp.field.curDEF - 1000)
+        return "Opponent DEF -1000 (persistent)."
+      end
+      return "No valid face-up DEF target."
+    end },
+
+  { key="econt", name="Enemy Controller (ATK→DEF, lock)", cost=2, who="oppATK",
+    apply=function(state, me_idx)
+      local opp = state.players[3 - me_idx]
+      if opp.field and opp.field.pos == "ATK" then
+        opp.field.pos = "DEF"
+        opp.field.lockUntilTurn = state.turn_num + 1 -- until end of its controller’s next turn
+        return "Switched opponent to DEF and position-locked."
+      end
+      return "No opponent ATK monster."
+    end },
+
+  -- cost 3
+  { key="riryoku", name="Riryoku (+1000 to chip on next attack)", cost=3, who="none",
+    apply=function(state, me_idx)
+      state.turn_flags.rrkNext = true
+      return "Next attack’s chip gets +1000."
+    end },
+
+  { key="shrink", name="Shrink (-1000 ATK until end of next turn)", cost=3, who="anyFACE",
+    apply=function(state, me_idx)
+      local me = state.players[me_idx]; local opp = state.players[3 - me_idx]
+      local t = (opp.field and opp.field.pos ~= "SET") and opp.field or (me.field and me.field.pos ~= "SET" and me.field or nil)
+      if not t then return "No face-up target." end
+      t.card.ATK = t.card.ATK - 1000
+      t._atkRevert = (t._atkRevert or 0) - 1000
+      t._revertOnTurn = state.turn_num + 2
+      return "Target -1000 ATK until end of its controller’s next turn."
+    end },
+
+  -- cost 4
+  { key="mega", name="Megamorph (next attack uses full ATK as chip; then your attacker DEF)", cost=4, who="none",
+    apply=function(state, me_idx)
+      state.turn_flags.megaNext = true
+      return "Next attack uses FULL ATK as chip. After battle your attacker goes to DEF."
+    end },
+
+  { key="smash", name="Smashing Ground (opp DEF to 1000)", cost=4, who="oppDEF",
+    apply=function(state, me_idx)
+      local opp = state.players[3 - me_idx]
+      if opp.field and opp.field.pos == "DEF" then
+        opp.field.curDEF = 1000
+        return "Set opponent DEF to 1000."
+      end
+      return "No face-up DEF target."
+    end },
+
+  { key="castle", name="Castle Walls (+1000 DEF up to printed)", cost=4, who="meDEF",
+    apply=function(state, me_idx)
+      local me = state.players[me_idx]
+      if me.field and me.field.pos == "DEF" then
+        local maxDEF = me.field.card.DEF
+        me.field.curDEF = clamp(me.field.curDEF + 1000, 0, maxDEF)
+        return "Your DEF +1000 (capped at printed DEF)."
+      end
+      return "No face-up DEF monster."
+    end },
+}
+
+-- === Re-balance the spell list ===
+local function retune_spells()
+  if not SPELLS then return end
+
+  -- Index by key for quick edits
+  local bykey = {}
+  for _, sp in ipairs(SPELLS) do bykey[sp.key] = sp end
+
+  local new = {}
+
+  -- Keep Ceasefire (your key is "cease1") at cost 1
+  if bykey["cease1"] then bykey["cease1"].cost = 1; table.insert(new, bykey["cease1"]) end
+
+  -- Reinforcements (+500 ATK) → cost 2
+  if bykey["reinforce"] then bykey["reinforce"].cost = 2; table.insert(new, bykey["reinforce"]) end
+
+  -- Shield Crush (-500 DEF) → cost 2 (your key is "chip500")
+  if bykey["chip500"] then bykey["chip500"].cost = 2; table.insert(new, bykey["chip500"]) end
+
+  table.insert(new, {
+    key  = "stopatk",
+    cost = 2,
+    name = "Stop Attack (Change opponent from ATK to DEF)",
+    apply = function(st, me_idx)
+      local opp_idx = 3 - me_idx
+      local opp = st.players[opp_idx]
+      if opp.field and opp.field.pos == "ATK" then
+        opp.field.pos = "DEF"
+        local poss = (labels_for and select(2, labels_for(st, opp_idx)))
+                    or ((opp_idx == 1) and "Your" or ((st.npc_name or "NPC").."'s"))
+        local nm = short_name(opp.field.card.title)
+        return string.format("Stop Attack: %s %s switched to DEF.", poss, nm)
+      end
+      return "No opponent ATK monster."
+    end
+  })
+
+  -- Axe of Despair (+1000 ATK) → cost 3
+  if bykey["axe"] then bykey["axe"].cost = 3; table.insert(new, bykey["axe"]) end
+
+  -- Shield Crush (-1000 DEF) → cost 3
+  if bykey["shield1000"] then bykey["shield1000"].cost = 3; table.insert(new, bykey["shield1000"]) end
+
+  -- Shrink stays cost 3 (enforce)
+  if bykey["shrink"] then bykey["shrink"].cost = 3; table.insert(new, bykey["shrink"]) end
+
+  -- Remove: Enemy Controller (econt), Riryoku (riryoku), and all your old cost-4 spells (mega, smash, castle)
+
+  -- Add Raigeki (cost 4): destroy opponent's monster regardless of position (even Set)
+  table.insert(new, {
+    key = "raigeki",
+    cost = 4,
+    name = "Raigeki (Destroy opponent's monster)",
+    apply = function(st, me_idx)
+      local opp_idx = 3 - me_idx
+      local f = st.players[opp_idx].field
+      if not f then return "Raigeki: No target." end
+      local poss = (labels_for and select(2, labels_for(st, opp_idx))) or ((opp_idx == 1) and "Your" or ((st.npc_name or "NPC").."'s"))
+      local nm = short_name(f.card.title)
+      do_KO(st, opp_idx)
+      return string.format("Raigeki: %s %s was destroyed.", poss, nm)
+    end
+  })
+
+  SPELLS = new
+end
+
+-- Call once after defining SPELLS
+retune_spells()
+
+-- === Utility: draw, reshuffle from grave when needed ===
+local function draw_one(p)
+  if #p.deck == 0 then
+    if #p.grave > 0 then
+      for i=#p.grave,1,-1 do table.insert(p.deck, p.grave[i]); p.grave[i]=nil end
+      shuffle(p.deck)
+    end
+  end
+  if #p.deck > 0 then table.insert(p.hand, table.remove(p.deck)) end
+end
+
+-- === Start-of-turn cleanup / end-of-turn cleanup ===
+local function begin_turn(state)
+  local me = state.players[state.turn_player]
+  state.turn_flags = { hasSummoned=false, hasCast=false, hasAttacked=false, megaNext=false, rrkNext=false, _undoATK=0 }
+  -- unlock positions if lock expired
+  for i=1,2 do
+    local f = state.players[i].field
+    if f and f.lockUntilTurn and state.turn_num > f.lockUntilTurn then f.lockUntilTurn = nil end
+    if f and f._revertOnTurn and state.turn_num >= f._revertOnTurn then
+      if f._atkRevert and f._atkRevert ~= 0 then f.card.ATK = f.card.ATK - f._atkRevert; f._atkRevert = 0 end
+      f._revertOnTurn = nil
+    end
+  end
+  cleanup_zero_def(state)
+  -- Draw (except no one draws on their FIRST turn)
+  if not state.noDrawThisTurn[state.turn_player] then draw_one(me) end
+  state.noDrawThisTurn[state.turn_player] = nil
+end
+
+local function end_turn(state)
+  -- undo ATK buffs that say "this turn"
+  if state.turn_flags._undoATK and state.turn_flags._undoATK ~= 0 then
+    local f = state.players[state.turn_player].field
+    if f then f.card.ATK = f.card.ATK - state.turn_flags._undoATK end
+  end
+  -- hand size 4
+  local me = state.players[state.turn_player]
+  while #me.hand > 4 do table.remove(me.hand, #me.hand) end  -- discard from end (simple)
+  state.turn_player = 3 - state.turn_player
+  state.turn_num = state.turn_num + 1
+  begin_turn(state)
+end
+
+-- === Summon / Set ===
+local function can_place(me, flags)
+  if flags.hasSummoned then return false end
+  return me.field == nil
+end
+
+local function do_summon(me, hand_idx)
+  local c = table.remove(me.hand, hand_idx)
+  me.field = { card=deepcopy(c), pos="ATK", curDEF=c.DEF }
+end
+
+local function do_set(me, hand_idx)
+  local c = table.remove(me.hand, hand_idx)
+  me.field = { card=deepcopy(c), pos="SET", curDEF=c.DEF }
+end
+
+-- === NPC AI (aggressive vs SET; avoids stalling in face-up DEF) ===
+local function npc_take_turn(state)
+  local me   = state.players[2]
+  local opp  = state.players[1]
+
+  -- find a spell by key (local helper; no global SP dependency)
+  local function SPkey(key)
+    if not SPELLS then return nil end
+    for _, sp in ipairs(SPELLS) do
+      if sp.key == key then return sp end
+    end
+    return nil
+  end
+
+  -- Pay & apply spell by key; announce only on success
+  local function npc_cast(spkey, announce_text)
+    local sp = SPkey(spkey); if not sp then return false end
+    local cost = sp.cost or 0
+    if #me.hand < cost then return false end
+    if not npc_pay_cost(state, 2, cost) then return false end
+    local msg = sp.apply(state, 2)
+    if not msg or msg:match("^No ") then
+      -- (Optional) refund path could go here; we keep simple.
+      return false
+    end
+    state.turn_flags.hasCast = true
+    if announce_text then battle_announce(state, fmt_npc(state) .. " cast " .. announce_text) end
+    return true
+  end
+
+  local function ensure_atk()
+    if me.field and me.field.pos ~= "ATK" then
+      me.field.pos = "ATK"
+      battle_announce(state, fmt_npc(state) .. " switched its monster to ATK.")
+    end
+  end
+
+  -- ---------- PRE-ACTION: improve stance ----------
+  if me.field and can_switch_now and can_switch_now(state, 2) then
+    if me.field.pos == "SET" then
+      me.field.pos = "ATK"
+      battle_announce(state, fmt_npc(state) .. " flipped its monster to ATK.")
+    elseif me.field.pos == "DEF" then
+      local goATK = false
+      if not opp.field then
+        goATK = true
+      elseif opp.field.pos == "SET" then
+        goATK = true
+      elseif opp.field.pos == "DEF" then
+        local H = chip_from_atk(me.field.card.ATK or 0)
+        local theirDEF = opp.field.curDEF or (opp.field.card.DEF or 0)
+        goATK = (H >= theirDEF)
+      else -- opp ATK
+        local plan = npc_plan_to_beat(opp.field.card.ATK or 0, me.field.card.ATK or 0, #me.hand)
+        if plan then
+          goATK = true
+          -- be in ATK before using ATK buffs (they only apply to face-up ATK)
+          ensure_atk()
+          if not state.turn_flags.hasCast and plan.use ~= "none" then
+            if plan.use == "axe"       then npc_cast("axe",        "Axe of Despair (+1000 ATK).") end
+            if plan.use == "reinforce" then npc_cast("reinforce",  "Reinforcements (+500 ATK).") end
+            if plan.use == "shrink" and opp.field and opp.field.pos ~= "SET" then
+              npc_cast("shrink", "Shrink (-1000 ATK).")
+            end
+          end
+        end
+      end
+      if goATK and me.field.pos ~= "ATK" then
+        me.field.pos = "ATK"
+        battle_announce(state, fmt_npc(state) .. " switched its monster to ATK.")
+      end
+    end
+  end
+
+  -- ---------- MAIN PHASE: summon/set if empty ----------
+  if not state.turn_flags.hasSummoned and not me.field then
+    if #me.hand == 0 then draw_one(me) end
+    if #me.hand > 0 then
+      if opp.field and opp.field.pos == "ATK" then
+        local oppATK = opp.field.card.ATK or 0
+        local found_plan, best_idx = nil, 1
+        table.sort(me.hand, function(a,b) return (a.ATK - a.DEF) > (b.ATK - b.DEF) end)
+        for i, c in ipairs(me.hand) do
+          local plan = npc_plan_to_beat(oppATK, c.ATK or 0, #me.hand - 1)
+          if plan then best_idx = i; found_plan = plan; break end
+        end
+        local c = me.hand[best_idx]
+        if found_plan then
+          do_summon(me, best_idx); state.turn_flags.hasSummoned = true; me.field._enteredTurn = state.turn_num
+          battle_announce(state, fmt_npc(state) .. " Summoned " .. short_name(c.title) .. " [ATK " .. (c.ATK or 0) .. "]")
+          -- cast needed pump/debuff now (we are already ATK after summoning)
+          if not state.turn_flags.hasCast and found_plan.use ~= "none" then
+            if found_plan.use == "axe"       then npc_cast("axe",        "Axe of Despair (+1000 ATK).") end
+            if found_plan.use == "reinforce" then npc_cast("reinforce",  "Reinforcements (+500 ATK).") end
+            if found_plan.use == "shrink" and opp.field and opp.field.pos ~= "SET" then
+              npc_cast("shrink", "Shrink (-1000 ATK).")
+            end
+          end
+        else
+          -- Can't win into ATK → Set best defender
+          table.sort(me.hand, function(a,b) return (a.DEF or 0) > (b.DEF or 0) end)
+          c = me.hand[1]
+          do_set(me, 1); state.turn_flags.hasSummoned = true; me.field._enteredTurn = state.turn_num
+          battle_announce(state, fmt_npc(state) .. " Set a monster.")
+        end
+
+      elseif opp.field and opp.field.pos == "DEF" then
+        -- Try to crack DEF; else Set best DEF
+        table.sort(me.hand, function(a,b) return (a.ATK or 0) > (b.ATK or 0) end)
+        local c = me.hand[1]
+        local H = chip_from_atk(c.ATK or 0)
+        local theirDEF = opp.field.curDEF or (opp.field.card.DEF or 0)
+        if H >= theirDEF then
+          do_summon(me, 1); state.turn_flags.hasSummoned = true; me.field._enteredTurn = state.turn_num
+          battle_announce(state, fmt_npc(state) .. " Summoned " .. short_name(c.title) .. " [ATK " .. (c.ATK or 0) .. "]")
+        else
+          table.sort(me.hand, function(a,b) return (a.DEF or 0) > (b.DEF or 0) end)
+          c = me.hand[1]
+          do_set(me, 1); state.turn_flags.hasSummoned = true; me.field._enteredTurn = state.turn_num
+          battle_announce(state, fmt_npc(state) .. " Set a monster.")
+        end
+
+      elseif opp.field and opp.field.pos == "SET" then
+        -- Unknown card: pressure by Summoning ATK with our best attacker
+        table.sort(me.hand, function(a,b) return (a.ATK or 0) > (b.ATK or 0) end)
+        local c = me.hand[1]
+        do_summon(me, 1); state.turn_flags.hasSummoned = true; me.field._enteredTurn = state.turn_num
+        battle_announce(state, fmt_npc(state) .. " Summoned " .. short_name(c.title) .. " [ATK " .. (c.ATK or 0) .. "]")
+
+      else
+        -- Opponent empty: best attacker
+        table.sort(me.hand, function(a,b) return (a.ATK or 0) > (b.ATK or 0) end)
+        local c = me.hand[1]
+        do_summon(me, 1); state.turn_flags.hasSummoned = true; me.field._enteredTurn = state.turn_num
+        battle_announce(state, fmt_npc(state) .. " Summoned " .. short_name(c.title) .. " [ATK " .. (c.ATK or 0) .. "]")
+      end
+    end
+  end
+
+  -- Anti-DEF utility (optional). npc_cast checks cost & validity itself.
+  if not state.turn_flags.hasCast and opp.field and opp.field.pos == "DEF" then
+    npc_cast("shield1000", "Shield Crush (-1000 DEF).")
+  end
+
+  -- Attack if possible
+  if can_attack(state, 2) then
+    resolve_attack(state)
+  end
+
+  end_turn(state)
+end
+
+-- === BBS building ===
+local function hand_label(card)  -- compact line for hand
+  local base = base_title(card.title)
+  return string.format("%s  A:%d D:%d", base, card.ATK or 0, card.DEF or 0)
+end
+
+-- Show name + position; mask Set names for opponent only
+local function name_pos_label(f, mask_set)
+  if not f then return "(empty)" end
+  local pos = (f.pos == "SET") and "SET" or f.pos
+  if mask_set and f.pos == "SET" then
+    return string.format("(Set Monster) [%s]", pos)
+  end
+  local base = base_title(f.card.title)
+  return string.format("%s [%s]", base, pos)
+end
+
+local function stats_line(f, mask_set)
+  if not f then return "   —" end
+
+  local ATK = (f.card and f.card.ATK) or 0
+  local DEF = (f.card and f.card.DEF) or 0
+
+  if f.pos == "SET" then
+    if mask_set then
+      -- Opponent's face-down: show nothing
+      return "   (face-down)"
+    else
+      -- Your own face-down: pick one of these styles (uncomment one)
+      -- return string.format("   DEF ?/%d", DEF)   -- show printed DEF but keep current hidden
+      return "   (face-down)"                       -- fully hidden
+    end
+
+  elseif f.pos == "ATK" then
+    return string.format("   ATK %d", ATK)
+
+  else -- face-up DEF
+    local cur = tonumber(f.curDEF or DEF) or 0
+    local max = tonumber(DEF) or cur
+    local bar = (type(def_bar) == "function") and (" "..def_bar(cur, max)) or ""
+    return string.format(" DEF %d/%d%s", cur, max, bar)
+  end
+end
+
+local function field_label(f)
+  if not f then return "(empty)" end
+  local base = base_title(f.card.title)
+  local pos = f.pos == "SET" and "SET" or f.pos
+  if f.pos == "ATK" then
+    return string.format("%s [ATK %d]", base, f.card.ATK)
+  elseif f.pos == "DEF" then
+    return string.format("%s [DEF %d/%d]", base, f.curDEF, f.card.DEF)
+  else
+    return string.format("(Set) %s [DEF ?/%d]", base, f.card.DEF)
+  end
+end
+
+local function battle_title(state)
+  local you = state.players[1]; local ai = state.players[2]
+  return string.format("Battle vs %s  |  KOs: You %d - %d %s  |  Turn %d",
+    state.npc_name or "NPC", you.KOs or 0, ai.KOs or 0, state.npc_name or "NPC", state.turn_num or 1)
+end
+
+local function build_main_posts(pid)
+  local st = battle_by_pid[pid]
+  local posts = {}
+  local me  = st.players[1]
+  local opp = st.players[2]
+  local flags = st.turn_flags
+
+  -- ===== Actions FIRST (pinned to very top) =====
+  if st.turn_player == 1 then
+    -- If no monster yet & you clicked a hand card, expose Summon/Set first at the top
+    if not me.field and can_place(me, flags) and st._lastHandIdx and me.hand[st._lastHandIdx] then
+      posts[#posts+1] = { id = BTL_SUMMON, read = true, title = "Summon (face-up ATK)" }
+      posts[#posts+1] = { id = BTL_SET,    read = true, title = "Set (face-down DEF)" }
+    end
+
+    -- Once you have a monster (or after placing), put End Turn at the very top
+    if has_monster(me) then
+      posts[#posts+1] = { id = BTL_END, read = true, title = "End Turn" }
+    end
+
+    -- Only show context-legal options
+    if can_switch_now(st, 1) then
+      posts[#posts+1] = { id = BTL_SWITCH, read = true, title = "Switch Position" }
+    end
+    if can_attack(st, 1) then
+      posts[#posts+1] = { id = BTL_ATTACK, read = true, title = "Attack" }
+    end
+    if any_castable_spell(st, 1) then
+      posts[#posts+1] = { id = BTL_CAST, read = true, title = "Cast Spell" }
+    end
+  end
+
+  -- ===== Field header (comes AFTER actions) =====
+  local yf = st.players[1].field
+  local of = st.players[2].field
+  posts[#posts+1] = { id=(yf and BTL_VIEW_ME or BTL_OK),  read=true, title="Your:     "..name_pos_label(yf, false) }
+  posts[#posts+1] = { id=BTL_OK,                          read=true, title=           stats_line(yf, false) }
+  posts[#posts+1] = { id=(of and of.pos~="SET" and BTL_VIEW_OPP or BTL_OK), read=true, title="Opponent: "..name_pos_label(of, true) }
+  posts[#posts+1] = { id=BTL_OK,                          read=true, title=           stats_line(of, true) }
+
+  -- Opponent hand count
+  posts[#posts+1] = { id=BTL_OK, read=true, title=string.format("Opponent hand: %d", #opp.hand) }
+
+  -- ===== Hand =====
+  posts[#posts+1] = { id=BTL_OK, read=true, title="Your Hand:" }
+  for i, card in ipairs(me.hand) do
+    local sel = (st._lastHandIdx == i) and " ←" or ""
+    posts[#posts+1] = {
+      id    = "hand:"..i,
+      read  = true,
+      title = string.format("  %d) %s [A %d / D %d]%s", i, short_name(card.title), card.ATK, card.DEF, sel)
+    }
+  end
+
+  -- ===== Always allow Concede at bottom =====
+  posts[#posts+1] = { id = BTL_CONCEDE, read = true, title = "Concede" }
+
+  return battle_title(st), posts
+end
+
+local function open_battle_board(pid)
+  local st = battle_by_pid[pid]
+  if not st then return end
+  battle_refreshing[pid] = true
+  battle_ui_open[pid] = true
+
+  local title, posts
+  if st.ui == "cast" then
+    title, posts = build_cast_posts(pid)
+  elseif st.ui == "discard" then
+    title, posts = build_discard_posts(pid)
+  else
+    title, posts = build_main_posts(pid)
+  end
+  Net.open_board(pid, title, BATTLE_BOARD_COLOR, posts)
+end
+
+-- === Discard picker (choose exactly N cards to pay a spell cost) ===
+build_discard_posts = function(pid)
+  local st = battle_by_pid[pid]
+  if not st then
+    return "Duel", { { id=BTL_OK, read=true, title="(no state)" } }
+  end
+  local me   = st.players[1]
+  local need = st._discard_cost or 0
+
+  st._discard_sel = st._discard_sel or {}
+  local chosen = 0
+  for _, v in pairs(st._discard_sel) do
+    if v then chosen = chosen + 1 end
+  end
+
+  local posts = {}
+  posts[#posts+1] = {
+    id    = BTL_OK, read = true,
+    title = string.format("Discard %d card(s) to cast %s:", need, st._pending_spell or "?")
+  }
+
+  for i, c in ipairs(me.hand) do
+    local picked = st._discard_sel[i]
+    local mark   = picked and " [x]" or " [ ]"
+    posts[#posts+1] = {
+      id    = BTL_DSEL_PREFIX..i, read = true,
+      title = string.format("  %d) %s [A %d / D %d]%s", i, short_name(c.title), c.ATK, c.DEF, mark)
+    }
+  end
+
+  posts[#posts+1] = {
+    id    = (chosen == need) and BTL_DCONF or BTL_OK, read = true,
+    title = (chosen == need) and "Confirm Discard" or string.format("Confirm Discard (%d/%d)", chosen, need)
+  }
+  posts[#posts+1] = { id = BTL_DCANCEL, read = true, title = "Cancel" }
+
+  return battle_title(st).." - Discard", posts
+end
+
+-- === Cast submenu (shows spells + costs; paying via hand picks) ===
+build_cast_posts = function(pid)
+  local st = battle_by_pid[pid]
+  local posts = {}
+  posts[#posts+1] = { id=BTL_OK, read=true, title="Select a Spell (discard = cost):" }
+
+  local function split_name_desc(s)
+    s = tostring(s or "")
+    -- Prefer parenthetical: "Name (desc)"
+    local n, d = s:match("^%s*([^%(]+)%s*%(%s*(.+)%)%s*$")
+    if n then return (n:gsub("%s+$","")), d end
+    -- Fallback em dash / hyphen / colon
+    n, d = s:match("^%s*([^%—%-:]+)%s*[—%-%:]+%s*(.+)%s*$")
+    if n then return (n:gsub("%s+$","")), d end
+    return s, nil
+  end
+
+  for _, sp in ipairs(SPELLS) do
+    local enabled = (#st.players[1].hand >= sp.cost)
+    local base, desc = split_name_desc(sp.name)
+    local label = string.format("[%d] %s", sp.cost, base)
+    if not enabled then label = label .. "  (need " .. sp.cost .. ")" end
+
+    -- Clickable spell name
+    posts[#posts+1] = { id = BTL_CAST_PICK .. sp.key, read = true, title = label }
+    -- Non-clickable description line (if any)
+    if desc and #desc > 0 then
+      posts[#posts+1] = { id = BTL_OK, read = true, title = "    " .. desc }
+    end
+  end
+
+  posts[#posts+1] = { id="__b_back__", read=true, title="Back" }
+  return battle_title(st).." - Spells", posts
+end
+
+local function open_cast_board(pid)
+  battle_refreshing[pid] = true
+  local title, posts = build_cast_posts(pid)
+  Net.open_board(pid, title, BATTLE_BOARD_COLOR, posts)
+end
+
+-- === Pay cost by discarding chosen cards from hand ===
+local function pay_cost_from_hand(st, me_idx, cost, chosen_idxs_descending)
+  local me = st.players[me_idx]
+  if #me.hand < cost then return false end
+  -- delete using provided hand indices (descending order so removal doesn’t shift earlier)
+  table.sort(chosen_idxs_descending, function(a,b) return a>b end)
+  for _,i in ipairs(chosen_idxs_descending) do
+    table.remove(me.hand, i)
+  end
+  return true
+end
+
+-- === Public entry point ===
+function custom.start_card_battle(pid, cfg)
+  -- 1) Build Player deck: prefer persisted deck, else random
+  local deck1
+  do
+    local counts = load_persisted_deck_counts(pid)
+    if counts then
+      local d = materialize_deck_from_counts(pid, counts)
+      if d and #d == 10 then deck1 = d end
+    end
+    if not deck1 then
+      local err
+      deck1, err = build_random_deck_from_collection(pid)
+      if not deck1 then Net.message_player(pid, err or "Could not build your deck."); return end
+    end
+  end
+
+  -- 2) NPC deck: random from your collection
+  local deck2, err2 = build_random_deck_from_collection(pid)
+  if not deck2 then Net.message_player(pid, err2 or "NPC could not build a deck."); return end
+
+  -- Ensure both decks have ATK/DEF (safety)
+  rehydrate_deck_stats(pid, deck1)
+  rehydrate_deck_stats(pid, deck2)
+
+  -- Shuffle both before opening draw
+  if shuffle then
+    shuffle(deck1)
+    shuffle(deck2)
+  end
+
+  -- Build player states and draw opening 2
+  local P1 = new_player_state(); P1.deck = deck1
+  local P2 = new_player_state(); P2.deck = deck2
+  draw_one(P1); draw_one(P1)
+  draw_one(P2); draw_one(P2)
+
+  local state = {
+    npc_name      = (cfg and cfg.npc_name) or "NPC Duelist",
+    players       = { [1]=P1, [2]=P2 },
+    turn_player   = 1,
+    turn_num      = 1,
+    p1AttackLocked= true,
+    finished      = false,
+    noDrawThisTurn= { [1]=true, [2]=true }, -- no one draws on their very first turn
+    turn_flags    = { hasSummoned=false, hasCast=false, hasAttacked=false, megaNext=false, rrkNext=false },
+    pid           = pid
+  }
+
+  battle_by_pid[pid] = state
+  begin_turn(state)
+  open_battle_board(pid)
+end
+
+-- === Battle click handler ===
+local function handle_battle_post_selection(event)
+  local pid     = event.player_id
+  local post_id = tostring(event.post_id or "")
+  local st      = battle_by_pid[pid]
+  if not st then return false end
+
+  -- If finished, any click closes
+  if st.finished then
+    local who = (st.winner == 1) and "You win! (3 KOs)" or (st.winner == 2 and (st.npc_name or "NPC").." wins! (3 KOs)" or "Duel ended.")
+    Net.message_player(pid, who)
+    battle_by_pid[pid] = nil
+    pcall(Net.close_bbs, pid)
+    return true
+  end
+
+  local me    = st.players[1]
+  local opp   = st.players[2]
+  local flags = st.turn_flags
+  -- View Your monster
+  if post_id == BTL_VIEW_ME then
+    local f = me.field
+    if not f then return true end
+    local info = item_info_from_field_card(f.card)
+    if info then
+      show_card_dialog_with_mug(pid, info)
+    else
+      Net.message_player(pid, "No details available for this card.")
+    end
+    return true
+  end
+
+  -- View Opponent monster (only if revealed/face-up)
+  if post_id == BTL_VIEW_OPP then
+    local f = opp.field
+    if not f or f.pos == "SET" then
+      Net.message_player(pid, "You can’t view a face-down monster.")
+      return true
+    end
+    local info = item_info_from_field_card(f.card)
+    if info then
+      show_card_dialog_with_mug(pid, info)
+    else
+      Net.message_player(pid, "No details available for this card.")
+    end
+    return true
+  end
+
+  -- Switch Position
+  if post_id == BTL_SWITCH then
+    if st.turn_player ~= 1 then return true end
+    if not can_switch_now(st, 1) then
+      Net.message_player(pid, "You can’t switch position right now.")
+      return true
+    end
+    local f = me.field
+    if not f then return true end
+    if f.pos == "SET" then
+      f.pos = "ATK"  -- flip summon
+    else
+      f.pos = (f.pos == "ATK") and "DEF" or "ATK"
+    end
+    -- announce with possessive
+    do
+      local subj, poss = "You", "Your"
+      if labels_for then subj, poss = labels_for(st, 1) end
+      local nm = short_name(f.card.title)
+      battle_announce(st, subj .. " switched " .. nm .. " to " .. f.pos .. ".")
+    end
+    st.turn_flags.hasSwitched = true
+    battle_reopen[pid] = true; pcall(Net.close_bbs, pid)
+    return true
+  end
+
+  -- Back from submenus
+  if post_id == "__b_back__" then
+    st.ui = "main"
+    battle_reopen[pid] = true
+    pcall(Net.close_bbs, pid)
+    return true
+  end
+
+  -- Concede / Cancel
+  if post_id == BTL_CONCEDE or post_id == BTL_CANCEL then
+    st.finished = true; st.winner = 2
+    battle_reopen[pid] = true
+    pcall(Net.close_bbs, pid)
+    return true
+  end
+
+  -- Hand selection: store last index for summon/set convenience
+  local hand_idx = post_id:match("^hand:(%d+)")
+  if hand_idx then
+    st._lastHandIdx = tonumber(hand_idx)
+    -- Just re-open (acts like a cursor)
+    battle_reopen[pid] = true
+    pcall(Net.close_bbs, pid)
+    return true
+  end
+
+  -- Summon / Set
+  if post_id == BTL_SUMMON or post_id == BTL_SET then
+    if st.turn_player ~= 1 then return true end
+    if not can_place(me, flags) then Net.message_player(pid, "You already Summoned/Set or your field is occupied."); return true end
+    local idx = st._lastHandIdx or 1
+    if not me.hand[idx] then Net.message_player(pid, "Select a card in hand first."); return true end
+
+    if post_id == BTL_SUMMON then
+      do_summon(me, idx)
+    else
+      do_set(me, idx)
+    end
+
+    if me.field then
+      me.field._enteredTurn = st.turn_num
+      local subj, poss = "You", "Your"
+      if labels_for then subj, poss = labels_for(st, 1) end
+      local nm = short_name(me.field.card.title)
+      if post_id == BTL_SUMMON then
+        battle_announce(st, subj .. " Summoned " .. nm .. " [ATK " .. me.field.card.ATK .. "]")
+      else
+        battle_announce(st, subj .. " Set a monster.")
+      end
+    end
+    flags.hasSummoned = true
+    battle_reopen[pid] = true; pcall(Net.close_bbs, pid)
+    return true
+  end
+
+  -- Attack
+  if post_id == BTL_ATTACK then
+    if st.turn_player ~= 1 then return true end
+    if can_attack(st, 1) then
+      resolve_attack(st)
+      if st.finished then battle_reopen[pid]=true; pcall(Net.close_bbs, pid); return true end
+      battle_reopen[pid] = true; pcall(Net.close_bbs, pid)
+    else
+      Net.message_player(pid, "You cannot attack now.")
+    end
+    return true
+  end
+
+  -- End Turn
+  if post_id == BTL_END then
+    if st.turn_player ~= 1 then return true end
+    if not has_monster(me) then
+      Net.message_player(pid, "You must Summon or Set a monster before ending your turn.")
+      return true
+    end
+    end_turn(st)
+    -- NPC automatically plays its turn if duel not finished
+    if not st.finished and st.turn_player == 2 then npc_take_turn(st) end
+    battle_reopen[pid] = true; pcall(Net.close_bbs, pid)
+    return true
+  end
+
+  -- Cast
+  if post_id == BTL_CAST then
+    if st.turn_player ~= 1 then return true end
+    if not has_monster(me) then
+      Net.message_player(pid, "You must control a monster to cast spells.")
+      return true
+    end
+    if flags.hasCast then
+      Net.message_player(pid, "You already cast a spell this turn.")
+      return true
+    end
+    st.ui = "cast"
+    battle_reopen[pid] = true
+    pcall(Net.close_bbs, pid)
+    return true
+  end
+
+  -- Pick a specific spell
+  local picked_key = post_id:match("^"..BTL_CAST_PICK.."(.+)")
+  if picked_key then
+    if st.turn_player ~= 1 then return true end
+    if not has_monster(me) then
+      Net.message_player(pid, "You must control a monster to cast spells.")
+      st.ui = "main"; battle_reopen[pid] = true; pcall(Net.close_bbs, pid); return true
+    end
+
+    local sp = SP(picked_key)
+    if not SP then
+    function SP(key)
+      if not SPELLS then return nil end
+      for _, sp in ipairs(SPELLS) do if sp.key == key then return sp end end
+      return nil
+    end
+    end
+    local cost = sp.cost or 0
+    if #me.hand < cost then Net.message_player(pid, "Not enough cards in hand to pay ("..cost..")."); return true end
+
+    -- If you have more cards than the cost, let you choose which to discard.
+    if #me.hand > cost and cost > 0 then
+      st._pending_spell = sp.key
+      st._discard_cost  = cost
+      st._discard_sel   = {}
+      st.ui = "discard"
+      battle_reopen[pid] = true
+      pcall(Net.close_bbs, pid)
+      return true
+    end
+
+    -- Auto-pay when hand size == cost (or cost==0)
+    if cost > 0 then
+      local idxs = {}
+      for i=#me.hand, #me.hand - cost + 1, -1 do table.insert(idxs, i) end
+      pay_cost_from_hand(st, 1, cost, idxs)
+    end
+
+    local msg = sp.apply(st, 1)
+    cleanup_zero_def(st)
+    Net.message_player(pid, msg or (sp.name.." resolved."))
+    flags.hasCast = true
+    st.ui = "main"
+    battle_reopen[pid] = true
+    pcall(Net.close_bbs, pid)
+    return true
+  end
+
+  -- Discard picker: toggle a card
+  local dsel = post_id:match("^"..BTL_DSEL_PREFIX.."(%d+)$")
+  if dsel then
+    local i = tonumber(dsel)
+    if me.hand[i] then
+      st._discard_sel[i] = not st._discard_sel[i]
+    end
+    battle_reopen[pid] = true; pcall(Net.close_bbs, pid)
+    return true
+  end
+
+  -- Discard picker: Confirm
+  if post_id == BTL_DCONF then
+    local need = st._discard_cost or 0
+    local picks = {}
+    for i,_ in pairs(st._discard_sel or {}) do if st._discard_sel[i] then table.insert(picks, i) end end
+    table.sort(picks, function(a,b) return a>b end) -- remove from highest index down
+    if #picks ~= need then
+      Net.message_player(pid, "Select exactly "..need.." card(s).")
+      battle_reopen[pid] = true; pcall(Net.close_bbs, pid); return true
+    end
+
+    -- pay
+    for _, idx in ipairs(picks) do table.remove(me.hand, idx) end
+
+    local sp = SP(st._pending_spell)
+    st._pending_spell, st._discard_cost, st._discard_sel = nil, nil, nil
+    if not sp then
+      st.ui = "main"; battle_reopen[pid] = true; pcall(Net.close_bbs, pid); return true
+    end
+
+    local msg = sp.apply(st, 1)
+    cleanup_zero_def(st)
+    Net.message_player(pid, msg or (sp.name.." resolved."))
+    flags.hasCast = true
+
+    st.ui = "main"
+    battle_reopen[pid] = true
+    pcall(Net.close_bbs, pid)
+    return true
+  end
+
+  -- Discard picker: Cancel
+  if post_id == BTL_DCANCEL then
+    st._pending_spell, st._discard_cost, st._discard_sel = nil, nil, nil
+    st.ui = "cast"
+    battle_reopen[pid] = true
+    pcall(Net.close_bbs, pid)
+    return true
+  end
+
+  return true
+end
+
+-- ==========
+-- Deck Editor (BBS)
+-- ==========
+
+local deck_editor = deck_editor or {}
+local saved_deck_by_pid = saved_deck_by_pid or {}
+-- Deck Editor state
+local deck_editor     = deck_editor     or {} -- [pid] = { counts = {...}, active=true }
+local deck_reopen     = deck_reopen     or {} -- [pid] = true → reopen Deck Editor after close
+local deck_refreshing = deck_refreshing or {} -- [pid] = true while we are reopening programmatically
+
+local DECK_EDIT_OPEN   = "__deck_edit__"
+local DECK_ADD_PREFIX  = "deck:add:"
+local DECK_REM_PREFIX  = "deck:rem:"
+local DECK_SAVE        = "__deck_save__"
+local DECK_CLEAR       = "__deck_clear__"
+local DECK_BACK        = "__deck_back__"
+
+local function _pool_map(rows)
+  local m = {}
+  for _,r in ipairs(rows or {}) do m[r.id] = r end
+  return m
+end
+
+local function deck_refresh(pid)
+  deck_reopen[pid] = true
+  pcall(Net.close_bbs, pid)
+end
+
+local function _deck_total_and_have_urgdr(counts, poolmap)
+  local total, have = 0, false
+  for id, n in pairs(counts or {}) do
+    if n and n > 0 then
+      total = total + n
+      local row = poolmap[id]
+      local rar = tostring((row and (row.rar or parse_rarity_tag(row.title))) or "C"):upper()
+      if rar == "UR" or rar == "GDR" then have = true end
+    end
+  end
+  return total, have
+end
+
+-- How many more copies of this row can we add, respecting new rarity-wide caps
+local function _max_add_for_row(counts, row, poolmap)
+  local owned   = row.qty or 0
+  local in_deck = (counts[row.id] or 0)
+  local rar     = tostring(row.rar or parse_rarity_tag(row.title) or "C"):upper()
+  local total, urgdr_total, sr_total, r_total = _rarity_totals(counts, poolmap)
+
+  local remaining_owned = math.max(0, owned - in_deck)
+  if remaining_owned <= 0 then return 0 end
+
+  if rar == "UR" or rar == "GDR" then
+    -- UR/GDR combined: max 1 total across deck; also cannot exceed 1 per title implicitly
+    if in_deck >= 1 then return 0 end
+    return (urgdr_total >= 1) and 0 or 1
+
+  elseif rar == "SR" then
+    -- SR: max 2 total across all SR
+    local room = math.max(0, 2 - sr_total)
+    return math.min(remaining_owned, room)
+
+  elseif rar == "R" then
+    -- R: max 3 total across all R
+    local room = math.max(0, 3 - r_total)
+    return math.min(remaining_owned, room)
+
+  else
+    -- Commons: limited only by ownership
+    return remaining_owned
+  end
+end
+
+-- Build a concrete 10-card deck list from counts (reads ATK/DEF now)
+local function _materialize_deck(pid, counts, poolmap)
+  local deck = {}
+  for id, n in pairs(counts or {}) do
+    local row = poolmap[id]
+    if row and n and n > 0 then
+      for i=1,n do
+        local meta = read_item_meta_flexible(pid, id)
+        local A, D = parse_atk_def_from_meta(meta)
+        deck[#deck+1] = { id=id, title=row.title, rarity=(row.rar or "C"), ATK=A or 0, DEF=D or 0 }
+      end
+    end
+  end
+  hydrate_card_from_id(pid, entry)
+  return deck
+end
+
+-- Preload counts from persisted memory (fallback to RAM deck)
+local function _rar_tag(r)
+  r = tostring(r or ""):upper()
+  if r == "UR" or r == "GDR" or r == "SR" or r == "R" or r == "C" then
+    return "[" .. r .. "]"
+  end
+  return "[C]"
+end
+
+-- Trim long names to fit single-line boards better (ASCII "..." only)
+local function _trim_name(s, maxlen)
+  s = tostring(s or "")
+  maxlen = maxlen or 22
+  if #s <= maxlen then return s end
+  return s:sub(1, maxlen - 3) .. "..."
+end
+
+-- Prefer persisted counts; fall back to RAM deck counts
+local function _counts_from_saved(pid)
+  local c = load_persisted_deck_counts and load_persisted_deck_counts(pid)
+  if c and next(c) then
+    local out = {}; for id,n in pairs(c) do out[id]=n end
+    return out
+  end
+  local counts = {}
+  local saved = saved_deck_by_pid and saved_deck_by_pid[pid]
+  if saved and #saved > 0 then
+    for _,card in ipairs(saved) do
+      counts[card.id] = (counts[card.id] or 0) + 1
+    end
+  end
+  return counts
+end
+
+function open_deck_editor(pid)
+  local pool     = snapshot_player_collection(pid)
+  local poolmap  = _pool_map(pool)
+
+  -- init state first
+  deck_editor[pid] = deck_editor[pid] or {}
+  player_using_card_bbs[pid] = false
+  deck_editor[pid].active = true
+
+  -- IMPORTANT: only seed from saved if counts is nil (don’t overwrite {} from Clear)
+  if deck_editor[pid].counts == nil then
+    deck_editor[pid].counts = _counts_from_saved(pid) or {}
+  end
+  local counts = deck_editor[pid].counts
+
+  -- header & rule lines (ASCII-safe + short)
+  local total, urgdr_total, sr_total, r_total = _rarity_totals(counts, poolmap)
+  local title = string.format("Deck Editor (%d/10)", total)
+  local posts = {}
+  posts[#posts+1] = { id=BTL_OK, read=true, title="Rules:" }
+  posts[#posts+1] = { id=BTL_OK, read=true, title="UR/GDR = 1" }
+  posts[#posts+1] = { id=BTL_OK, read=true, title="SR <= 2" }
+  posts[#posts+1] = { id=BTL_OK, read=true, title="R  <= 3" }
+  posts[#posts+1] = { id=BTL_OK, read=true, title="Deck size = 10" }
+
+  -- controls
+  if total == 10 then
+    posts[#posts+1] = { id=DECK_SAVE,  read=true, title="Save Deck (use in duels)" }
+  else
+    posts[#posts+1] = { id=BTL_OK,     read=true, title=string.format("Save Deck (need %d more)", 10-total) }
+  end
+  posts[#posts+1] = { id=DECK_CLEAR,   read=true, title="Clear Deck" }
+  posts[#posts+1] = { id=DECK_BACK,    read=true, title="Back to Card List" }
+
+  -- current deck
+  posts[#posts+1] = { id=BTL_OK, read=true, title="Current Deck:" }
+  local had_any = false
+  local deck_lines = {}
+  for id, n in pairs(counts) do
+    if n and n > 0 then
+      local row = poolmap[id]
+      if row then deck_lines[#deck_lines+1] = { id=id, n=n, row=row } end
+    end
+  end
+  table.sort(deck_lines, function(a,b)
+    local ra, na = sort_key_from_title(a.row.title)
+    local rb, nb = sort_key_from_title(b.row.title)
+    if ra ~= rb then return ra < rb end
+    if na ~= nb then return na < nb end
+    return tostring(a.row.title) < tostring(b.row.title)
+  end)
+  for _,e in ipairs(deck_lines) do
+    had_any = true
+    posts[#posts+1] = {
+      id = DECK_REM_PREFIX..e.id, read = true,
+      title = string.format("  [-] %s  x%d", e.row.title, e.n)
+    }
+  end
+  if not had_any then
+    posts[#posts+1] = { id=BTL_OK, read=true, title="  (empty)" }
+  end
+
+  -- add-from-collection (hide non-addable to reduce clutter)
+  posts[#posts+1] = { id=BTL_OK, read=true, title="Add from Collection:" }
+  table.sort(pool, function(a,b)
+    local ra, na = sort_key_from_title(a.title)
+    local rb, nb = sort_key_from_title(b.title)
+    if ra ~= rb then return ra < rb end
+    if na ~= nb then return na < nb end
+    return tostring(a.title) < tostring(b.title)
+  end)
+  for _, row in ipairs(pool) do
+    local max_add = _max_add_for_row(counts, row, poolmap)
+    if max_add > 0 and total < 10 then
+      local own  = row.qty or 0
+      local in_d = counts[row.id] or 0
+      posts[#posts+1] = {
+        id    = DECK_ADD_PREFIX..row.id, read=true,
+        title = string.format("  [+] %s (owned %d, in deck %d)", row.title, own, in_d)
+      }
+    end
+  end
+
+  Net.open_board(pid, title, LIST_BOARD_COLOR, posts)
+end
+
+-- Handle clicks inside deck editor
+function handle_deck_post_selection(event)
+  local pid  = event.player_id
+  local post = tostring(event.post_id or "")
+  if post == "" then return false end
+
+  -- Deck editor posts we care about
+  if post ~= "__deck_edit__" and           -- opener is handled elsewhere
+     post ~= "__deck_clear__" and
+     post ~= "__deck_save__"  and
+     post ~= "__deck_back__"  and
+     not post:match("^deck:add:") and
+     not post:match("^deck:rem:") then
+    return false
+  end
+
+  -- Open / Back are handled in your router; we ignore here
+  if post == "__deck_back__" then return false end
+  if post == "__deck_edit__" then return false end
+
+  -- Ensure editor state exists
+  deck_editor[pid] = deck_editor[pid] or { counts = {} }
+  local counts = deck_editor[pid].counts or {}
+
+  -- Snapshot & helpers
+  local pool    = snapshot_player_collection(pid)
+  local poolmap = _pool_map(pool)
+
+  -- CLEAR
+  if post == "__deck_clear__" then
+    deck_editor[pid] = deck_editor[pid] or {}
+    deck_editor[pid].counts = {}      -- keep it as {}, not nil
+    open_deck_editor(pid)             -- rebuild UI using the now-empty counts
+    return true
+  end
+
+  -- SAVE (validates your rarity totals)
+  if post == "__deck_save__" then
+    local total, urgdr_total, sr_total, r_total = _rarity_totals(counts, poolmap)
+    if total ~= 10 then Net.message_player(pid, "Deck must have exactly 10 cards."); return true end
+    if urgdr_total > 1 then Net.message_player(pid, "UR/GDR total cannot exceed 1."); return true end
+    if sr_total  > 2 then Net.message_player(pid, "SR total cannot exceed 2.");     return true end
+    if r_total   > 3 then Net.message_player(pid, "R total cannot exceed 3.");      return true end
+
+    if persist_deck_counts then persist_deck_counts(pid, counts) end
+    Net.message_player(pid, "Saved deck of 10 cards. This deck will be used in duels.")
+    deck_reopen[pid] = true
+    pcall(Net.close_bbs, pid)
+    return true
+  end
+
+  -- ADD
+  local add_id = post:match("^deck:add:(.+)")
+  if add_id then
+    local row = poolmap[add_id]
+    if not row then return true end
+    local total = 0; for _,n in pairs(counts) do total = total + (n or 0) end
+    if total >= 10 then Net.message_player(pid, "Deck is full."); return true end
+    local max_add = _max_add_for_row(counts, row, poolmap)
+    if max_add <= 0 then Net.message_player(pid, "Cannot add more of this card."); return true end
+    counts[add_id] = (counts[add_id] or 0) + 1
+    deck_reopen[pid] = true
+    pcall(Net.close_bbs, pid)
+    return true
+  end
+
+  -- REMOVE
+  local rem_id = post:match("^deck:rem:(.+)")
+  if rem_id then
+    if (counts[rem_id] or 0) > 0 then counts[rem_id] = counts[rem_id] - 1 end
+    if (counts[rem_id] or 0) <= 0 then counts[rem_id] = nil end
+    deck_reopen[pid] = true
+    pcall(Net.close_bbs, pid)
+    return true
+  end
+
+  return false
+end
+
+-- In scripts/ezlibs-custom/custom.lua
+-- Add somewhere near other public functions:
+function custom.start_card_battle_pvp(pid1, pid2, cfg)
+  -- TODO: replace this stub with the real PVP version that opens boards for both players.
+  -- For now, just tell both players the entry point is wired:
+  Net.message_player(pid1, "[YGO] PVP request received with "..(Net.get_player_name(pid2) or "opponent")..".")
+  Net.message_player(pid2, "[YGO] PVP request received with "..(Net.get_player_name(pid1) or "opponent")..".")
+  -- When you finish a duel, call:
+  --   local ygo_tables = require('scripts/ezlibs-custom/ygo_duel_tables')
+  --   ygo_tables.on_ygo_pvp_end(winner_pid, loser_pid, { table_id = cfg and cfg.table_id })
+end
+
+-- ==== Unified helpers (put before the listeners) ====
+-- Small helpers to know which board is currently “active”
+local function _battle_active(pid)
+  return (battle_by_pid and battle_by_pid[pid] ~= nil) and (battle_ui_open and battle_ui_open[pid] == true)
+end
+local function _trade_active(pid)
+  return trader_by_pid and trader_by_pid[pid] ~= nil
+end
+
+-- ==== Unified click router: Battle → Trader → Actions → Card List ====
+Net:on("post_selection", function(event)
+  local pid     = event.player_id
+  local post_id = tostring(event.post_id or "")
+  print("[cards] post_selection pid", pid, "post_id", post_id,
+        "in_actions=", in_actions_menu[pid], "in_main=", player_using_card_bbs[pid])
+
+  -- 1) Battle clicks first (if a battle board is open)
+  if _battle_active(pid) and handle_battle_post_selection and handle_battle_post_selection(event) then
+    return
+  end
+
+  -- 2) Trader clicks next (if a trader board is open)
+  if _trade_active(pid) and handle_trade_post_selection and handle_trade_post_selection(event) then
+    return
+  end
+
+  -- 3) Deck Editor internal clicks (add/remove/save/back)
+  if handle_deck_post_selection and handle_deck_post_selection(event) then
+    return
+  end
+
+  -- 4) Open Deck Editor from Card Collection top row
+  if post_id == "__deck_edit__" then
+    -- mark active and schedule a reopen after the current board closes
+    deck_editor[pid] = deck_editor[pid] or { counts = _counts_from_saved(pid) }
+    deck_editor[pid].active = true
+    deck_reopen[pid] = true
+    pcall(Net.close_bbs, pid)  -- this will trigger board_close → we reopen there
+    return true
+  end
+
+  -- 5) Your existing Actions menu (Summon/Dismiss/Open List/Close)
   if in_actions_menu[pid] then
     in_actions_menu[pid] = false
-    local action = event.post_id
-    log("actions menu selection:", action)
+    local action = post_id
+    print("[cards] actions menu selection:", action)
 
     if action == ACTION_SUMMON then
       local info = last_viewed_card_by_player[pid]
       if not info then Net.message_player(pid, "(View a card first.)"); return end
       if summoned_bot_by_player[pid] then
-        log("replacing existing summon bot_id", summoned_bot_by_player[pid])
         pcall(Net.remove_bot, summoned_bot_by_player[pid])
       end
       local bot_id = spawn_card_npc_for_all(pid, info)
       if bot_id then
         summoned_bot_by_player[pid] = bot_id
         pending_actions_menu[pid] = true
-        log("summoned; set pending_actions_menu for quick Dismiss/Open List")
       end
       return
 
     elseif action == ACTION_DISMISS then
       if summoned_bot_by_player[pid] then
-        log("dismissing bot_id", summoned_bot_by_player[pid])
         pcall(Net.remove_bot, summoned_bot_by_player[pid])
         summoned_bot_by_player[pid] = nil
       end
       pending_actions_menu[pid] = true
-      log("dismissed; set pending_actions_menu to reopen options")
       return
 
     elseif action == ACTION_OPEN_LIST then
@@ -729,50 +2605,90 @@ Net:on("post_selection", function(event)
       return
 
     elseif action == ACTION_CLOSE then
-      log("closing BBS for pid", pid)
       pcall(Net.close_bbs, pid)
       player_using_card_bbs[pid] = false
       return
     end
   end
 
+  -- 6) Plain Card List selection → open the card’s detail/mugshot viewer
   if player_using_card_bbs[pid] == true then
     local item = ezmemory.get_item_info(event.post_id)
-    log("main list selection ->", item and item.name or "(unknown)")
+    print("[cards] main list selection ->", item and item.name or "(unknown)")
     show_card_dialog_with_mug(pid, item)
     return
   end
 
-  log("post_selection fell through; no known context")
+  print("[cards] post_selection fell through; no known context")
 end)
 
+-- ==== Unified board_close (reopen/refresh safe for Battle + Trader) ====
 Net:on("board_close", function(event)
   local pid = event.player_id
-  log("board_close pid", pid)
 
-  -- If we scheduled a reopen from a click, do it first.
-  if trade_reopen and trade_reopen[pid] then
-    trade_reopen[pid] = nil
-    if trader_by_pid and trader_by_pid[pid] then
-      open_trade_board(pid)  -- sets trade_refreshing[pid] = true internally
+  -- Deck Editor: scheduled refresh
+  if deck_reopen and deck_reopen[pid] then
+    deck_reopen[pid] = nil
+    if deck_editor and deck_editor[pid] and deck_editor[pid].active then
+      deck_refreshing[pid] = true           -- suppress normal close logic
+      open_deck_editor(pid)                 -- reopen deck editor
+    end
+    return                                  -- stop here; a reopen is happening
+  end
+
+  -- Deck Editor: we just reopened; clear the one-shot flag and stop
+  if deck_refreshing and deck_refreshing[pid] then
+    deck_refreshing[pid] = nil
+    return
+  end
+
+  -- 1) Battle reopen (programmatic)
+  if battle_reopen and battle_reopen[pid] then
+    battle_reopen[pid] = nil
+    if battle_by_pid and battle_by_pid[pid] then
+      open_battle_board(pid)
     end
     return
   end
 
-  -- If the close was triggered by our own Net.open_board refresh, ignore it.
+  -- Ignore programmatic closes triggered by battle refresh
+  if battle_refreshing and battle_refreshing[pid] then
+    battle_refreshing[pid] = nil
+    return
+  end
+
+  -- 2) Trader reopen (programmatic)
+  if trade_reopen and trade_reopen[pid] then
+    trade_reopen[pid] = nil
+    if trader_by_pid and trader_by_pid[pid] then
+      open_trade_board(pid)
+    end
+    return
+  end
+
+  -- Ignore programmatic closes triggered by trader refresh
   if trade_refreshing and trade_refreshing[pid] then
     trade_refreshing[pid] = nil
     return
   end
 
-  -- Normal close behavior: exit trade mode.
-  trader_by_pid[pid] = nil
-  player_using_card_bbs[pid] = false
-  in_actions_menu[pid] = false
-  if open_list_after_close[pid] then
+  -- 3) Actions menu asked to open Card List
+  if open_list_after_close and open_list_after_close[pid] then
     open_list_after_close[pid] = false
     open_card_list(pid)
+    return
   end
+
+  -- 4) Manual close: mark battle UI closed so it doesn't hijack future clicks
+  battle_ui_open[pid] = false
+
+  -- Clear finished duel state only when it actually ended
+  local st = battle_by_pid and battle_by_pid[pid]
+  if st and st.finished then
+    battle_by_pid[pid] = nil
+  end
+
+  print("[cards] board_close pid", pid)
 end)
 
 -- Clean up on join/leave
