@@ -1050,7 +1050,7 @@
   </object>
   <object id="148" name="give moneyz" type="Dialogue" x="1045.5" y="900.5">
    <properties>
-    <property name="Amount" type="int" value="10000"/>
+    <property name="Amount" type="int" value="150000"/>
     <property name="Dialogue Type" value="none"/>
     <property name="Event Name" value="Win_Gamble"/>
     <property name="Next 1" type="object" value="0"/>

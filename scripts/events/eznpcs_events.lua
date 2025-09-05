@@ -8,6 +8,7 @@ local ezwarps = require('scripts/ezlibs-scripts/ezwarps/main')
 local ezencounters = require('scripts/ezlibs-scripts/ezencounters/main')
 local helpers = require('scripts/ezlibs-scripts/helpers')
 local custom = require('scripts/ezlibs-custom/custom')
+local onceitem = require('scripts/events/eznpcs_onceitem')
 
 
 local sfx = {
