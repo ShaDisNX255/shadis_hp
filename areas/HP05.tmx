@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.8" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="11" height="18" tilewidth="64" tileheight="32" infinite="0" nextlayerid="3" nextobjectid="8">
+<map version="1.8" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="11" height="18" tilewidth="64" tileheight="32" infinite="0" nextlayerid="3" nextobjectid="9">
  <properties>
   <property name="Background" value="custom"/>
   <property name="Background Animation" value="/server/assets/custom/backgrounds/wcity/01-generic1.animation"/>
@@ -12,6 +12,7 @@
  <tileset firstgid="1" source="../assets/tiles/central_platform.tsx"/>
  <tileset firstgid="241" source="../assets/ezlibs-assets/ezcheckpoints/bn5cubegreen_tile.tsx"/>
  <tileset firstgid="245" source="../assets/tiles/home_warp.tsx"/>
+ <tileset firstgid="250" source="../assets/tiles/BBSOldFixed.tsx"/>
  <layer id="1" name="Tile Layer 0" width="11" height="18">
   <data encoding="csv">
 52,19,29,39,49,9,19,29,39,49,5,
@@ -69,6 +70,14 @@
     <property name="Direction" value="Up Right"/>
     <property name="Target Area" value="WCity1"/>
     <property name="Target Object" value="2"/>
+   </properties>
+  </object>
+  <object id="8" name="HP05 BBS" type="BBS" gid="251" x="48" y="288" width="48" height="69">
+   <properties>
+    <property name="BBS" type="bool" value="true"/>
+    <property name="Color" type="color" value="#ffffffff"/>
+    <property name="Name" value="HP05"/>
+    <property name="Post Limit" type="int" value="300"/>
    </properties>
   </object>
  </objectgroup>

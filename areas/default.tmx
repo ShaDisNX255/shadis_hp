@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.8" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="50" height="50" tilewidth="64" tileheight="32" infinite="0" nextlayerid="13" nextobjectid="235">
+<map version="1.8" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="50" height="50" tilewidth="64" tileheight="32" infinite="0" nextlayerid="13" nextobjectid="249">
  <properties>
   <property name="Background" value="custom"/>
   <property name="Background Animation" value="/server/assets/custom/backgrounds/home/kottouhinyanodennou.animation"/>
@@ -34,6 +34,9 @@
  <tileset firstgid="145" source="../assets/tiles/Toy_Robo.tsx"/>
  <tileset firstgid="283" source="../assets/tiles/Warp_tohp_exe2.tsx"/>
  <tileset firstgid="287" source="../assets/tiles/TBS.tsx"/>
+ <tileset firstgid="288" source="../assets/tiles/tiny_desks.tsx"/>
+ <tileset firstgid="290" source="../assets/tiles/bn3-bbs.tsx"/>
+ <tileset firstgid="296" source="../assets/tiles/BattleMachineBN4.tsx"/>
  <layer id="1" name="Tile Layer 1" width="50" height="50">
   <data encoding="csv">
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -58,19 +61,19 @@
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,136,136,136,136,136,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,136,0,0,0,0,0,0,0,0,2147483671,2147483671,2147483671,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,136,0,0,0,0,0,0,10,11,10,11,10,11,10,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,136,0,0,0,0,0,0,11,8,9,8,9,8,11,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,136,0,7,8,7,0,0,10,9,6,7,6,9,10,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,136,0,8,7,8,13,13,11,8,7,5,7,8,11,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,136,0,7,8,7,0,0,10,9,6,7,6,9,10,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,136,0,0,0,0,0,0,11,8,9,6,9,8,11,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,136,136,136,136,136,136,0,10,11,10,7,10,11,10,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,136,0,0,0,0,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,136,136,136,136,0,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,136,11,6,11,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,7,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,11,6,11,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,136,0,0,0,0,0,0,11,8,9,8,9,8,11,0,0,8,9,8,9,8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,136,0,7,8,7,0,0,10,9,6,7,6,9,10,0,0,9,9,9,9,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,136,0,8,7,8,13,13,11,8,7,5,7,8,11,9,9,8,9,9,9,8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,136,0,7,8,7,0,0,10,9,6,7,6,9,10,0,0,9,9,9,9,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,136,0,0,0,0,0,0,11,8,9,6,9,8,11,0,0,8,9,8,9,8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,136,136,136,136,136,136,0,10,11,10,7,10,11,10,0,0,0,0,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,136,0,0,0,0,6,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,136,136,136,136,0,7,0,0,0,0,0,0,0,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,136,11,6,11,0,0,0,0,8,9,8,9,8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,7,6,0,0,0,0,9,8,9,8,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,11,6,11,0,0,0,0,8,9,8,9,8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,8,9,8,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8,9,8,9,8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -463,21 +466,21 @@
    </properties>
    <point/>
   </object>
-  <object id="218" name="Card Pack Seller" type="NPC" x="685.5" y="852.5">
+  <object id="218" name="Card Pack Seller" type="NPC" x="1104" y="848">
    <properties>
     <property name="Asset Name" value="normal-navi-bn4_green"/>
     <property name="Dialogue Type" value="first"/>
-    <property name="Direction" value="Down Right"/>
+    <property name="Direction" value="Up Left"/>
     <property name="Next 1" type="object" value="219"/>
     <property name="Text 1" value="Hey there, I sell card packs!"/>
    </properties>
    <point/>
   </object>
-  <object id="220" name="Card Pack Trader" type="NPC" x="882" y="852">
+  <object id="220" name="Card Pack Trader" type="NPC" x="976" y="720">
    <properties>
     <property name="Asset Name" value="normal-navi-bn4_red"/>
     <property name="Dialogue Type" value="first"/>
-    <property name="Direction" value="Up Left"/>
+    <property name="Direction" value="Down Left"/>
     <property name="Next 1" type="object" value="221"/>
     <property name="Text 1" value="Hey there, I trade cards"/>
    </properties>
@@ -512,7 +515,7 @@
   </object>
   <object id="225" name="Mystical Elf" type="Item" x="599" y="871">
    <properties>
-    <property name="Description" value="Common: Mystical Elf - A: 800 / D: 200"/>
+    <property name="Description" value="Common: Mystical Elf - A: 800 / D: 2000"/>
     <property name="Name" value="[C]MElf"/>
     <property name="Price" value="0"/>
     <property name="Type" value="item"/>
@@ -597,6 +600,86 @@
     <property name="Name" value="[GDR]S.Skull"/>
     <property name="Price" value="0"/>
     <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="235" name="Duel Tester" type="NPC" x="1104" y="720">
+   <properties>
+    <property name="Asset Name" value="normal-navi-bn4_green"/>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Direction" value="Down Left"/>
+    <property name="Next 1" type="object" value="247"/>
+    <property name="Text 1" value="You can duel with me to practice before Battle City opens."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="236" name="Duel" type="Dialogue" x="1168" y="720">
+   <properties>
+    <property name="Battle Draw" type="object" value="239"/>
+    <property name="Battle Lost" type="object" value="238"/>
+    <property name="Battle Won" type="object" value="237"/>
+    <property name="Dialogue Type" value="none"/>
+    <property name="Event Name" value="Card Battle (NPC)"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="237" name="Win" type="Dialogue" x="1200" y="800">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Text 1" value="You won!"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="238" name="Lost" type="Dialogue" x="1216" y="784">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Text 1" value="You lost!"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="239" name="Draw" type="Dialogue" x="1232" y="768">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Text 1" value="We tied..."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="240" name="Duel Table" type="Duel Table" gid="297" x="1024" y="800" width="32" height="33">
+   <properties>
+    <property name="Type" value="Duel Table"/>
+   </properties>
+  </object>
+  <object id="242" name="JobBBS" type="JobBBS" gid="294" x="624" y="848" width="80" height="96">
+   <properties>
+    <property name="Color" type="color" value="#ffff0000"/>
+    <property name="Name" value="Main Job BBS"/>
+   </properties>
+  </object>
+  <object id="243" gid="101" x="1024" y="1024" width="64" height="39"/>
+  <object id="244" gid="134" x="1040" y="912" width="64" height="64">
+   <properties>
+    <property name="Flavor" value="Battle City under construction"/>
+   </properties>
+  </object>
+  <object id="245" gid="134" x="1040" y="944" width="64" height="64"/>
+  <object id="246" name="Duel Table" type="Duel Table" gid="297" x="1072" y="800" width="32" height="33">
+   <properties>
+    <property name="Type" value="Duel Table"/>
+   </properties>
+  </object>
+  <object id="247" name="Ask Duel" type="Dialogue" x="1088" y="672">
+   <properties>
+    <property name="Dialogue Type" value="question"/>
+    <property name="Next 1" type="object" value="236"/>
+    <property name="Next 2" type="object" value="248"/>
+    <property name="Text 1" value="Would you like to duel?"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="248" name="Refuse" type="Dialogue" x="1136" y="672">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Text 1" value="Maybe some other time"/>
    </properties>
    <point/>
   </object>
@@ -867,7 +950,7 @@
    </properties>
    <point/>
   </object>
-  <object id="219" name="Card pack" type="Dialogue" x="690.5" y="903.5">
+  <object id="219" name="Card pack" type="Dialogue" x="736" y="992">
    <properties>
     <property name="Dialogue Type" value="Pack Shop"/>
     <property name="Pack Description" value="1st Pack Available"/>
@@ -901,7 +984,7 @@
    </properties>
    <point/>
   </object>
-  <object id="221" name="Card trader" type="Dialogue" x="978.5" y="893.5">
+  <object id="221" name="Card trader" type="Dialogue" x="912" y="640">
    <properties>
     <property name="Dialogue Type" value="Card Trader"/>
     <property name="Pack Description" value="I'll take any 10 cards and give you 1 random card back."/>

@@ -4,6 +4,13 @@ local sfx = {
     item_get='/server/assets/ezlibs-assets/sfx/item_get.ogg'
 }
 
+local JobBBS = (function()
+  local ok, M = pcall(require, 'scripts/jobbbs/JobBBS')
+  if ok and M then return M end
+  ok, M = pcall(require, 'scripts/jobbbs/jobbbs') -- fallback name if needed
+  return ok and M or nil
+end)()
+
 local persist_health_and_emotion = function (player_id,encounter_info,stats)
     if stats.emotion == 1 then
         Net.set_player_emotion(player_id, stats.emotion)
@@ -14,6 +21,9 @@ local persist_health_and_emotion = function (player_id,encounter_info,stats)
 end
 
 local give_result_awards = function (player_id,encounter_info,stats)
+    if JobBBS and JobBBS.on_encounter_result then
+      pcall(JobBBS.on_encounter_result, player_id, stats)
+    end
     -- stats = { health: number, score: number, time: number, ran: bool, emotion: number, turns: number, npcs: { id: String, health: number }[] }
     persist_health_and_emotion(player_id,encounter_info,stats)
     if stats.ran then
@@ -28,6 +38,9 @@ local give_result_awards = function (player_id,encounter_info,stats)
 end
 
 local give_result_awards_rare = function (player_id,encounter_info,stats)
+    if JobBBS and JobBBS.on_encounter_result then
+      pcall(JobBBS.on_encounter_result, player_id, stats)
+    end
     -- stats = { health: number, score: number, time: number, ran: bool, emotion: number, turns: number, npcs: { id: String, health: number }[] }
     if stats.ran then
         return -- no rewards for wimps

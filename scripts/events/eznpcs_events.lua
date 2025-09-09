@@ -8,7 +8,7 @@ local ezwarps = require('scripts/ezlibs-scripts/ezwarps/main')
 local ezencounters = require('scripts/ezlibs-scripts/ezencounters/main')
 local helpers = require('scripts/ezlibs-scripts/helpers')
 local custom = require('scripts/ezlibs-custom/custom')
-local onceitem = require('scripts/events/eznpcs_onceitem')
+local onceitem = require('scripts/events/eznpcs_onceitem')   -- loads the onceitem rental type
 
 
 local sfx = {
@@ -18,6 +18,13 @@ local sfx = {
     gibberish = '/server/assets/ezlibs-assets/sfx/gibberish.ogg',
     card_error = '/server/assets/ezlibs-assets/ezfarms/card_error.ogg'
 }
+
+local JobBBS = (function()
+  local ok, M = pcall(require, 'scripts/jobbbs/JobBBS')
+  if ok and M then return M end
+  ok, M = pcall(require, 'scripts/jobbbs/jobbbs') -- fallback if name changes
+  return ok and M or nil
+end)()
 
 local event1 = {
     name = "Italian Gibberish",
@@ -482,6 +489,9 @@ local function open_one_pack(player_id, area_id, pack, mug)
             or string.format("Opened %s... but it was empty?", pack.name),
         mug.texture_path, mug.animation_path
     ))
+    if JobBBS and JobBBS.on_pack_open then
+      pcall(JobBBS.on_pack_open, player_id, { count = 1, pack = pack.name })
+    end
     return true
 end
 
@@ -517,6 +527,9 @@ local function open_n_packs(player_id, area_id, pack, mug, n)
     local header = string.format("Opened %d x %s and got:", n, pack.name)
     local body = (#lines > 0) and (header.."\n- "..table.concat(lines, "\n- ")) or (header.."\n(nothing?)")
     await(Async.message_player(player_id, body, mug.texture_path, mug.animation_path))
+    if JobBBS and JobBBS.on_pack_open then
+      pcall(JobBBS.on_pack_open, player_id, { count = n, pack = pack.name })
+    end
     return true
 end
 

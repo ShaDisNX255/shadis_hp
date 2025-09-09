@@ -1,5 +1,7 @@
 local ezmemory = require('scripts/ezlibs-scripts/ezmemory')
 local helpers  = require('scripts/ezlibs-scripts/helpers')
+local ygo_pvp  = require('scripts/ezlibs-custom/ygo_pvp')
+local jobbbs  = require('scripts/jobbbs/JobBBS')
 
 local custom = {}
 -- Read an item’s info/meta when you might have either "area,id" or just a raw id.
@@ -9,6 +11,196 @@ local do_KO            -- assigned later
 local build_cast_posts -- assigned later
 local base_title  -- forward decl so short_name can call it
 local battle_ui_open = battle_ui_open or {}
+
+-- Forward declare so earlier closures capture it as an upvalue, not a global
+local name_for
+local open_battle_board
+
+function name_for(st, seat_i)
+  local p = st.players and st.players[seat_i]
+  -- Prefer stored name; fallback to player name from pid; else P1/P2
+  local n = (p and p.name)
+        or (st.pids and Net.get_player_name(st.pids[seat_i]))
+        or ("P"..tostring(seat_i))
+  return n
+end
+-- === Battle UI globals (declare once, at top of helpers) ===
+battle_reopen   = battle_reopen   or {}  -- existing in your code; keep table shared
+_ann_q          = _ann_q          or {}  -- per-player announcement queue
+_ann_busy       = _ann_busy       or {}  -- true while a modal is open for that pid
+_reopen_pending = _reopen_pending or {}  -- deferred board refresh while modal is up
+_ack_count       = _ack_count       or {}
+
+-- === Safe announcer (queues popups so they never overlap) ===
+-- ========= Modal-aware announcer + gate =========
+-- Try to resolve Async from require or from _G.Async (some servers preload it)
+local function _resolve_async()
+  local ok, A = pcall(require, "scripts/ezlibs-scripts/async")
+  if ok and A and A.message_player then return A end
+  if _G.Async and _G.Async.message_player then return _G.Async end
+  return nil
+end
+
+local Async = _resolve_async()
+
+-- per-player count of currently-open modal boxes
+_ack_count      = _ack_count      or {}
+_reopen_pending = _reopen_pending or {}
+
+-- When a modal closes, if we had deferred a refresh, do it now.
+local function _after_modal_closed_impl(pid)
+  if _reopen_pending[pid] then
+    _reopen_pending[pid] = nil
+    if not battle_reopen[pid] then battle_reopen[pid] = true end
+    pcall(Net.close_bbs, pid)
+  end
+end
+
+-- EXPOSE for JobBBS.lua (which calls this on textbox_response)
+_G._after_modal_closed = function(pid)
+  -- decrement ack if needed
+  local n = (_ack_count[pid] or 0)
+  if n > 0 then
+    _ack_count[pid] = n - 1
+    print(("[custom][announce] JobBBS --ack %s -> %d"):format(tostring(pid), _ack_count[pid]))
+  else
+    _ack_count[pid] = 0
+  end
+  _after_modal_closed_impl(pid)
+end
+
+-- === SAFE REFRESH: don't close BBS if a modal is up ===
+closing_for_refresh      = closing_for_refresh      or {}
+closing_for_refresh_ts   = closing_for_refresh_ts   or {}
+PROGRAM_REFRESH_WINDOW_S = PROGRAM_REFRESH_WINDOW_S or 0.35  -- ~350ms
+
+local function safe_request_refresh(pid)
+  if not pid then return end
+  -- if an async announcer modal is up, defer until it’s closed
+  if _ann_busy and _ann_busy[pid] then
+    _reopen_pending[pid] = true
+    return
+  end
+  -- mark this as a programmatic (refresh) close and timestamp it
+  closing_for_refresh[pid]    = true
+  closing_for_refresh_ts[pid] = os.clock()
+  -- tell board_close to reopen the battle board afterward
+  battle_reopen[pid] = true
+  print("[custom][refresh] programmatic close scheduled for", pid)
+  pcall(Net.close_bbs, pid)
+end
+
+-- Announcer: prefer true modal via Async; fall back to non-modal toast
+local function safe_announce(pid, msg)
+  if not pid or not msg or msg == "" then return end
+
+  if not Async then
+    -- Try to resolve again in case modules loaded later
+    Async = _resolve_async()
+  end
+
+  if Async and Async.message_player then
+    -- Treat as modal: ++ack now; JobBBS will call _after_modal_closed() on close
+    _ack_count[pid] = (_ack_count[pid] or 0) + 1
+    print(("[custom][announce] MODAL ++ack %s -> %d"):format(tostring(pid), _ack_count[pid]))
+    local ok, err = pcall(Async.message_player, pid, msg)
+    if not ok then
+      print("[custom][announce] Async.message_player error: "..tostring(err))
+      -- Fallback to non-modal and undo the ack to avoid “stuck busy”
+      _ack_count[pid] = math.max(0, (_ack_count[pid] or 1) - 1)
+      print(("[custom][announce] Fallback --ack %s -> %d"):format(tostring(pid), _ack_count[pid]))
+      pcall(Net.message_player, pid, msg)
+      _after_modal_closed_impl(pid)
+    end
+    return
+  end
+
+  -- Last resort: non-modal toast (cannot gate on this)
+  print(("[custom][announce] non-modal to=%s"):format(tostring(pid)))
+  pcall(Net.message_player, pid, msg)
+end
+
+-- Announce to both viewers (PvP) or the single player (PvE)
+local function battle_announce(st, msg)
+  if not st or not msg then return end
+  if st.pids and type(st.pids) == "table" then
+    for _, p in ipairs(st.pids) do safe_announce(p, msg) end
+  elseif st.pid then
+    safe_announce(st.pid, msg)
+  end
+end
+
+-- Refresh both viewers, or just the actor in PvE
+local function refresh_both(st, actor_pid)
+  if not st then return end
+  if st.pids and type(st.pids)=="table" then
+    for _, p in ipairs(st.pids) do safe_request_refresh(p) end
+  else
+    safe_request_refresh(actor_pid or st.pid)
+  end
+end
+
+-- Block End Turn while the opponent has any modal open
+function gate_if_opponent_busy(st, actor_pid)
+  if not st or not st.pids or not actor_pid then return false end
+  local my  = seat_idx(st, actor_pid) or 1
+  local opp = st.pids[3 - my]
+  if not opp then return false end
+  local busy = (_ack_count[opp] or 0) > 0
+  print(("[custom][gate] actor=%s opp=%s opp_ack=%d busy=%s")
+        :format(tostring(actor_pid), tostring(opp), _ack_count[opp] or 0, tostring(busy)))
+  if busy then
+    local nm = Net.get_player_name(opp) or "opponent"
+    -- IMPORTANT: non-modal toast so we don’t create a new modal here
+    pcall(Net.message_player, actor_pid, "Waiting on "..nm.." to close their message...")
+    return true
+  end
+  return false
+end
+
+-- Ensure `custom` is visible to modules that expect a global (fallback)
+_G.custom = _G.custom or custom
+
+-- Try to load the PVP module from either location, with clear logging.
+local function try_require(modname)
+  local ok, res = pcall(require, modname)
+  if ok then
+    print("[ygo] Loaded PVP module: " .. modname)
+    return res
+  else
+    print("[ygo] Require failed for " .. modname .. ": " .. tostring(res))
+    return nil
+  end
+end
+
+local JobBBS = (function()
+  local ok, M = pcall(require, 'scripts/jobbbs/JobBBS')
+  if ok and M then return M end
+  ok, M = pcall(require, 'scripts/jobbbs/jobbbs')
+  return ok and M or nil
+end)()
+
+-- If the module loaded, prefer injection; otherwise we’ll fall back to global `custom`.
+if ygo_pvp then
+  if ygo_pvp.set_start_fn then
+    ygo_pvp.set_start_fn(function(a, b, cfg)
+      return custom.start_card_battle_pvp(a, b, cfg)
+    end)
+    print("[ygo] PVP start function injected.")
+  else
+    print("[ygo] Warning: ygo_pvp.set_start_fn missing; module may expect global `custom`.")
+  end
+else
+  print("[ygo] ERROR: PVP module not found; duel tables won’t work.")
+end
+
+local ok_ygo, ygo_pvp = pcall(require, "scripts/ezlibs-custom/ygo_pvp")
+if ok_ygo and ygo_pvp and ygo_pvp.set_start_fn then
+  ygo_pvp.set_start_fn(function(a, b, cfg)
+    return custom.start_card_battle_pvp(a, b, cfg)
+  end)
+end
+
 do
   if not _G.__cards_rng_seeded then
     local t  = os.time()
@@ -140,11 +332,6 @@ local function rehydrate_deck_stats(pid, deck)
   end
 end
 
--- === Play-by-play announcer ===
-local function battle_announce(st, msg)
-  if st and st.pid then Net.message_player(st.pid, msg) end
-end
-
 -- Totals across rarities for current counts
 local function _rarity_totals(counts, poolmap)
   local total, urgdr_total, sr_total, r_total, c_total = 0, 0, 0, 0, 0
@@ -172,10 +359,20 @@ end
 
 -- Returns two strings for a given side: subject and possessive.
 -- idx=1 is the human player; idx=2 is the NPC.
-local function labels_for(st, idx)
-  local subj = (idx == 1) and "You" or (st.npc_name or "NPC")
-  local poss = (idx == 1) and "Your" or (subj .. "'s")
-  return subj, poss
+local function labels_for(st, seat_i)
+  seat_i = (seat_i == 1) and 1 or 2
+  if st.mode == "pvp" then
+    local p = st.players and st.players[seat_i]
+    local n = (p and p.name) or ("P"..seat_i)
+    return n, (n .. "'s")
+  else
+    if seat_i == 1 then
+      return "You", "Your"
+    else
+      local npc = st.npc_name or "NPC"
+      return npc, (npc .. "'s")
+    end
+  end
 end
 
 -- Format one-liners
@@ -976,6 +1173,21 @@ local battle_reopen      = battle_reopen or {}   -- [pid] = true to reopen after
 local battle_refreshing  = battle_refreshing or {}
 
 -- simple helpers
+-- === Battle BBS "lock" (prevents accidental closing with B) ===
+local LOCK_BATTLE_BBS = true
+local _b_warned = _b_warned or {}
+
+local function _reopen_battle_now_or_later(pid)
+  -- If a modal (announcer) is up, defer reopen until it closes
+  if _ann_busy and _ann_busy[pid] then
+    _reopen_pending[pid] = true
+    return
+  end
+  if open_battle_board then
+    open_battle_board(pid)
+  end
+end
+
 local function def_bar(cur, max)
   cur = tonumber(cur or 0) or 0
   max = tonumber(max or 0) or 0
@@ -1204,6 +1416,21 @@ do_KO = function(state, victim_idx)
   if killer.KOs >= 3 then
     state.finished = true
     state.winner   = killer_idx
+
+    -- Free the duel table only for PVP matches
+    if not state.table_freed then
+      local ok, err = pcall(function()
+        if state.mode == "pvp" and ygo_pvp and ygo_pvp.on_ygo_pvp_end then
+          local winner_pid = state.pids and state.pids[killer_idx]
+          local loser_pid  = state.pids and state.pids[3 - killer_idx]
+          if winner_pid and loser_pid then
+            ygo_pvp.on_ygo_pvp_end(winner_pid, loser_pid, { table_id = state.table_id })
+          end
+        end
+      end)
+      if not ok then print("[ygo] on_ygo_pvp_end error: "..tostring(err)) end
+      state.table_freed = true
+    end
   end
 end
 
@@ -1254,12 +1481,16 @@ local function resolve_attack(state)
       D.curDEF = math.max(0, D.curDEF - H)
       battle_announce(state, defPoss .. " " .. dn .. " DEF reduced to " .. D.curDEF .. "/" .. D.card.DEF)
       A.pos = "DEF" -- Counter-Set only if defender survived
+	  state.turn_flags.hasSwitched = true
     end
 
     -- Megamorph after-battle: attacker goes to DEF if still on field
     if state.turn_flags.megaNext then
       local meF = state.players[me_idx].field
-      if meF then meF.pos = "DEF" end
+      if meF then
+        meF.pos = "DEF"
+        state.turn_flags.hasSwitched = true
+	  end
     end
   end
 
@@ -1665,6 +1896,13 @@ local function npc_take_turn(state)
     resolve_attack(state)
   end
 
+    -- Announce end of NPC turn (PVP shows both players; PvE shows local)
+  if state.pids then
+    announce_both(state, (fmt_npc(state) .. " ended their turn."))
+  else
+    battle_announce(state, (fmt_npc(state) .. " ended its turn."))
+  end
+
   end_turn(state)
 end
 
@@ -1686,7 +1924,7 @@ local function name_pos_label(f, mask_set)
 end
 
 local function stats_line(f, mask_set)
-  if not f then return "   —" end
+  if not f then return "   -" end
 
   local ATK = (f.card and f.card.ATK) or 0
   local DEF = (f.card and f.card.DEF) or 0
@@ -1725,23 +1963,51 @@ local function field_label(f)
   end
 end
 
-local function battle_title(state)
-  local you = state.players[1]; local ai = state.players[2]
-  return string.format("Battle vs %s  |  KOs: You %d - %d %s  |  Turn %d",
-    state.npc_name or "NPC", you.KOs or 0, ai.KOs or 0, state.npc_name or "NPC", state.turn_num or 1)
+local function battle_title(st)
+  local p1 = (st.players and st.players[1]) or {}
+  local p2 = (st.players and st.players[2]) or {}
+
+  local n1 = (p1.name and tostring(p1.name)) or "P1"
+  local n2 = (p2.name and tostring(p2.name)) or (st.npc_name or "NPC")
+
+  -- KO counters (default 0)
+  local k1 = tonumber(p1.KOs or 0) or 0
+  local k2 = tonumber(p2.KOs or 0) or 0
+  local turn = tonumber(st.turn_num or 1) or 1
+
+  if st.mode == "pvp" then
+    return string.format("Duel: %s vs %s  |  KOs: %s %d - %d %s  |  Turn %d",
+      n1, n2, n1, k1, k2, n2, turn)
+  else
+    -- PvE keeps the NPC name
+    local npc = st.npc_name or "NPC"
+    return string.format("Battle vs %s  |  KOs: You %d - %d %s  |  Turn %d",
+      npc, k1, k2, npc, turn)
+  end
 end
 
 local function build_main_posts(pid)
   local st = battle_by_pid[pid]
+  if not st then
+    return "Duel", { { id = "ygo:noop", read = true, title = "No duel state." } }
+  end
+
+  -- Who is the viewer?
+  local my = seat_idx(st, pid) -- 1 or 2
+  local me  = st.players[my]
+  local opp = st.players[3 - my]
+  local flags = st.turn_flags or {}
+  local is_my_turn = (st.turn_player == my)
+
+  -- Per-player (or fallback) hand selection
+  local lastIdx = (st._lastHandIdx_by and st._lastHandIdx_by[pid]) or st._lastHandIdx
+
   local posts = {}
-  local me  = st.players[1]
-  local opp = st.players[2]
-  local flags = st.turn_flags
 
   -- ===== Actions FIRST (pinned to very top) =====
-  if st.turn_player == 1 then
-    -- If no monster yet & you clicked a hand card, expose Summon/Set first at the top
-    if not me.field and can_place(me, flags) and st._lastHandIdx and me.hand[st._lastHandIdx] then
+  if is_my_turn then
+    -- If no monster yet & you clicked a hand card, expose Summon/Set at the top
+    if (not me.field) and can_place(me, flags) and lastIdx and me.hand[lastIdx] then
       posts[#posts+1] = { id = BTL_SUMMON, read = true, title = "Summon (face-up ATK)" }
       posts[#posts+1] = { id = BTL_SET,    read = true, title = "Set (face-down DEF)" }
     end
@@ -1751,35 +2017,35 @@ local function build_main_posts(pid)
       posts[#posts+1] = { id = BTL_END, read = true, title = "End Turn" }
     end
 
-    -- Only show context-legal options
-    if can_switch_now(st, 1) then
+    -- Only show context-legal options (use my seat index)
+    if can_switch_now(st, my) then
       posts[#posts+1] = { id = BTL_SWITCH, read = true, title = "Switch Position" }
     end
-    if can_attack(st, 1) then
+    if can_attack(st, my) then
       posts[#posts+1] = { id = BTL_ATTACK, read = true, title = "Attack" }
     end
-    if any_castable_spell(st, 1) then
+    if any_castable_spell(st, my) then
       posts[#posts+1] = { id = BTL_CAST, read = true, title = "Cast Spell" }
     end
   end
 
   -- ===== Field header (comes AFTER actions) =====
-  local yf = st.players[1].field
-  local of = st.players[2].field
-  posts[#posts+1] = { id=(yf and BTL_VIEW_ME or BTL_OK),  read=true, title="Your:     "..name_pos_label(yf, false) }
-  posts[#posts+1] = { id=BTL_OK,                          read=true, title=           stats_line(yf, false) }
-  posts[#posts+1] = { id=(of and of.pos~="SET" and BTL_VIEW_OPP or BTL_OK), read=true, title="Opponent: "..name_pos_label(of, true) }
-  posts[#posts+1] = { id=BTL_OK,                          read=true, title=           stats_line(of, true) }
+  local yf = me.field
+  local of = opp.field
+  posts[#posts+1] = { id = (yf and BTL_VIEW_ME or BTL_OK),  read = true, title = "Your:     " .. name_pos_label(yf, false) }
+  posts[#posts+1] = { id = BTL_OK,                          read = true, title =                stats_line(yf, false) }
+  posts[#posts+1] = { id = (of and of.pos ~= "SET" and BTL_VIEW_OPP or BTL_OK), read = true, title = "Opponent: " .. name_pos_label(of, true) }
+  posts[#posts+1] = { id = BTL_OK,                          read = true, title =              stats_line(of, true) }
 
   -- Opponent hand count
-  posts[#posts+1] = { id=BTL_OK, read=true, title=string.format("Opponent hand: %d", #opp.hand) }
+  posts[#posts+1] = { id = BTL_OK, read = true, title = string.format("Opponent hand: %d", #(opp.hand or {})) }
 
   -- ===== Hand =====
-  posts[#posts+1] = { id=BTL_OK, read=true, title="Your Hand:" }
+  posts[#posts+1] = { id = BTL_OK, read = true, title = "Your Hand:" }
   for i, card in ipairs(me.hand) do
-    local sel = (st._lastHandIdx == i) and " ←" or ""
+    local sel = (lastIdx == i) and " ←" or ""
     posts[#posts+1] = {
-      id    = "hand:"..i,
+      id    = "hand:" .. i,
       read  = true,
       title = string.format("  %d) %s [A %d / D %d]%s", i, short_name(card.title), card.ATK, card.DEF, sel)
     }
@@ -1791,9 +2057,49 @@ local function build_main_posts(pid)
   return battle_title(st), posts
 end
 
-local function open_battle_board(pid)
-  local st = battle_by_pid[pid]
-  if not st then return end
+-- Seating helper used by the battle UI; global so any builder can use it.
+_G.seat_idx = _G.seat_idx or function(st, pid)
+  if not st then return 1 end
+  -- Fast path: explicit mapping (we set this in PVP state)
+  if st.seat_of and st.seat_of[pid] then
+    return st.seat_of[pid]
+  end
+  -- Fallback: infer from st.pids[1/2]
+  if st.pids then
+    if st.pids[1] == pid then return 1 end
+    if st.pids[2] == pid then return 2 end
+  end
+  -- Last resort: default to P1
+  return 1
+end
+
+-- Returns my_index(1/2), me, opp
+local function me_opp(st, pid)
+  local me_i = seat_idx(st, pid)
+  local opp_i = 3 - me_i
+  return me_i, st.players[me_i], st.players[opp_i]
+end
+
+-- In PVP: pick the correct side of any {p1=..., p2=...} structure
+local function side_for(st, pid, sides)
+  local me_i = seat_idx(st, pid)
+  return (me_i == 1) and sides.p1 or sides.p2
+end
+
+-- Broadcast small “announcer” messages to both players
+local function announce_both(st, text)
+  if not st or not st.pids then return end
+  for _, p in ipairs(st.pids) do
+    Net.message_player(p, "[YGO] " .. text)
+  end
+end
+
+function open_battle_board(pid)
+  local st = battle_by_pid[pid]; if not st then return end
+  print("[custom] open_battle_board pid=", pid)
+  local my = seat_idx(st, pid)
+  print(string.format("[custom] open_battle_board pid=%s ui=%s my=%s", tostring(pid), tostring(st.ui or "main"), tostring(my)))
+
   battle_refreshing[pid] = true
   battle_ui_open[pid] = true
 
@@ -1805,6 +2111,7 @@ local function open_battle_board(pid)
   else
     title, posts = build_main_posts(pid)
   end
+  print(string.format("[custom] open_battle_board posts=%d", #(posts or {})))
   Net.open_board(pid, title, BATTLE_BOARD_COLOR, posts)
 end
 
@@ -1814,14 +2121,14 @@ build_discard_posts = function(pid)
   if not st then
     return "Duel", { { id=BTL_OK, read=true, title="(no state)" } }
   end
-  local me   = st.players[1]
+
+  local my = seat_idx(st, pid)
+  local me = st.players[my]
   local need = st._discard_cost or 0
 
   st._discard_sel = st._discard_sel or {}
   local chosen = 0
-  for _, v in pairs(st._discard_sel) do
-    if v then chosen = chosen + 1 end
-  end
+  for _, v in pairs(st._discard_sel) do if v then chosen = chosen + 1 end end
 
   local posts = {}
   posts[#posts+1] = {
@@ -1850,29 +2157,31 @@ end
 -- === Cast submenu (shows spells + costs; paying via hand picks) ===
 build_cast_posts = function(pid)
   local st = battle_by_pid[pid]
+  if not st then
+    return "Duel", { { id=BTL_OK, read=true, title="(no state)" } }
+  end
+
+  local my = seat_idx(st, pid)
   local posts = {}
   posts[#posts+1] = { id=BTL_OK, read=true, title="Select a Spell (discard = cost):" }
 
   local function split_name_desc(s)
     s = tostring(s or "")
-    -- Prefer parenthetical: "Name (desc)"
     local n, d = s:match("^%s*([^%(]+)%s*%(%s*(.+)%)%s*$")
     if n then return (n:gsub("%s+$","")), d end
-    -- Fallback em dash / hyphen / colon
     n, d = s:match("^%s*([^%—%-:]+)%s*[—%-%:]+%s*(.+)%s*$")
     if n then return (n:gsub("%s+$","")), d end
     return s, nil
   end
 
   for _, sp in ipairs(SPELLS) do
-    local enabled = (#st.players[1].hand >= sp.cost)
+    local cost = sp.cost or 0
+    local enabled = (#st.players[my].hand >= cost)
     local base, desc = split_name_desc(sp.name)
-    local label = string.format("[%d] %s", sp.cost, base)
-    if not enabled then label = label .. "  (need " .. sp.cost .. ")" end
+    local label = string.format("[%d] %s", cost, base)
+    if not enabled then label = label .. "  (need " .. cost .. ")" end
 
-    -- Clickable spell name
     posts[#posts+1] = { id = BTL_CAST_PICK .. sp.key, read = true, title = label }
-    -- Non-clickable description line (if any)
     if desc and #desc > 0 then
       posts[#posts+1] = { id = BTL_OK, read = true, title = "    " .. desc }
     end
@@ -1961,105 +2270,134 @@ local function handle_battle_post_selection(event)
   local st      = battle_by_pid[pid]
   if not st then return false end
 
-  -- If finished, any click closes
+  -- Seat-aware refs
+  local me_i, me, opp = me_opp(st, pid)
+  local flags = st.turn_flags or {}
+
+  -- Turn-gated actions
+  local function _is_turn_action(id)
+    return (id == BTL_SUMMON) or (id == BTL_SET) or (id == BTL_SWITCH)
+        or (id == BTL_ATTACK) or (id == BTL_CAST) or (id == BTL_END)
+  end
+  if _is_turn_action(post_id) and st.turn_player ~= me_i then
+    Net.message_player(pid, "[YGO] Not your turn.")
+    return true
+  end
+
+  -- If finished, any click closes (keep your JobBBS hook)
   if st.finished then
-    local who = (st.winner == 1) and "You win! (3 KOs)" or (st.winner == 2 and (st.npc_name or "NPC").." wins! (3 KOs)" or "Duel ended.")
+    if JobBBS and JobBBS.on_npc_duel_result then
+      pcall(JobBBS.on_npc_duel_result, pid, { winner = st.winner, npc_name = st.npc_name, kos = 3 })
+    end
+    local who = (st.winner == me_i) and "You win! (3 KOs)"
+             or (st.winner and "Opponent wins! (3 KOs)" or "Duel ended.")
     Net.message_player(pid, who)
     battle_by_pid[pid] = nil
     pcall(Net.close_bbs, pid)
     return true
   end
 
-  local me    = st.players[1]
-  local opp   = st.players[2]
-  local flags = st.turn_flags
-  -- View Your monster
+  -- View YOUR monster
   if post_id == BTL_VIEW_ME then
     local f = me.field
     if not f then return true end
     local info = item_info_from_field_card(f.card)
-    if info then
-      show_card_dialog_with_mug(pid, info)
-    else
-      Net.message_player(pid, "No details available for this card.")
-    end
+    if info then show_card_dialog_with_mug(pid, info) else Net.message_player(pid, "No details available for this card.") end
     return true
   end
 
-  -- View Opponent monster (only if revealed/face-up)
+  -- View OPP monster (only if face-up)
   if post_id == BTL_VIEW_OPP then
     local f = opp.field
-    if not f or f.pos == "SET" then
-      Net.message_player(pid, "You can’t view a face-down monster.")
-      return true
-    end
+    if not f or f.pos == "SET" then Net.message_player(pid, "You can’t view a face-down monster."); return true end
     local info = item_info_from_field_card(f.card)
-    if info then
-      show_card_dialog_with_mug(pid, info)
-    else
-      Net.message_player(pid, "No details available for this card.")
-    end
+    if info then show_card_dialog_with_mug(pid, info) else Net.message_player(pid, "No details available for this card.") end
     return true
   end
 
   -- Switch Position
   if post_id == BTL_SWITCH then
-    if st.turn_player ~= 1 then return true end
-    if not can_switch_now(st, 1) then
-      Net.message_player(pid, "You can’t switch position right now.")
-      return true
-    end
-    local f = me.field
-    if not f then return true end
-    if f.pos == "SET" then
-      f.pos = "ATK"  -- flip summon
-    else
-      f.pos = (f.pos == "ATK") and "DEF" or "ATK"
-    end
-    -- announce with possessive
-    do
-      local subj, poss = "You", "Your"
-      if labels_for then subj, poss = labels_for(st, 1) end
-      local nm = short_name(f.card.title)
-      battle_announce(st, subj .. " switched " .. nm .. " to " .. f.pos .. ".")
-    end
-    st.turn_flags.hasSwitched = true
-    battle_reopen[pid] = true; pcall(Net.close_bbs, pid)
+  if st.turn_player ~= me_i then return true end
+  if not can_switch_now(st, me_i) then
+    Net.message_player(pid, "You can’t switch position right now.")
     return true
+  end
+  local f = me.field
+  if not f then return true end
+
+  if f.pos == "SET" then
+    f.pos = "ATK"
+  else
+    f.pos = (f.pos == "ATK") and "DEF" or "ATK"
+  end
+
+  local pname = name_for(st, me_i)
+  battle_announce(st, string.format("%s switched %s to %s.", pname, short_name(f.card.title), f.pos))
+
+  st.turn_flags.hasSwitched = true
+  refresh_both(st, pid)
+  return true
   end
 
   -- Back from submenus
   if post_id == "__b_back__" then
     st.ui = "main"
-    battle_reopen[pid] = true
-    pcall(Net.close_bbs, pid)
+    safe_request_refresh(pid)
     return true
   end
 
   -- Concede / Cancel
   if post_id == BTL_CONCEDE or post_id == BTL_CANCEL then
-    st.finished = true; st.winner = 2
-    battle_reopen[pid] = true
-    pcall(Net.close_bbs, pid)
+    local my = seat_idx(st, pid) or 1
+    st.finished = true
+    st.winner   = 3 - my
+
+    -- Announce
+    local subj = (labels_for and select(1, labels_for(st, my, pid))) or "You"
+    if st.pids then
+      announce_both(st, "[Concede] " .. ((subj == "You") and ((Net.get_player_name(pid) or "Player") .. " conceded.") or (subj .. " conceded.")))
+    else
+      battle_announce(st, "You conceded.")
+    end
+
+    -- Let ygo_pvp free the table (if this was a PVP duel)
+    pcall(function()
+      if st.mode == "pvp" and ygo_pvp and ygo_pvp.on_ygo_pvp_end and st.pids then
+        local winner_pid = st.pids[st.winner]
+        local loser_pid  = st.pids[my]
+        if winner_pid and loser_pid then
+          ygo_pvp.on_ygo_pvp_end(winner_pid, loser_pid, { table_id = st.table_id })
+        end
+      end
+    end)
+
+    safe_request_refresh(pid)
     return true
   end
 
-  -- Hand selection: store last index for summon/set convenience
+  -- Hand cursor (store per-player)
   local hand_idx = post_id:match("^hand:(%d+)")
   if hand_idx then
-    st._lastHandIdx = tonumber(hand_idx)
-    -- Just re-open (acts like a cursor)
-    battle_reopen[pid] = true
-    pcall(Net.close_bbs, pid)
+    st._lastHandIdx_by = st._lastHandIdx_by or {}
+    st._lastHandIdx_by[pid] = tonumber(hand_idx)
+    safe_request_refresh(pid)
     return true
   end
 
   -- Summon / Set
   if post_id == BTL_SUMMON or post_id == BTL_SET then
-    if st.turn_player ~= 1 then return true end
-    if not can_place(me, flags) then Net.message_player(pid, "You already Summoned/Set or your field is occupied."); return true end
-    local idx = st._lastHandIdx or 1
-    if not me.hand[idx] then Net.message_player(pid, "Select a card in hand first."); return true end
+    if st.turn_player ~= me_i then return true end
+
+    if not can_place(me, flags) then
+      Net.message_player(pid, "You already Summoned/Set or your field is occupied.")
+      return true
+    end
+
+    local idx = (st._lastHandIdx_by and st._lastHandIdx_by[pid]) or st._lastHandIdx or 1
+    if not me.hand[idx] then
+      Net.message_player(pid, "Select a card in hand first.")
+      return true
+    end
 
     if post_id == BTL_SUMMON then
       do_summon(me, idx)
@@ -2069,120 +2407,120 @@ local function handle_battle_post_selection(event)
 
     if me.field then
       me.field._enteredTurn = st.turn_num
-      local subj, poss = "You", "Your"
-      if labels_for then subj, poss = labels_for(st, 1) end
       local nm = short_name(me.field.card.title)
+      local pname = name_for(st, me_i)
       if post_id == BTL_SUMMON then
-        battle_announce(st, subj .. " Summoned " .. nm .. " [ATK " .. me.field.card.ATK .. "]")
+        battle_announce(st, string.format("%s Summoned %s [ATK %d]", pname, nm, me.field.card.ATK))
       else
-        battle_announce(st, subj .. " Set a monster.")
+        battle_announce(st, string.format("%s Set a monster.", pname))
       end
     end
     flags.hasSummoned = true
-    battle_reopen[pid] = true; pcall(Net.close_bbs, pid)
+
+    -- refresh BOTH players so the other client sees the new board immediately
+    refresh_both(st, pid)
     return true
+
   end
 
   -- Attack
   if post_id == BTL_ATTACK then
-    if st.turn_player ~= 1 then return true end
-    if can_attack(st, 1) then
-      resolve_attack(st)
-      if st.finished then battle_reopen[pid]=true; pcall(Net.close_bbs, pid); return true end
-      battle_reopen[pid] = true; pcall(Net.close_bbs, pid)
-    else
-      Net.message_player(pid, "You cannot attack now.")
-    end
-    return true
+  if st.turn_player ~= me_i then return true end
+  if can_attack(st, me_i) then
+    resolve_attack(st)          -- your function does announcer lines for damage/flip/etc.
+    cleanup_zero_def(st)        -- keep if you use it elsewhere
+    refresh_both(st, pid)
+  else
+    Net.message_player(pid, "You cannot attack now.")
   end
+  return true
+end
 
   -- End Turn
-  if post_id == BTL_END then
-    if st.turn_player ~= 1 then return true end
-    if not has_monster(me) then
-      Net.message_player(pid, "You must Summon or Set a monster before ending your turn.")
-      return true
-    end
-    end_turn(st)
-    -- NPC automatically plays its turn if duel not finished
-    if not st.finished and st.turn_player == 2 then npc_take_turn(st) end
-    battle_reopen[pid] = true; pcall(Net.close_bbs, pid)
+if post_id == BTL_END then
+  if st.turn_player ~= me_i then return true end
+  if not has_monster(me) then
+    Net.message_player(pid, "You must Summon/Set a monster before ending your turn.")
     return true
   end
 
-  -- Cast
+  -- Block while opponent has a modal open (PvP only)
+  if st.mode == "pvp" and gate_if_opponent_busy(st, pid) then
+    return true
+  end
+
+  local ended_name = name_for(st, me_i)
+  end_turn(st)  -- IMPORTANT: handles “this turn” rollbacks and begins next turn
+
+  -- Announce turn change
+  local next_name = name_for(st, st.turn_player)
+  battle_announce(st, ended_name .. " ended their turn.")
+  battle_announce(st, "It is now " .. next_name .. "'s turn.")
+
+  -- In PvE, let the NPC immediately take its turn (it will call end_turn again)
+  if not st.pids then
+    npc_take_turn(st)
+  end
+
+  refresh_both(st, pid)
+  return true
+end
+
+  -- Cast (open submenu)
   if post_id == BTL_CAST then
-    if st.turn_player ~= 1 then return true end
-    if not has_monster(me) then
-      Net.message_player(pid, "You must control a monster to cast spells.")
-      return true
-    end
-    if flags.hasCast then
-      Net.message_player(pid, "You already cast a spell this turn.")
-      return true
-    end
+    if st.turn_player ~= me_i then return true end
+    if not has_monster(me) then Net.message_player(pid, "You must control a monster to cast spells."); return true end
+    if flags.hasCast then Net.message_player(pid, "You already cast a spell this turn."); return true end
     st.ui = "cast"
-    battle_reopen[pid] = true
-    pcall(Net.close_bbs, pid)
+    safe_request_refresh(pid)
     return true
   end
 
   -- Pick a specific spell
   local picked_key = post_id:match("^"..BTL_CAST_PICK.."(.+)")
   if picked_key then
-    if st.turn_player ~= 1 then return true end
     if not has_monster(me) then
       Net.message_player(pid, "You must control a monster to cast spells.")
-      st.ui = "main"; battle_reopen[pid] = true; pcall(Net.close_bbs, pid); return true
+      st.ui = "main"; safe_request_refresh(pid); return true
     end
-
-    local sp = SP(picked_key)
-    if not SP then
-    function SP(key)
-      if not SPELLS then return nil end
-      for _, sp in ipairs(SPELLS) do if sp.key == key then return sp end end
-      return nil
-    end
-    end
+    local sp = SP(picked_key); if not sp then return true end
     local cost = sp.cost or 0
     if #me.hand < cost then Net.message_player(pid, "Not enough cards in hand to pay ("..cost..")."); return true end
 
-    -- If you have more cards than the cost, let you choose which to discard.
+    -- If more cards than cost, let the player choose
     if #me.hand > cost and cost > 0 then
       st._pending_spell = sp.key
       st._discard_cost  = cost
       st._discard_sel   = {}
       st.ui = "discard"
-      battle_reopen[pid] = true
-      pcall(Net.close_bbs, pid)
+      safe_request_refresh(pid)
       return true
     end
 
-    -- Auto-pay when hand size == cost (or cost==0)
+    -- Auto-pay (use last N cards)
     if cost > 0 then
       local idxs = {}
       for i=#me.hand, #me.hand - cost + 1, -1 do table.insert(idxs, i) end
-      pay_cost_from_hand(st, 1, cost, idxs)
+      pay_cost_from_hand(st, me_i, cost, idxs)
     end
 
-    local msg = sp.apply(st, 1)
+    local msg = sp.apply(st, me_i)
     cleanup_zero_def(st)
     Net.message_player(pid, msg or (sp.name.." resolved."))
     flags.hasCast = true
     st.ui = "main"
-    battle_reopen[pid] = true
-    pcall(Net.close_bbs, pid)
+    refresh_both(st, pid)
     return true
   end
 
-  -- Discard picker: toggle a card
+  -- Discard picker: toggle
   local dsel = post_id:match("^"..BTL_DSEL_PREFIX.."(%d+)$")
   if dsel then
     local i = tonumber(dsel)
     if me.hand[i] then
       st._discard_sel[i] = not st._discard_sel[i]
     end
-    battle_reopen[pid] = true; pcall(Net.close_bbs, pid)
+    safe_request_refresh(pid)
     return true
   end
 
@@ -2191,29 +2529,27 @@ local function handle_battle_post_selection(event)
     local need = st._discard_cost or 0
     local picks = {}
     for i,_ in pairs(st._discard_sel or {}) do if st._discard_sel[i] then table.insert(picks, i) end end
-    table.sort(picks, function(a,b) return a>b end) -- remove from highest index down
+    table.sort(picks, function(a,b) return a>b end)
     if #picks ~= need then
       Net.message_player(pid, "Select exactly "..need.." card(s).")
-      battle_reopen[pid] = true; pcall(Net.close_bbs, pid); return true
+      safe_request_refresh(pid); return true
     end
 
-    -- pay
     for _, idx in ipairs(picks) do table.remove(me.hand, idx) end
 
     local sp = SP(st._pending_spell)
     st._pending_spell, st._discard_cost, st._discard_sel = nil, nil, nil
     if not sp then
-      st.ui = "main"; battle_reopen[pid] = true; pcall(Net.close_bbs, pid); return true
+      st.ui = "main"; safe_request_refresh(pid); return true
     end
 
-    local msg = sp.apply(st, 1)
+    local msg = sp.apply(st, me_i)
     cleanup_zero_def(st)
     Net.message_player(pid, msg or (sp.name.." resolved."))
     flags.hasCast = true
 
     st.ui = "main"
-    battle_reopen[pid] = true
-    pcall(Net.close_bbs, pid)
+    refresh_both(st, pid)
     return true
   end
 
@@ -2221,8 +2557,7 @@ local function handle_battle_post_selection(event)
   if post_id == BTL_DCANCEL then
     st._pending_spell, st._discard_cost, st._discard_sel = nil, nil, nil
     st.ui = "cast"
-    battle_reopen[pid] = true
-    pcall(Net.close_bbs, pid)
+    safe_request_refresh(pid)
     return true
   end
 
@@ -2518,16 +2853,79 @@ function handle_deck_post_selection(event)
   return false
 end
 
--- In scripts/ezlibs-custom/custom.lua
--- Add somewhere near other public functions:
-function custom.start_card_battle_pvp(pid1, pid2, cfg)
-  -- TODO: replace this stub with the real PVP version that opens boards for both players.
-  -- For now, just tell both players the entry point is wired:
-  Net.message_player(pid1, "[YGO] PVP request received with "..(Net.get_player_name(pid2) or "opponent")..".")
-  Net.message_player(pid2, "[YGO] PVP request received with "..(Net.get_player_name(pid1) or "opponent")..".")
-  -- When you finish a duel, call:
-  --   local ygo_tables = require('scripts/ezlibs-custom/ygo_duel_tables')
-  --   ygo_tables.on_ygo_pvp_end(winner_pid, loser_pid, { table_id = cfg and cfg.table_id })
+-- PVP entrypoint: start a duel between two players
+function custom.start_card_battle_pvp(pidA, pidB, cfg)
+  print(string.format("[custom] start_card_battle_pvp: pidA=%s pidB=%s table_id=%s",
+    tostring(pidA), tostring(pidB), tostring(cfg and cfg.table_id)))
+
+  -- 1) Build decks
+  local countsA = load_persisted_deck_counts and load_persisted_deck_counts(pidA) or {}
+  local countsB = load_persisted_deck_counts and load_persisted_deck_counts(pidB) or {}
+  print(string.format("[custom] deck counts: A=%d, B=%d",
+    (countsA and (#(countsA.cards or {}) > 0 and #countsA.cards) or (next(countsA) and 10 or 0)),
+    (countsB and (#(countsB.cards or {}) > 0 and #countsB.cards) or (next(countsB) and 10 or 0))))
+
+  local deckA = materialize_deck_from_counts and materialize_deck_from_counts(pidA, countsA) or {}
+  local deckB = materialize_deck_from_counts and materialize_deck_from_counts(pidB, countsB) or {}
+  print(string.format("[custom] materialized decks: A=%d cards, B=%d cards", #deckA, #deckB))
+
+  if #deckA == 0 or #deckB == 0 then
+    Net.message_player(pidA, "[YGO] One of the players has no saved deck.")
+    Net.message_player(pidB, "[YGO] One of the players has no saved deck.")
+    print("[custom] abort: empty deck")
+    return false
+  end
+
+  -- 2) Build shared battle state
+  local st = {
+    mode          = "pvp",
+    pids          = { pidA, pidB },
+    seat_of       = { [pidA]=1, [pidB]=2 },
+    players       = {
+      { name = Net.get_player_name(pidA) or "P1", deck = {}, hand = {}, grave = {}, KOs = 0 },
+      { name = Net.get_player_name(pidB) or "P2", deck = {}, hand = {}, grave = {}, KOs = 0 },
+    },
+    turn_player   = 1,
+    turn_num      = 1,
+    noDrawThisTurn= { [1]=true, [2]=true },
+    table_id      = cfg and cfg.table_id or nil,
+    ui            = "main",
+  }
+
+  -- copy decks (reverse insert keeps top-of-deck order if your materializer returns top-first)
+  for i=#deckA,1,-1 do table.insert(st.players[1].deck, deckA[i]) end
+  for i=#deckB,1,-1 do table.insert(st.players[2].deck, deckB[i]) end
+  print(string.format("[custom] state decks ready: P1=%d P2=%d", #st.players[1].deck, #st.players[2].deck))
+
+  -- 3) Engine helpers present?
+  if not shuffle or not draw_one or not begin_turn then
+    print("[custom] abort: missing helpers (shuffle/draw_one/begin_turn)")
+    return false
+  end
+
+  -- 4) Shuffle + draw opening hands
+  shuffle(st.players[1].deck); shuffle(st.players[2].deck)
+  for i=1,2 do
+  draw_one(st.players[1])
+  draw_one(st.players[2])
+  end
+
+  -- 5) Map both pids → shared state
+  battle_by_pid[pidA] = st
+  battle_by_pid[pidB] = st
+  print("[custom] mapped pids to battle state")
+
+  -- 6) Begin turn (sets flags, etc.)
+  begin_turn(st)
+  print("[custom] begin_turn ok; deferring UI open via board_close")
+
+  -- 7) DO NOT open boards here; let board_close open them after the duel-table closes
+  battle_reopen[pidA] = true
+  battle_reopen[pidB] = true
+  print("[custom] set battle_reopen for both players")
+
+  print("[custom] PVP start complete (returning true)")
+  return true
 end
 
 -- ==== Unified helpers (put before the listeners) ====
@@ -2546,17 +2944,25 @@ Net:on("post_selection", function(event)
   print("[cards] post_selection pid", pid, "post_id", post_id,
         "in_actions=", in_actions_menu[pid], "in_main=", player_using_card_bbs[pid])
 
-  -- 1) Battle clicks first (if a battle board is open)
-  if _battle_active(pid) and handle_battle_post_selection and handle_battle_post_selection(event) then
+  -- Debug trace
+  print(string.format("[custom] post_selection pid=%s post_id=%s", tostring(event.player_id), tostring(event.post_id)))
+  if JobBBS and JobBBS.handle_post_selection and JobBBS.handle_post_selection(event) then
     return
   end
 
-  -- 2) Trader clicks next (if a trader board is open)
+-- 1) JobBBS clicks
+  if JobBBS and event.post_id and tostring(event.post_id):match("^__job:") then
+    -- Let JobBBS handle it; if it returns true, stop other menus from processing
+    local handled = JobBBS.handle_post_selection(event)
+    if handled then return end
+  end
+
+  -- 2) Trader clicks
   if _trade_active(pid) and handle_trade_post_selection and handle_trade_post_selection(event) then
     return
   end
 
-  -- 3) Deck Editor internal clicks (add/remove/save/back)
+  -- 3) Deck Editor internal clicks
   if handle_deck_post_selection and handle_deck_post_selection(event) then
     return
   end
@@ -2619,45 +3025,96 @@ Net:on("post_selection", function(event)
     return
   end
 
+  -- 7) YGO PVP clicks
+  if ygo_pvp and ygo_pvp.handle_post_selection and ygo_pvp.handle_post_selection(event) then
+    print("[custom] post_selection handled by ygo_pvp")
+    return
+  end
+
+  -- 8) Battle clicks
+  if _battle_active(pid) and handle_battle_post_selection and handle_battle_post_selection(event) then
+    return
+  end
+
   print("[cards] post_selection fell through; no known context")
 end)
 
--- ==== Unified board_close (reopen/refresh safe for Battle + Trader) ====
+
+BATTLE_CLOSE_LOCK = (BATTLE_CLOSE_LOCK == nil) and true or BATTLE_CLOSE_LOCK
+closing_for_refresh    = closing_for_refresh    or {}
+closing_for_refresh_ts = closing_for_refresh_ts or {}
+PROGRAM_REFRESH_WINDOW_S = PROGRAM_REFRESH_WINDOW_S or 0.35
+
 Net:on("board_close", function(event)
   local pid = event.player_id
+  print(string.format("[custom] board_close pid=%s", tostring(pid)))
+
+  if JobBBS and JobBBS.is_waiting and JobBBS.is_waiting(pid) then
+    return
+  end
+
+  -- Compute whether THIS close looks like a recent programmatic refresh
+  local is_prog   = closing_for_refresh[pid] == true
+  local age       = is_prog and ((os.clock() - (closing_for_refresh_ts[pid] or 0))) or 999
+  local is_recent = is_prog and (age <= PROGRAM_REFRESH_WINDOW_S)
+
+  -- A) Battle UI deferred open (handle FIRST so refresh can reopen instantly)
+  if battle_reopen and battle_reopen[pid] then
+    battle_reopen[pid] = nil
+    closing_for_refresh[pid] = nil  -- consume any pending refresh marker
+    if battle_by_pid and battle_by_pid[pid] then
+      print(("[custom] board_close: battle_reopen → open_battle_board pid=%s"):format(pid))
+      open_battle_board(pid)
+      return
+    end
+  end
+
+  -- B) Swallow ONLY very recent programmatic refresh closes
+  if is_recent then
+    closing_for_refresh[pid] = nil
+    print("[custom][refresh] swallowed recent programmatic close (", string.format("%.3fs", age), ")")
+    return
+  end
+
+  -- C) Manual battle-close lock: if in an active duel, reopen immediately
+  local st = battle_by_pid and battle_by_pid[pid] or nil
+  local lock_on = (type(BATTLE_CLOSE_LOCK) == "boolean") and BATTLE_CLOSE_LOCK or false
+  if lock_on and st and not st.finished then
+    print("[custom][lock] manual close during active duel → reopening Battle BBS")
+    open_battle_board(pid)
+    return
+  end
+
+  -- D) Duel-table lobby handler (unchanged)
+  if ygo_pvp and ygo_pvp.handle_board_close and ygo_pvp.handle_board_close(event) then
+    print("[custom] board_close handled by ygo_pvp")
+    return
+  end
+
+  -- E) (optional legacy) ignore old battle_refreshing flag if you still use it
+  if battle_refreshing and battle_refreshing[pid] then
+    battle_refreshing[pid] = nil
+    print("[custom] board_close: battle_refreshing cleared")
+    return
+  end
 
   -- Deck Editor: scheduled refresh
   if deck_reopen and deck_reopen[pid] then
     deck_reopen[pid] = nil
     if deck_editor and deck_editor[pid] and deck_editor[pid].active then
-      deck_refreshing[pid] = true           -- suppress normal close logic
-      open_deck_editor(pid)                 -- reopen deck editor
+      deck_refreshing[pid] = true
+      open_deck_editor(pid)
     end
-    return                                  -- stop here; a reopen is happening
+    return
   end
 
-  -- Deck Editor: we just reopened; clear the one-shot flag and stop
+  -- Deck Editor: programmatic reopen swallow
   if deck_refreshing and deck_refreshing[pid] then
     deck_refreshing[pid] = nil
     return
   end
 
-  -- 1) Battle reopen (programmatic)
-  if battle_reopen and battle_reopen[pid] then
-    battle_reopen[pid] = nil
-    if battle_by_pid and battle_by_pid[pid] then
-      open_battle_board(pid)
-    end
-    return
-  end
-
-  -- Ignore programmatic closes triggered by battle refresh
-  if battle_refreshing and battle_refreshing[pid] then
-    battle_refreshing[pid] = nil
-    return
-  end
-
-  -- 2) Trader reopen (programmatic)
+  -- Trader reopen (programmatic)
   if trade_reopen and trade_reopen[pid] then
     trade_reopen[pid] = nil
     if trader_by_pid and trader_by_pid[pid] then
@@ -2666,28 +3123,33 @@ Net:on("board_close", function(event)
     return
   end
 
-  -- Ignore programmatic closes triggered by trader refresh
+  -- Trader: programmatic reopen swallow
   if trade_refreshing and trade_refreshing[pid] then
     trade_refreshing[pid] = nil
     return
   end
 
-  -- 3) Actions menu asked to open Card List
+  -- Actions menu asked to open Card List
   if open_list_after_close and open_list_after_close[pid] then
     open_list_after_close[pid] = false
     open_card_list(pid)
     return
   end
 
-  -- 4) Manual close: mark battle UI closed so it doesn't hijack future clicks
-  battle_ui_open[pid] = false
-
-  -- Clear finished duel state only when it actually ended
-  local st = battle_by_pid and battle_by_pid[pid]
-  if st and st.finished then
-    battle_by_pid[pid] = nil
+  if jobbbs and jobbbs.on_board_close and jobbbs.on_board_close(event) then
+    return
   end
 
+
+  -- Ignore manual close if battle still active (legacy guard)
+  st = battle_by_pid and battle_by_pid[pid]
+  if st and not st.finished then
+    print("[cards] board_close during active battle; ignoring")
+    return
+  end
+
+  battle_ui_open[pid] = false
+  if st and st.finished then battle_by_pid[pid] = nil end
   print("[cards] board_close pid", pid)
 end)
 

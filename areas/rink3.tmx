@@ -662,7 +662,7 @@
   <object id="93" name="Rare" type="Mystery Option" x="356" y="45">
    <properties>
     <property name="Next 1" type="object" value="94"/>
-    <property name="Next 2" type="object" value="95"/>
+    <property name="Next 2" type="object" value="94"/>
     <property name="Next 3" type="object" value="95"/>
     <property name="Type" value="random"/>
    </properties>
@@ -684,16 +684,16 @@
    </properties>
    <point/>
   </object>
-  <object id="96" name="200,000" type="Mystery Option" x="349" y="-24">
+  <object id="96" name="100,000" type="Mystery Option" x="349" y="-24">
    <properties>
-    <property name="Amount" value="200000"/>
+    <property name="Amount" value="100000"/>
     <property name="Type" value="money"/>
    </properties>
    <point/>
   </object>
-  <object id="97" name="400,000" type="Mystery Option" x="329" y="-48">
+  <object id="97" name="300,000" type="Mystery Option" x="329" y="-48">
    <properties>
-    <property name="Amount" value="400000"/>
+    <property name="Amount" value="300000"/>
     <property name="Type" value="money"/>
    </properties>
    <point/>
@@ -719,9 +719,9 @@
     <property name="Target Object" value="144"/>
    </properties>
   </object>
-  <object id="101" name="100,000" type="Mystery Option" x="357.5" y="-13.5">
+  <object id="101" name="80,000" type="Mystery Option" x="357.5" y="-13.5">
    <properties>
-    <property name="Amount" value="100000"/>
+    <property name="Amount" value="80000"/>
     <property name="Type" value="money"/>
    </properties>
    <point/>

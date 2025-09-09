@@ -557,7 +557,7 @@
   <object id="87" name="Rare" type="Mystery Option" x="643" y="235">
    <properties>
     <property name="Next 1" type="object" value="88"/>
-    <property name="Next 2" type="object" value="89"/>
+    <property name="Next 2" type="object" value="88"/>
     <property name="Next 3" type="object" value="89"/>
     <property name="Type" value="random"/>
    </properties>
