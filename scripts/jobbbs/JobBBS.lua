@@ -411,25 +411,25 @@ local function jobs_pool()
     end)
 
   -- Inspect
-  J('inspect3', 'Inspector', 'LuigiEXE', 'LVL1: Inspect three 3 objects.',
+  J('inspect3', 'Inspector', 'LuigiEXE', 'LVL1: Inspect 3 different objects.',
     function(pid, st, base_key)
       st.prog.objects = st.prog.objects or {}
       local base = st.prog.baseline and st.prog.baseline[base_key] and st.prog.baseline[base_key].objects or nil
       local c = count_diff(st.prog.objects, base); return c>=3, c, 3
     end)
-  J('inspect6', 'Inspector', 'LuigiEXE', 'LVL2: Inspect three 6 objects.',
+  J('inspect6', 'Inspector', 'LuigiEXE', 'LVL2: Inspect 6 different objects.',
     function(pid, st, base_key)
       st.prog.objects = st.prog.objects or {}
       local base = st.prog.baseline and st.prog.baseline[base_key] and st.prog.baseline[base_key].objects or nil
       local c = count_diff(st.prog.objects, base); return c>=6, c, 6
     end)
-  J('inspect9', 'Inspector', 'LuigiEXE', 'LVL3: Inspect three 9 objects.',
+  J('inspect9', 'Inspector', 'LuigiEXE', 'LVL3: Inspect 9 different objects.',
     function(pid, st, base_key)
       st.prog.objects = st.prog.objects or {}
       local base = st.prog.baseline and st.prog.baseline[base_key] and st.prog.baseline[base_key].objects or nil
       local c = count_diff(st.prog.objects, base); return c>=9, c, 9
     end)
-  J('inspect12', 'Inspector', 'LuigiEXE', 'LVL MAX: Inspect three 12 objects.',
+  J('inspect12', 'Inspector', 'LuigiEXE', 'LVL MAX: Inspect 12 different objects.',
     function(pid, st, base_key)
       st.prog.objects = st.prog.objects or {}
       local base = st.prog.baseline and st.prog.baseline[base_key] and st.prog.baseline[base_key].objects or nil
