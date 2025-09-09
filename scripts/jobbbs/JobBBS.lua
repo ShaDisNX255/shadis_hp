@@ -257,15 +257,18 @@ local function give_money(pid, amount)
   amount = math.floor(tonumber(amount) or 0)
   if amount == 0 then return end
   local ok = false
-  if ezmemory.give_player_money then
-    ok = pcall(ezmemory.give_player_money, pid, amount)
+  -- match WCity1.lua behavior
+  if ezmemory.spend_player_money then
+    ok = pcall(ezmemory.spend_player_money, pid, -amount)
   end
   if not ok then
-    -- fallback: mutate persistent memory directly
     local mem = _mem(pid)
     mem.money = math.max(0, (tonumber(mem.money) or 0) + amount)
   end
-  Net.message_player(pid, string.format('+$%d', amount))
+  Net.message_player(pid, string.format('Got $%d!', amount))
+  if Net.play_sound_for_player then
+    pcall(Net.play_sound_for_player, pid, '/server/assets/ezlibs-assets/sfx/item_get.ogg')
+  end
 end
 
 local function give_item(pid, item_id, qty)
