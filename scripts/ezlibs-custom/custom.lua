@@ -24,6 +24,47 @@ function name_for(st, seat_i)
         or ("P"..tostring(seat_i))
   return n
 end
+-- Return ezmemory item info from a field card (id may be "area,id" or plain id)
+local function item_info_from_field_card(card)
+  if not card or not card.id then return nil end
+  local info = ezmemory.get_item_info(card.id)
+  if info then return info end
+  local a,i = tostring(card.id):match("^([^,]+),(%d+)$")
+  if i then
+    info = ezmemory.get_item_info(tonumber(i))
+    if info then return info end
+  end
+  return nil
+end
+
+-- --- Card Viewer cross-talk guard -----------------------------------------
+local card_list_open = card_list_open or {}
+
+local function clear_card_viewer_state(pid)
+  if not pid then return end
+  card_list_open[pid] = nil
+
+  -- Best-effort: many "cards" viewers leave this global/table set.
+  local pam = rawget(_G, "pending_actions_menu")
+  if type(pam) == "table" then
+    pam[pid] = nil
+  elseif pam ~= nil then
+    _G.pending_actions_menu = false
+  end
+
+  -- If your cards module exposes resets, call them safely.
+  local cardsmod = rawget(_G, "cards")
+  if type(cardsmod) == "table" then
+    if type(cardsmod.clear_pending) == "function" then pcall(cardsmod.clear_pending, pid) end
+    if type(cardsmod.reset_for_pid) == "function" then pcall(cardsmod.reset_for_pid, pid) end
+  end
+end
+
+-- Optional: allows the cards module to skip itself during battles if you add a check there.
+function custom.is_battle_open_for(pid)
+  local st = battle_by_pid and battle_by_pid[pid]
+  return (st ~= nil) and (st.finished ~= true)
+end
 -- === Battle UI globals (declare once, at top of helpers) ===
 battle_reopen   = battle_reopen   or {}  -- existing in your code; keep table shared
 _ann_q          = _ann_q          or {}  -- per-player announcement queue
@@ -715,6 +756,18 @@ local function compute_target_in_front(pid)
   return area_id, sx, sy, sz
 end
 
+local function compute_target_behind(pid)
+  local area_id = Net.get_player_area(pid)
+  local pos     = Net.get_player_position(pid) or {x=0, y=0, z=0}
+  local dir     = as_dir_string(Net.get_player_direction(pid))
+  local px, py, pz = pos.x or pos[1] or 0, pos.y or pos[2] or 0, pos.z or pos[3] or 0
+  local dx, dy  = dir_to_front_offset(dir)
+  local sx      = round16(px - dx)
+  local sy      = round16(py - dy)
+  local sz      = pz
+  return area_id, sx, sy, sz
+end
+
 -- ---------- UI pieces ----------
 local function show_card_dialog_with_mug(pid, item)
   local name = item and item.name or "(unknown)"
@@ -758,6 +811,7 @@ local function open_actions_menu(pid, title)
 end
 
 local function open_card_list(pid)
+  card_list_open[pid] = true
   local safe_secret   = helpers.get_safe_player_secret(pid)
   local player_memory = ezmemory.get_player_memory(safe_secret)
 
@@ -824,6 +878,86 @@ local function spawn_card_npc_for_all(pid, info)
   return bot_id
 end
 
+-- === Duel↔Overworld helpers (spawn “behind”, reuse your summon table) ===
+
+-- Track table exists earlier; just reuse it here
+summoned_bot_by_player = summoned_bot_by_player or {}
+
+-- Seat -> player_id (PVP has both; PvE uses st.pid for seat 1)
+local function _pid_for_seat(st, seat_i)
+  if st and st.pids and type(st.pids) == "table" then return st.pids[seat_i] end
+  if st and seat_i == 1 then return st.pid end
+  return nil
+end
+
+-- Remove the player’s current OW card (same behavior as your Actions “Dismiss”)
+local function _duel_dismiss_overworld_for_pid(pid)
+  if summoned_bot_by_player and summoned_bot_by_player[pid] then
+    pcall(Net.remove_bot, summoned_bot_by_player[pid])
+    summoned_bot_by_player[pid] = nil
+  end
+end
+
+-- Spawn a card OW bot BEHIND the summoner (mirrors spawn_card_npc_for_all fields)
+local function spawn_card_npc_behind(pid, info)
+  local area, sx, sy, sz = compute_target_behind(pid)
+  local display_name = get_summon_display_name(info.name or "Card")
+  local ow_png  = info.ow_png or info.png
+  local ow_anim = info.ow_anim or info.anim
+
+  local ok, bot_id = pcall(Net.create_bot, {
+    name               = display_name,
+    area_id            = area,
+    x = sx or 0, y = sy or 0, z = sz or 0,
+    texture_path       = ow_png,
+    animation_path     = ow_anim,
+    mug_animation_path = info.anim,
+    animation          = "IDLE",
+  })
+  if not ok or not bot_id then
+    Net.message_player(pid, "Couldn't summon the card.")
+    return nil
+  end
+  pcall(Net.set_bot_name, bot_id, display_name)
+  return bot_id
+end
+
+-- Item info from a field slot -> OW paths; spawn behind; replace any prior
+local function _duel_spawn_faceup_for_seat(st, seat_i)
+  if not st then return end
+  local pid = _pid_for_seat(st, seat_i); if not pid then return end
+  local pl  = st.players and st.players[seat_i]
+  local f   = pl and pl.field
+  if not f or f.pos == "SET" then return end -- never leak face-down info
+
+  local info  = item_info_from_field_card(f.card) or {}
+  local name  = (info and info.name) or f.card.title
+  local ow_png, ow_anim = build_overworld_paths_for_name(name)
+  local _, mug_anim     = build_mug_paths_for_name(name)
+
+  _duel_dismiss_overworld_for_pid(pid)
+  local bot_id = spawn_card_npc_behind(pid, { name=name, ow_png=ow_png, ow_anim=ow_anim, anim=mug_anim })
+  if bot_id then
+    summoned_bot_by_player[pid] = bot_id
+  end
+end
+
+-- Call this whenever a seat’s monster is destroyed/removed from field
+local function _duel_on_monster_destroyed(st, seat_i)
+  local pid = _pid_for_seat(st, seat_i)
+  if pid then _duel_dismiss_overworld_for_pid(pid) end
+end
+
+-- Clear both players’ OW spawns (use on duel end)
+local function _duel_cleanup_overworld(st)
+  if not st then return end
+  if st.pids and type(st.pids)=="table" then
+    for _, p in ipairs(st.pids) do _duel_dismiss_overworld_for_pid(p) end
+  elseif st.pid then
+    _duel_dismiss_overworld_for_pid(st.pid)
+  end
+end
+
 -- ---------- events ----------
 print("[cards] Loaded card collection menu (spawns IN FRONT on same Z; no follow; manual dismiss; custom summon names).")
 
@@ -835,6 +969,24 @@ Net:on("tile_interaction", function(event)
   if event.button ~= 1 then return end -- Left Shoulder only
   local pid = event.player_id
   log("tile_interaction (Left Shoulder) pid", pid, "pending_actions_menu=", pending_actions_menu[pid], "has_summon=", summoned_bot_by_player[pid] ~= nil)
+  -- Detect an active battle UI for this player
+  local battle_up = (_battle_active and _battle_active(pid))
+                 or (custom and custom.is_battle_open_for and custom.is_battle_open_for(pid))
+                 or false
+
+  -- ✅ If we’re in battle AND the viewer set the "open actions next" latch,
+  -- open the battle actions instead of the Card Viewer.
+  if battle_up and pending_actions_menu[pid] then
+    in_actions_menu[pid] = true              -- we’re explicitly going into actions
+    -- leave pending_actions_menu[pid] as-is or clear it here; either is fine.
+    -- Clearing here is a bit tidier:
+    pending_actions_menu[pid] = false
+
+    -- trigger a reopen so build_main_posts can render Summon/Set at top
+    battle_reopen[pid] = true
+    pcall(Net.close_bbs, pid)
+    return
+  end
 
   if pending_actions_menu[pid] then
     pending_actions_menu[pid] = false
@@ -1225,18 +1377,7 @@ end
 local function has_monster(plr)
   return plr and plr.field ~= nil
 end
--- Return ezmemory item info from a field card (id may be "area,id" or plain id)
-local function item_info_from_field_card(card)
-  if not card or not card.id then return nil end
-  local info = ezmemory.get_item_info(card.id)
-  if info then return info end
-  local a,i = tostring(card.id):match("^([^,]+),(%d+)$")
-  if i then
-    info = ezmemory.get_item_info(tonumber(i))
-    if info then return info end
-  end
-  return nil
-end
+
 local function can_switch_now(st, me_idx)
   local f = st.players[me_idx].field
   if not f then return false end
@@ -1400,6 +1541,9 @@ do_KO = function(state, victim_idx)
     vic.field = nil
   end
 
+  _duel_on_monster_destroyed(state, victim_idx)
+
+
   local killer_idx = 3 - victim_idx
   local killer     = state.players[killer_idx]
   killer.KOs = (killer.KOs or 0) + 1
@@ -1416,6 +1560,8 @@ do_KO = function(state, victim_idx)
   if killer.KOs >= 3 then
     state.finished = true
     state.winner   = killer_idx
+
+    _duel_cleanup_overworld(state)
 
     -- Free the duel table only for PVP matches
     if not state.table_freed then
@@ -1450,6 +1596,7 @@ local function resolve_attack(state)
   if D.pos == "SET" then
     D.pos = "DEF"
     battle_announce(state, "Reveal: " .. defPoss .. " Set is " .. dn .. " [DEF " .. D.curDEF .. "/" .. D.card.DEF .. "]")
+	_duel_spawn_faceup_for_seat(state, opp_idx)
   end
 
   if D.pos == "ATK" then
@@ -1531,6 +1678,7 @@ SPELLS = {
       local opp = state.players[3 - me_idx]
       if opp.field and opp.field.pos == "SET" then
         opp.field.pos = "DEF"
+		_duel_spawn_faceup_for_seat(state, 3 - me_idx)
         return "Revealed opponent’s Set monster (now face-up DEF)."
       end
       return "No Set monster to reveal."
@@ -2095,6 +2243,8 @@ local function announce_both(st, text)
 end
 
 function open_battle_board(pid)
+  player_using_card_bbs[pid] = false
+  in_actions_menu[pid] = false
   local st = battle_by_pid[pid]; if not st then return end
   print("[custom] open_battle_board pid=", pid)
   local my = seat_idx(st, pid)
@@ -2292,6 +2442,7 @@ local function handle_battle_post_selection(event)
     local who = (st.winner == me_i) and "You win! (3 KOs)"
              or (st.winner and "Opponent wins! (3 KOs)" or "Duel ended.")
     Net.message_player(pid, who)
+    _duel_cleanup_overworld(st)
     battle_by_pid[pid] = nil
     pcall(Net.close_bbs, pid)
     return true
@@ -2334,6 +2485,9 @@ local function handle_battle_post_selection(event)
   local pname = name_for(st, me_i)
   battle_announce(st, string.format("%s switched %s to %s.", pname, short_name(f.card.title), f.pos))
 
+  if was_set and f.pos ~= "SET" then
+    _duel_spawn_faceup_for_seat(st, me_i)
+  end
   st.turn_flags.hasSwitched = true
   refresh_both(st, pid)
   return true
@@ -2350,6 +2504,7 @@ local function handle_battle_post_selection(event)
   if post_id == BTL_CONCEDE or post_id == BTL_CANCEL then
     local my = seat_idx(st, pid) or 1
     st.finished = true
+    _duel_cleanup_overworld(st)
     st.winner   = 3 - my
 
     -- Announce
@@ -2414,6 +2569,9 @@ local function handle_battle_post_selection(event)
       else
         battle_announce(st, string.format("%s Set a monster.", pname))
       end
+    end
+    if post_id == BTL_SUMMON then
+      _duel_spawn_faceup_for_seat(st, me_i)
     end
     flags.hasSummoned = true
 
@@ -2941,6 +3099,8 @@ end
 Net:on("post_selection", function(event)
   local pid     = event.player_id
   local post_id = tostring(event.post_id or "")
+  local battle_up = (_battle_active and _battle_active(pid)) or
+                  (custom and custom.is_battle_open_for and custom.is_battle_open_for(pid)) or false
   print("[cards] post_selection pid", pid, "post_id", post_id,
         "in_actions=", in_actions_menu[pid], "in_main=", player_using_card_bbs[pid])
 
@@ -3018,7 +3178,7 @@ Net:on("post_selection", function(event)
   end
 
   -- 6) Plain Card List selection → open the card’s detail/mugshot viewer
-  if player_using_card_bbs[pid] == true then
+  if player_using_card_bbs[pid] == true and not battle_up then
     local item = ezmemory.get_item_info(event.post_id)
     print("[cards] main list selection ->", item and item.name or "(unknown)")
     show_card_dialog_with_mug(pid, item)
@@ -3051,6 +3211,18 @@ Net:on("board_close", function(event)
 
   if JobBBS and JobBBS.is_waiting and JobBBS.is_waiting(pid) then
     return
+  end
+
+  if player_using_card_bbs[pid] then
+    player_using_card_bbs[pid] = false
+    in_actions_menu[pid] = false
+  end
+
+  -- If the last closed board was the Card Collection, clear its sticky flags
+  if card_list_open[pid] then
+    print(string.format("[custom] board_close: card list closed → clearing state for %s", tostring(pid)))
+    clear_card_viewer_state(pid)
+    -- don't return; let the rest of the handler run
   end
 
   -- Compute whether THIS close looks like a recent programmatic refresh
