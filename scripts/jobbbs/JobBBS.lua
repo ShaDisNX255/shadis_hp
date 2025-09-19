@@ -150,27 +150,37 @@ end
 -- ===== Per-player state =====
 -- st fields: day_key, prog={visited/spoke_npcs/objects/obj_areas, virus, duel, pack, active, baseline},
 --            boards[board_id] = { accepted, claimed, job_ids, awaiting_kind, awaiting_idx }
-local S = { by_pid = {} }
-S.by_key = S.by_key or {}
+local S = rawget(_G, '__JOBBBS_STATE__')
+if not S or type(S) ~= 'table' then
+  S = { by_pid = {}, by_key = {} }
+  _G.__JOBBBS_STATE__ = S
+end
 local function player_key(pid)
-  local name = nil
-  if _G.Net and Net.get_player_name then
-    pcall(function() name = Net.get_player_name(pid) end)
-  end
-  if name and name ~= '' then return 'name:'..tostring(name) end
   return 'pid:'..tostring(pid)
 end
 
+-- Unify any old name-keyed state into the PID key
 local function attach_state(pid)
   local st = S.by_pid[pid]
   if st then return st end
-  local key = player_key(pid)
-  st = S.by_key[key]
+
+  local pid_key = 'pid:'..tostring(pid)
+
+  -- If you previously stored by name, pull that table and alias it
+  local name, name_key
+  if _G.Net and Net.get_player_name then
+    pcall(function() name = Net.get_player_name(pid) end)
+  end
+  if name and name ~= '' then name_key = 'name:'..tostring(name) end
+
+  st = S.by_key[pid_key] or (name_key and S.by_key[name_key]) or nil
   if not st then
     st = { day_key = os.date('%Y-%m-%d'), prog={}, boards={} }
     load_mem_into_state(pid, st)
-    S.by_key[key] = st
   end
+
+  S.by_key[pid_key] = st
+  if name_key then S.by_key[name_key] = st end -- optional alias for backwards compat
   S.by_pid[pid] = st
   return st
 end
@@ -181,23 +191,25 @@ local function today_key()
 end
 
 local function ensure_daily_reset(pid)
-  local st = S.by_pid[pid]
-  if not st then return end
-  local today = today_key()
+  local st = attach_state(pid)
+  local today = os.date('%Y-%m-%d')
+  st.day_key = st.day_key or today
   if st.day_key ~= today then
     st.day_key = today
-    -- Reset per-day board state, but keep overall progress; clear baselines/active so new accepts start fresh
-    for _, B in pairs(st.boards or {}) do
-      B.accepted = {}
-      B.claimed  = {}
-      B.job_ids  = nil
-      B.awaiting_kind = nil
-      B.awaiting_idx  = nil
-    end
     st.prog = st.prog or {}
+
+    -- keep these: they reset job snapshots and gates
     st.prog.baseline = {}
     st.prog.active   = {}
+
+    -- NEW: reset per-day unique sets so “visit/talk/inspect today” starts fresh
+    st.prog.visited    = {}
+    st.prog.spoke_npcs = {}
+    st.prog.objects    = {}
+    st.prog.obj_areas  = {}
+
     save_mem(pid, st)
+    if dbg then dbg('daily reset -> cleared per-day sets', pid, today) end
   end
 end
 
@@ -671,30 +683,55 @@ local function ensure_jobs_for_today(pid, st, board_id)
 end
 
 -- ===== Passive progress listeners =====
-if _G.Net and Net.on then
-  Net:on('player_area_transfer', function(ev)
-    local pid = ev.player_id
-    ensure_daily_reset(pid)
-    local st = attach_state(pid)
-    if not st then return end
-    st.prog.active = st.prog.active or {}
-    if not st.prog.active.visit then return end -- gate until a visit* job is accepted
-    st.prog.visited = st.prog.visited or {}
-    local area = tostring(Net.get_player_area(pid) or '')
-    st.prog.visited[area] = true
-    save_mem(pid, st)
-  end)
+if _G.Net and Net.on and not _G.__jobbbs_hooks_move_talk_v2 then
+  _G.__jobbbs_hooks_move_talk_v2 = true
 
+  -- Handles both table-style and positional events
+  local function on_area_change(a, b, c, ...)
+    print('[jobbbs] on_area_change types:', type(a), type(b), type(c))
+    if type(a) == 'table' then for k,v in pairs(a) do print('[jobbbs] ev', k, v) end end
+    local pid, to_area
+    if type(a) == 'table' then
+      local ev = a
+      pid     = ev.player_id or ev.pid or ev.id or ev.source or ev.actor_id
+      to_area = ev.to_area or ev.dest_area or ev.to or ev.area or ev.destination or ev.to_area_id
+    else
+      -- positional: (pid, from_area, to_area) or (pid, to_area)
+      pid, to_area = a, (c or b)
+    end
+    if not pid then return end
+
+    local st = attach_state(pid)
+    ensure_daily_reset(pid)
+    if not st then return end
+
+    st.prog.active = st.prog.active or {}
+    if not st.prog.active.visit then return end  -- gate until a visit* job is accepted
+
+    st.prog.visited = st.prog.visited or {}
+    local area = tostring(to_area or (Net.get_player_area and Net.get_player_area(pid)) or '')
+    if area == '' then return end
+    if not st.prog.visited[area] then
+      st.prog.visited[area] = true
+      save_mem(pid, st)
+    end
+    if dbg then dbg('visit++', pid, area) end
+  end
+
+  Net:on('player_area_transfered', on_area_change)
+  Net:on('player_transfered',      on_area_change)
+  Net:on('player_area_transfer',   on_area_change)
+
+  -- Keep your NPC tracking as-is
   Net:on('actor_interaction', function(ev)
     if ev.button ~= 0 then return end
     local pid = ev.player_id
-    ensure_daily_reset(pid)
     local st = attach_state(pid)
+    ensure_daily_reset(pid)
     if not st then return end
     if Net.is_player and Net.is_player(ev.actor_id) then return end
     st.prog.active = st.prog.active or {}
-    if not st.prog.active.npc then return end -- gate until an npc* job is accepted
-    -- Track unique NPCs (area + actor) so repeat talks don't count toward the goal
+    if not st.prog.active.npc then return end
     local area = tostring(Net.get_player_area(pid) or '')
     local key  = area..':'..tostring(ev.actor_id or '')
     st.prog.spoke_npcs = st.prog.spoke_npcs or {}
@@ -702,7 +739,6 @@ if _G.Net and Net.on then
       st.prog.spoke_npcs[key] = true
       save_mem(pid, st)
     end
-    -- Optional legacy counter (not used for completion but handy for debugging)
     st.prog.spoke = (st.prog.spoke or 0) + 1
     save_mem(pid, st)
   end)
@@ -774,9 +810,9 @@ end
 
 function JobBBS.handle_post_selection(event)
   local pid = event.player_id
-  local st = attach_state(pid)
-  if not st then return false end
-  ensure_daily_reset(pid)
+    local st = attach_state(pid)
+    ensure_daily_reset(pid)
+    if not st then return end
 
   local post = tostring(event.post_id or '')
   if not post:match('^__job:') then return false end
