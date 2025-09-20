@@ -159,10 +159,93 @@ local function player_key(pid)
   return 'pid:'..tostring(pid)
 end
 
+local function _run_one_time_migrations(st, pid)
+  st.__migrate = st.__migrate or {}
+
+  ------------------------------------------------------------------
+  -- (A) One-time wipe for inspect_area* jobs (areas-based progress)
+  ------------------------------------------------------------------
+  if not st.__migrate.inspect_area_reset_v1 then
+    st.prog = st.prog or {}
+
+    -- Clear the unique-area set so the next accept snapshots a clean slate
+    st.prog.obj_areas = {}
+
+    -- Drop baselines ONLY for inspect_area* jobs
+    if st.prog.baseline then
+      for base_key in pairs(st.prog.baseline) do
+        -- base_key looks like "<boardId>/<jobId>"
+        local jid = tostring(base_key):match('/([^/]+)$') or tostring(base_key)
+        if jid:match('^inspect_area') then
+          st.prog.baseline[base_key] = nil
+        end
+      end
+    end
+
+    -- Ungate and un-accept inspect_area* so you can re-accept cleanly
+    st.prog.active = st.prog.active or {}
+    st.prog.active.inspect = nil
+    for _, B in pairs(st.boards or {}) do
+      B.accepted = B.accepted or {}
+      for jid in pairs(B.accepted) do
+        if tostring(jid):match('^inspect_area') then
+          B.accepted[jid] = nil
+        end
+      end
+      B.awaiting_kind, B.awaiting_idx, B.awaiting_base, B.awaiting_step = nil, nil, nil, nil
+    end
+
+    st.__migrate.inspect_area_reset_v1 = true
+    save_mem(pid, st)
+    if dbg then dbg('[migrate] inspect_area_reset_v1 applied', tostring(pid)) end
+  end
+
+  ------------------------------------------------------------------
+  -- (B) One-time wipe for inspect* (object-based progress)
+  ------------------------------------------------------------------
+  if not st.__migrate.inspect_reset_v1 then
+    st.prog = st.prog or {}
+
+    -- Clear unique object keys
+    st.prog.objects = {}
+
+    -- Drop baselines for inspect* (but NOT inspect_area*)
+    if st.prog.baseline then
+      for base_key in pairs(st.prog.baseline) do
+        local jid = tostring(base_key):match('/([^/]+)$') or tostring(base_key)
+        -- match inspect, inspect9, inspect12, etc., but exclude inspect_area*
+        if jid:match('^inspect$') or jid:match('^inspect%d+$') then
+          st.prog.baseline[base_key] = nil
+        end
+      end
+    end
+
+    -- Ungate and un-accept inspect* jobs (not the area ones)
+    st.prog.active = st.prog.active or {}
+    st.prog.active.inspect = nil
+    for _, B in pairs(st.boards or {}) do
+      B.accepted = B.accepted or {}
+      for jid in pairs(B.accepted) do
+        local s = tostring(jid)
+        if (s:match('^inspect$') or s:match('^inspect%d+$')) then
+          B.accepted[jid] = nil
+        end
+      end
+    end
+
+    st.__migrate.inspect_reset_v1 = true
+    save_mem(pid, st)
+    if dbg then dbg('[migrate] inspect_reset_v1 applied', tostring(pid)) end
+  end
+end
+
 -- Unify any old name-keyed state into the PID key
 local function attach_state(pid)
   local st = S.by_pid[pid]
-  if st then return st end
+  if st then
+    _run_one_time_migrations(st, pid)  -- <-- run even for already-attached players
+    return st
+  end
 
   local pid_key = 'pid:'..tostring(pid)
 
@@ -182,6 +265,7 @@ local function attach_state(pid)
   S.by_key[pid_key] = st
   if name_key then S.by_key[name_key] = st end -- optional alias for backwards compat
   S.by_pid[pid] = st
+  _run_one_time_migrations(st, pid)
   return st
 end
 
@@ -262,7 +346,7 @@ local REWARDS = {
   duel_win2      = { money=60000 },
   duel_win3      = { money=90000 },
   pack_open1     = { money=60000 },
-  pack_open10    = { money=140000 },
+  pack_open10    = { money=300000 },
 }
 
 local function give_money(pid, amount)
@@ -987,14 +1071,30 @@ end
 
 -- ===== Engine listeners (object + yes/no) =====
 if _G.Net and Net.on then
-  Net:on('object_interaction', function(ev)
-    if ev.button ~= 0 then return end
-    local pid  = ev.player_id
-    ensure_daily_reset(pid)
-    local area = Net.get_player_area(pid)
-    local obj  = Net.get_object_by_id(area, ev.object_id)
-    if not obj then return end
+  Net:on('object_interaction', function(a, b, c)
+    -- Normalize payload (table or positional)
+    local ev = (type(a) == 'table') and a or { player_id = a, object_id = b, button = c }
+    local pid = ev.player_id
+    if not pid then return end
 
+    -- Match your original behavior: only act on confirm button (0)
+    if ev.button ~= 0 then return end
+
+    -- Resolve area + object
+    local area = ev.area or ev.area_id or (Net.get_player_area and Net.get_player_area(pid))
+    area = tostring(area or ''); if area == '' then return end
+
+    local obj_id = ev.object_id
+    local obj = nil
+    if obj_id ~= nil and Net.get_object_by_id then
+      obj = Net.get_object_by_id(area, obj_id)
+      if not obj then return end
+    else
+      -- if your build ever omits object_id, we can't open boards reliably
+      return
+    end
+
+    -- 1) If it's a JobBBS object, open the board (exactly like your old code)
     local cls  = tostring(obj.class or '')
     local typ  = tostring(obj.type  or '')
     if cls == 'JobBBS' or typ == 'JobBBS' then
@@ -1003,18 +1103,27 @@ if _G.Net and Net.on then
       return
     end
 
-    -- Track unique object interactions only after an inspect-type job is accepted
-    local st = attach_state(pid)
-    if st and st.prog then
-      st.prog.active = st.prog.active or {}
-      if st.prog.active.inspect then
-        local key = tostring(area)..':'..tostring(ev.object_id or '')
-        st.prog.objects   = st.prog.objects   or {}
-        st.prog.obj_areas = st.prog.obj_areas or {}
-        st.prog.objects[key] = true
-        st.prog.obj_areas[tostring(area)] = true
-        save_mem(pid, st)
-      end
+    -- 2) Otherwise, track unique object inspections (post-accept only)
+    local st = attach_state(pid); if not st then return end
+    ensure_daily_reset(pid)
+
+    st.prog = st.prog or {}
+    st.prog.active = st.prog.active or {}
+    if not st.prog.active.inspect then return end
+
+    -- Stable key: area + object_id (fallbacks just in case)
+    local key = area..':'..tostring(obj_id or obj.id or obj.name or '')
+
+    st.prog.objects   = st.prog.objects   or {}
+    st.prog.obj_areas = st.prog.obj_areas or {}
+
+    if not st.prog.objects[key] then
+      st.prog.objects[key] = true
+      st.prog.obj_areas[area] = true
+      save_mem(pid, st)
+      if dbg then dbg('inspect++', pid, key) end
+    else
+      if dbg then dbg('inspect (repeat)', pid, key) end
     end
   end)
 
