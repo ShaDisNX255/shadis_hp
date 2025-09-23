@@ -13,6 +13,18 @@
  <tileset firstgid="241" source="../assets/ezlibs-assets/ezcheckpoints/bn5cubegreen_tile.tsx"/>
  <tileset firstgid="245" source="../assets/tiles/home_warp.tsx"/>
  <tileset firstgid="250" source="../assets/tiles/BBSOldFixed.tsx"/>
+ <tileset firstgid="259" source="../assets/tiles/Bus Stop.tsx"/>
+ <tileset firstgid="260" source="../assets/objects/toy.tsx"/>
+ <tileset firstgid="261" source="../assets/objects/tree.tsx"/>
+ <tileset firstgid="269" source="../assets/objects/Teddy.tsx"/>
+ <tileset firstgid="270" source="../assets/objects/LanHpAnimatedTiles.tsx"/>
+ <tileset firstgid="274" source="../assets/objects/Junkpiles.tsx"/>
+ <tileset firstgid="276" source="../assets/objects/EXE6_boss_markers.tsx"/>
+ <tileset firstgid="284" source="../assets/objects/Ducky.tsx"/>
+ <tileset firstgid="285" source="../assets/objects/coffee.tsx"/>
+ <tileset firstgid="289" source="../assets/objects/beyblade.tsx"/>
+ <tileset firstgid="295" source="../assets/objects/BoktaiDolls28x33.tsx"/>
+<tileset firstgid="300" source="../assets/objects/edit_mode_tile_removal_cursor.tsx"/>
  <layer id="1" name="Tile Layer 0" width="11" height="18">
   <data encoding="csv">
 52,19,29,39,49,9,19,29,39,49,5,
@@ -57,9 +69,9 @@
     <property name="Skip Prompt" type="bool" value="true"/>
    </properties>
   </object>
-  <object id="4" name="Pass" type="Dialogue" x="256" y="320">
+  <object id="4" name="Butler" type="Dialogue" x="256" y="320">
    <properties>
-    <property name="Dialogue Type" value="oncepass"/>
+    <property name="Dialogue Type" value="oncehub"/>
     <property name="Memory Area" value="WCity1"/>
     <property name="Once Key" value="KeyHP04"/>
    </properties>
@@ -80,5 +92,27 @@
     <property name="Post Limit" type="int" value="300"/>
    </properties>
   </object>
+ </objectgroup>
+ <objectgroup id="3" name="Object Layer 2" visible="0" offsetx="0" offsety="-16">
+  <object id="13" gid="259" x="192" y="-16" width="16" height="53"/>
+  <object id="26" gid="260" x="-240" y="320" width="32" height="24"/>
+  <object id="27" gid="261" x="-192" y="320" width="64" height="64"/>
+  <object id="28" gid="265" x="-160" y="288" width="64" height="64"/>
+  <object id="29" gid="269" x="-144" y="256" width="36" height="49"/>
+  <object id="30" gid="270" x="-128" y="192" width="64" height="32"/>
+  <object id="31" gid="274" x="-144" y="400" width="64" height="64"/>
+  <object id="33" gid="2147483924" x="-131.5" y="407.5" width="73" height="34"/>
+  <object id="34" gid="2147483926" x="-96" y="384" width="73" height="34"/>
+  <object id="35" gid="2147483928" x="-96" y="448" width="73" height="34"/>
+  <object id="36" gid="2147483930" x="-58" y="418" width="73" height="34"/>
+  <object id="37" gid="2147483932" x="-112" y="368" width="38" height="36"/>
+  <object id="38" gid="285" x="-80" y="352" width="33" height="54"/>
+  <object id="39" gid="289" x="-96" y="304" width="18" height="25"/>
+  <object id="40" gid="2147483947" x="-43" y="331" width="28" height="30"/>
+  <object id="41" gid="2147483946" x="-43" y="299" width="28" height="30"/>
+  <object id="42" gid="2147483945" x="-43" y="267" width="28" height="30"/>
+  <object id="43" gid="2147483944" x="-43" y="235" width="28" height="30"/>
+  <object id="44" gid="2147483943" x="-48" y="208" width="28" height="30"/>
+  <object id="45" gid="300" x="-17" y="519" width="64" height="32"/>
  </objectgroup>
 </map>

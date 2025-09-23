@@ -1072,6 +1072,7 @@
   <object id="177" name="OnceItem" type="Dialogue" x="1009.5" y="842.5">
    <properties>
     <property name="Dialogue Type" value="onceitem"/>
+    <property name="HP Area" value="HP01"/>
     <property name="Item 1" type="object" value="178"/>
     <property name="Lease Months" type="int" value="1"/>
     <property name="Next 1" type="object" value="179"/>
@@ -1095,14 +1096,14 @@
   <object id="179" name="Success" type="Dialogue" x="1034" y="828">
    <properties>
     <property name="Dialogue Type" value="first"/>
-    <property name="Text 1" value="Congratulations, you have HP1 for 1 month!"/>
+    <property name="Text 1" value="Congratulations, you have HP01 for 1 month!"/>
    </properties>
    <point/>
   </object>
   <object id="180" name="Already Purchased" type="Dialogue" x="1042" y="836">
    <properties>
     <property name="Dialogue Type" value="first"/>
-    <property name="Text 1" value="Sorry, HP1 is already being rented"/>
+    <property name="Text 1" value="Sorry, HP01 is already being rented"/>
    </properties>
    <point/>
   </object>
@@ -1126,6 +1127,7 @@
   <object id="183" name="OnceItem" type="Dialogue" x="1014" y="686.5">
    <properties>
     <property name="Dialogue Type" value="onceitem"/>
+    <property name="HP Area" value="HP02"/>
     <property name="Item 1" type="object" value="184"/>
     <property name="Lease Months" type="int" value="1"/>
     <property name="Next 1" type="object" value="185"/>
@@ -1149,14 +1151,14 @@
   <object id="185" name="Success" type="Dialogue" x="1038.5" y="672">
    <properties>
     <property name="Dialogue Type" value="first"/>
-    <property name="Text 1" value="Congratulations, you have HP1 for 1 month!"/>
+    <property name="Text 1" value="Congratulations, you have HP02 for 1 month!"/>
    </properties>
    <point/>
   </object>
   <object id="186" name="Already Purchased" type="Dialogue" x="1046.5" y="680">
    <properties>
     <property name="Dialogue Type" value="first"/>
-    <property name="Text 1" value="Sorry, HP1 is already being rented"/>
+    <property name="Text 1" value="Sorry, HP02 is already being rented"/>
    </properties>
    <point/>
   </object>
@@ -1527,14 +1529,15 @@
   <object id="189" name="OnceItem" type="Dialogue" x="1014" y="494.5">
    <properties>
     <property name="Dialogue Type" value="onceitem"/>
+    <property name="HP Area" value="HP03"/>
     <property name="Item 1" type="object" value="190"/>
     <property name="Lease Months" type="int" value="1"/>
     <property name="Next 1" type="object" value="191"/>
     <property name="Next 2" type="object" value="192"/>
     <property name="Next 3" type="object" value="193"/>
     <property name="Once Key" value="KeyHP03"/>
-    <property name="Price" type="int" value="1000000"/>
-    <property name="Renewal Price" type="int" value="800000"/>
+    <property name="Price" type="int" value="5"/>
+    <property name="Renewal Price" type="int" value="5"/>
    </properties>
    <point/>
   </object>
@@ -1550,14 +1553,14 @@
   <object id="191" name="Success" type="Dialogue" x="1038.5" y="480">
    <properties>
     <property name="Dialogue Type" value="first"/>
-    <property name="Text 1" value="Congratulations, you have HP1 for 1 month!"/>
+    <property name="Text 1" value="Congratulations, you have HP03 for 1 month!"/>
    </properties>
    <point/>
   </object>
   <object id="192" name="Already Purchased" type="Dialogue" x="1046.5" y="488">
    <properties>
     <property name="Dialogue Type" value="first"/>
-    <property name="Text 1" value="Sorry, HP1 is already being rented"/>
+    <property name="Text 1" value="Sorry, HP03 is already being rented"/>
    </properties>
    <point/>
   </object>
@@ -1581,6 +1584,7 @@
   <object id="195" name="OnceItem" type="Dialogue" x="1014" y="366.5">
    <properties>
     <property name="Dialogue Type" value="onceitem"/>
+    <property name="HP Area" value="HP04"/>
     <property name="Item 1" type="object" value="196"/>
     <property name="Lease Months" type="int" value="1"/>
     <property name="Next 1" type="object" value="197"/>
@@ -1604,14 +1608,14 @@
   <object id="197" name="Success" type="Dialogue" x="1038.5" y="352">
    <properties>
     <property name="Dialogue Type" value="first"/>
-    <property name="Text 1" value="Congratulations, you have HP1 for 1 month!"/>
+    <property name="Text 1" value="Congratulations, you have HP04 for 1 month!"/>
    </properties>
    <point/>
   </object>
   <object id="198" name="Already Purchased" type="Dialogue" x="1046.5" y="360">
    <properties>
     <property name="Dialogue Type" value="first"/>
-    <property name="Text 1" value="Sorry, HP1 is already being rented"/>
+    <property name="Text 1" value="Sorry, HP04 is already being rented"/>
    </properties>
    <point/>
   </object>
@@ -1635,6 +1639,7 @@
   <object id="201" name="OnceItem" type="Dialogue" x="1334" y="366.5">
    <properties>
     <property name="Dialogue Type" value="onceitem"/>
+    <property name="HP Area" value="HP05"/>
     <property name="Item 1" type="object" value="202"/>
     <property name="Lease Months" type="int" value="1"/>
     <property name="Next 1" type="object" value="203"/>
@@ -1658,14 +1663,14 @@
   <object id="203" name="Success" type="Dialogue" x="1358.5" y="352">
    <properties>
     <property name="Dialogue Type" value="first"/>
-    <property name="Text 1" value="Congratulations, you have HP1 for 1 month!"/>
+    <property name="Text 1" value="Congratulations, you have HP05 for 1 month!"/>
    </properties>
    <point/>
   </object>
   <object id="204" name="Already Purchased" type="Dialogue" x="1366.5" y="360">
    <properties>
     <property name="Dialogue Type" value="first"/>
-    <property name="Text 1" value="Sorry, HP1 is already being rented"/>
+    <property name="Text 1" value="Sorry, HP05 is already being rented"/>
    </properties>
    <point/>
   </object>

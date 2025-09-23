@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.8" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="50" height="50" tilewidth="64" tileheight="32" infinite="0" nextlayerid="3" nextobjectid="64">
+<map version="1.8" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="50" height="50" tilewidth="64" tileheight="32" infinite="0" nextlayerid="3" nextobjectid="78">
  <properties>
   <property name="Background" value="custom"/>
   <property name="Background Animation" value="/server/assets/custom/backgrounds/wcity/01-generic1.animation"/>
@@ -22,6 +22,7 @@
  <tileset firstgid="411" source="../assets/ezlibs-assets/ezcheckpoints/bn5cubegreen_tile.tsx"/>
  <tileset firstgid="415" source="../assets/tiles/coffee.tsx"/>
  <tileset firstgid="419" source="../assets/tiles/TBS.tsx"/>
+ <tileset firstgid="420" source="../assets/ezlibs-assets/ezmystery/GreenMysteryData.tsx"/>
  <layer id="1" name="Tile Layer 0" width="50" height="50">
   <data encoding="csv">
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -521,5 +522,123 @@
    <point/>
   </object>
   <object id="63" type="PVP Board" gid="419" x="716.5" y="429.5" width="37" height="57"/>
+  <object id="64" name="MysteryDataResults" type="Mystery Option" x="667.5" y="329.5">
+   <properties>
+    <property name="Next 1" type="object" value="65"/>
+    <property name="Next 2" type="object" value="65"/>
+    <property name="Next 3" type="object" value="65"/>
+    <property name="Next 4" type="object" value="66"/>
+    <property name="Next 5" type="object" value="66"/>
+    <property name="Next 6" type="object" value="67"/>
+    <property name="Next 7" type="object" value="67"/>
+    <property name="Next 8" type="object" value="68"/>
+    <property name="Next 9" type="object" value="69"/>
+    <property name="Type" value="random"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="65" name="100" type="Mystery Option" x="681.5" y="237.5">
+   <properties>
+    <property name="Amount" value="100"/>
+    <property name="Type" value="money"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="66" name="150" type="Mystery Option" x="699" y="250">
+   <properties>
+    <property name="Amount" value="150"/>
+    <property name="Type" value="money"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="67" name="200" type="Mystery Option" x="722.5" y="274.5">
+   <properties>
+    <property name="Amount" value="200"/>
+    <property name="Type" value="money"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="68" name="250" type="Mystery Option" x="736.5" y="290.5">
+   <properties>
+    <property name="Amount" value="250"/>
+    <property name="Type" value="money"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="69" name="Uncommon" type="Mystery Option" x="569.5" y="243.5">
+   <properties>
+    <property name="Next 1" type="object" value="68"/>
+    <property name="Next 2" type="object" value="68"/>
+    <property name="Next 3" type="object" value="68"/>
+    <property name="Next 4" type="object" value="68"/>
+    <property name="Next 5" type="object" value="68"/>
+    <property name="Next 6" type="object" value="70"/>
+    <property name="Next 7" type="object" value="70"/>
+    <property name="Next 8" type="object" value="70"/>
+    <property name="Next 9" type="object" value="71"/>
+    <property name="Type" value="random"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="70" name="700" type="Mystery Option" x="591.5" y="197.5">
+   <properties>
+    <property name="Amount" value="700"/>
+    <property name="Type" value="money"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="71" name="Rare" type="Mystery Option" x="524" y="199">
+   <properties>
+    <property name="Next 1" type="object" value="70"/>
+    <property name="Next 2" type="object" value="72"/>
+    <property name="Next 3" type="object" value="73"/>
+    <property name="Type" value="random"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="72" name="3000" type="Mystery Option" x="548" y="159">
+   <properties>
+    <property name="Amount" value="3000"/>
+    <property name="Type" value="money"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="73" name="Ultra Rare" type="Mystery Option" x="494" y="163">
+   <properties>
+    <property name="Next 1" type="object" value="74"/>
+    <property name="Next 2" type="object" value="72"/>
+    <property name="Next 3" type="object" value="76"/>
+    <property name="Type" value="random"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="74" name="30000" type="Mystery Option" x="517" y="130">
+   <properties>
+    <property name="Amount" value="30000"/>
+    <property name="Type" value="money"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="75" name="1000000" type="Mystery Option" x="497" y="106">
+   <properties>
+    <property name="Amount" value="1000000"/>
+    <property name="Type" value="money"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="76" name="Millionaire" type="Mystery Option" x="472" y="129">
+   <properties>
+    <property name="Next 1" type="object" value="75"/>
+    <property name="Next 2" type="object" value="74"/>
+    <property name="Type" value="random"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="77" name="GreenMysteryData" type="Mystery Data" gid="420" x="404" y="406" width="14" height="43">
+   <properties>
+    <property name="Next 1" type="object" value="64"/>
+    <property name="Type" value="random"/>
+   </properties>
+  </object>
  </objectgroup>
 </map>
