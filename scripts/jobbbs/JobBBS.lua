@@ -752,7 +752,11 @@ end
 
 local function ensure_jobs_for_today(pid, st, board_id)
   local B = get_board(st, board_id)
+  -- If we already built today's list, just reuse it
   if B.job_ids and B.day_key == st.day_key then return B end
+
+  local last_day = B.day_key
+
   local pool, cats = jobs_pool()
   local order = { 'visit','npc','inspect','virus','duel','pack' }
   local ids = {}
@@ -761,11 +765,28 @@ local function ensure_jobs_for_today(pid, st, board_id)
     local seed = table.concat({ player_key(pid), st.day_key, board_id, cat }, '|')
     ids[#ids+1] = pick_deterministic(list, seed)
   end
+
+  -- New day for this board? wipe per-day flags
+  if last_day ~= st.day_key then
+    B.accepted = {}
+    B.claimed  = {}
+    B.awaiting_kind, B.awaiting_idx, B.awaiting_base, B.awaiting_step = nil, nil, nil, nil
+
+    -- (nice-to-have) drop stale baselines for this board so progress re-snapshots cleanly
+    if st.prog and st.prog.baseline then
+      local esc = tostring(board_id):gsub("(%W)","%%%1")  -- escape pattern magic
+      for k in pairs(st.prog.baseline) do
+        if tostring(k):match('^'..esc..'/') then
+          st.prog.baseline[k] = nil
+        end
+      end
+    end
+  end
+
   B.job_ids = ids
   B.day_key = st.day_key
   return B
 end
-
 -- ===== Passive progress listeners =====
 if _G.Net and Net.on and not _G.__jobbbs_hooks_move_talk_v2 then
   _G.__jobbbs_hooks_move_talk_v2 = true
