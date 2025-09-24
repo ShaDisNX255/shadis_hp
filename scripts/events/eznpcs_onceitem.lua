@@ -1412,10 +1412,21 @@ local function open_decorate_menu(player_id, dialogue)
         end)
       end
     elseif sel == "Clear all" then
-      local area_id  = Net.get_player_area(player_id)
-      local once_key = normalize_key(dprop(dialogue, "Once Key", ""))
+      local area_id   = Net.get_player_area(player_id)
+      local once_key  = normalize_key(dprop(dialogue, "Once Key", ""))
+      if once_key == "" then return end
 
-      -- Remove only this renter's placed objects
+      -- ✅ Renter-only gate (same logic as start_place_session/start_remove_session)
+      local BUCKET_AREA_ID = resolve_mem_area_id(dialogue, player_id, nil)
+      local mem = ezmemory.get_area_memory(BUCKET_AREA_ID); mem.onceitems = mem.onceitems or {}
+      local rec = mem.onceitems[once_key]; local now = os.time()
+      if (not rec) or (not rec.expires_at) or (rec.expires_at <= now)
+         or (helpers.get_safe_player_secret(player_id) ~= rec.owner_secret) then
+        await(Async.message_player(player_id, "Only the current renter can clear this HP."))
+        return
+      end
+
+      -- Remove only this renter's placed objects (and any stray previews)
       for _, oid in ipairs(Net.list_objects(area_id) or {}) do
         local o  = Net.get_object_by_id(area_id, oid)
         local cp = o and o.custom_properties
@@ -1425,12 +1436,11 @@ local function open_decorate_menu(player_id, dialogue)
           end
         end
       end
+    
+      -- Persist the now-empty placement list (prevents rehydrate)
+      persist_area(area_id, BUCKET_AREA_ID, once_key)
 
-      -- Persist the now-empty placement list (and legacy XML snapshot)
-      local BUCKET = resolve_mem_area_id(dialogue, player_id, nil)
-      persist_area(area_id, BUCKET, once_key)
-
-      Async.message_player(player_id, "Cleared all oncehub objects.")
+      await(Async.message_player(player_id, "Cleared all objects."))
     end
   end)
 end
