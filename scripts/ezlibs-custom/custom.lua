@@ -2,6 +2,7 @@ local ezmemory = require('scripts/ezlibs-scripts/ezmemory')
 local helpers  = require('scripts/ezlibs-scripts/helpers')
 local ygo_pvp  = require('scripts/ezlibs-custom/ygo_pvp')
 local jobbbs  = require('scripts/jobbbs/JobBBS')
+local fishing  = require('scripts/ezlibs-custom/fishing')
 
 local custom = {}
 -- Read an item’s info/meta when you might have either "area,id" or just a raw id.
@@ -15,6 +16,14 @@ local battle_ui_open = battle_ui_open or {}
 -- Forward declare so earlier closures capture it as an upvalue, not a global
 local name_for
 local open_battle_board
+
+_G.__bbs_guard = _G.__bbs_guard or { ignore_once = {} }
+
+local function _guard_ignore_next_close(pid, why)
+  if not pid then return end
+  _G.__bbs_guard.ignore_once[pid] = tostring(why or "foreign")
+end
+_G._guard_ignore_next_close = _guard_ignore_next_close  -- expose for other modules
 
 function name_for(st, seat_i)
   local p = st.players and st.players[seat_i]
@@ -3207,6 +3216,16 @@ PROGRAM_REFRESH_WINDOW_S = PROGRAM_REFRESH_WINDOW_S or 0.35
 
 Net:on("board_close", function(event)
   local pid = event.player_id
+  local why = _G.__bbs_guard and _G.__bbs_guard.ignore_once and _G.__bbs_guard.ignore_once[pid]
+
+  print(string.format("[custom][bbs] board_close pid=%s ignore_once=%s", tostring(pid), tostring(why)))
+
+  -- If a foreign module asked us to ignore this close, do so and clear the flag
+  if why then
+    _G.__bbs_guard.ignore_once[pid] = nil
+    print(string.format("[custom][bbs] skipping board_close logic for %s (reason: %s)", tostring(pid), why))
+    return
+  end
   print(string.format("[custom] board_close pid=%s", tostring(pid)))
 
   if JobBBS and JobBBS.is_waiting and JobBBS.is_waiting(pid) then
