@@ -244,10 +244,10 @@ local function fast_close_board(pid)
 
   -- Give the UI one tick to tear down. Some engines require >0, so use 0.01s.
   -- (If your Async allows 0, you can change to 0 to be even snappier.)
-  await(Async.sleep(0))
+  await(Async.sleep(0.05))
 
   -- Brief input shield so no other plugin sees the close press
-  menu_closed_now(pid, 0.01)         -- locks/unlocks input for ~400ms
+  menu_closed_now(pid, 0.05)         -- locks/unlocks input for ~400ms
 end
 
 -- ====================== Memory helpers ======================
@@ -1482,27 +1482,36 @@ local function open_pass_menu(player_id, npc, dialogue)
 end
 
 -- Register oncehub dialogue
-eznpcs.add_event({
-  name = "oncehub",
-  action = function(npc, player_id, dialogue, relay_object)
-    return async(function ()
-	  ensure_rehydrated(player_id, dialogue)
+eznpcs.add_event{
+  name = 'oncehub',
+  action = function(npc, player_id, dialogue)
+    return async(function()
+      ensure_rehydrated(player_id, dialogue)
+
+      -- Build posts with STABLE ids
       local posts = {
-        helpers.create_bbs_option("Set/Clear visitor password"),
-        helpers.create_bbs_option("Decorate HP"),
+        { id = "oncehub_pass",  title = "Set/Clear visitor password" },
+        { id = "oncehub_decor", title = "Decorate HP" },
       }
       local board = ezmenus.open_menu(player_id, "Home Hub", MENU_COLOR.YELLOW, posts)
       local sel = await(board.selection_once())
-	  menu_closed_now(player_id, 0.5)
-	  fast_close_board(player_id)
-      if sel == "Set/Clear visitor password" then
+      fast_close_board(player_id)
+      if not sel then return end
+
+      -- robust match: accept either id or title (some clients send the title)
+      local function matches(s, post)
+        s = tostring(s or ""):lower()
+        return s == tostring(post.id or ""):lower() or s == tostring(post.title or ""):lower()
+      end
+
+      if matches(sel, posts[1]) then
         await(open_pass_menu(player_id, npc, dialogue))
-      elseif sel == "Decorate HP" then
+      elseif matches(sel, posts[2]) then
         await(open_decorate_menu(player_id, dialogue))
       end
     end)
   end
-})
+}
 
 -- ====================== oncehub listeners ======================
 Net:on("tile_interaction", function (event)
