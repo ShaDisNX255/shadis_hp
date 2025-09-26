@@ -1238,6 +1238,25 @@ local function remove_current(player_id)
   stop_session(player_id, "Removed "..name..".")
 end
 
+
+local ONCEHUB_DEBUG = true
+local function od(...)
+  if ONCEHUB_DEBUG then
+    local ok, name = pcall(Net.get_player_name, select(1, ...))
+    local pid = select(1, ...)
+    if type(pid) == "string" and (#pid == 36 or #pid == 37) then
+      -- common UUID-ish; include player name if we can
+      if ok and name then
+        print("[oncehub]["..name.."]", select(2, ...))
+      else
+        print("[oncehub]["..pid.."]", select(2, ...))
+      end
+    else
+      print("[oncehub]", ...)
+    end
+  end
+end
+
 -- ---------- Start sessions ----------
 local function get_template_layer_name(dialogue)
   local v = (dialogue and dialogue.custom_properties and dialogue.custom_properties["Template Layer"]) or ""
@@ -1483,24 +1502,6 @@ local function open_pass_menu(player_id, npc, dialogue)
       end
     end
   end)
-end
-
-local ONCEHUB_DEBUG = true
-local function od(...)
-  if ONCEHUB_DEBUG then
-    local ok, name = pcall(Net.get_player_name, select(1, ...))
-    local pid = select(1, ...)
-    if type(pid) == "string" and (#pid == 36 or #pid == 37) then
-      -- common UUID-ish; include player name if we can
-      if ok and name then
-        print("[oncehub]["..name.."]", select(2, ...))
-      else
-        print("[oncehub]["..pid.."]", select(2, ...))
-      end
-    else
-      print("[oncehub]", ...)
-    end
-  end
 end
 
 -- Register oncehub dialogue
