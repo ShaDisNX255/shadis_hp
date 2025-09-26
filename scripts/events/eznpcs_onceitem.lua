@@ -244,10 +244,10 @@ local function fast_close_board(pid)
 
   -- Give the UI one tick to tear down. Some engines require >0, so use 0.01s.
   -- (If your Async allows 0, you can change to 0 to be even snappier.)
-  await(Async.sleep(0.05))
+  await(Async.sleep(0.08))
 
   -- Brief input shield so no other plugin sees the close press
-  menu_closed_now(pid, 0.05)         -- locks/unlocks input for ~400ms
+  menu_closed_now(pid, 0.08)         -- locks/unlocks input for ~400ms
 end
 
 -- ====================== Memory helpers ======================
@@ -1394,8 +1394,10 @@ local function open_decorate_menu(player_id, dialogue)
       helpers.create_bbs_option("Remove object"),
       helpers.create_bbs_option("Clear all")
     }
+	od(player_id, "open DECOR menu")
     local board = ezmenus.open_menu(player_id, "Decorate HP", MENU_COLOR.GREEN, posts)
     local sel = await(board.selection_once())
+	od(player_id, "decor: selection='"..tostring(sel).."'")
 	menu_closed_now(player_id, 0.5)
 	fast_close_board(player_id)
     if sel == "Place object" then
@@ -1451,8 +1453,10 @@ local function open_pass_menu(player_id, npc, dialogue)
       helpers.create_bbs_option("Set visitor password"),
       helpers.create_bbs_option("Clear visitor password"),
     }
+	od(player_id, "open PASS menu")
     local board = ezmenus.open_menu(player_id, "Visitor Password", MENU_COLOR.BLUE, opts)
     local sel = await(board.selection_once())
+	od(player_id, "pass: selection='"..tostring(sel).."'")
 	menu_closed_now(player_id, 0.5)
 	fast_close_board(player_id)
 
@@ -1481,6 +1485,24 @@ local function open_pass_menu(player_id, npc, dialogue)
   end)
 end
 
+local ONCEHUB_DEBUG = true
+local function od(...)
+  if ONCEHUB_DEBUG then
+    local ok, name = pcall(Net.get_player_name, select(1, ...))
+    local pid = select(1, ...)
+    if type(pid) == "string" and (#pid == 36 or #pid == 37) then
+      -- common UUID-ish; include player name if we can
+      if ok and name then
+        print("[oncehub]["..name.."]", select(2, ...))
+      else
+        print("[oncehub]["..pid.."]", select(2, ...))
+      end
+    else
+      print("[oncehub]", ...)
+    end
+  end
+end
+
 -- Register oncehub dialogue
 eznpcs.add_event{
   name = 'oncehub',
@@ -1488,26 +1510,38 @@ eznpcs.add_event{
     return async(function()
       ensure_rehydrated(player_id, dialogue)
 
-      -- Build posts with STABLE ids
       local posts = {
         { id = "oncehub_pass",  title = "Set/Clear visitor password" },
         { id = "oncehub_decor", title = "Decorate HP" },
       }
+
+      od(player_id, "open HUB menu")
       local board = ezmenus.open_menu(player_id, "Home Hub", MENU_COLOR.YELLOW, posts)
       local sel = await(board.selection_once())
-      fast_close_board(player_id)
-      if not sel then return end
+      -- IMPORTANT: do NOT force-close here; let open_menu replace it safely
+      -- fast_close_board(player_id)
 
-      -- robust match: accept either id or title (some clients send the title)
+      if not sel then
+        od(player_id, "hub: selection=nil (closed with B?)")
+        return
+      end
+
       local function matches(s, post)
         s = tostring(s or ""):lower()
         return s == tostring(post.id or ""):lower() or s == tostring(post.title or ""):lower()
       end
 
+      od(player_id, "hub: selection='"..tostring(sel).."'")
       if matches(sel, posts[1]) then
+        od(player_id, "route → PASS menu")
+        await(Async.sleep(0.10)) -- give UI one tick so slow clients don't drop the open
         await(open_pass_menu(player_id, npc, dialogue))
       elseif matches(sel, posts[2]) then
+        od(player_id, "route → DECOR menu")
+        await(Async.sleep(0.10))
         await(open_decorate_menu(player_id, dialogue))
+      else
+        od(player_id, "hub: selection did not match any post")
       end
     end)
   end
