@@ -1536,8 +1536,8 @@
     <property name="Next 2" type="object" value="192"/>
     <property name="Next 3" type="object" value="193"/>
     <property name="Once Key" value="KeyHP03"/>
-    <property name="Price" type="int" value="5"/>
-    <property name="Renewal Price" type="int" value="5"/>
+    <property name="Price" type="int" value="1000000"/>
+    <property name="Renewal Price" type="int" value="800000"/>
    </properties>
    <point/>
   </object>
