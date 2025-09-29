@@ -81,8 +81,10 @@
   <object id="6" name="WCity1" type="Custom Warp" gid="245" x="160" y="512" width="60" height="32">
    <properties>
     <property name="Direction" value="Up Right"/>
+    <property name="Incoming Data" value="HP01"/>
     <property name="Target Area" value="WCity1"/>
     <property name="Target Object" value="2"/>
+    <property name="Warp In" type="bool" value="true"/>
    </properties>
   </object>
   <object id="9" name="HP01 BBS" type="BBS" gid="257" x="48" y="288" width="48" height="69">

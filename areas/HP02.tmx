@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.8" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="11" height="18" tilewidth="64" tileheight="32" infinite="0" nextlayerid="3" nextobjectid="10">
+<map version="1.8" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="11" height="18" tilewidth="64" tileheight="32" infinite="0" nextlayerid="3" nextobjectid="16">
  <properties>
   <property name="Background" value="custom"/>
   <property name="Background Animation" value="/server/assets/custom/backgrounds/wcity/01-generic1.animation"/>
@@ -25,7 +25,29 @@
  <tileset firstgid="285" source="../assets/objects/coffee.tsx"/>
  <tileset firstgid="289" source="../assets/objects/beyblade.tsx"/>
  <tileset firstgid="295" source="../assets/objects/BoktaiDolls28x33.tsx"/>
-<tileset firstgid="300" source="../assets/objects/edit_mode_tile_removal_cursor.tsx"/>
+ <tileset firstgid="300" source="../assets/objects/edit_mode_tile_removal_cursor.tsx"/>
+ <tileset firstgid="301" source="../assets/tiles/Roadblock.tsx"/>
+ <tileset firstgid="303" source="../assets/fishing/blue/0.tsx"/>
+ <tileset firstgid="304" source="../assets/fishing/blue/1.tsx"/>
+ <tileset firstgid="305" source="../assets/fishing/blue/2.tsx"/>
+ <tileset firstgid="306" source="../assets/fishing/blue/3.tsx"/>
+ <tileset firstgid="307" source="../assets/fishing/blue/4.tsx"/>
+ <tileset firstgid="308" source="../assets/fishing/blue/5.tsx"/>
+ <tileset firstgid="309" source="../assets/fishing/blue/6.tsx"/>
+ <tileset firstgid="310" source="../assets/fishing/blue/7.tsx"/>
+ <tileset firstgid="311" source="../assets/fishing/blue/8.tsx"/>
+ <tileset firstgid="312" source="../assets/fishing/blue/9.tsx"/>
+ <tileset firstgid="313" source="../assets/fishing/blue/10.tsx"/>
+ <tileset firstgid="314" source="../assets/fishing/yellow/1.tsx"/>
+ <tileset firstgid="315" source="../assets/fishing/yellow/10.tsx"/>
+ <tileset firstgid="316" source="../assets/fishing/yellow/2.tsx"/>
+ <tileset firstgid="317" source="../assets/fishing/yellow/3.tsx"/>
+ <tileset firstgid="318" source="../assets/fishing/yellow/4.tsx"/>
+ <tileset firstgid="319" source="../assets/fishing/yellow/5.tsx"/>
+ <tileset firstgid="320" source="../assets/fishing/yellow/6.tsx"/>
+ <tileset firstgid="321" source="../assets/fishing/yellow/7.tsx"/>
+ <tileset firstgid="322" source="../assets/fishing/yellow/8.tsx"/>
+ <tileset firstgid="323" source="../assets/fishing/yellow/9.tsx"/>
  <layer id="1" name="Tile Layer 0" width="11" height="18">
   <data encoding="csv">
 52,19,29,39,49,9,19,29,39,49,5,
@@ -55,7 +77,7 @@
     <property name="Dialogue Type" value="first"/>
     <property name="Direction" value="Up Left"/>
     <property name="Next 1" type="object" value="4"/>
-    <property name="Text 1" value="Hey there, I can change your password for visitors"/>
+    <property name="Text 1" value="Hey there"/>
    </properties>
    <point/>
   </object>
@@ -81,8 +103,10 @@
   <object id="6" name="WCity1" type="Custom Warp" gid="245" x="160" y="512" width="60" height="32">
    <properties>
     <property name="Direction" value="Up Right"/>
+    <property name="Incoming Data" value="HP02"/>
     <property name="Target Area" value="WCity1"/>
     <property name="Target Object" value="26"/>
+    <property name="Warp In" type="bool" value="true"/>
    </properties>
   </object>
   <object id="8" name="HP02 BBS" type="BBS" gid="257" x="48" y="288" width="48" height="69">
@@ -91,6 +115,21 @@
     <property name="Color" type="color" value="#ffffffff"/>
     <property name="Name" value="HP02"/>
     <property name="Post Limit" type="int" value="300"/>
+   </properties>
+  </object>
+  <object id="10" name="water" type="water" gid="2147483949" x="48" y="144" width="64" height="64">
+   <properties>
+    <property name="Water" type="bool" value="true"/>
+   </properties>
+  </object>
+  <object id="11" name="water" type="water" gid="2147483949" x="48" y="176" width="64" height="64">
+   <properties>
+    <property name="Water" type="bool" value="true"/>
+   </properties>
+  </object>
+  <object id="12" name="water" type="water" gid="2147483949" x="48" y="208" width="64" height="64">
+   <properties>
+    <property name="Water" type="bool" value="true"/>
    </properties>
   </object>
  </objectgroup>
@@ -115,5 +154,28 @@
   <object id="43" gid="2147483944" x="-43" y="235" width="28" height="30"/>
   <object id="44" gid="2147483943" x="-48" y="208" width="28" height="30"/>
   <object id="45" gid="300" x="-17" y="519" width="64" height="32"/>
+ </objectgroup>
+ <objectgroup id="13" name="Fishing" visible="0">
+  <object id="282" gid="303" x="-160" y="384" width="17" height="91"/>
+  <object id="283" gid="314" x="-160" y="368" width="17" height="91"/>
+  <object id="284" gid="316" x="-144" y="368" width="17" height="91"/>
+  <object id="285" gid="317" x="-144" y="352" width="17" height="91"/>
+  <object id="286" gid="318" x="-128" y="352" width="17" height="91"/>
+  <object id="287" gid="319" x="-128" y="336" width="17" height="91"/>
+  <object id="288" gid="320" x="-112" y="336" width="17" height="91"/>
+  <object id="289" gid="321" x="-112" y="320" width="17" height="91"/>
+  <object id="290" gid="322" x="-96" y="320" width="17" height="91"/>
+  <object id="291" gid="323" x="-96" y="304" width="17" height="91"/>
+  <object id="292" gid="315" x="-80" y="304" width="17" height="91"/>
+  <object id="294" gid="305" x="-48" y="464" width="17" height="91"/>
+  <object id="295" gid="306" x="-48" y="448" width="17" height="91"/>
+  <object id="296" gid="307" x="-32" y="448" width="17" height="91"/>
+  <object id="297" gid="308" x="-32" y="432" width="17" height="91"/>
+  <object id="298" gid="309" x="-16" y="432" width="17" height="91"/>
+  <object id="299" gid="310" x="-16" y="416" width="17" height="91"/>
+  <object id="300" gid="311" x="0" y="416" width="17" height="91"/>
+  <object id="302" gid="312" x="0" y="400" width="17" height="91"/>
+  <object id="303" gid="313" x="16" y="400" width="17" height="91"/>
+  <object id="304" gid="304" x="-64" y="464" width="17" height="91"/>
  </objectgroup>
 </map>

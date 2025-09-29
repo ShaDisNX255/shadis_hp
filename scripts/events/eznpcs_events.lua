@@ -708,3 +708,46 @@ eznpcs.add_event{
     end)
   end
 }
+
+local event_hp_warp = {
+  name = "HP Warp",
+  action = function(npc, player_id, dialogue, relay_object)
+    return async(function ()
+      local mug = eznpcs.get_dialogue_mugshot(npc, player_id, dialogue)
+
+      local prompt = dialogue.custom_properties["Prompt"] or "Which HP would you like to visit?"
+      await(Async.message_player(player_id, prompt, mug.texture_path, mug.animation_path))
+
+      -- Free-text input (player can type a number)
+      local raw = await(Async.prompt_player(player_id))
+      if raw == nil or raw == "" then
+        return dialogue.custom_properties["On Cancel"] or dialogue.custom_properties["Next 2"]
+      end
+
+      -- Extract first number from the input
+      local n = tonumber(tostring(raw):match("%d+"))
+      local min = tonumber(dialogue.custom_properties["Min"]) or 1
+      local max = tonumber(dialogue.custom_properties["Max"]) or 999
+      if not n or n < min or n > max then
+        local msg = dialogue.custom_properties["Invalid Msg"] or "That's not a valid HP."
+        await(Async.message_player(player_id, msg, mug.texture_path, mug.animation_path))
+        return dialogue.custom_properties["On Invalid"] or dialogue.custom_properties["Next 2"]
+      end
+
+      -- Build the landing key string
+      local pad = tonumber(dialogue.custom_properties["Pad"]) or 0
+      local nn  = (pad > 0) and string.format("%0"..pad.."d", n) or tostring(n)
+      local tpl = dialogue.custom_properties["Data Template"] or "HP {n}"
+      local data = tpl:gsub("{n}", nn)
+
+      print(string.format("[HPWarp] pid=%s input=%s -> landing='%s'", tostring(player_id), tostring(raw), data))
+
+      -- Hand off to ezwarps (will transfer immediately if it finds the landing) 
+      ezwarps.handle_player_request(player_id, data)
+
+      -- We end the dialogue here (warp happens or ezwarps logs “no landing” if missing)
+      return nil
+    end)
+  end
+}
+eznpcs.add_event(event_hp_warp)
