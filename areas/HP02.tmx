@@ -96,13 +96,6 @@
     <property name="Post Limit" type="int" value="300"/>
    </properties>
   </object>
-  <object id="46" name="fisharea" type="Custom Warp" gid="301" x="118" y="246" width="64" height="40">
-   <properties>
-    <property name="Direction" value="Up Right"/>
-    <property name="Target Area" value="fisharea"/>
-    <property name="Target Object" value="1"/>
-   </properties>
-  </object>
  </objectgroup>
  <objectgroup id="3" name="Object Layer 2" visible="0" offsetx="0" offsety="-16">
   <object id="13" gid="259" x="192" y="-16" width="16" height="53"/>

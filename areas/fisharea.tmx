@@ -88,11 +88,11 @@
 </data>
  </layer>
  <objectgroup id="2" name="Object Layer 0">
-  <object id="1" name="HP02" type="Custom Warp" gid="2147483889" x="1344" y="736" width="64" height="40">
+  <object id="1" name="deffault" type="Custom Warp" gid="2147483889" x="1344" y="736" width="64" height="40">
    <properties>
     <property name="Direction" value="Up Left"/>
-    <property name="Target Area" value="HP02"/>
-    <property name="Target Object" value="46"/>
+    <property name="Target Area" value="default"/>
+    <property name="Target Object" value="307"/>
    </properties>
   </object>
   <object id="9" name="Fishing Test" type="Water" gid="2147483921" x="1136" y="784" width="64" height="64">
