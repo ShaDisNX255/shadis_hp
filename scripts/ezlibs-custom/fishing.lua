@@ -1,9 +1,10 @@
 -- /server/scripts/ezlibs-custom/fishing.lua
--- Fishing mini-game: mash A to control a meter; hold within a sweet band to catch fish.
--- Author: you + ChatGPT
+-- Fishing mini-game + FishBBS (Top 10 heaviest)
+-- Everything in one file.
 
 -- ====================== Requires ======================
-local helpers = require('scripts/ezlibs-scripts/helpers')
+local helpers  = require('scripts/ezlibs-scripts/helpers')
+local ezmemory = require('scripts/ezlibs-scripts/ezmemory')
 
 -- Resolve Async if not global
 local function _resolve_async()
@@ -24,7 +25,8 @@ local FISHING = {
   METER_SIDE    = "right",     -- "left" | "right" | number (tiles). If number, exact side offset (tiles).
   METER_DISTANCE = 0.8,        -- legacy fallback; kept for compatibility
 
-  -- Extra world-space nudge after facing/side placement (tiles). y>0 moves down on screen.
+  -- Extra world-space nudge after facing/side placement (tiles).
+  -- Positive y moves the meter lower on the screen.
   METER_SCREEN_SHIFT = { x = 2.5, y = 0.0, z = 0.0 },
 
   -- Total time window to hook the fish
@@ -36,19 +38,19 @@ local FISHING = {
   -- Sweet spot width: number of consecutive pips that count as "sweet"
   SWEET_WIDTH = 2,             -- e.g., 2 means [4..5] or [7..8], always within 1..9
 
-  -- Heaviness presets (decay rate per sec and mash gain multiplier)
+  -- Heaviness presets (higher decay = harder; mash is how much each A tap helps)
   HEAVINESS = {
     --  key            decay/s   mashGain  hold_mult
     { key="light",       decay=1.2,  mash=1.20,  hold_mult=0.95 },
     { key="medium",      decay=1.8,  mash=1.00,  hold_mult=1.00 },
     { key="heavy",       decay=2.5,  mash=0.90,  hold_mult=1.10 },
-
-    -- New harder tiers
+    -- Harder tiers
     { key="very_heavy",  decay=3.6,  mash=0.85,  hold_mult=1.20 },
     { key="brutal",      decay=4.8,  mash=0.80,  hold_mult=1.35 },
     { key="legendary",   decay=6.0,  mash=0.75,  hold_mult=1.50 },
   },
 
+  -- Odds for each heaviness tier
   HEAVINESS_CHANCES = {
     light       = 25,
     medium      = 25,
@@ -68,33 +70,40 @@ local FISHING = {
     legendary   = { 25.0, 40.0 },
   },
 
-  -- Your meter catalog (blue 0..10, yellow 0..10)
+  -- Leaderboard persistence (stored under this area)
+  LEADERBOARD = {
+    MEM_AREA = "fisharea",  -- << your fishing zone
+    KEY      = "fish_top10",
+    MAX      = 10,
+  },
+
+  -- Your meter catalog (blue 0..10, yellow 0..10) – GIDs kept exactly
   METERS = {
     blue = {
-      [0]  = 303,  -- 0
-      [1]  = 304,  -- blue-1
-      [2]  = 305,  -- blue-2
-      [3]  = 306,  -- blue-3
-      [4]  = 307,  -- blue-4
-      [5]  = 308,  -- blue-5
-      [6]  = 309,  -- blue-6
-      [7]  = 310,  -- blue-7
-      [8]  = 311,  -- blue-8
-      [9]  = 312,  -- blue-9
-      [10] = 313,  -- blue-10
+      [0]  = 275,  -- 0
+      [1]  = 286,  -- blue-1
+      [2]  = 288,  -- blue-2
+      [3]  = 289,  -- blue-3
+      [4]  = 290,  -- blue-4
+      [5]  = 291,  -- blue-5
+      [6]  = 292,  -- blue-6
+      [7]  = 293,  -- blue-7
+      [8]  = 294,  -- blue-8
+      [9]  = 295,  -- blue-9
+      [10] = 287,  -- blue-10
     },
     yellow = {
       [0]  = 0,    -- no yellow-0 asset (intentional)
-      [1]  = 314,  -- yellow-1
-      [2]  = 316,  -- yellow-2
-      [3]  = 317,  -- yellow-3
-      [4]  = 318,  -- yellow-4
-      [5]  = 319,  -- yellow-5
-      [6]  = 320,  -- yellow-6
-      [7]  = 321,  -- yellow-7
-      [8]  = 322,  -- yellow-8
-      [9]  = 323,  -- yellow-9
-      [10] = 315,  -- yellow-10
+      [1]  = 276,  -- yellow-1
+      [2]  = 277,  -- yellow-2
+      [3]  = 278,  -- yellow-3
+      [4]  = 279,  -- yellow-4
+      [5]  = 280,  -- yellow-5
+      [6]  = 281,  -- yellow-6
+      [7]  = 282,  -- yellow-7
+      [8]  = 283,  -- yellow-8
+      [9]  = 284,  -- yellow-9
+      [10] = 285,  -- yellow-10
     },
   },
 
@@ -102,7 +111,7 @@ local FISHING = {
   SFX = {
     start  = "/server/assets/ezlibs-assets/sfx/select.ogg",
     catch  = "/server/assets/ezlibs-assets/sfx/item_get.ogg",
-    fail   = "/server/assets/ezlibs-assets/sfx/cancel.ogg",
+    fail   =  "/server/assets/ezlibs-assets/sfx/cancel.ogg",
     tick   = nil,
   },
 }
@@ -303,7 +312,7 @@ local SESS = {}    -- [pid] = session
 --   area_id, started_at, last_pos {x,y,z}, active,
 --   meter_color, meter_phase (0..10), meter_value (float), meter_oid,
 --   sweet_lo, sweet_hi, hold_req, hold_accum,
---   decay, mashGain, taps
+--   heaviness, weight_lb, decay, mashGain, taps
 
 -- ====================== Utility ======================
 local function _play(pid, path)
@@ -312,6 +321,42 @@ local function _play(pid, path)
 end
 
 local function _clamp(v, a, b) if v < a then return a elseif v > b then return b else return v end end
+
+-- ====================== Leaderboard helpers ======================
+local function _lb_bucket()
+  local area = (FISHING.LEADERBOARD and FISHING.LEADERBOARD.MEM_AREA) or "fisharea"
+  local key  = (FISHING.LEADERBOARD and FISHING.LEADERBOARD.KEY) or "fish_top10"
+  local mem  = ezmemory.get_area_memory(area) or {}
+  mem[key] = mem[key] or {}
+  return mem, mem[key], area, key
+end
+
+-- Insert a catch, sort desc by weight, trim to MAX. Returns rank (1-based) if in top MAX.
+local function _record_catch(pid, weight_lb)
+  if not weight_lb then return nil end
+  local name = nil
+  pcall(function() name = Net.get_player_name(pid) end)
+  name = name or tostring(pid)
+
+  local mem, list, area = _lb_bucket()
+  local rec = { weight = tonumber(weight_lb) or 0, player_name = tostring(name), pid = tostring(pid), ts = os.time() }
+  table.insert(list, rec)
+  table.sort(list, function(a,b) return (a.weight or 0) > (b.weight or 0) end)
+  local maxn = (FISHING.LEADERBOARD and FISHING.LEADERBOARD.MAX) or 10
+  while #list > maxn do table.remove(list) end
+
+  local rank = nil
+  for i, r in ipairs(list) do
+    if r == rec then rank = i; break end
+  end
+  ezmemory.save_area_memory(area)
+  return rank
+end
+
+local function _lb_top10()
+  local _, list = _lb_bucket()
+  return list
+end
 
 -- ====================== Meter Preview ======================
 local function _meter_gid(area_id, color, phase)
@@ -406,6 +451,7 @@ local function _despawn_meter(pid)
   end
 end
 
+-- ====================== Difficulty / weight helpers ======================
 local function _pick_heaviness()
   local H = FISHING.HEAVINESS
   local odds = FISHING.HEAVINESS_CHANCES
@@ -436,6 +482,7 @@ local function _random_weight_lb(key)
   return math.floor(((lo + math.random() * (hi - lo)) * 10) + 0.5) / 10
 end
 
+-- ====================== Cleanup ======================
 local function _cleanup_fishing_meters(area_id, only_pid)
   if not area_id then return end
   local list = Net.list_objects(area_id) or {}
@@ -448,17 +495,13 @@ local function _cleanup_fishing_meters(area_id, only_pid)
         local owner = tostring(cp.fishing_pid or "")
         local kill = false
         if only_pid then
-          -- remove only this player's meters
           kill = (owner == tostring(only_pid))
         else
-          -- remove orphans: no owner or owner offline
           if owner == "" then
             kill = true
           else
             local ok, _ = pcall(Net.get_player_area, owner)
-            if (not ok) or (Net.get_player_area(owner) == nil) then
-              kill = true
-            end
+            if (not ok) or (Net.get_player_area(owner) == nil) then kill = true end
           end
         end
         if kill then pcall(Net.remove_object, area_id, oid) end
@@ -467,12 +510,12 @@ local function _cleanup_fishing_meters(area_id, only_pid)
   end
 end
 
+-- ====================== Core game loop ======================
 local function _stop(pid, msg, sfx)
   local s = SESS[pid]; if not s then return end
   s.active = false
   _despawn_meter(pid)
-  -- Extra sweep for this player's meters in the session area
-  pcall(_cleanup_fishing_meters, s.area_id, pid)
+  pcall(_cleanup_fishing_meters, s.area_id, pid) -- sweep this player's meters
   SESS[pid] = nil
   if msg and msg ~= "" then
     if Async and Async.message_player then Async.message_player(pid, msg)
@@ -481,17 +524,17 @@ local function _stop(pid, msg, sfx)
   _play(pid, sfx)
 end
 
--- ====================== Core game loop ======================
 local function _start_session(pid)
   local area = Net.get_player_area(pid)
   if not area then return end
-  -- Nuke any of this player's lingering meters in this area (from a stuck prior run)
+
+  -- Nuke any lingering meters in this area for this player
   _cleanup_fishing_meters(area, pid)
 
-  -- Pick fish heaviness, hold requirement
+  -- Pick fish heaviness w/ odds; scale hold time by heaviness
   local H = _pick_heaviness()
   local base_hold = (FISHING.HOLD_RANGE_S.min + math.random() * (FISHING.HOLD_RANGE_S.max - FISHING.HOLD_RANGE_S.min))
-  local hold_req = base_hold * (H.hold_mult or 1.0)
+  local hold_req  = base_hold * (H.hold_mult or 1.0)
 
   -- Sweet band (width W) constrained to 1..9 inclusive
   local W = math.max(1, math.min(3, tonumber(FISHING.SWEET_WIDTH or 2)))
@@ -516,11 +559,11 @@ local function _start_session(pid)
     hold_req    = hold_req,    -- seconds needed inside band
     hold_accum  = 0.0,
 
-    heaviness  = H.key,                  -- track which tier
-    weight_lb  = _random_weight_lb(H.key), -- pretty message only
-    decay       = H.decay,
-    mashGain    = H.mash,
-    taps        = 0.0,
+    heaviness  = H.key,
+    weight_lb  = _random_weight_lb(H.key),
+    decay      = H.decay,
+    mashGain   = H.mash,
+    taps       = 0.0,
   }
   SESS[pid] = s
   _play(pid, FISHING.SFX.start)
@@ -571,11 +614,13 @@ local function _start_session(pid)
 
       -- Success
       if cur.hold_accum >= cur.hold_req then
-        local wt_str = ""
-        if cur.weight_lb then
-          wt_str = (" (%.1f lb)"):format(cur.weight_lb)
+        local w = cur.weight_lb
+        local rank = _record_catch(pid, w)
+        local msg = ("You caught a fish! (%.1f lb)"):format(w or 0)
+        if rank and rank <= ((FISHING.LEADERBOARD and FISHING.LEADERBOARD.MAX) or 10) then
+          msg = msg .. ("  New leaderboard #%d!"):format(rank)
         end
-        _stop(pid, "You caught a fish!"..wt_str, FISHING.SFX.catch)
+        _stop(pid, msg, FISHING.SFX.catch)
         return
       end
 
@@ -583,6 +628,51 @@ local function _start_session(pid)
     end
   end)
 end
+
+-- ====================== FishBBS (Top 10 board) ======================
+local FISHBBS = {
+  TITLE = "FishBBS - Top 10 Heaviest",
+  COLOR = { r=90, g=180, b=255 },
+}
+
+local function _trunc(s, n)
+  s = tostring(s or "")
+  if #s <= n then return s end
+  return s:sub(1, n)
+end
+
+local function _open_fishbbs(pid)
+  local list = _lb_top10() or {}
+  local posts = {}
+
+  if #list == 0 then
+    posts[#posts+1] = { id='__fishbbs:none', read=true, title='No catches yet. Be the first!', author='' }
+  else
+    local MAX_NAME = 20
+    for i, rec in ipairs(list) do
+      local nm = _trunc(tostring(rec.player_name or "Unknown"), MAX_NAME)
+      local wt = tonumber(rec.weight or 0) or 0
+      posts[#posts+1] = {
+        id     = '__fishbbs:post:'..i,
+        read   = true,
+        title  = string.format('%2d  %s', i, nm),   -- no '#'
+        author = string.format('%.1f lb', wt),
+      }
+      if i >= 10 then break end
+    end
+  end
+
+  Net.open_board(pid, FISHBBS.TITLE, FISHBBS.COLOR, posts)
+end
+
+-- Handle clicks on FishBBS
+Net:on("bbs_post_selection", function(ev)
+  local pid = ev.player_id; if not pid then return end
+  local id = tostring(ev.post_id or '')
+  if id:match('^__fishbbs:') then
+    -- read-only; nothing else to do
+  end
+end)
 
 -- ====================== Input handling ======================
 local function _register_tap(pid)
@@ -594,15 +684,28 @@ end
 Net:on("object_interaction", function(ev)
   if ev.button ~= 0 then return end -- A only
   local pid = ev.player_id
+  local area_id = Net.get_player_area(pid)
+
+  -- Resolve the clicked object (for class/type)
+  local obj = Net.get_object_by_id(area_id, ev.object_id)
+  if obj then
+    local cls = tostring(obj.class or '')
+    local typ = tostring(obj.type  or '')
+    -- If this is a FishBBS object, open the board and return.
+    if cls == 'FishBBS' or typ == 'FishBBS' then
+      _open_fishbbs(pid)
+      return
+    end
+  end
+
+  -- If already fishing, treat A as mash
   local s = SESS[pid]
   if s and s.active then
-    _register_tap(pid) -- treat A as mash while fishing
+    _register_tap(pid)
     return
   end
 
   -- Start immediately on Water object (testing phase)
-  local area_id = Net.get_player_area(pid)
-  local obj = Net.get_object_by_id(area_id, ev.object_id)
   if not obj then return end
   local cp = obj.custom_properties or {}
   local water = cp["Water"] or cp["water"] or cp["WATER"]
@@ -620,7 +723,7 @@ Net:on("tile_interaction", function(ev)
   _register_tap(pid)
 end)
 
--- Cleanup on transfer/quit
+-- Cleanup on transfer/quit (also clean orphans on join/transfer)
 Net:on("player_transfer", function(ev)
   local pid = ev.player_id
   if SESS[pid] and SESS[pid].active then
@@ -635,19 +738,17 @@ Net:on("player_quit", function(ev)
   end
 end)
 
--- When the player appears in an area, remove any stuck meters owned by them
 Net:on("player_join_area", function(ev)
   local aid = ev.area_id or Net.get_player_area(ev.player_id)
   if aid then _cleanup_fishing_meters(aid, ev.player_id) end
 end)
 
--- When the player transfers between areas, clean in the destination
 Net:on("player_area_transfer", function(ev)
   local aid = ev.to_area_id or ev.area_id or Net.get_player_area(ev.player_id)
   if aid then _cleanup_fishing_meters(aid, ev.player_id) end
 end)
 
--- ====================== Public API ======================
+-- ====================== Public API (optional) ======================
 local fishing = {}
 
 function fishing.set_meters(tbl)
@@ -659,6 +760,10 @@ end
 
 function fishing.start_for_player(pid)
   _start_session(pid)
+end
+
+function fishing.open_fishbbs(pid)
+  _open_fishbbs(pid)
 end
 
 return fishing

@@ -57,7 +57,7 @@
     <property name="Interact Relay" type="object" value="3"/>
    </properties>
   </object>
-  <object id="3" name="Merchant Nel" type="NPC" x="259.5" y="276.5">
+  <object id="3" name="Merchant Nel" type="NPC" x="257.5" y="280.5">
    <properties>
     <property name="Asset Name" value="heel-navi-exe4_black"/>
     <property name="Dialogue Type" value="first"/>

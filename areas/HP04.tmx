@@ -87,7 +87,7 @@
     <property name="Warp In" type="bool" value="true"/>
    </properties>
   </object>
-  <object id="8" name="HP04 BBS" type="BBS" gid="251" x="48" y="288" width="48" height="69">
+  <object id="8" name="HP04 BBS" type="BBS" gid="257" x="48" y="288" width="48" height="69">
    <properties>
     <property name="BBS" type="bool" value="true"/>
     <property name="Color" type="color" value="#ffffffff"/>
