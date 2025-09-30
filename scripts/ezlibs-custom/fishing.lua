@@ -248,26 +248,6 @@ local function resolve_preview_flip_flags(area_id, template_layer_name, base_gid
   return def_fh, def_fv, def_fr
 end
 
--- Cache per-area per-gid meter dimensions so they never bounce between players
-local _DIM_CACHE = {}
-local function _meter_dims_from_template(area_id, base_gid)
-  local key = tostring(area_id) .. ":" .. tostring(base_gid)
-  local hit = _DIM_CACHE[key]
-  if hit then return hit.w, hit.h end
-
-  -- First: exact object from the "Fishing" template layer
-  local w, h = get_template_dims_from_layer(area_id, FISHING.TEMPLATE_LAYER, base_gid)
-  if not w or not h then
-    -- Fallback: tileset tile->map tile ratio
-    w, h = get_gid_dims_in_tiles(area_id, base_gid)
-  end
-  w = tonumber(w) or 1
-  h = tonumber(h) or 1
-
-  _DIM_CACHE[key] = { w = w, h = h }
-  return w, h
-end
-
 -- ====================== Placement helpers ======================
 local function get_cursor_point(player_id, dist)
   local ok_pos, pos = pcall(Net.get_player_position, player_id)
@@ -401,7 +381,7 @@ local function _spawn_or_update_meter(pid)
 
   local base_gid = gid_base(raw_gid)
   local want_fh, want_fv, want_fr = resolve_preview_flip_flags(area_id, FISHING.TEMPLATE_LAYER, base_gid, false, false, false)
-  local w, h = _meter_dims_from_template(area_id, base_gid)
+  local w, h = resolve_object_dims(area_id, FISHING.TEMPLATE_LAYER, base_gid)
   w = tonumber(w) or 1
   h = tonumber(h) or 1
 
