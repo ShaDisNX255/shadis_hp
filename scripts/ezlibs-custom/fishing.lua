@@ -26,6 +26,7 @@ local FISHING = {
   TEMPLATE_LAYER = "Fishing",
   HOLD_SECONDS = 5.0,
   FORCE_METER_DIMS_PX = nil,
+  EXPECTED_METER_DIMS_PX = { w = 17, h = 91 },
   DEBUG = true,
 
   -- Placement around the player
@@ -180,8 +181,11 @@ local function find_prototype_for_gid(area_id, target_gid)
 end
 
 local function _tmx_read_map_tilesize(xml)
-  local tw = tonumber(xml:match('tilewidth="(%d+)"') or xml:match('tilewidth="(%d+%.%d+)"')) or 0
-  local th = tonumber(xml:match('tileheight="(%d+)"') or xml:match('tileheight="(%d+%.%d+)"')) or 0
+  -- Only read from the <map ...> tag
+  local map_tag = xml:match("<map%s+[^>]*>")
+  if not map_tag then return 0, 0 end
+  local tw = tonumber(map_tag:match('tilewidth="([%d%.]+)"'))  or 0
+  local th = tonumber(map_tag:match('tileheight="([%d%.]+)"')) or 0
   return tw, th
 end
 
@@ -366,16 +370,32 @@ local function _lb_top10()
   return list
 end
 
--- Convert pixels to map tiles using the current area's map tile size
+local function _map_info(xml)
+  local map_tag = xml:match("<map%s+[^>]*>")
+  if not map_tag then return "orthogonal", 32, 32 end
+  local orient = map_tag:match('orientation="([^"]+)"') or "orthogonal"
+  local tw = tonumber(map_tag:match('tilewidth="([%d%.]+)"'))  or 32
+  local th = tonumber(map_tag:match('tileheight="([%d%.]+)"')) or 32
+  return orient, tw, th
+end
+
 local function _px_to_tiles(area_id, w_px, h_px)
   local ok, xml = pcall(Net.map_to_string, area_id)
   if not ok or type(xml) ~= "string" then return 1, 1 end
-  local tw = tonumber(xml:match('tilewidth="([%d%.]+)"'))  or 32
-  local th = tonumber(xml:match('tileheight="([%d%.]+)"')) or 32
-  local wt = (tonumber(w_px) or 0) / tw
-  local ht = (tonumber(h_px) or 0) / th
+  local orient, tw, th = _map_info(xml)
+
+  -- Use tileheight for BOTH axes on isometric maps (and any non-square tile sets).
+  local basis = (orient == "isometric" or tw ~= th) and th or tw
+
+  local wt = (tonumber(w_px) or 0) / basis
+  local ht = (tonumber(h_px) or 0) / basis
   if wt <= 0 then wt = 1 end
   if ht <= 0 then ht = 1 end
+
+  if FISHING.DEBUG then
+    print(("[fishing] px->tiles using basis=%d (orient=%s tw=%d th=%d): %dx%d px -> %.3fx%.3f tiles")
+      :format(basis, orient, tw, th, tonumber(w_px) or 0, tonumber(h_px) or 0, wt, ht))
+  end
   return wt, ht
 end
 
@@ -399,6 +419,25 @@ local function _resolve_meter_dims(area_id, template_layer_name, base_gid)
   return w, h, src
 end
 
+local function _enforce_expected_dims(area_id, w, h)
+  local exp = FISHING.EXPECTED_METER_DIMS_PX
+  if not exp or not exp.w or not exp.h then return w, h, false end
+  local ew, eh = _px_to_tiles(area_id, exp.w, exp.h)
+
+  -- relative error against expected
+  local dw = math.abs((tonumber(w) or 0) - ew) / (ew == 0 and 1 or ew)
+  local dh = math.abs((tonumber(h) or 0) - eh) / (eh == 0 and 1 or eh)
+
+  if dw > 0.15 or dh > 0.15 then
+    if FISHING.DEBUG then
+      print(("[fishing] size auto-correct: had %.3fx%.3f, expect %.3fx%.3f (from %dx%d px)")
+        :format(w, h, ew, eh, exp.w, exp.h))
+    end
+    return ew, eh, true
+  end
+  return w, h, false
+end
+
 -- ====================== Meter Preview ======================
 local function _meter_gid(area_id, color, phase)
   local catalog = FISHING.METERS[color] or {}
@@ -419,6 +458,11 @@ local function _spawn_or_update_meter(pid)
   local w, h = _resolve_meter_dims(area_id, FISHING.TEMPLATE_LAYER, base_gid)
   w = tonumber(w) or 1
   h = tonumber(h) or 1
+
+  do
+    local nw, nh, fixed = _enforce_expected_dims(area_id, w, h)
+    if fixed then w, h = nw, nh end
+  end
 
   local forward = FISHING.METER_FORWARD or FISHING.METER_DISTANCE or 0.2
   local side_default = math.max(1.4, (w or 1) * 0.65)
