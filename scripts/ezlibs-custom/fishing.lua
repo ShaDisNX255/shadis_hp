@@ -25,6 +25,8 @@ local FISHING = {
   -- Hidden layer where your meter prototype objects live
   TEMPLATE_LAYER = "Fishing",
   HOLD_SECONDS = 5.0,
+  FORCE_METER_DIMS_PX = nil,
+  DEBUG = true,
 
   -- Placement around the player
   METER_FORWARD = 0.2,         -- a little in front of facing
@@ -364,6 +366,39 @@ local function _lb_top10()
   return list
 end
 
+-- Convert pixels to map tiles using the current area's map tile size
+local function _px_to_tiles(area_id, w_px, h_px)
+  local ok, xml = pcall(Net.map_to_string, area_id)
+  if not ok or type(xml) ~= "string" then return 1, 1 end
+  local tw = tonumber(xml:match('tilewidth="([%d%.]+)"'))  or 32
+  local th = tonumber(xml:match('tileheight="([%d%.]+)"')) or 32
+  local wt = (tonumber(w_px) or 0) / tw
+  local ht = (tonumber(h_px) or 0) / th
+  if wt <= 0 then wt = 1 end
+  if ht <= 0 then ht = 1 end
+  return wt, ht
+end
+
+-- Wrapper that chooses dims: FORCE override (if set) else your current resolver
+local function _resolve_meter_dims(area_id, template_layer_name, base_gid)
+  local forced = FISHING.FORCE_METER_DIMS_PX
+  if forced and forced.w and forced.h then
+    local w, h = _px_to_tiles(area_id, forced.w, forced.h)
+    if FISHING.DEBUG then
+      print(("[fishing] FORCE dims -> tiles: %.3fx%.3f from %dx%d px")
+        :format(w, h, forced.w, forced.h))
+    end
+    return w, h, "forced"
+  end
+  -- Fallback to your current behavior (whatever you reverted to)
+  local w, h, src = resolve_object_dims(area_id, template_layer_name, base_gid)
+  if FISHING.DEBUG then
+    print(("[fishing] RESOLVE dims (%s) -> tiles: %.3fx%.3f (gid=%s)")
+      :format(tostring(src), tonumber(w) or -1, tonumber(h) or -1, tostring(base_gid)))
+  end
+  return w, h, src
+end
+
 -- ====================== Meter Preview ======================
 local function _meter_gid(area_id, color, phase)
   local catalog = FISHING.METERS[color] or {}
@@ -381,7 +416,7 @@ local function _spawn_or_update_meter(pid)
 
   local base_gid = gid_base(raw_gid)
   local want_fh, want_fv, want_fr = resolve_preview_flip_flags(area_id, FISHING.TEMPLATE_LAYER, base_gid, false, false, false)
-  local w, h = resolve_object_dims(area_id, FISHING.TEMPLATE_LAYER, base_gid)
+  local w, h = _resolve_meter_dims(area_id, FISHING.TEMPLATE_LAYER, base_gid)
   w = tonumber(w) or 1
   h = tonumber(h) or 1
 
@@ -431,6 +466,16 @@ local function _spawn_or_update_meter(pid)
     local cur = Net.get_object_by_id(area_id, s.meter_oid)
     if not cur or (cur.data and tonumber(cur.data.gid) ~= data.gid) then
       must_recreate = true
+    else
+      local cw = tonumber(cur.width)  or 0
+      local ch = tonumber(cur.height) or 0
+      if math.abs(cw - w) > 0.001 or math.abs(ch - h) > 0.001 then
+        if FISHING.DEBUG then
+          print(("[fishing] size mismatch -> recreate (had %.3fx%.3f, want %.3fx%.3f)")
+            :format(cw, ch, w, h))
+        end
+        must_recreate = true
+      end
     end
   end
 
