@@ -56,7 +56,7 @@ local FISHING = {
     -- Harder tiers
     { key="very_heavy",  decay=3.6,  mash=0.85,  hold_mult=1.20 },
     { key="brutal",      decay=4.8,  mash=0.80,  hold_mult=1.35 },
-    { key="legendary",   decay=6.0,  mash=0.75,  hold_mult=1.50 },
+    { key="legendary",   decay=5.4,  mash=0.75,  hold_mult=1.40 },
   },
 
   -- Odds for each heaviness tier
@@ -438,6 +438,9 @@ local function _enforce_expected_dims(area_id, w, h)
   return w, h, false
 end
 
+-- Tracks all areas where we have spawned a FishingMeter for a given player
+local _PID_AREAS = {}  -- pid -> { [area_id]=true, ... }
+
 -- ====================== Meter Preview ======================
 local function _meter_gid(area_id, color, phase)
   local catalog = FISHING.METERS[color] or {}
@@ -532,6 +535,8 @@ local function _spawn_or_update_meter(pid)
       if not ok then return end
     end
     s.meter_oid = res
+    _PID_AREAS[pid] = _PID_AREAS[pid] or {}
+    _PID_AREAS[pid][area_id] = true
   else
     Net.move_object(area_id, s.meter_oid, x, y, z)
     Net.set_object_data(area_id, s.meter_oid, data)
@@ -543,6 +548,21 @@ local function _despawn_meter(pid)
   if s.meter_oid then
     pcall(function() Net.remove_object(s.area_id, s.meter_oid) end)
     s.meter_oid = nil
+  end
+end
+
+local function _cleanup_all_for_pid(pid)
+  -- Clean in every area we know this player had a meter
+  local areas = _PID_AREAS[pid]
+  if areas then
+    for aid, _ in pairs(areas) do
+      pcall(_cleanup_fishing_meters, aid, pid)
+    end
+    _PID_AREAS[pid] = nil
+  else
+    -- Fallback: try current area if still available
+    local ok, aid = pcall(Net.get_player_area, pid)
+    if ok and aid then pcall(_cleanup_fishing_meters, aid, pid) end
   end
 end
 
@@ -839,6 +859,13 @@ end)
 Net:on("player_area_transfer", function(ev)
   local aid = ev.to_area_id or ev.area_id or Net.get_player_area(ev.player_id)
   if aid then _cleanup_fishing_meters(aid, ev.player_id) end
+end)
+
+-- Some servers fire a different event on net drop; harmless if it never fires
+Net:on("player_disconnect", function(ev)
+  local pid = ev.player_id
+  if SESS[pid] and SESS[pid].active then _stop(pid, nil, nil) end
+  _cleanup_all_for_pid(pid)
 end)
 
 -- ====================== Public API (optional) ======================
