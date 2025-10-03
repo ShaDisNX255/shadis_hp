@@ -30,13 +30,13 @@ local FISHING = {
   DEBUG = true,
 
   -- Placement around the player
-  METER_FORWARD = 0.2,         -- a little in front of facing
-  METER_SIDE    = "right",     -- "left" | "right" | number (tiles). If number, exact side offset (tiles).
+  METER_FORWARD = 0,         -- a little in front of facing
+  METER_SIDE    = 0,     -- "left" | "right" | number (tiles). If number, exact side offset (tiles).
   METER_DISTANCE = 0.8,        -- legacy fallback; kept for compatibility
 
   -- Extra world-space nudge after facing/side placement (tiles).
   -- Positive y moves the meter lower on the screen.
-  METER_SCREEN_SHIFT = { x = 2.5, y = 0.0, z = 0.0 },
+  METER_SCREEN_SHIFT = { x = 1.5, y = 0.0, z = 0.0 },
 
   -- Total time window to hook the fish
   MAX_DURATION_S = 10.0,
@@ -115,6 +115,26 @@ local FISHING = {
       [10] = 285,  -- yellow-10
     },
   },
+
+  -- Timer meter (0..5 phases), horizontal bar above the player.
+  -- Fill these GIDs to match your "Fishing" layer objects for the timer bar.
+  METERS_TIMER = {
+    [0] = 299,    -- replace 0 with your gid for empty bar
+    [1] = 300,
+    [2] = 301,
+    [3] = 302,
+    [4] = 303,
+    [5] = 304,
+  },
+
+  -- Placement just for the timer meter (independent from fish meter)
+  TIMER_FORWARD      = 0.0,           -- a touch in front of the player (0.0 is fine)
+  TIMER_SIDE         = 0,             -- 0 keeps it centered; can be "left"/"right" or a number
+  TIMER_SCREEN_SHIFT = { x = -2.0, y = -2.0, z = 0.0 }, -- y<0 draws above the player
+
+  -- Optional size enforcement for the timer bar (pixels -> tiles; isometric-safe)
+  FORCE_TIMER_DIMS_PX    = nil,                 -- e.g., { w = 91, h = 17 } if your timer is 91x17 px
+  EXPECTED_TIMER_DIMS_PX = { w = 94, h = 16 },                 -- e.g., { w = 91, h = 17 } to auto-correct if it ever drifts
 
   -- Optional sfx paths (set to nil if not wanted)
   SFX = {
@@ -438,6 +458,49 @@ local function _enforce_expected_dims(area_id, w, h)
   return w, h, false
 end
 
+local function _timer_gid(area_id, phase)
+  local t = FISHING.METERS_TIMER or {}
+  return tonumber(t[phase or 0] or 0) or 0
+end
+
+-- Size resolver for the timer bar; mirrors your fish resolver but uses timer-specific overrides.
+local function _resolve_timer_dims(area_id, layer_name, base_gid)
+  -- Force override (pixels -> tiles) if configured
+  local forced = FISHING.FORCE_TIMER_DIMS_PX
+  if forced and forced.w and forced.h then
+    local w, h = _px_to_tiles(area_id, forced.w, forced.h)
+    if FISHING.DEBUG then
+      print(("[fishing] TIMER FORCE dims px %dx%d -> tiles %.3fx%.3f (gid=%s)")
+        :format(forced.w, forced.h, w, h, tostring(base_gid)))
+    end
+    return w, h, "forced"
+  end
+
+  -- Fallback to your existing pipeline (proto -> tmx -> tileset)
+  local w, h, src = resolve_object_dims(area_id, layer_name, base_gid)
+
+  -- Expected override (auto-correct if mismatch)
+  local exp = FISHING.EXPECTED_TIMER_DIMS_PX
+  if exp and exp.w and exp.h then
+    local ew, eh = _px_to_tiles(area_id, exp.w, exp.h)
+    local dw = math.abs((tonumber(w) or 0) - ew) / (ew == 0 and 1 or ew)
+    local dh = math.abs((tonumber(h) or 0) - eh) / (eh == 0 and 1 or eh)
+    if dw > 0.15 or dh > 0.15 then
+      if FISHING.DEBUG then
+        print(("[fishing] TIMER auto-correct size %.3fx%.3f -> %.3fx%.3f (from %dx%d px)")
+          :format(tonumber(w) or -1, tonumber(h) or -1, ew, eh, exp.w, exp.h))
+      end
+      w, h, src = ew, eh, "expected"
+    end
+  end
+
+  if FISHING.DEBUG then
+    print(("[fishing] TIMER dims (%s) -> tiles: %.3fx%.3f (gid=%s)")
+      :format(tostring(src), tonumber(w) or -1, tonumber(h) or -1, tostring(base_gid)))
+  end
+  return tonumber(w) or 1, tonumber(h) or 1, src
+end
+
 -- Tracks all areas where we have spawned a FishingMeter for a given player
 local _PID_AREAS = {}  -- pid -> { [area_id]=true, ... }
 
@@ -551,6 +614,99 @@ local function _despawn_meter(pid)
   end
 end
 
+local function _spawn_or_update_timer(pid)
+  local s = SESS[pid]; if not s or not s.active then return end
+  local area_id = s.area_id; if not area_id then return end
+
+  -- Resolve current frame gid
+  local raw_gid = _timer_gid(area_id, s.timer_phase or 0)
+  if not raw_gid or raw_gid == 0 then return end
+
+  local base_gid = gid_base(raw_gid)
+  local want_fh, want_fv, want_fr =
+    resolve_preview_flip_flags(area_id, FISHING.TEMPLATE_LAYER, base_gid, false, false, false)
+
+  -- Size (timer-specific)
+  local w, h = _resolve_timer_dims(area_id, FISHING.TEMPLATE_LAYER, base_gid)
+
+  -- Position (timer-specific)
+  local forward  = FISHING.TIMER_FORWARD or 0.0
+  local side_spec = (FISHING.TIMER_SIDE ~= nil) and FISHING.TIMER_SIDE or 0
+  local side_default = 0  -- timer stays centered unless you pass a number or "left"/"right"
+  local x, y, z = get_offset_point(pid, forward, side_spec, side_default)
+  if not x or not y then return end
+  x = tonumber(x) or 0; y = tonumber(y) or 0; z = tonumber(z) or 0
+
+  -- Apply timer-specific nudge
+  do
+    local shift = FISHING.TIMER_SCREEN_SHIFT or {}
+    x = x + (shift.x or 0)
+    y = y + (shift.y or 0)   -- negative draws above player
+    z = z + (shift.z or 0)
+  end
+
+  local data = {
+    type = "tile",
+    gid = tonumber(base_gid) or 0,
+    flipped_horizontally = not not want_fh,
+    flipped_vertically   = not not want_fv,
+    rotated              = not not want_fr,
+  }
+
+  local spec = {
+    name     = "",
+    class    = "FishingTimer",
+    visible  = true,
+    x        = x, y = y, z = z,
+    width    = w, height = h,
+    rotation = 0,
+    data     = data,
+    custom_properties = {
+      fishing_timer = "true",
+      fishing_pid   = tostring(pid or ""),
+    }
+  }
+
+  local must_recreate = false
+  if not s.timer_oid then
+    must_recreate = true
+  else
+    local cur = Net.get_object_by_id(area_id, s.timer_oid)
+    if not cur or (cur.data and tonumber(cur.data.gid) ~= data.gid) then
+      must_recreate = true
+    else
+      -- if size ever drifts, rebuild
+      local cw = tonumber(cur.width)  or 0
+      local ch = tonumber(cur.height) or 0
+      if math.abs(cw - w) > 0.001 or math.abs(ch - h) > 0.001 then
+        must_recreate = true
+      end
+    end
+  end
+
+  if must_recreate then
+    if s.timer_oid then pcall(function() Net.remove_object(area_id, s.timer_oid) end) end
+    local ok, res = pcall(Net.create_object, area_id, spec)
+    if not ok then
+      spec.layer = FISHING.TEMPLATE_LAYER
+      ok, res = pcall(Net.create_object, area_id, spec)
+      if not ok then return end
+    end
+    s.timer_oid = res
+  else
+    Net.move_object(area_id, s.timer_oid, x, y, z)
+    Net.set_object_data(area_id, s.timer_oid, data)
+  end
+end
+
+local function _despawn_timer(pid)
+  local s = SESS[pid]; if not s then return end
+  if s.timer_oid then
+    pcall(function() Net.remove_object(s.area_id, s.timer_oid) end)
+    s.timer_oid = nil
+  end
+end
+
 local function _cleanup_all_for_pid(pid)
   -- Clean in every area we know this player had a meter
   local areas = _PID_AREAS[pid]
@@ -605,7 +761,9 @@ local function _cleanup_fishing_meters(area_id, only_pid)
     local o = Net.get_object_by_id(area_id, oid)
     if o then
       local cp = o.custom_properties or {}
-      local is_meter = (o.class == "FishingMeter") or (tostring(cp.fishing_meter or "") == "true")
+      local is_meter =
+        (o.class == "FishingMeter") or (tostring(cp.fishing_meter or "") == "true") or
+        (o.class == "FishingTimer") or (tostring(cp.fishing_timer or "") == "true")
       if is_meter then
         local owner = tostring(cp.fishing_pid or "")
         local kill = false
@@ -630,6 +788,7 @@ local function _stop(pid, msg, sfx)
   local s = SESS[pid]; if not s then return end
   s.active = false
   _despawn_meter(pid)
+  _despawn_timer(pid)
   pcall(_cleanup_fishing_meters, s.area_id, pid) -- sweep this player's meters
   SESS[pid] = nil
   if msg and msg ~= "" then
@@ -679,6 +838,7 @@ local function _start_session(pid)
     decay      = H.decay,
     mashGain   = H.mash,
     taps       = 0.0,
+    timer_phase = 0,
   }
   SESS[pid] = s
   _play(pid, FISHING.SFX.start)
@@ -721,9 +881,19 @@ local function _start_session(pid)
       else
         cur.meter_color = "blue"
       end
+      -- Timer bar shows accumulated progress toward hold requirement (0..5)
+      local ratio = 0
+      if (cur.hold_req or 0) > 0 then
+        ratio = _clamp((cur.hold_accum or 0) / cur.hold_req, 0, 1)
+      end
+      local tphase = math.floor(ratio * 5 + 0.5)
+      if tphase ~= cur.timer_phase then
+        cur.timer_phase = tphase
+      end
 
       -- Update meter preview
       _spawn_or_update_meter(pid)
+      _spawn_or_update_timer(pid)
 
       -- Success
       if cur.hold_accum >= cur.hold_req then
