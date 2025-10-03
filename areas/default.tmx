@@ -130,16 +130,6 @@
   </object>
   <object id="110" gid="59" x="720" y="688" width="33" height="54"/>
   <object id="111" gid="59" x="864" y="688" width="33" height="54"/>
-  <object id="139" name="Cube1" type="Checkpoint" gid="80" x="640" y="784" width="53.25" height="56">
-   <properties>
-    <property name="Description" value="This cube is in the way"/>
-    <property name="Once" type="bool" value="true"/>
-    <property name="Password" value="Test1"/>
-    <property name="Skip Prompt" type="bool" value="false"/>
-    <property name="Unlock Failed Message" value="Thou shall not pass!"/>
-    <property name="Unlocked Message" value="You can pass"/>
-   </properties>
-  </object>
   <object id="144" name="Rink" type="Custom Warp" gid="109" x="544" y="768" width="64" height="39">
    <properties>
     <property name="Direction" value="Down Right"/>

@@ -26,7 +26,7 @@
  <tileset firstgid="289" source="../assets/objects/beyblade.tsx"/>
  <tileset firstgid="295" source="../assets/objects/BoktaiDolls28x33.tsx"/>
  <tileset firstgid="300" source="../assets/objects/edit_mode_tile_removal_cursor.tsx"/>
- <tileset firstgid="301" source="../assets/tiles/EXE6_Shortcuts.tsx"/>
+ <tileset firstgid="301" source="../assets/objects/frag.tsx"/>
  <layer id="1" name="Tile Layer 0" width="11" height="18">
   <data encoding="csv">
 52,19,29,39,49,9,19,29,39,49,5,
@@ -118,5 +118,6 @@
   <object id="43" gid="2147483944" x="-43" y="235" width="28" height="30"/>
   <object id="44" gid="2147483943" x="-48" y="208" width="28" height="30"/>
   <object id="45" gid="300" x="-17" y="519" width="64" height="32"/>
+  <object id="46" gid="301" x="-32" y="368" width="28" height="34"/>
  </objectgroup>
 </map>

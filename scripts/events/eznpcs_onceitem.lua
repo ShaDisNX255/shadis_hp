@@ -89,6 +89,7 @@ local ONCEHUB_CATALOG = {
   { id = "otenko_doll",  name = "Otenko Doll",  ts_source = "../assets/objects/BoktaiDolls28x33.tsx", gid = 2147483943, layer = "Object Layer 2" },
   { id = "doronbo_doll",  name = "Doronbo Doll",  ts_source = "../assets/objects/BoktaiDolls28x33.tsx", gid = 2147483945, layer = "Object Layer 2" },
   { id = "okenko_doll",  name = "Okenko Doll",  ts_source = "../assets/objects/BoktaiDolls28x33.tsx", gid = 2147483944, layer = "Object Layer 2" },
+  { id = "bug_frag",  name = "Bug Frag",  ts_source = "../assets/objects/frag.tsx", gid = 301, layer = "Object Layer 2" },
 }
 
 local MENU_COLOR = {

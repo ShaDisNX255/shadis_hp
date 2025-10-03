@@ -351,16 +351,6 @@
   <object id="105" gid="208" x="928" y="640" width="64" height="37"/>
   <object id="106" gid="206" x="960" y="608" width="64" height="37"/>
   <object id="107" gid="206" x="992" y="640" width="64" height="37"/>
-  <object id="111" name="Cube2" type="Checkpoint" gid="249" x="1040" y="496" width="53.25" height="56">
-   <properties>
-    <property name="Description" value="This cube seems to be placed by a prankster Navi"/>
-    <property name="Once" type="bool" value="true"/>
-    <property name="Password" value="WeWillWake again"/>
-    <property name="Skip Prompt" type="bool" value="false"/>
-    <property name="Unlock Failed Message" value="Incorrect Password"/>
-    <property name="Unlocked Message" value="Unlocked!"/>
-   </properties>
-  </object>
   <object id="118" name="Cube3" type="Checkpoint" gid="249" x="850.363" y="1523.64" width="77.4531" height="61" visible="0">
    <properties>
     <property name="Description" value="Admin Block, well done on finding this!"/>
