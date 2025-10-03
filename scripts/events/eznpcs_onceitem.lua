@@ -820,28 +820,6 @@ local function decor_add_owned(pid, id, qty)
   if ezmemory.save_player_memory then ezmemory.save_player_memory(pid) end
 end
 
-local function count_placed_in_area_by_key(area_id, once_key, object_id)
-  local c = 0
-  local ids = Net.list_objects(area_id)
-  for _, oid in ipairs(ids) do
-    local o = Net.get_object_by_id(area_id, oid)
-    local cp = o and o.custom_properties
-    if cp and cp.placed_by_oncehub == "true" and cp.oncehub_id == object_id then
-      -- Count only objects placed for THIS HP/renter
-      if cp.oncehub_key == once_key then c = c + 1 end
-    end
-  end
-  return c
-end
-
-local function decor_left_to_place(pid, area_id, once_key, object_id)
-  local owned  = decor_count_owned(pid, object_id)
-  local placed = count_placed_in_area_by_key(area_id, once_key, object_id)
-  local left   = owned - placed
-  if left < 0 then left = 0 end
-  return left, owned, placed
-end
-
 local function short_money(n)  -- tiny UI helper like your pack shop
   n = tonumber(n) or 0
   local abs = math.abs(n)
@@ -966,22 +944,32 @@ local function decor_add_owned(pid, id, qty)
   decor_set_owned(pid, id, cur + qty)
 end
 
--- Count how many of this object the *current renter* has already placed in this HP
-local function count_placed_in_area_by_key(area_id, once_key, object_id)
+-- Count how many of this object the CURRENT PLAYER has placed in this HP
+local function count_placed_in_area_by_player(area_id, once_key, object_id, pid)
+  local secret = helpers.get_safe_player_secret(pid)
   local c = 0
-  for _, oid in ipairs(Net.list_objects(area_id)) do
-    local o = Net.get_object_by_id(area_id, oid)
+  for _, oid in ipairs(Net.list_objects(area_id) or {}) do
+    local o  = Net.get_object_by_id(area_id, oid)
     local cp = o and o.custom_properties
-    if cp and cp.placed_by_oncehub == "true" and cp.oncehub_id == object_id then
-      if cp.oncehub_key == once_key then c = c + 1 end
+    if cp
+      and (cp.placed_by_oncehub == "true")
+      and (cp.oncehub_key or "") == (once_key or "")
+      and (cp.oncehub_id  or "") == (object_id or "")
+    then
+      -- Visitors tag with visitor_secret; renters tag with owner_secret (see place_current patch)
+      if (cp.visitor_secret and cp.visitor_secret == secret) or
+         (cp.owner_secret   and cp.owner_secret   == secret)
+      then
+        c = c + 1
+      end
     end
   end
   return c
 end
 
 local function decor_left_to_place(pid, area_id, once_key, object_id)
-  local owned  = decor_count_owned(pid, object_id)
-  local placed = count_placed_in_area_by_key(area_id, once_key, object_id)
+  local owned  = decor_count_owned(pid, object_id)                         -- per-player inventory
+  local placed = count_placed_in_area_by_player(area_id, once_key, object_id, pid) -- per-player placements
   local left   = math.max(0, owned - placed)
   return left, owned, placed
 end
@@ -1017,6 +1005,8 @@ local function snapshot_oncehub_placements(area_id, once_key)
           oncehub_name = (cp.oncehub_name or "Object"),
           oncehub_id   = (cp.oncehub_id   or "object"),
           oncehub_key  = (cp.oncehub_key  or (once_key or "")),
+          visitor_secret = cp.visitor_secret,
+          owner_secret   = cp.owner_secret,
         }
       })
     end
@@ -1083,6 +1073,8 @@ local function rehydrate_placements(area_id, bucket_area_id, once_key)
         oncehub_name = (obj.custom_properties and obj.custom_properties.oncehub_name) or "Object",
         oncehub_id   = (obj.custom_properties and obj.custom_properties.oncehub_id)   or "object",
         oncehub_key  = (obj.custom_properties and obj.custom_properties.oncehub_key)  or (once_key or ""),
+        visitor_secret = obj.custom_properties and obj.custom_properties.visitor_secret or nil,
+        owner_secret   = obj.custom_properties and obj.custom_properties.owner_secret   or nil,
       }
     })
   end
@@ -1237,6 +1229,8 @@ local function place_current(player_id)
       oncehub_name      = tostring(s.object_name or "Object"),
       oncehub_id        = tostring(s.object_id   or "object"),
 	  oncehub_key       = tostring(s.once_key    or ""),
+      visitor_secret    = s.is_visitor and s.visitor_secret or nil,
+      owner_secret      = (not s.is_visitor) and (s.owner_secret or nil) or nil,
     }
   }
   Net.create_object(s.area_id, permanent)
@@ -1275,28 +1269,43 @@ end
 local function start_place_session(player_id, dialogue, chosen_gid, chosen_name, chosen_id, template_layer)
   local area_id = Net.get_player_area(player_id)
   local object_gid = tonumber(chosen_gid)
-  if not object_gid then
-    object_gid = try_resolve_test_gid(dialogue, area_id)
-  end
+  if not object_gid then object_gid = try_resolve_test_gid(dialogue, area_id) end
   if object_gid then object_gid = gid_base(object_gid) end
   if not object_gid then
     Async.message_player(player_id, "Couldn't resolve a placeable object (gid).")
     return
   end
 
-  -- Authorize renter
-  local once_key = normalize_key(dprop(dialogue, "Once Key", ""))
-  local BUCKET_AREA_ID = resolve_mem_area_id(dialogue, player_id, nil)
-  local mem = ezmemory.get_area_memory(BUCKET_AREA_ID); mem.onceitems = mem.onceitems or {}
-  local rec = mem.onceitems[once_key]; local now = os.time()
-  if (not rec) or (not rec.expires_at) or (rec.expires_at <= now) or (helpers.get_safe_player_secret(player_id) ~= rec.owner_secret) then
+  local once_key        = normalize_key(dprop(dialogue, "Once Key", ""))
+  local BUCKET_AREA_ID  = resolve_mem_area_id(dialogue, player_id, nil)
+  local mem             = ezmemory.get_area_memory(BUCKET_AREA_ID); mem.onceitems = mem.onceitems or {}
+  local rec             = mem.onceitems[once_key]
+  local now             = os.time()
+  local secret          = helpers.get_safe_player_secret(player_id)
+  local active          = rec and rec.expires_at and rec.expires_at > now
+  local is_renter       = active and (secret == (rec and rec.owner_secret))
+  local is_visitor      = (not is_renter) and active and (rec and rec.visitor_decor == true)
+
+  -- Authorization: renter OR (visitor with visitor_decor enabled)
+  if not is_renter and not is_visitor then
     Async.message_player(player_id, "Only the current renter can decorate this HP.")
     return
   end
+
+  -- Per-player inventory check
   local left, owned = decor_left_to_place(player_id, area_id, once_key, (chosen_id or ""))
   if owned > 0 and left <= 0 then
     Async.message_player(player_id, ("You’ve used all of your %s (owned %d)."):format(chosen_name or "object", owned))
     return
+  end
+
+  -- Visitor one-object rule
+  if is_visitor then
+    local existing_oid = _find_visitor_object and select(1, _find_visitor_object(area_id, once_key, secret))
+    if existing_oid then
+      await(Async.message_player(player_id, "You can only place one object here. Remove it first to place a new one."))
+      return
+    end
   end
 
   ONCEHUB.sessions[player_id] = {
@@ -1310,7 +1319,12 @@ local function start_place_session(player_id, dialogue, chosen_gid, chosen_name,
     cursor_distance = tonumber(dprop(dialogue, "Cursor Distance Tiles", "0.75")) or 0.75,
     mode = 'place',
     active = true,
+    -- who is placing:
+    is_visitor     = is_visitor,
+    visitor_secret = is_visitor and secret or nil,
+    owner_secret   = is_renter  and secret or nil,
   }
+
   async(function()
     await(Async.message_player(player_id, "Place Mode: Press A to place. Leave the area to cancel."))
   end)
@@ -1417,6 +1431,87 @@ end
 -- ====================== oncehub menus ======================
 local function open_decorate_menu(player_id, dialogue)
   return async(function ()
+    local area_id  = Net.get_player_area(player_id)
+    local once_key = normalize_key(dprop(dialogue, "Once Key", ""))
+    if once_key == "" then
+      await(Async.message_player(player_id, "This butler needs an 'Once Key' property."))
+      return
+    end
+
+    -- Look up rental record
+    local BUCKET_AREA_ID = resolve_mem_area_id(dialogue, player_id, nil)
+    local mem = ezmemory.get_area_memory(BUCKET_AREA_ID); mem.onceitems = mem.onceitems or {}
+    local rec = mem.onceitems[once_key]
+    local now = os.time()
+    local is_renter = rec and rec.expires_at and rec.expires_at > now
+                      and (helpers.get_safe_player_secret(player_id) == rec.owner_secret)
+
+    -- ========== VISITOR PATH ==========
+    if not is_renter then
+      if not (rec and rec.visitor_decor == true) then
+        await(Async.message_player(player_id, "Only the current renter can decorate this HP."))
+        return
+      end
+
+      -- Visitors: small quiz (no BBS race), enforce 1-object limit
+      local res = await(Async.quiz_player(
+        player_id,
+        "Place object",
+        "Remove object",
+        "Cancel"
+      ))
+      _oh_log(player_id, "visitor-decor choice: "..tostring(res))
+      if res == nil or res == 2 then return end
+
+      local vsec = helpers.get_safe_player_secret(player_id)
+
+      -- Helper: find the object this visitor placed (relies on earlier helper if present)
+      local function find_my_object()
+        if _find_visitor_object then
+          local oid = _find_visitor_object(area_id, once_key, vsec)
+          if type(oid) == "table" then oid = oid[1] end -- tolerate {oid,obj} return form
+          return oid
+        end
+        -- inline fallback
+        for _, oid in ipairs(Net.list_objects(area_id) or {}) do
+          local o  = Net.get_object_by_id(area_id, oid)
+          local cp = o and o.custom_properties
+          if cp
+            and cp.placed_by_oncehub == "true"
+            and (cp.oncehub_key or "") == once_key
+            and (cp.visitor_secret or "") == vsec
+          then
+            return oid
+          end
+        end
+        return nil
+      end
+
+      if res == 1 then
+        -- Remove your object (no remove-mode)
+        local oid = find_my_object()
+        if oid then
+          pcall(Net.remove_object, area_id, oid)
+          persist_area(area_id, BUCKET_AREA_ID, once_key)
+          await(Async.message_player(player_id, "Your placed object was removed."))
+        else
+          await(Async.message_player(player_id, "You haven't placed any object here."))
+        end
+        return
+      end
+
+      -- res == 0 → Place object (only if they don't already have one)
+      if find_my_object() then
+        await(Async.message_player(player_id, "You can only place one object here. Remove it first to place a new one."))
+        return
+      end
+
+      await(open_place_catalog_menu(player_id, dialogue))
+      return
+    end
+    -- ========== END VISITOR PATH ==========
+
+    -- ========== RENTER PATH (BBS menu kept as-is) ==========
     local posts = {
       helpers.create_bbs_option("Place object"),
       helpers.create_bbs_option("Remove object"),
@@ -1424,11 +1519,14 @@ local function open_decorate_menu(player_id, dialogue)
     }
     local board = _open_menu_ignoring_custom(player_id, "Decorate HP", MENU_COLOR.GREEN, posts, "oncehub:decor")
     local sel = await(board.selection_once())
-	_oh_log(player_id, "decor selection: "..tostring(sel))
-	menu_closed_now(player_id, 0.5)
-	fast_close_board(player_id)
+    _oh_log(player_id, "decor selection: "..tostring(sel))
+    menu_closed_now(player_id, 0.5)
+    fast_close_board(player_id)
+    if not sel then return end
+
     if sel == "Place object" then
       await(open_place_catalog_menu(player_id, dialogue))
+
     elseif sel == "Remove object" then
       if start_remove_session(player_id, dialogue) then
         async(function ()
@@ -1440,12 +1538,13 @@ local function open_decorate_menu(player_id, dialogue)
           end
         end)
       end
+
     elseif sel == "Clear all" then
       local area_id   = Net.get_player_area(player_id)
       local once_key  = normalize_key(dprop(dialogue, "Once Key", ""))
       if once_key == "" then return end
 
-      -- ✅ Renter-only gate (same logic as start_place_session/start_remove_session)
+      -- ✅ Renter-only gate
       local BUCKET_AREA_ID = resolve_mem_area_id(dialogue, player_id, nil)
       local mem = ezmemory.get_area_memory(BUCKET_AREA_ID); mem.onceitems = mem.onceitems or {}
       local rec = mem.onceitems[once_key]; local now = os.time()
@@ -1455,7 +1554,7 @@ local function open_decorate_menu(player_id, dialogue)
         return
       end
 
-      -- Remove only this renter's placed objects (and any stray previews)
+      -- Remove placed objects for this HP (including visitor-tagged) and any stray previews
       for _, oid in ipairs(Net.list_objects(area_id) or {}) do
         local o  = Net.get_object_by_id(area_id, oid)
         local cp = o and o.custom_properties
@@ -1465,12 +1564,12 @@ local function open_decorate_menu(player_id, dialogue)
           end
         end
       end
-    
-      -- Persist the now-empty placement list (prevents rehydrate)
-      persist_area(area_id, BUCKET_AREA_ID, once_key)
 
+      -- Persist empty placement list (prevents rehydrate)
+      persist_area(area_id, BUCKET_AREA_ID, once_key)
       await(Async.message_player(player_id, "Cleared all objects."))
     end
+    -- ========== END RENTER PATH ==========
   end)
 end
 
@@ -1511,25 +1610,111 @@ local function open_pass_menu(player_id, npc, dialogue)
   end)
 end
 
+-- Renter/record helpers
+local function _get_rental_record(player_id, dialogue)
+  local once_key = normalize_key(dprop(dialogue, "Once Key", ""))
+  if once_key == "" then return nil, nil, "" end
+  local BUCKET = resolve_mem_area_id(dialogue, player_id, nil)
+  local mem = ezmemory.get_area_memory(BUCKET); mem.onceitems = mem.onceitems or {}
+  local rec = mem.onceitems[once_key]
+  return rec, BUCKET, once_key
+end
+
+local function _is_current_renter(player_id, dialogue)
+  local rec, BUCKET, once_key = _get_rental_record(player_id, dialogue)
+  if not rec or not rec.expires_at or rec.expires_at <= os.time() then
+    return false, rec, BUCKET, once_key
+  end
+  return helpers.get_safe_player_secret(player_id) == rec.owner_secret, rec, BUCKET, once_key
+end
+
+-- Find the object a specific visitor placed (by safe secret)
+local function _find_visitor_object(area_id, once_key, visitor_secret)
+  for _, oid in ipairs(Net.list_objects(area_id) or {}) do
+    local o  = Net.get_object_by_id(area_id, oid)
+    local cp = o and o.custom_properties
+    if cp
+      and cp.placed_by_oncehub == "true"
+      and (cp.oncehub_key or "") == (once_key or "")
+      and (cp.visitor_secret or "") == (visitor_secret or "__none__")
+    then
+      return oid, o
+    end
+  end
+  return nil, nil
+end
+
+local function open_visitor_decor_menu(player_id, dialogue)
+  return async(function ()
+    -- Build BBS options
+    local opts = {
+      helpers.create_bbs_option("Enable Visitor Decor"),
+      helpers.create_bbs_option("Disable Visitor Decor"),
+    }
+
+    -- Open board (guarded so custom.lua won’t insta-close it)
+    local board = _open_menu_ignoring_custom(player_id, "Visitor Decorations", MENU_COLOR.BLUE, opts, "oncehub:vdecor")
+    local sel = await(board.selection_once())
+    _oh_log(player_id, "vdecor selection: "..tostring(sel))
+    menu_closed_now(player_id, 0.5)
+    fast_close_board(player_id)
+    if not sel then return end
+
+    -- Renter-only auth (same as your password menu)
+    local once_key = normalize_key(dprop(dialogue, "Once Key", ""))
+    if once_key == "" then
+      await(Async.message_player(player_id, "This butler needs an 'Once Key' property."))
+      return
+    end
+    local BUCKET = resolve_mem_area_id(dialogue, player_id, nil)
+    local mem = ezmemory.get_area_memory(BUCKET); mem.onceitems = mem.onceitems or {}
+    local rec = mem.onceitems[once_key]
+    local now = os.time()
+    if (not rec) or (not rec.expires_at) or (rec.expires_at <= now)
+       or (helpers.get_safe_player_secret(player_id) ~= rec.owner_secret) then
+      await(Async.message_player(player_id, "Only the current renter can change visitor decorations."))
+      return
+    end
+
+    -- Toggle
+    if sel == "Enable Visitor Decorations" then
+      rec.visitor_decor = true
+      ezmemory.save_area_memory(BUCKET)
+      await(Async.message_player(player_id, "Visitor decorations enabled."))
+    elseif sel == "Disable Visitor Decorations" then
+      rec.visitor_decor = false
+      ezmemory.save_area_memory(BUCKET)
+      await(Async.message_player(player_id, "Visitor decorations disabled."))
+    end
+  end)
+end
+
 -- Register oncehub dialogue
 eznpcs.add_event({
   name = "oncehub",
   action = function(npc, player_id, dialogue, relay_object)
     return async(function ()
-	  ensure_rehydrated(player_id, dialogue)
+      ensure_rehydrated(player_id, dialogue)
+
       local posts = {
         helpers.create_bbs_option("Set/Clear visitor password"),
         helpers.create_bbs_option("Decorate HP"),
+        helpers.create_bbs_option("Visitor Decorations"),  -- 👈 NEW
       }
+
       local board = _open_menu_ignoring_custom(player_id, "Home Hub", MENU_COLOR.YELLOW, posts, "oncehub:hub")
       local sel = await(board.selection_once())
-	  _oh_log(player_id, "hub selection: "..tostring(sel))
-	  menu_closed_now(player_id, 0.5)
-	  fast_close_board(player_id)
+      _oh_log(player_id, "hub selection: "..tostring(sel))
+      menu_closed_now(player_id, 0.5)
+      fast_close_board(player_id)
+      if not sel then return end
+
       if sel == "Set/Clear visitor password" then
         await(open_pass_menu(player_id, npc, dialogue))
       elseif sel == "Decorate HP" then
         await(open_decorate_menu(player_id, dialogue))
+      elseif sel == "Visitor Decorations" then                       -- 👈 NEW
+        await(open_visitor_decor_menu(player_id, dialogue))
       end
     end)
   end
