@@ -19,6 +19,9 @@ local function _now_s()
 end
 
 local Async = _resolve_async()
+-- Online presence cache so we can exclude for current non-owners
+local AREA_PLAYERS = {}   -- [area_id] = { [pid]=true, ... }
+local PLAYER_AREA  = {}   -- [pid] = area_id
 
 -- ====================== Config you can edit ======================
 local FISHING = {
@@ -28,6 +31,8 @@ local FISHING = {
   FORCE_METER_DIMS_PX = nil,
   EXPECTED_METER_DIMS_PX = { w = 17, h = 91 },
   DEBUG = true,
+  PRIVATE_METERS = true,
+  PRIVATE_MODE = "exclude",
 
   -- Placement around the player
   METER_FORWARD = 0,         -- a little in front of facing
@@ -501,6 +506,96 @@ local function _resolve_timer_dims(area_id, layer_name, base_gid)
   return tonumber(w) or 1, tonumber(h) or 1, src
 end
 
+-- Get current occupants of an area (server API: Net.list_players(area_id))
+local function _players_in_area(area_id)
+  local ok, pids = pcall(Net.list_players, area_id)
+  if ok and type(pids) == "table" then return pids end
+  return {}
+end
+
+-- Exclude the object for everyone in the area except the owner,
+-- and remember it till they disconnect (so it stays hidden for them).
+local function _exclude_for_non_owners(owner_pid, area_id, object_id)
+  if not (FISHING.PRIVATE_METERS and area_id and object_id) then return end
+  for _, pid in ipairs(_players_in_area(area_id)) do
+    if pid ~= owner_pid then
+      -- Immediate hide now…
+      pcall(Net.exclude_object_for_player, pid, object_id)
+      -- …and remember till they leave this session
+      pcall(ezmemory.hide_object_from_player_till_disconnect, pid, area_id, object_id)
+    end
+  end
+end
+
+-- Include an object for the owner only
+local function _include_for_owner(owner_pid, object_id)
+  if not (FISHING.PRIVATE_METERS and owner_pid and object_id) then return end
+  pcall(Net.include_object_for_player, owner_pid, object_id)
+end
+
+-- On join/transfer, hide any existing meters not owned by the joiner
+local function _hide_existing_meters_for_joiner(ev)
+  if not FISHING.PRIVATE_METERS then return end
+  local pid = ev.player_id
+  local aid = ev.to_area_id or ev.area_id or Net.get_player_area(pid)
+  if not aid then return end
+
+  local list = Net.list_objects(aid) or {}
+  for _, oid in ipairs(list) do
+    local o = Net.get_object_by_id(aid, oid)
+    if o then
+      local cp = o.custom_properties or {}
+      local is_meter =
+        (o.class == "FishingMeter") or (tostring(cp.fishing_meter or "") == "true") or
+        (o.class == "FishingTimer") or (tostring(cp.fishing_timer or "") == "true")
+      if is_meter and tostring(cp.fishing_pid or "") ~= tostring(pid) then
+        -- Hide right now for the joiner…
+        pcall(Net.exclude_object_for_player, pid, oid)
+        -- …and also persist for this session
+        pcall(ezmemory.hide_object_from_player_till_disconnect, pid, aid, oid)
+        if FISHING.DEBUG then
+          print(("[fishing] joiner hide oid=%s owner=%s for pid=%s"):format(tostring(oid), tostring(cp.fishing_pid or ""), tostring(pid)))
+        end
+      end
+    end
+  end
+end
+
+-- Hook join/transfer so late arrivals do not see others' meters
+Net:on("player_join_area", _hide_existing_meters_for_joiner)
+Net:on("player_area_transfer", _hide_existing_meters_for_joiner)
+
+-- Exclude for everyone except the owner, both immediately and again one tick later.
+local function _exclude_for_non_owners(owner_pid, area_id, object_id)
+  if not (FISHING.PRIVATE_METERS and area_id and object_id) then return end
+
+  local function do_exclude()
+    local ok, pids = pcall(Net.list_players, area_id)
+    if not ok or type(pids) ~= "table" then return end
+    local n = 0
+    for _, pid in ipairs(pids) do
+      if pid ~= owner_pid then
+        -- direct per-player hide (works even if ezmemory path fails)
+        pcall(Net.exclude_object_for_player, pid, object_id)
+        -- also persist till disconnect so later updates keep it hidden
+        pcall(ezmemory.hide_object_from_player_till_disconnect, pid, area_id, object_id)
+        n = n + 1
+      end
+    end
+    if FISHING.DEBUG then
+      print(("[fishing] excluded for %d non-owners (oid=%s area=%s)"):format(n, tostring(object_id), tostring(area_id)))
+    end
+  end
+
+  -- exclude right now…
+  do_exclude()
+  -- …and again after a short delay so the client has definitely registered the object
+  async(function()
+    await(Async.sleep(0.05))  -- ~1 tick
+    do_exclude()
+  end)
+end
+
 -- Tracks all areas where we have spawned a FishingMeter for a given player
 local _PID_AREAS = {}  -- pid -> { [area_id]=true, ... }
 
@@ -558,7 +653,7 @@ local function _spawn_or_update_meter(pid)
   local spec = {
     name     = "",
     class    = "FishingMeter",
-    visible  = true,
+    visible  = not FISHING.PRIVATE_METERS,
     x        = x, y = y, z = z,
     width    = w, height = h,
     rotation = 0,
@@ -574,15 +669,15 @@ local function _spawn_or_update_meter(pid)
     must_recreate = true
   else
     local cur = Net.get_object_by_id(area_id, s.meter_oid)
-    if not cur or (cur.data and tonumber(cur.data.gid) ~= data.gid) then
+    if not cur then
       must_recreate = true
     else
+      -- only recreate if size drifted; DO NOT compare gid
       local cw = tonumber(cur.width)  or 0
       local ch = tonumber(cur.height) or 0
       if math.abs(cw - w) > 0.001 or math.abs(ch - h) > 0.001 then
         if FISHING.DEBUG then
-          print(("[fishing] size mismatch -> recreate (had %.3fx%.3f, want %.3fx%.3f)")
-            :format(cw, ch, w, h))
+          print(("[fishing] size mismatch -> recreate (had %.3fx%.3f, want %.3fx%.3f)"):format(cw, ch, w, h))
         end
         must_recreate = true
       end
@@ -598,6 +693,16 @@ local function _spawn_or_update_meter(pid)
       if not ok then return end
     end
     s.meter_oid = res
+    if FISHING.PRIVATE_METERS then
+      _exclude_for_non_owners(pid, area_id, s.meter_oid)
+      async(function()
+        await(Async.sleep(0.05))  -- small delay so all clients know about the object first
+        pcall(Net.set_object_visibility, area_id, s.meter_oid, true)
+        if FISHING.DEBUG then
+          print(("[fishing] reveal meter oid=%s area=%s"):format(tostring(s.meter_oid), tostring(area_id)))
+        end
+      end)
+    end
     _PID_AREAS[pid] = _PID_AREAS[pid] or {}
     _PID_AREAS[pid][area_id] = true
   else
@@ -656,7 +761,7 @@ local function _spawn_or_update_timer(pid)
   local spec = {
     name     = "",
     class    = "FishingTimer",
-    visible  = true,
+    visible  = not FISHING.PRIVATE_METERS,
     x        = x, y = y, z = z,
     width    = w, height = h,
     rotation = 0,
@@ -672,13 +777,17 @@ local function _spawn_or_update_timer(pid)
     must_recreate = true
   else
     local cur = Net.get_object_by_id(area_id, s.timer_oid)
-    if not cur or (cur.data and tonumber(cur.data.gid) ~= data.gid) then
+    if not cur then
       must_recreate = true
     else
-      -- if size ever drifts, rebuild
+      -- only recreate if size drifted; DO NOT compare gid
       local cw = tonumber(cur.width)  or 0
       local ch = tonumber(cur.height) or 0
       if math.abs(cw - w) > 0.001 or math.abs(ch - h) > 0.001 then
+        if FISHING.DEBUG then
+          print(("[fishing] timer size mismatch -> recreate (had %.3fx%.3f, want %.3fx%.3f)")
+            :format(cw, ch, w, h))
+        end
         must_recreate = true
       end
     end
@@ -693,7 +802,17 @@ local function _spawn_or_update_timer(pid)
       if not ok then return end
     end
     s.timer_oid = res
-  else
+    if FISHING.PRIVATE_METERS then
+      _exclude_for_non_owners(pid, area_id, s.timer_oid)
+      async(function()
+        await(Async.sleep(0.05))
+        pcall(Net.set_object_visibility, area_id, s.timer_oid, true)
+        if FISHING.DEBUG then
+          print(("[fishing] reveal timer oid=%s area=%s"):format(tostring(s.timer_oid), tostring(area_id)))
+        end
+      end)
+    end
+    else
     Net.move_object(area_id, s.timer_oid, x, y, z)
     Net.set_object_data(area_id, s.timer_oid, data)
   end
@@ -1014,26 +1133,54 @@ Net:on("player_transfer", function(ev)
   end
 end)
 
-Net:on("player_quit", function(ev)
+Net:on("player_join_area", function(ev)
   local pid = ev.player_id
-  if SESS[pid] and SESS[pid].active then
-    _stop(pid, nil, nil)
+  local aid = ev.area_id or Net.get_player_area(pid)
+  if not pid or not aid then return end
+  PLAYER_AREA[pid] = aid
+  AREA_PLAYERS[aid] = AREA_PLAYERS[aid] or {}
+  AREA_PLAYERS[aid][pid] = true
+
+  -- keep your existing orphan cleanup
+  _cleanup_fishing_meters(aid, pid)
+
+  -- and hide existing meters they do not own
+  _hide_existing_meters_for_joiner(ev)
+end)
+
+
+Net:on("player_area_transfer", function(ev)
+  local pid = ev.player_id
+  if not pid then return end
+  local from = PLAYER_AREA[pid] or ev.from_area_id or ev.area_id
+  if from and AREA_PLAYERS[from] then AREA_PLAYERS[from][pid] = nil end
+
+  local to = ev.to_area_id or Net.get_player_area(pid)
+  if to then
+    PLAYER_AREA[pid] = to
+    AREA_PLAYERS[to] = AREA_PLAYERS[to] or {}
+    AREA_PLAYERS[to][pid] = true
+
+    _cleanup_fishing_meters(to, pid)
+    _hide_existing_meters_for_joiner({ player_id = pid, area_id = to, to_area_id = to })
   end
 end)
 
-Net:on("player_join_area", function(ev)
-  local aid = ev.area_id or Net.get_player_area(ev.player_id)
-  if aid then _cleanup_fishing_meters(aid, ev.player_id) end
+Net:on("player_quit", function(ev)
+  local pid = ev.player_id
+  if not pid then return end
+  local aid = PLAYER_AREA[pid]
+  if aid and AREA_PLAYERS[aid] then AREA_PLAYERS[aid][pid] = nil end
+  PLAYER_AREA[pid] = nil
+  if SESS[pid] and SESS[pid].active then _stop(pid, nil, nil) end
 end)
 
-Net:on("player_area_transfer", function(ev)
-  local aid = ev.to_area_id or ev.area_id or Net.get_player_area(ev.player_id)
-  if aid then _cleanup_fishing_meters(aid, ev.player_id) end
-end)
-
--- Some servers fire a different event on net drop; harmless if it never fires
 Net:on("player_disconnect", function(ev)
   local pid = ev.player_id
+  if not pid then return end
+  local aid = PLAYER_AREA[pid]
+  if aid and AREA_PLAYERS[aid] then AREA_PLAYERS[aid][pid] = nil end
+  PLAYER_AREA[pid] = nil
   if SESS[pid] and SESS[pid].active then _stop(pid, nil, nil) end
   _cleanup_all_for_pid(pid)
 end)
