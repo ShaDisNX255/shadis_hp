@@ -1677,11 +1677,11 @@ local function open_visitor_decor_menu(player_id, dialogue)
     end
 
     -- Toggle
-    if sel == "Enable Visitor Decorations" then
+    if sel == "Enable Visitor Decor" then
       rec.visitor_decor = true
       ezmemory.save_area_memory(BUCKET)
       await(Async.message_player(player_id, "Visitor decorations enabled."))
-    elseif sel == "Disable Visitor Decorations" then
+    elseif sel == "Disable Visitor Decor" then
       rec.visitor_decor = false
       ezmemory.save_area_memory(BUCKET)
       await(Async.message_player(player_id, "Visitor decorations disabled."))
