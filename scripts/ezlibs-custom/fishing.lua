@@ -31,7 +31,7 @@ local FISHING = {
   HOLD_SECONDS = 5.0,
   FORCE_METER_DIMS_PX = nil,
   EXPECTED_METER_DIMS_PX = { w = 17, h = 91 },
-  DEBUG = true,
+  DEBUG = false,
   PRIVATE_METERS = true,
   PRIVATE_MODE = "exclude",
   RESULTS_CALLBACK = _default_fishing_rewards,
@@ -97,19 +97,6 @@ local FISHING = {
   METERS = {
     blue = {
       [0]  = 275,  -- 0
-      [1]  = 286,  -- blue-1
-      [2]  = 288,  -- blue-2
-      [3]  = 289,  -- blue-3
-      [4]  = 290,  -- blue-4
-      [5]  = 291,  -- blue-5
-      [6]  = 292,  -- blue-6
-      [7]  = 293,  -- blue-7
-      [8]  = 294,  -- blue-8
-      [9]  = 295,  -- blue-9
-      [10] = 287,  -- blue-10
-    },
-    yellow = {
-      [0]  = 0,    -- no yellow-0 asset (intentional)
       [1]  = 276,  -- yellow-1
       [2]  = 277,  -- yellow-2
       [3]  = 278,  -- yellow-3
@@ -120,6 +107,19 @@ local FISHING = {
       [8]  = 283,  -- yellow-8
       [9]  = 284,  -- yellow-9
       [10] = 285,  -- yellow-10
+    },
+    yellow = {
+      [0]  = 0,    -- no yellow-0 asset (intentional)
+      [1]  = 286,  -- blue-1
+      [2]  = 288,  -- blue-2
+      [3]  = 289,  -- blue-3
+      [4]  = 290,  -- blue-4
+      [5]  = 291,  -- blue-5
+      [6]  = 292,  -- blue-6
+      [7]  = 293,  -- blue-7
+      [8]  = 294,  -- blue-8
+      [9]  = 295,  -- blue-9
+      [10] = 287,  -- blue-10
     },
   },
 
@@ -1075,7 +1075,7 @@ local _PENDING_VIRUS = {}  -- pid -> { enc=table, area=string }
 
 local function _queue_virus_battle(pid, enc, area_id)
   _PENDING_VIRUS[pid] = { enc = enc, area = area_id }
-  Net.message_player(pid, "Oh no, it is a virus!")
+  Net.message_player(pid, "Oh no, it's a virus!")
 end
 
 local function _begin_pending_virus(pid)
