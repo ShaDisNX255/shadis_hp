@@ -5,6 +5,7 @@
 -- ====================== Requires ======================
 local helpers  = require('scripts/ezlibs-scripts/helpers')
 local ezmemory = require('scripts/ezlibs-scripts/ezmemory')
+local ezencounters = require('scripts/ezlibs-scripts/ezencounters/main')
 
 -- Resolve Async if not global
 local function _resolve_async()
@@ -33,6 +34,7 @@ local FISHING = {
   DEBUG = true,
   PRIVATE_METERS = true,
   PRIVATE_MODE = "exclude",
+  RESULTS_CALLBACK = _default_fishing_rewards,
 
   -- Placement around the player
   METER_FORWARD = 0,         -- a little in front of facing
@@ -147,6 +149,130 @@ local FISHING = {
     catch  = "/server/assets/ezlibs-assets/sfx/item_get.ogg",
     fail   =  "/server/assets/ezlibs-assets/sfx/cancel.ogg",
     tick   = nil,
+  },
+  VIRUS_CHANCE = 0.30,                 -- 30 percent for eligible tiers
+  VIRUS_EXCLUDED = {                   -- tiers that never trigger a virus
+    brutal = true,
+    legendary = true,
+  },
+
+  -- Fishing virus encounters - you can edit or add more
+  -- These are self-contained encounter infos passed to ezencounters
+  VIRUS_ENCOUNTERS = {
+    {
+      name   = "Encounter1", weight = 10,
+      path   = "/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    enemies={
+        {name="Shrimpy",rank=6},
+        {name="Shrimpy",rank=7},
+        {name="Shrimpy",rank=8},
+    },
+    obstacles={
+        {name="Rock"},
+        {name="Rock"},
+    },
+    positions={
+        {0,0,0,0,0,1},
+        {0,0,0,0,2,0},
+        {0,0,0,0,3,0},
+    },
+    obstacle_positions={
+        {0,0,1,0,0,0},
+        {0,0,0,2,0,0},
+        {0,0,0,0,0,0},
+    },
+    player_positions={
+        {0,0,0,0,0,0},
+        {0,1,0,0,0,0},
+        {0,0,0,0,0,0},
+    },
+    tiles={
+        {1,1,1,1,1,1},
+        {1,1,1,1,1,1},
+        {1,1,1,1,1,1},
+    },
+    teams={
+        {2,2,2,1,1,1},
+        {2,2,2,1,1,1},
+        {2,2,2,1,1,1},
+    },
+      music = { path="bn6_battle_xg.mid" },
+    },
+    {
+      name   = "Encounter2", weight = 10,
+      path   = "/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    enemies={
+        {name="Piranha",rank=4},
+        {name="ColdHead",rank=1},
+        {name="Tark",rank=1},
+    },
+    obstacles={
+        {name="Rock"},
+    },
+    positions={
+        {0,0,0,0,0,2},
+        {0,0,0,0,1,3},
+        {0,0,0,0,0,0},
+    },
+    obstacle_positions={
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+    },
+    player_positions={
+        {0,0,0,0,0,0},
+        {0,1,0,0,0,0},
+        {0,0,0,0,0,0},
+    },
+    tiles={
+        {1,1,1,1,1,1},
+        {1,1,1,1,1,1},
+        {1,1,1,1,1,1},
+    },
+    teams={
+        {2,2,2,1,1,1},
+        {2,2,2,1,1,1},
+        {2,2,2,1,1,1},
+    },
+	},
+    {
+      name   = "Encounter3", weight = 10,
+      path   = "/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+      enemies= { {name="Swordy",rank=1}, {name="Boomer",rank=1} },
+    enemies={
+        {name="SwordyEl",rank=5},
+        {name="SwordyEl",rank=2},
+        {name="SwordyEl",rank=8},
+    },
+    obstacles={
+    },
+    positions={
+        {0,0,0,0,3,0},
+        {0,0,0,0,1,0},
+        {0,0,0,0,2,0},
+    },
+    obstacle_positions={
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+    },
+    player_positions={
+        {0,0,0,0,0,0},
+        {0,1,0,0,0,0},
+        {0,0,0,0,0,0},
+    },
+    tiles={
+        {1,1,1,1,1,1},
+        {1,1,1,1,1,1},
+        {1,1,1,1,1,1},
+    },
+    teams={
+        {2,2,2,1,1,1},
+        {2,2,2,1,1,1},
+        {2,2,2,1,1,1},
+    },
+      music = { path="bn6_battle_xg.mid" },
+    },
   },
 }
 
@@ -902,6 +1028,75 @@ local function _cleanup_fishing_meters(area_id, only_pid)
   end
 end
 
+-- Weighted pick from FISHING.VIRUS_ENCOUNTERS
+local function _pick_virus_encounter()
+  local list = (FISHING.VIRUS_ENCOUNTERS or {})
+  local total = 0
+  for _, e in ipairs(list) do total = total + (e.weight or 1) end
+  if total <= 0 then return list[1] end
+  local roll = math.random() * total
+  for _, e in ipairs(list) do
+    roll = roll - (e.weight or 1)
+    if roll <= 0 then return e end
+  end
+  return list[#list]
+end
+
+-- Provide mob package once per area
+local _ASSET_PROVIDED = {}  -- key "area|path" -> true
+local function _ensure_asset(area_id, path)
+  if not area_id or not path or path == "" then return end
+  local key = tostring(area_id).."|"..tostring(path)
+  if not _ASSET_PROVIDED[key] then
+    pcall(Net.provide_asset, area_id, path)
+    _ASSET_PROVIDED[key] = true
+  end
+end
+
+local function _default_fishing_rewards(player_id, encounter_info, stats)
+  -- stats = { health, score, time, ran, emotion, turns, npcs = [...] }
+  if not stats or stats.ran then return end   -- no rewards if ran
+  local reward_monies = math.floor((stats.score or 0) * 5000)
+  if reward_monies > 0 then
+    ezmemory.spend_player_money(player_id, -reward_monies) -- negative spend = give money
+    Net.message_player(player_id, "Got $"..reward_monies.."!")
+    if FISHING.SFX and FISHING.SFX.catch then
+      Net.play_sound_for_player(player_id, FISHING.SFX.catch)
+    end
+  end
+end
+
+if FISHING.RESULTS_CALLBACK == nil then
+  FISHING.RESULTS_CALLBACK = _default_fishing_rewards
+end
+
+-- When a player closes a message box, we start their queued encounter.
+local _PENDING_VIRUS = {}  -- pid -> { enc=table, area=string }
+
+local function _queue_virus_battle(pid, enc, area_id)
+  _PENDING_VIRUS[pid] = { enc = enc, area = area_id }
+  Net.message_player(pid, "Oh no, it is a virus!")
+end
+
+local function _begin_pending_virus(pid)
+  local rec = _PENDING_VIRUS[pid]
+  if not rec then return end
+  _PENDING_VIRUS[pid] = nil  -- guard against double start
+
+  local enc  = rec.enc
+  local area = rec.area
+  _ensure_asset(area, enc and enc.path)
+
+  -- hook rewards just like WCity1
+  if FISHING.RESULTS_CALLBACK then
+    enc.results_callback = FISHING.RESULTS_CALLBACK
+  end
+
+  async(function()
+    await(ezencounters.begin_encounter(pid, enc))
+  end)
+end
+
 -- ====================== Core game loop ======================
 local function _stop(pid, msg, sfx)
   local s = SESS[pid]; if not s then return end
@@ -1015,16 +1210,31 @@ local function _start_session(pid)
       _spawn_or_update_timer(pid)
 
       -- Success
-      if cur.hold_accum >= cur.hold_req then
+    if cur.hold_accum >= cur.hold_req then
+      local tier = tostring(cur.heaviness or "")
+      local eligible = not (FISHING.VIRUS_EXCLUDED and FISHING.VIRUS_EXCLUDED[tier])
+      local chance = tonumber(FISHING.VIRUS_CHANCE or 0) or 0
+      local roll = math.random()
+
+      if eligible and roll < chance then
+        -- Virus encounter instead of a fish
+        local enc = _pick_virus_encounter()
+        local aid = cur.area_id
+        _stop(pid, nil, nil)          -- clean meters/session
+        _queue_virus_battle(pid, enc, aid)  -- shows the message and waits for textbox_response
+        return
+      else
+        -- Normal fish catch
         local w = cur.weight_lb
         local rank = _record_catch(pid, w)
         local msg = ("You caught a fish! (%.1f lb)"):format(w or 0)
         if rank and rank <= ((FISHING.LEADERBOARD and FISHING.LEADERBOARD.MAX) or 10) then
-          msg = msg .. ("  New leaderboard #%d!"):format(rank)
+          msg = msg .. ("  New leaderboard %d!"):format(rank)
         end
         _stop(pid, msg, FISHING.SFX.catch)
         return
       end
+    end
 
       await(Async.sleep(step))
     end
@@ -1073,6 +1283,14 @@ Net:on("bbs_post_selection", function(ev)
   local id = tostring(ev.post_id or '')
   if id:match('^__fishbbs:') then
     -- read-only; nothing else to do
+  end
+end)
+
+Net:on("textbox_response", function(a, b)
+  -- This event fires when any Net.message_player box is closed.
+  local pid = (type(a) == "table") and (a.player_id or a[1]) or a
+  if pid and _PENDING_VIRUS[pid] then
+    _begin_pending_virus(pid)
   end
 end)
 
