@@ -391,7 +391,7 @@ local function _rarity_totals(counts, poolmap)
       total = total + n
       local row = poolmap[id]
       local rar = tostring((row and (row.rar or parse_rarity_tag(row.title))) or "C"):upper()
-      if rar == "UR" or rar == "GDR" then urgdr_total = urgdr_total + n
+      if rar == "UR" or rar == "GDR" or rar == "GR" then urgdr_total = urgdr_total + n
       elseif rar == "SR" then sr_total = sr_total + n
       elseif rar == "R"  then r_total  = r_total  + n
       else c_total = c_total + n
@@ -520,6 +520,7 @@ local OW_SUBDIR_BY_RARITY = {
   SR = 'srare',    -- /server/assets/cards_ow/srare/
   UR = 'urare',    -- /server/assets/cards_ow/urare/
   GDR = 'gdrare',  -- /server/assets/cards_ow/gdrare/
+  GR  = 'grare',   -- /server/assets/cards_ow/grare/
 }
 local GENERIC_OW_ANIM  = OW_DIR .. 'card.animation'
 
@@ -594,10 +595,19 @@ local SUMMON_NAME_OVERRIDE = {
     ["REBMD"] = "Red-Eyes Black Metal Dragon",
     ["S.Skull"] = "Summoned Skull",
     ["B.Sk.D."] = "Black Skull Dragon",
+    ["GearFK"] = "Gearfried The Iron Knight",
+    ["GobAtkFrc"] = "Goblin Attack Force",
+    ["REBD"] = "Red-Eyes Black Dragon",
+    ["PanthrWar"] = "Panther Warrior",
+    ["ZMetalTnk"] = "Z-Metal Tank",
+    ["JiraiGumo"] = "JiraiGumo",
+    ["BabyDrgn"] = "Baby Dragon",
+    ["SilverFng"] = "Silver Fang",
+    ["GSoStone"] = "Giant Soldier of Stone",
 }
 
 -- Rarity sort order
-local RARITY_ORDER = { C = 1, R = 2, SR = 3, UR = 4, GDR = 5 }
+local RARITY_ORDER = { C = 1, R = 2, SR = 3, UR = 4, GDR = 5, GR = 5 }
 
 -- === STATE ===
 local player_using_card_bbs       = {}
@@ -1475,7 +1485,7 @@ local function build_random_deck_from_collection(pid)
         local meta = read_item_meta_flexible(pid, row.id)
         local A, D = parse_atk_def_from_meta(meta)
         local copy = { id=row.id, title=row.title, rarity=rar, ATK=A or 0, DEF=D or 0 }
-        if rar == "UR" or rar == "GDR" then
+        if rar == "UR" or rar == "GDR" or rar == "GR" then
           -- keep one “candidate” per physical copy, but we will only take 1 total later
           table.insert(urgdr, copy)
         elseif rar == "SR" then
@@ -2767,7 +2777,7 @@ local function _deck_total_and_have_urgdr(counts, poolmap)
       total = total + n
       local row = poolmap[id]
       local rar = tostring((row and (row.rar or parse_rarity_tag(row.title))) or "C"):upper()
-      if rar == "UR" or rar == "GDR" then have = true end
+      if rar == "UR" or rar == "GDR" or rar == "GR" then have = true end
     end
   end
   return total, have
@@ -2783,7 +2793,7 @@ local function _max_add_for_row(counts, row, poolmap)
   local remaining_owned = math.max(0, owned - in_deck)
   if remaining_owned <= 0 then return 0 end
 
-  if rar == "UR" or rar == "GDR" then
+  if rar == "UR" or rar == "GDR" or rar == "GR" then
     -- UR/GDR combined: max 1 total across deck; also cannot exceed 1 per title implicitly
     if in_deck >= 1 then return 0 end
     return (urgdr_total >= 1) and 0 or 1
@@ -2875,7 +2885,7 @@ function open_deck_editor(pid)
   local title = string.format("Deck Editor (%d/10)", total)
   local posts = {}
   posts[#posts+1] = { id=BTL_OK, read=true, title="Rules:" }
-  posts[#posts+1] = { id=BTL_OK, read=true, title="UR/GDR = 1" }
+  posts[#posts+1] = { id=BTL_OK, read=true, title="UR/GR/GDR = 1" }
   posts[#posts+1] = { id=BTL_OK, read=true, title="SR <= 2" }
   posts[#posts+1] = { id=BTL_OK, read=true, title="R  <= 3" }
   posts[#posts+1] = { id=BTL_OK, read=true, title="Deck size = 10" }

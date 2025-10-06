@@ -425,25 +425,27 @@ local function read_single_pack(dialogue)
     local desc  = get_ci(ci, "pack description") or ("Contains "..rolls.." random card(s).")
 
     local pools = {
-        { label = "Common",     items = extract_seq_ci(ci, "common "),     rate = tonumber(get_ci(ci, "common rate"))     },
-        { label = "Rare",       items = extract_seq_ci(ci, "rare "),       rate = tonumber(get_ci(ci, "rare rate"))       },
-        { label = "Super Rare", items = extract_seq_ci(ci, "super rare "), rate = tonumber(get_ci(ci, "super rare rate")) },
-        { label = "Ultra Rare", items = extract_seq_ci(ci, "ultra rare "), rate = tonumber(get_ci(ci, "ultra rare rate")) },
-        { label = "Gold Rare",  items = extract_seq_ci(ci, "gold rare "),  rate = tonumber(get_ci(ci, "gold rare rate"))  },
+      { label = "Common",     items = extract_seq_ci(ci, "common "),     rate = tonumber(get_ci(ci, "common rate"))     },
+      { label = "Rare",       items = extract_seq_ci(ci, "rare "),       rate = tonumber(get_ci(ci, "rare rate"))       },
+      { label = "Super Rare", items = extract_seq_ci(ci, "super rare "), rate = tonumber(get_ci(ci, "super rare rate")) },
+      { label = "Ultra Rare", items = extract_seq_ci(ci, "ultra rare "), rate = tonumber(get_ci(ci, "ultra rare rate")) },
+      { label = "Gold Rare",  items = extract_seq_ci(ci, "gold rare "),  rate = tonumber(get_ci(ci, "gold rare rate"))  },
+      { label = "Ghost Rare", items = extract_seq_ci(ci, "ghost rare "), rate = tonumber(get_ci(ci, "ghost rare rate")) },
     }
 
     -- Default rates if none set
     local any_rate = false
-    for _, p in ipairs(pools) do
-        if (p.rate or 0) > 0 then any_rate = true break end
-    end
+    for _, p in ipairs(pools) do if (p.rate or 0) > 0 then any_rate = true break end end
     if not any_rate then
-        local has_gdr = pools[5].items and #pools[5].items > 0
-        if has_gdr then
-            pools[1].rate, pools[2].rate, pools[3].rate, pools[4].rate, pools[5].rate = 753, 207, 30, 9, 1
-        else
-            pools[1].rate, pools[2].rate, pools[3].rate, pools[4].rate = 70, 25, 4, 1
-        end
+      local has_gdr = pools[5].items and #pools[5].items > 0
+      local has_gr  = pools[6].items and #pools[6].items > 0
+      if has_gdr or has_gr then
+        pools[1].rate, pools[2].rate, pools[3].rate, pools[4].rate = 753, 207, 30, 9
+        pools[5].rate = has_gdr and 1 or 0
+        pools[6].rate = has_gr  and 1 or 0
+      else
+        pools[1].rate, pools[2].rate, pools[3].rate, pools[4].rate = 70, 25, 4, 1
+      end
     end
 
     -- Keep only pools that have items and a positive rate
@@ -659,12 +661,16 @@ local function read_groups(dialogue)
     { label="Super Rare", items=seq(ci,"super rare "), weight=tonumber(get(ci,"super rare rate")) },
     { label="Ultra Rare", items=seq(ci,"ultra rare "), weight=tonumber(get(ci,"ultra rare rate")) },
     { label="Gold Rare",  items=seq(ci,"gold rare "),  weight=tonumber(get(ci,"gold rare rate"))  },
+    { label="Ghost Rare", items=seq(ci,"ghost rare "), weight=tonumber(get(ci,"ghost rare rate")) },
   }
   local any=false; for _,p in ipairs(pools) do if (p.weight or 0) > 0 then any=true break end end
   if not any then
     local has_gdr = pools[5].items and #pools[5].items > 0
-    if has_gdr then
-      pools[1].weight,pools[2].weight,pools[3].weight,pools[4].weight,pools[5].weight = 753,207,30,9,1
+    local has_gr  = pools[6].items and #pools[6].items > 0
+    if has_gdr or has_gr then
+      pools[1].weight,pools[2].weight,pools[3].weight,pools[4].weight = 753,207,30,9
+      pools[5].weight = has_gdr and 1 or 0
+      pools[6].weight = has_gr  and 1 or 0
     else
       pools[1].weight,pools[2].weight,pools[3].weight,pools[4].weight = 70,25,4,1
     end
@@ -702,7 +708,7 @@ eznpcs.add_event{
   action = function(npc, player_id, dialogue, relay_object)
     return async(function()
       local mug = eznpcs.get_dialogue_mugshot(npc, player_id, dialogue)
-      await(Async.message_player(player_id, "Let's duel! I'll build decks from your collection.\n(10 cards; UR/GDR=1, SR≤2, R≤3, C=any)", mug.texture_path, mug.animation_path))
+      await(Async.message_player(player_id, "Let's duel! I'll build decks from your collection.\n(10 cards; UR/GDR/GR=1, SR≤2, R≤3, C=any)", mug.texture_path, mug.animation_path))
       custom.start_card_battle(player_id, { npc_name = (dialogue and dialogue.custom_properties and (dialogue.custom_properties["NPC Name"] or dialogue.custom_properties["Npc Name"])) or "NPC Duelist" })
       return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
     end)
