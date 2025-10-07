@@ -274,6 +274,43 @@ local FISHING = {
       music = { path="bn6_battle_xg.mid" },
     },
   },
+  -- Money per pound for normal fish (not viruses)
+  FISH_REWARD_PER_LB = 3000,  -- edit to taste
+
+  -- Waiting phase: bite indicator (public, visible to everyone)
+  BITE = {
+    -- Fill these with your GIDs (two frames: idle + bite flash)
+    GIDS = {
+      idle = 0,  -- e.g., 310
+      bite = 305,  -- e.g., 311
+    },
+    -- Placement controls (separate from fish/timer meters)
+    FORWARD = 0.0,
+    SIDE    = 0,  -- number or "left"/"right"
+    SCREEN_SHIFT = { x = -1.0, y = -1.0, z = 0.0 }, -- above player a little
+
+    -- Optional size enforcement just for the bite icon
+    FORCE_DIMS_PX    = nil,              -- e.g., { w=32, h=32 }
+    EXPECTED_DIMS_PX = { w = 22, h = 22 },
+
+    -- Random wait before a bite shows up
+    WAIT_RANGE_S = { min = 1.2, max = 3.0 },
+
+    -- Window to press A when it bites (heavier = shorter)
+    WINDOW_S = {
+      light = 1.10,  medium = 0.95,  heavy = 0.80,
+      very_heavy = 0.65, brutal = 0.55, legendary = 0.45,
+    },
+
+    -- Optional sfx on bite popup
+    SFX_BITE = nil, -- "/server/assets/ezlibs-assets/sfx/select.ogg"
+  },
+
+  BAIT = {
+    ITEM_NAME = "bait",
+    VIRUS_CHANCE = 0.10, -- reduced when used (default is 0.30)
+    HEAVINESS_CHANCES = { light=20, medium=20, heavy=20, very_heavy=15, brutal=15, legendary=10 },
+  },
 }
 
 -- ====================== Minimal TMX helpers ======================
@@ -722,6 +759,113 @@ local function _exclude_for_non_owners(owner_pid, area_id, object_id)
   end)
 end
 
+-- ---- Bite indicator (public) ----
+local function _bite_gid(state)
+  local g = FISHING.BITE and FISHING.BITE.GIDS
+  return tonumber(g and g[state] or 0) or 0
+end
+
+local function _resolve_bite_dims(area_id, base_gid)
+  local forced = FISHING.BITE and FISHING.BITE.FORCE_DIMS_PX
+  if forced and forced.w and forced.h then
+    local w, h = _px_to_tiles(area_id, forced.w, forced.h); return w, h, "forced"
+  end
+  local w, h, src = resolve_object_dims(area_id, FISHING.TEMPLATE_LAYER, base_gid)
+  local exp = FISHING.BITE and FISHING.BITE.EXPECTED_DIMS_PX
+  if exp and exp.w and exp.h then
+    local ew, eh = _px_to_tiles(area_id, exp.w, exp.h)
+    local dw = math.abs((tonumber(w) or 0) - ew) / (ew == 0 and 1 or ew)
+    local dh = math.abs((tonumber(h) or 0) - eh) / (eh == 0 and 1 or eh)
+    if dw > 0.15 or dh > 0.15 then w, h, src = ew, eh, "expected" end
+  end
+  return tonumber(w) or 1, tonumber(h) or 1, src
+end
+
+local function _spawn_or_update_bite(pid)
+  local s = SESS[pid]; if not s or not s.active then return end
+  if s.phase ~= "waiting" then return end
+  local area_id = s.area_id; if not area_id then return end
+
+  local state = s.bite_state or "idle"
+  local raw_gid = _bite_gid(state)
+
+  -- If idle has gid=0 (your choice), hard-despawn so nothing lingers
+  if raw_gid == 0 then
+    if s.bite_oid then
+      pcall(function() Net.remove_object(area_id, s.bite_oid) end)
+      s.bite_oid = nil
+      if FISHING.DEBUG then print("[fishing] bite: despawn (idle=0)") end
+    end
+    return
+  end
+
+  local base_gid = gid_base(raw_gid)
+  local fh,fv,fr = resolve_preview_flip_flags(area_id, FISHING.TEMPLATE_LAYER, base_gid, false,false,false)
+  local w,h = _resolve_bite_dims(area_id, base_gid)
+
+  local forward = (FISHING.BITE and FISHING.BITE.FORWARD) or 0.0
+  local side    = (FISHING.BITE and FISHING.BITE.SIDE)
+  local x,y,z   = get_offset_point(pid, forward, side or 0, 0)
+  if not x then return end
+  do
+    local sh = (FISHING.BITE and FISHING.BITE.SCREEN_SHIFT) or {}
+    x = x + (sh.x or 0); y = y + (sh.y or 0); z = z + (sh.z or 0)
+  end
+
+  if FISHING.DEBUG then
+    print(("[fishing] bite spawn/update: state=%s gid=%d dims=%.3fx%.3f pos=(%.2f,%.2f,%.2f)")
+      :format(state, base_gid, w, h, x, y, z))
+  end
+
+  local data = { type="tile", gid=base_gid, flipped_horizontally=fh, flipped_vertically=fv, rotated=fr }
+  local spec = {
+    name = "",
+    class="FishingBite", visible=true,
+    x=x, y=y, z=z, width=w, height=h, rotation=0, data=data,
+    custom_properties = { fishing_bite="true", fishing_pid=tostring(pid or "") }
+  }
+
+  local must_recreate = false
+  if not s.bite_oid then
+    must_recreate = true
+  else
+    local cur = Net.get_object_by_id(area_id, s.bite_oid)
+    if not cur then must_recreate = true
+    else
+      local cw = tonumber(cur.width) or 0; local ch = tonumber(cur.height) or 0
+      if math.abs(cw - w) > 0.001 or math.abs(ch - h) > 0.001 then must_recreate = true end
+    end
+  end
+
+  if must_recreate then
+    if s.bite_oid then pcall(function() Net.remove_object(area_id, s.bite_oid) end) end
+    local ok,res = pcall(Net.create_object, area_id, spec)
+    if not ok then
+      -- retry on template layer
+      spec.layer = FISHING.TEMPLATE_LAYER
+      ok,res=pcall(Net.create_object, area_id, spec)
+      if not ok then
+        if FISHING.DEBUG then
+          print("[fishing] bite create failed twice (check GID/tileset/layer).")
+        end
+        return
+      end
+    end
+    s.bite_oid = res
+  else
+    local ok1 = pcall(Net.move_object, area_id, s.bite_oid, x, y, z)
+    local ok2 = pcall(Net.set_object_data, area_id, s.bite_oid, data)
+    if FISHING.DEBUG and (not ok1 or not ok2) then
+      print("[fishing] bite update failed (move/data).")
+    end
+  end
+end
+
+local function _despawn_bite(pid)
+  local s = SESS[pid]; if not s then return end
+  if s.bite_oid then pcall(function() Net.remove_object(s.area_id, s.bite_oid) end); s.bite_oid = nil end
+end
+
 -- Tracks all areas where we have spawned a FishingMeter for a given player
 local _PID_AREAS = {}  -- pid -> { [area_id]=true, ... }
 
@@ -1008,7 +1152,8 @@ local function _cleanup_fishing_meters(area_id, only_pid)
       local cp = o.custom_properties or {}
       local is_meter =
         (o.class == "FishingMeter") or (tostring(cp.fishing_meter or "") == "true") or
-        (o.class == "FishingTimer") or (tostring(cp.fishing_timer or "") == "true")
+        (o.class == "FishingTimer") or (tostring(cp.fishing_timer or "") == "true") or
+        (o.class == "FishingBite")  or (tostring(cp.fishing_bite  or "") == "true")
       if is_meter then
         local owner = tostring(cp.fishing_pid or "")
         local kill = false
@@ -1103,6 +1248,7 @@ local function _stop(pid, msg, sfx)
   s.active = false
   _despawn_meter(pid)
   _despawn_timer(pid)
+  _despawn_bite(pid)
   pcall(_cleanup_fishing_meters, s.area_id, pid) -- sweep this player's meters
   SESS[pid] = nil
   if msg and msg ~= "" then
@@ -1112,18 +1258,54 @@ local function _stop(pid, msg, sfx)
   _play(pid, sfx)
 end
 
-local function _start_session(pid)
-  local area = Net.get_player_area(pid)
-  if not area then return end
+-- Quietly restart the waiting phase without tearing down the session.
+local function _quiet_restart_wait(pid)
+  local s = SESS[pid]; if not s or not s.active or s.phase ~= "waiting" then return end
+  s.bite_active = false
+  s.bite_state  = "idle"
+  s.bite_until  = 0
+  _spawn_or_update_bite(pid) -- will despawn if idle gid=0
 
-  -- Nuke any lingering meters in this area for this player
+  local rng = (FISHING.BITE and FISHING.BITE.WAIT_RANGE_S) or {min=1.2, max=3.0}
+  local wmin = tonumber(rng.min or 1.2) or 1.2
+  local wmax = tonumber(rng.max or 3.0) or 3.0
+  local bite_in = wmin + math.random() * math.max(0, wmax - wmin)
+
+  s.next_bite_at = _now_s() + bite_in
+  if FISHING.DEBUG then
+    print(("[fishing] anti-mash: restart wait, next bite in %.2fs"):format(bite_in))
+  end
+end
+
+-- pick heaviness using a custom odds table
+local function _pick_heaviness_with_odds(odds)
+  local H = FISHING.HEAVINESS
+  local o = odds or FISHING.HEAVINESS_CHANCES
+  if not o then return H[math.random(1, #H)] end
+  local total = 0; for _, h in ipairs(H) do total = total + (o[h.key] or 0) end
+  if total <= 0 then return H[math.random(1, #H)] end
+  local roll = math.random() * total; local acc = 0
+  for _, h in ipairs(H) do
+    acc = acc + (o[h.key] or 0)
+    if roll <= acc then return h end
+  end
+  return H[#H]
+end
+
+local function _start_session(pid, opts)
+  local area = Net.get_player_area(pid); if not area then return end
   _cleanup_fishing_meters(area, pid)
 
-  -- Pick fish heaviness w/ odds; scale hold time by heaviness
-  local H = _pick_heaviness()
-  local base_hold = (FISHING.HOLD_SECONDS or (FISHING.HOLD_RANGE_S.min + math.random() * (FISHING.HOLD_RANGE_S.max - FISHING.HOLD_RANGE_S.min)))
+  local used_bait = opts and opts.used_bait or false
+  local odds = used_bait and (FISHING.BAIT and FISHING.BAIT.HEAVINESS_CHANCES)
+               or FISHING.HEAVINESS_CHANCES
+
+  -- pick heaviness and hold (uses per-session odds)
+  local H = _pick_heaviness_with_odds(odds)
+  local base_hold = (FISHING.HOLD_SECONDS or (FISHING.HOLD_RANGE_S.min + math.random() *
+                    (FISHING.HOLD_RANGE_S.max - FISHING.HOLD_RANGE_S.min)))
   local hold_req  = base_hold * (H.hold_mult or 1.0)
-  -- Sweet band (width W) constrained to 1..9 inclusive
+
   local W = math.max(1, math.min(3, tonumber(FISHING.SWEET_WIDTH or 2)))
   local max_lo = 9 - (W - 1)
   local sweet_lo = math.random(1, max_lo)
@@ -1134,34 +1316,56 @@ local function _start_session(pid)
   local s = {
     area_id     = area,
     started_at  = _now_s(),
-    ends_at     = _now_s() + math.ceil(FISHING.MAX_DURATION_S),
     last_pos    = { x = px.x, y = px.y, z = px.z },
     active      = true,
 
+    -- waiting phase
+    phase       = "waiting",
+    bite_state  = "idle",
+    bite_active = false,
+    bite_until  = 0,
+    bite_oid    = nil,
+    next_bite_at = nil, -- important: session field
+
+    -- reeling
     meter_color = "blue",
-    meter_phase = 0,           -- 0..10 (display int)
-    meter_value = 0.0,         -- 0..10 (float accumulator)
-
-    sweet_lo    = sweet_lo,    -- inclusive
-    sweet_hi    = sweet_hi,    -- inclusive
-    hold_req    = hold_req,    -- seconds needed inside band
+    meter_phase = 0,
+    meter_value = 0.0,
+    sweet_lo    = sweet_lo,
+    sweet_hi    = sweet_hi,
+    hold_req    = hold_req,
     hold_accum  = 0.0,
-
-    heaviness  = H.key,
-    weight_lb  = _random_weight_lb(H.key),
-    decay      = H.decay,
-    mashGain   = H.mash,
-    taps       = 0.0,
+    heaviness   = H.key,
+    weight_lb   = _random_weight_lb(H.key),
+    decay       = H.decay,
+    mashGain    = H.mash,
+    used_bait   = used_bait and true or false,
+    virus_chance = used_bait and ((FISHING.BAIT and FISHING.BAIT.VIRUS_CHANCE) or FISHING.VIRUS_CHANCE)
+                              or (FISHING.VIRUS_CHANCE),
+    odds_used    = odds,
+    taps        = 0.0,
     timer_phase = 0,
   }
   SESS[pid] = s
   _play(pid, FISHING.SFX.start)
 
+  -- waiting loop
   async(function()
-    local step = 0.08
+    local wait_rng = (FISHING.BITE and FISHING.BITE.WAIT_RANGE_S) or {min=1.2,max=3.0}
+    local wait_min = tonumber(wait_rng.min or 1.2) or 1.2
+    local wait_max = tonumber(wait_rng.max or 3.0) or 3.0
+    local step = 0.05
+
+    -- seed the first bite time on the session
+    if not s.next_bite_at then
+      local bite_in = wait_min + math.random() * math.max(0, wait_max - wait_min)
+      s.next_bite_at = _now_s() + bite_in
+    end
+
     while true do
-      local cur = SESS[pid]; if not cur or not cur.active then return end
-      -- Cancel if the player moved
+      local cur = SESS[pid]; if not cur or not cur.active or cur.phase ~= "waiting" then return end
+
+      -- movement cancels
       local p = Net.get_player_position(pid); if not p then return end
       local dx = (p.x - cur.last_pos.x); local dy = (p.y - cur.last_pos.y); local dz = (p.z - cur.last_pos.z)
       if math.abs(dx) > 0.01 or math.abs(dy) > 0.01 or math.abs(dz) > 0.01 then
@@ -1169,76 +1373,146 @@ local function _start_session(pid)
         return
       end
 
-      -- Time out (use wall time to avoid CPU-time stalls)
+      -- draw bite indicator
+      _spawn_or_update_bite(pid)
+
+      -- time to bite?
+      if (not cur.bite_active) and _now_s() >= (cur.next_bite_at or 0) then
+        cur.bite_state  = "bite"
+        cur.bite_active = true
+        local win_tbl = (FISHING.BITE and FISHING.BITE.WINDOW_S) or {}
+        local win = tonumber(win_tbl[cur.heaviness] or 0.9) or 0.9
+        cur.bite_until = _now_s() + win
+        if FISHING.DEBUG then
+          print(("[fishing] BITE! window=%.2fs gid=%d"):format(win, _bite_gid("bite") or -1))
+        end
+        _spawn_or_update_bite(pid)
+        local sfx = FISHING.BITE and FISHING.BITE.SFX_BITE; _play(pid, sfx)
+      end
+
+      -- missed the window?
+      if cur.bite_active and _now_s() > (cur.bite_until or 0) then
+        _stop(pid, "Too slow! The fish slipped away.", FISHING.SFX.fail)
+        return
+      end
+
+      await(Async.sleep(step))
+    end
+  end)
+end
+
+local function _begin_reeling(pid)
+  local s = SESS[pid]; if not s or not s.active then return end
+  s.phase = "reeling"
+  s.ends_at = _now_s() + math.ceil(FISHING.MAX_DURATION_S)
+  s.meter_color = "blue"
+  s.meter_phase = 0
+  s.meter_value = 0.0
+  s.hold_accum  = 0.0
+  s.timer_phase = 0
+
+  async(function()
+    local step = 0.08
+    while true do
+      local cur = SESS[pid]; if not cur or not cur.active or cur.phase ~= "reeling" then return end
+      -- movement cancel
+      local p = Net.get_player_position(pid); if not p then return end
+      local dx = (p.x - cur.last_pos.x); local dy = (p.y - cur.last_pos.y); local dz = (p.z - cur.last_pos.z)
+      if math.abs(dx) > 0.01 or math.abs(dy) > 0.01 or math.abs(dz) > 0.01 then
+        _stop(pid, "Stopped fishing because you scared the fish. Stay still next time.", FISHING.SFX.fail)
+        return
+      end
+      -- time out
       if _now_s() >= (cur.ends_at or 0) then
         _stop(pid, "The fish got away!", FISHING.SFX.fail)
         return
       end
-      -- Apply decay & taps with float accumulator
+
+      -- decay + taps
       local value = tonumber(cur.meter_value or cur.meter_phase or 0)
       value = value - (cur.decay * step) + (cur.taps * cur.mashGain)
       cur.taps = 0
       value = _clamp(value, 0, 10)
       cur.meter_value = value
-
-      -- Snap to displayed phase (integer 0..10)
       local phase = math.floor(value + 0.5)
-      if phase ~= cur.meter_phase then
-        cur.meter_phase = phase
-      end
+      if phase ~= cur.meter_phase then cur.meter_phase = phase end
 
-      -- Yellow while inside the sweet band; blue otherwise
       local in_sweet = (cur.meter_phase >= cur.sweet_lo and cur.meter_phase <= cur.sweet_hi)
-      if in_sweet then
-        cur.meter_color = "yellow"
-        cur.hold_accum = cur.hold_accum + step
-      else
-        cur.meter_color = "blue"
-      end
-      -- Timer bar shows accumulated progress toward hold requirement (0..5)
-      local ratio = 0
-      if (cur.hold_req or 0) > 0 then
-        ratio = _clamp((cur.hold_accum or 0) / cur.hold_req, 0, 1)
-      end
-      local tphase = math.floor(ratio * 5 + 0.5)
-      if tphase ~= cur.timer_phase then
-        cur.timer_phase = tphase
-      end
+      if in_sweet then cur.meter_color = "yellow"; cur.hold_accum = cur.hold_accum + step
+      else cur.meter_color = "blue" end
 
-      -- Update meter preview
+      -- timer bar progress (0..5)
+      local ratio = 0
+      if (cur.hold_req or 0) > 0 then ratio = _clamp((cur.hold_accum or 0) / cur.hold_req, 0, 1) end
+      local tphase = math.floor(ratio * 5 + 0.5); if tphase ~= cur.timer_phase then cur.timer_phase = tphase end
+
+      -- draw meters
       _spawn_or_update_meter(pid)
       _spawn_or_update_timer(pid)
 
-      -- Success
-    if cur.hold_accum >= cur.hold_req then
-      local tier = tostring(cur.heaviness or "")
-      local eligible = not (FISHING.VIRUS_EXCLUDED and FISHING.VIRUS_EXCLUDED[tier])
-      local chance = tonumber(FISHING.VIRUS_CHANCE or 0) or 0
-      local roll = math.random()
+      -- success
+      if cur.hold_accum >= cur.hold_req then
+        local tier = tostring(cur.heaviness or "")
+        local eligible = not (FISHING.VIRUS_EXCLUDED and FISHING.VIRUS_EXCLUDED[tier])
+        local chance = tonumber(cur.virus_chance or FISHING.VIRUS_CHANCE or 0) or 0
+        local roll = math.random()
 
-      if eligible and roll < chance then
-        -- Virus encounter instead of a fish
-        local enc = _pick_virus_encounter()
-        local aid = cur.area_id
-        _stop(pid, nil, nil)          -- clean meters/session
-        _queue_virus_battle(pid, enc, aid)  -- shows the message and waits for textbox_response
-        return
-      else
-        -- Normal fish catch
-        local w = cur.weight_lb
-        local rank = _record_catch(pid, w)
-        local msg = ("You caught a fish! (%.1f lb)"):format(w or 0)
-        if rank and rank <= ((FISHING.LEADERBOARD and FISHING.LEADERBOARD.MAX) or 10) then
-          msg = msg .. ("  New leaderboard %d!"):format(rank)
+        if eligible and roll < chance then
+          local enc = _pick_virus_encounter()
+          local aid = cur.area_id
+          _stop(pid, nil, nil)
+          _queue_virus_battle(pid, enc, aid)
+          return
+        else
+          -- fish catch: pay money and show message (+ leaderboard)
+          local w = cur.weight_lb or 0
+          local pay_per_lb = tonumber(FISHING.FISH_REWARD_PER_LB or 0) or 0
+          local monies = math.floor((w * pay_per_lb) + 0.5)
+          if monies > 0 then ezmemory.spend_player_money(pid, -monies) end
+
+          local rank = _record_catch(pid, w)
+          local msg = ("You caught a fish! It weighed %.1f lb. You earned $%d!"):format(w, monies)
+          if rank and rank <= ((FISHING.LEADERBOARD and FISHING.LEADERBOARD.MAX) or 10) then
+            msg = msg .. ("  New leaderboard %d!"):format(rank)
+          end
+          _stop(pid, msg, FISHING.SFX.catch)
+          return
         end
-        _stop(pid, msg, FISHING.SFX.catch)
-        return
       end
-    end
 
       await(Async.sleep(step))
     end
   end)
+end
+
+local function _try_begin_reeling(pid)
+  local s = SESS[pid]; if not s or not s.active or s.phase ~= "waiting" then return end
+  if not s.bite_active then return end
+  if _now_s() > (s.bite_until or 0) then return end
+  -- success: hook!
+  _despawn_bite(pid)
+  _begin_reeling(pid)
+end
+
+-- item helpers (ezmemory)
+local function _count_item(pid, name)
+  local ok, n = pcall(ezmemory.count_player_item, pid, name)
+  return (ok and tonumber(n) or 0) or 0
+end
+local function _consume_item(pid, name, qty)
+  pcall(ezmemory.remove_player_item, pid, name, qty or 1)
+end
+
+-- queue: start fishing only after the player closes a message
+local _PENDING_START = {}  -- pid -> { used_bait = bool }
+local function _queue_start_after_message(pid, msg, used_bait)
+  _PENDING_START[pid] = { used_bait = used_bait and true or false }
+  Net.message_player(pid, msg or "Starting to fish...")
+end
+local function _begin_pending_start(pid)
+  local rec = _PENDING_START[pid]; if not rec then return end
+  _PENDING_START[pid] = nil
+  _start_session(pid, rec) -- pass { used_bait = true/false }
 end
 
 -- ====================== FishBBS (Top 10 board) ======================
@@ -1287,13 +1561,11 @@ Net:on("bbs_post_selection", function(ev)
 end)
 
 Net:on("textbox_response", function(a, b)
-  -- This event fires when any Net.message_player box is closed.
   local pid = (type(a) == "table") and (a.player_id or a[1]) or a
-  if pid and _PENDING_VIRUS[pid] then
-    _begin_pending_virus(pid)
-  end
+  if not pid then return end
+  if _PENDING_VIRUS[pid] then _begin_pending_virus(pid); return end
+  if _PENDING_START[pid] then _begin_pending_start(pid); return end
 end)
-
 -- ====================== Input handling ======================
 local function _register_tap(pid)
   local s = SESS[pid]; if not s or not s.active then return end
@@ -1306,41 +1578,74 @@ Net:on("object_interaction", function(ev)
   local pid = ev.player_id
   local area_id = Net.get_player_area(pid)
 
-  -- Resolve the clicked object (for class/type)
+  -- Which object was clicked
   local obj = Net.get_object_by_id(area_id, ev.object_id)
   if obj then
     local cls = tostring(obj.class or '')
     local typ = tostring(obj.type  or '')
-    -- If this is a FishBBS object, open the board and return.
+    -- Open FishBBS if this is a board
     if cls == 'FishBBS' or typ == 'FishBBS' then
       _open_fishbbs(pid)
       return
     end
   end
 
-  -- If already fishing, treat A as mash
+  -- Already fishing: treat A as a tap (this lets anti-mash restart work)
   local s = SESS[pid]
   if s and s.active then
-    _register_tap(pid)
+    if s.phase == "waiting" then
+      if s.bite_active then
+        _try_begin_reeling(pid)
+      else
+        _quiet_restart_wait(pid)  -- was: _stop + _start_session
+      end
+    else
+      _register_tap(pid)
+    end
     return
   end
-
-  -- Start immediately on Water object (testing phase)
+  -- Start only if this is a Water object
   if not obj then return end
   local cp = obj.custom_properties or {}
   local water = cp["Water"] or cp["water"] or cp["WATER"]
   local is_yes = (water == true) or (tostring(water or ""):lower() == "yes") or (tostring(water or ""):lower() == "true")
   if not is_yes then return end
 
-  _start_session(pid)
+  -- Ask to use bait (yes/no). Start after the player closes the message.
+  async(function()
+    local bait_conf = FISHING.BAIT or {}
+    local bait_name = bait_conf.ITEM_NAME or "bait"
+    local have = _count_item(pid, bait_name)
+
+    if have <= 0 then
+      _queue_start_after_message(pid, "Starting to fish without bait", false)
+      return
+    end
+
+    local q = string.format("You have %d bait. Use 1 to start fishing?", have)
+    local ans = await(Async.question_player(pid, q, nil, nil))  -- returns 1 (Yes) or 0 (No)
+
+    if ans == 1 then
+      _consume_item(pid, bait_name, 1)
+      _queue_start_after_message(pid, "Using bait... virus chance reduced.", true)
+    else -- ans == 0
+      _queue_start_after_message(pid, "Starting to fish without bait", false)
+    end
+  end)
 end)
 
 Net:on("tile_interaction", function(ev)
-  if ev.button ~= 0 then return end -- A only
+  if ev.button ~= 0 then return end
   local pid = ev.player_id
-  local s = SESS[pid]
-  if not s or not s.active then return end
-  _register_tap(pid)
+  local s = SESS[pid]; if not s or not s.active then return end
+  if s.phase == "waiting" then
+    if s.bite_active then
+      _try_begin_reeling(pid)
+    else
+      _quiet_restart_wait(pid)  -- was: _stop + _start_session
+    end
+    return
+  end
 end)
 
 -- Cleanup on transfer/quit (also clean orphans on join/transfer)

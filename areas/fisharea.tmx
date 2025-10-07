@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.8" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="50" height="50" tilewidth="64" tileheight="32" infinite="0" nextlayerid="4" nextobjectid="47">
+<map version="1.8" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="50" height="50" tilewidth="64" tileheight="32" infinite="0" nextlayerid="4" nextobjectid="54">
  <properties>
   <property name="Background" value="custom"/>
   <property name="Background Animation" value="/server/assets/custom/backgrounds/fisharea/aquarium.animation"/>
@@ -39,6 +39,7 @@
  <tileset firstgid="302" source="../assets/fishing/timer/3.tsx"/>
  <tileset firstgid="303" source="../assets/fishing/timer/4.tsx"/>
  <tileset firstgid="304" source="../assets/fishing/timer/5.tsx"/>
+ <tileset firstgid="305" source="../assets/fishing/ex.tsx"/>
  <layer id="1" name="Tile Layer 0" width="50" height="50">
   <data encoding="csv">
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -137,31 +138,74 @@
     <property name="Asset Name" value="fisherprog"/>
     <property name="Dialogue Type" value="first"/>
     <property name="Direction" value="Down Left"/>
-    <property name="Next 1" type="object" value="44"/>
-    <property name="Text 1" value="Hello there, I can explain how to play the fishing mini-game"/>
+    <property name="Next 1" type="object" value="48"/>
+    <property name="Text 1" value="Hey there, welcome to the fishing mini-game"/>
    </properties>
    <point/>
   </object>
-  <object id="44" name="Explain?" type="Dialogue" x="1200" y="608">
-   <properties>
-    <property name="Dialogue Type" value="question"/>
-    <property name="Next 1" type="object" value="45"/>
-    <property name="Next 2" type="object" value="46"/>
-    <property name="Text 1" value="Would you like me to explain how to play?"/>
-   </properties>
-   <point/>
-  </object>
-  <object id="45" name="Yes" type="Dialogue" x="1184" y="560">
+  <object id="45" name="Exp1" type="Dialogue" x="1118.5" y="539.5">
    <properties>
     <property name="Dialogue Type" value="first"/>
-    <property name="Text 1" value="The game is simple. There will be 2 meters that will show you your progress. The goal of the game is to tap &quot;A&quot; until you reach the sweet spot which will be indicated by a green bar on the meter to the right. You need to stay in this sweet spot long enough to catch the fish. The time needed will be represented by the meter above you. Different fish have different sweet spots, so pay attention. Also be aware that you may run into viruses instead of catching fish."/>
+    <property name="Next 1" type="object" value="51"/>
+    <property name="Text 1" value="Cast your line at the water and wait. When you see the bite icon, press &quot;A&quot; to hook. If you press too early, you'll scare the fish!"/>
    </properties>
    <point/>
   </object>
-  <object id="46" name="No" type="Dialogue" x="1216" y="560">
+  <object id="46" name="No" type="Dialogue" x="1197" y="511">
    <properties>
     <property name="Dialogue Type" value="first"/>
     <property name="Text 1" value="Alright then, have fun"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="48" name="Quiz" type="Dialogue" x="1175.5" y="614.5">
+   <properties>
+    <property name="Dialogue Type" value="quiz"/>
+    <property name="Next 1" type="object" value="45"/>
+    <property name="Next 2" type="object" value="49"/>
+    <property name="Next 3" type="object" value="46"/>
+    <property name="Text 1" value="Explain"/>
+    <property name="Text 2" value="Buy bait"/>
+    <property name="Text 3" value="Cancel"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="49" name="Bait shop" type="Dialogue" x="1153.5" y="560.5">
+   <properties>
+    <property name="Dialogue Type" value="shop"/>
+    <property name="Item 1" type="object" value="50"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="50" name="bait" type="Item" x="1141" y="515.5">
+   <properties>
+    <property name="Description" value="Bait used to fish"/>
+    <property name="Name" value="bait"/>
+    <property name="Price" value="9000"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="51" name="Exp2" type="Dialogue" x="1090.5" y="505.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="52"/>
+    <property name="Text 1" value="During reeling you have two meters. The right meter shows tension; tap &quot;A&quot; to keep the bar in the green sweet spot. The top meter fills while you hold the sweet spot. Fill it to catch the fish."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="52" name="Exp3" type="Dialogue" x="1088.5" y="479.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="53"/>
+    <property name="Text 1" value="Be careful as you can find viruses instead of fish. You can use bait before fishing. Bait slightly lowers the chance of viruses and makes bigger fish a bit more likely."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="53" name="Exp4" type="Dialogue" x="1086.5" y="459.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Text 1" value="Have fun!"/>
    </properties>
    <point/>
   </object>
@@ -194,5 +238,6 @@
   <object id="40" name="timer-3" gid="302" x="1248" y="1088" width="94" height="16"/>
   <object id="41" name="timer-4" gid="303" x="1264" y="1104" width="94" height="16"/>
   <object id="42" name="timer-5" gid="304" x="1280" y="1120" width="94" height="16"/>
+  <object id="47" name="ex" gid="305" x="1317" y="1151" width="3" height="13"/>
  </objectgroup>
 </map>
