@@ -7,6 +7,7 @@
   <property name="Background Vel X" type="float" value="0.115"/>
   <property name="Background Vel Y" type="float" value="0"/>
   <property name="Name" value="Fish Area"/>
+  <property name="Song" value="/server/assets/On the River.ogg"/>
  </properties>
  <tileset firstgid="1" source="../assets/tiles/central_platform.tsx"/>
  <tileset firstgid="241" source="../assets/tiles/EXE6_Shortcuts.tsx"/>
