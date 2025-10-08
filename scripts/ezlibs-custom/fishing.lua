@@ -313,8 +313,7 @@ local FISHING      = {
     },
 
     -- Optional sfx on bite popup
-    SFX_BITE         = nil,
-    "/server/assets/ezlibs-assets/sfx/WaterDeepSplash.ogg"
+    SFX_BITE         = "/server/assets/sfx/WaterDeepSplash.ogg",
   },
 
   BAIT                   = {
