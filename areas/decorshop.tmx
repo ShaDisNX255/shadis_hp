@@ -84,7 +84,7 @@
     <property name="Price 18" type="int" value="400000"/>
     <property name="Price 19" type="int" value="400000"/>
     <property name="Price 2" type="int" value="40000"/>
-    <property name="Price 20" type="int" value="70000"/>
+    <property name="Price 20" type="int" value="700000"/>
     <property name="Price 21" type="int" value="40000"/>
     <property name="Price 3" type="int" value="50000"/>
     <property name="Price 4" type="int" value="50000"/>
