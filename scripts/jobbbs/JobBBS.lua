@@ -279,22 +279,37 @@ local function ensure_daily_reset(pid)
   local st = attach_state(pid)
   local today = os.date('%Y-%m-%d')
   st.day_key = st.day_key or today
+
   if st.day_key ~= today then
     st.day_key = today
     st.prog = st.prog or {}
 
-    -- keep these: they reset job snapshots and gates
+    -- reset job snapshots and gates
     st.prog.baseline = {}
     st.prog.active   = {}
 
-    -- NEW: reset per-day unique sets so “visit/talk/inspect today” starts fresh
+    -- reset per-day unique sets
     st.prog.visited    = {}
     st.prog.spoke_npcs = {}
     st.prog.objects    = {}
     st.prog.obj_areas  = {}
 
+    -- NEW: wipe all boards so nothing carries over
+    if st.boards then
+      for board_id, B in pairs(st.boards) do
+        if not B then goto continue end
+        if B.day_key ~= today then
+          B.accepted, B.claimed = {}, {}
+          B.awaiting_kind, B.awaiting_idx, B.awaiting_base, B.awaiting_step = nil, nil, nil, nil
+          B.job_ids = nil
+          B.day_key = nil
+        end
+        ::continue::
+      end
+    end
+
     save_mem(pid, st)
-    if dbg then dbg('daily reset -> cleared per-day sets', pid, today) end
+    if dbg then dbg('daily reset -> cleared per-day sets + board flags', pid, today) end
   end
 end
 
@@ -867,15 +882,36 @@ end
 
 local function ensure_jobs_for_today(pid, st, board_id)
   local B = get_board(st, board_id)
+
+  -- If we already have today's list for this board, reuse it
   if B.job_ids and B.day_key == st.day_key then return B end
+
+  -- Day changed for this board? Nuke per-day flags + pending prompts
+  if B.day_key ~= st.day_key then
+    B.accepted, B.claimed = {}, {}
+    B.awaiting_kind, B.awaiting_idx, B.awaiting_base, B.awaiting_step = nil, nil, nil, nil
+
+    -- Drop stale baselines for this board so progress snapshots are fresh
+    if st.prog and st.prog.baseline then
+      local esc = tostring(board_id):gsub("(%W)", "%%%1") -- escape pattern chars
+      for k in pairs(st.prog.baseline) do
+        if tostring(k):match('^'..esc..'/') then
+          st.prog.baseline[k] = nil
+        end
+      end
+    end
+  end
+
+  -- Pick today's jobs deterministically
   local pool, cats = jobs_pool()
-  local order = { 'visit','npc','inspect','virus','duel','pack', 'fish' }
+  local order = { 'visit','npc','inspect','virus','duel','pack','fish' }
   local ids = {}
   for _, cat in ipairs(order) do
     local list = cats[cat]
     local seed = table.concat({ player_key(pid), st.day_key, board_id, cat }, '|')
     ids[#ids+1] = pick_deterministic(list, seed)
   end
+
   B.job_ids = ids
   B.day_key = st.day_key
   return B
