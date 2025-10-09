@@ -7,6 +7,9 @@ local helpers      = require('scripts/ezlibs-scripts/helpers')
 local ezmemory     = require('scripts/ezlibs-scripts/ezmemory')
 local ezencounters = require('scripts/ezlibs-scripts/ezencounters/main')
 
+local okJobBBS, JobBBS = pcall(require, 'scripts/jobbbs/JobBBS')
+if not okJobBBS then JobBBS = nil end
+
 -- Resolve Async if not global
 local function _resolve_async()
   if _G and _G.Async then return _G.Async end
@@ -46,7 +49,7 @@ local FISHING      = {
   METER_SCREEN_SHIFT     = { x = 1.5, y = 0.0, z = 0.0 },
 
   -- Total time window to hook the fish
-  MAX_DURATION_S         = 10.0,
+  MAX_DURATION_S         = 12.0,
 
   -- Time you must hold inside the sweet band to succeed
   HOLD_RANGE_S           = { min = 3.0, max = 6.0 },
@@ -61,9 +64,9 @@ local FISHING      = {
     { key = "medium",     decay = 1.8, mash = 1.00, hold_mult = 1.00 },
     { key = "heavy",      decay = 2.5, mash = 0.90, hold_mult = 1.10 },
     -- Harder tiers
-    { key = "very_heavy", decay = 3.6, mash = 0.85, hold_mult = 1.20 },
-    { key = "brutal",     decay = 4.8, mash = 0.80, hold_mult = 1.35 },
-    { key = "legendary",  decay = 5.4, mash = 0.75, hold_mult = 1.40 },
+    { key = "very_heavy", decay = 3.6, mash = 0.85, hold_mult = 1.15 },
+    { key = "brutal",     decay = 4.8, mash = 0.80, hold_mult = 1.20 },
+    { key = "legendary",  decay = 5.4, mash = 0.75, hold_mult = 1.30 },
   },
 
   -- Odds for each heaviness tier
@@ -281,7 +284,7 @@ local FISHING      = {
     },
   },
   -- Money per pound for normal fish (not viruses)
-  FISH_REWARD_PER_LB     = 3000, -- edit to taste
+  FISH_REWARD_PER_LB     = 1800, -- edit to taste
 
   -- Waiting phase: bite indicator (public, visible to everyone)
   BITE                   = {
@@ -304,12 +307,12 @@ local FISHING      = {
 
     -- Window to press A when it bites (heavier = shorter)
     WINDOW_S         = {
-      light = 1.10,
-      medium = 0.95,
-      heavy = 0.80,
-      very_heavy = 0.65,
-      brutal = 0.55,
-      legendary = 0.45,
+      light = 0.85,
+      medium = 0.75,
+      heavy = 0.65,
+      very_heavy = 0.45,
+      brutal = 0.35,
+      legendary = 0.25,
     },
 
     -- Optional sfx on bite popup
@@ -1293,9 +1296,15 @@ local function _begin_pending_virus(pid)
   local area          = rec.area
   _ensure_asset(area, enc and enc.path)
 
-  -- hook rewards just like WCity1
-  if FISHING.RESULTS_CALLBACK then
-    enc.results_callback = FISHING.RESULTS_CALLBACK
+  -- hook rewards just like WCity1, but also notify JobBBS
+  local inner_cb = FISHING.RESULTS_CALLBACK  -- may be default or custom
+  enc.results_callback = function(p, enc_info, stats)
+    -- original rewards
+    if inner_cb then pcall(inner_cb, p, enc_info, stats) end
+    -- JobBBS fishing-virus result
+    if JobBBS and JobBBS.on_fish_virus_result then
+      pcall(JobBBS.on_fish_virus_result, p, { area = area, stats = stats })
+    end
   end
 
   async(function()
@@ -1327,15 +1336,16 @@ local function _quiet_restart_wait(pid)
   local s = SESS[pid]; if not s or not s.active or s.phase ~= "waiting" then return end
   s.bite_active = false
   s.bite_state  = "idle"
-  s.bite_until  = 0
-  _spawn_or_update_bite(pid) -- will despawn if idle gid=0
+  s.bite_until_rel = 0
+  _spawn_or_update_bite(pid)
 
   local rng = (FISHING.BITE and FISHING.BITE.WAIT_RANGE_S) or { min = 1.2, max = 3.0 }
   local wmin = tonumber(rng.min or 1.2) or 1.2
   local wmax = tonumber(rng.max or 3.0) or 3.0
   local bite_in = wmin + math.random() * math.max(0, wmax - wmin)
 
-  s.next_bite_at = _now_s() + bite_in
+  -- push next bite relative to current wait elapsed
+  s.next_bite_at = (s.wait_elapsed or 0) + bite_in
   if FISHING.DEBUG then
     print(("[fishing] anti-mash: restart wait, next bite in %.2fs"):format(bite_in))
   end
@@ -1420,19 +1430,26 @@ local function _start_session(pid, opts)
     local wait_max = tonumber(wait_rng.max or 3.0) or 3.0
     local step = 0.05
 
-    -- seed the first bite time on the session
+    -- per-session elapsed time for the waiting phase
+    s.wait_elapsed = 0
+
+    -- seed the first bite time RELATIVE to wait_elapsed
     if not s.next_bite_at then
       local bite_in = wait_min + math.random() * math.max(0, wait_max - wait_min)
-      s.next_bite_at = _now_s() + bite_in
+      s.next_bite_at = (s.wait_elapsed or 0) + bite_in
     end
 
     while true do
       local cur = SESS[pid]; if not cur or not cur.active or cur.phase ~= "waiting" then return end
 
+      -- advance our session clock
+      cur.wait_elapsed = (cur.wait_elapsed or 0) + step
+
       -- movement cancels
       local p = Net.get_player_position(pid); if not p then return end
       local dx = (p.x - cur.last_pos.x); local dy = (p.y - cur.last_pos.y); local dz = (p.z - cur.last_pos.z)
       if math.abs(dx) > 0.01 or math.abs(dy) > 0.01 or math.abs(dz) > 0.01 then
+        if JobBBS and JobBBS.on_fish_fail then pcall(JobBBS.on_fish_fail, pid) end
         _stop(pid, "Stopped fishing because you scared the fish. Stay still next time.", FISHING.SFX.fail)
         return
       end
@@ -1441,12 +1458,12 @@ local function _start_session(pid, opts)
       _spawn_or_update_bite(pid)
 
       -- time to bite?
-      if (not cur.bite_active) and _now_s() >= (cur.next_bite_at or 0) then
-        cur.bite_state  = "bite"
-        cur.bite_active = true
-        local win_tbl   = (FISHING.BITE and FISHING.BITE.WINDOW_S) or {}
-        local win       = tonumber(win_tbl[cur.heaviness] or 0.9) or 0.9
-        cur.bite_until  = _now_s() + win
+      if (not cur.bite_active) and (cur.wait_elapsed >= (cur.next_bite_at or math.huge)) then
+        cur.bite_state   = "bite"
+        cur.bite_active  = true
+        local win_tbl    = (FISHING.BITE and FISHING.BITE.WINDOW_S) or {}
+        local win        = tonumber(win_tbl[cur.heaviness] or 0.9) or 0.9
+        cur.bite_until_rel = (cur.wait_elapsed or 0) + win
         if FISHING.DEBUG then
           print(("[fishing] BITE! window=%.2fs gid=%d"):format(win, _bite_gid("bite") or -1))
         end
@@ -1455,7 +1472,8 @@ local function _start_session(pid, opts)
       end
 
       -- missed the window?
-      if cur.bite_active and _now_s() > (cur.bite_until or 0) then
+      if cur.bite_active and (cur.wait_elapsed > (cur.bite_until_rel or 0)) then
+        if JobBBS and JobBBS.on_fish_fail then pcall(JobBBS.on_fish_fail, pid) end
         _stop(pid, "Too slow! The fish slipped away.", FISHING.SFX.fail)
         return
       end
@@ -1483,11 +1501,13 @@ local function _begin_reeling(pid)
       local p = Net.get_player_position(pid); if not p then return end
       local dx = (p.x - cur.last_pos.x); local dy = (p.y - cur.last_pos.y); local dz = (p.z - cur.last_pos.z)
       if math.abs(dx) > 0.01 or math.abs(dy) > 0.01 or math.abs(dz) > 0.01 then
+        if JobBBS and JobBBS.on_fish_fail then pcall(JobBBS.on_fish_fail, pid) end
         _stop(pid, "Stopped fishing because you scared the fish. Stay still next time.", FISHING.SFX.fail)
         return
       end
       -- time out
       if _now_s() >= (cur.ends_at or 0) then
+        if JobBBS and JobBBS.on_fish_fail then pcall(JobBBS.on_fish_fail, pid) end
         _stop(pid, "The fish got away!", FISHING.SFX.fail)
         return
       end
@@ -1527,6 +1547,10 @@ local function _begin_reeling(pid)
         if eligible and roll < chance then
           local enc = _pick_virus_encounter()
           local aid = cur.area_id
+          -- ADD: mark that a fishing virus started (for “Clean the Pond” jobs)
+          if JobBBS and JobBBS.on_fish_virus_start then
+            pcall(JobBBS.on_fish_virus_start, pid, { area = aid })
+          end
           _stop(pid, nil, nil)
           _queue_virus_battle(pid, enc, aid)
           return
@@ -1542,6 +1566,16 @@ local function _begin_reeling(pid)
           if rank and rank <= ((FISHING.LEADERBOARD and FISHING.LEADERBOARD.MAX) or 10) then
             msg = msg .. ("  New leaderboard %d!"):format(rank)
           end
+          -- ADD THIS (notify JobBBS about a successful catch)
+          if JobBBS and JobBBS.on_fish_catch then
+            pcall(JobBBS.on_fish_catch, pid, {
+              weight     = w,
+              heaviness  = cur.heaviness,
+              used_bait  = cur.used_bait or false,
+              area       = cur.area_id,
+              rank       = rank
+            })
+          end
           _stop(pid, msg, FISHING.SFX.catch)
           return
         end
@@ -1555,8 +1589,8 @@ end
 local function _try_begin_reeling(pid)
   local s = SESS[pid]; if not s or not s.active or s.phase ~= "waiting" then return end
   if not s.bite_active then return end
-  if _now_s() > (s.bite_until or 0) then return end
-  -- success: hook!
+  -- accept only if still within the relative bite window
+  if (s.wait_elapsed or 0) > (s.bite_until_rel or 0) then return end
   _despawn_bite(pid)
   _begin_reeling(pid)
 end
@@ -1724,6 +1758,7 @@ end)
 Net:on("player_transfer", function(ev)
   local pid = ev.player_id
   if SESS[pid] and SESS[pid].active then
+    if JobBBS and JobBBS.on_fish_fail then pcall(JobBBS.on_fish_fail, pid) end
     _stop(pid, "Fishing cancelled.", FISHING.SFX.fail)
   end
 end)

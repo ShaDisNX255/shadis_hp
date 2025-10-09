@@ -121,6 +121,7 @@ local function job_category(job_id)
   if job_id:match('^virus')   then return 'virus'   end
   if job_id:match('^duel')    then return 'duel'    end
   if job_id:match('^pack')    then return 'pack'    end
+  if job_id:match('^fish')   then return 'fish'   end
   return nil
 end
 
@@ -347,6 +348,23 @@ local REWARDS = {
   duel_win3      = { money=90000 },
   pack_open1     = { money=60000 },
   pack_open10    = { money=300000 },
+  fish_catch3       = { money = 40000 },
+  fish_catch6       = { money = 70000 },
+  fish_catch9       = { money = 100000 },
+  fish_catch12      = { money = 130000 },
+  fish_single_10lb  = { money = 60000 },
+  fish_single_15lb  = { money = 90000 },
+  fish_single_20lb  = { money = 130000 },
+  fish_total_40lb   = { money = 90000 },
+  fish_total_60lb   = { money = 130000 },
+  fish_total_90lb   = { money = 180000 },
+  fish_streak3      = { money = 70000 },
+  fish_streak4      = { money = 90000 },
+  fish_streak5      = { money = 120000 },
+  fish_streak6      = { money = 160000 },
+  fish_virus_lake3  = { money = 90000 },
+  fish_virus_lake6  = { money = 140000 },
+  fish_virus_lake9  = { money = 200000 },
 }
 
 local function give_money(pid, amount)
@@ -708,12 +726,102 @@ local function jobs_pool()
       local base = st.prog.baseline and st.prog.baseline[base_key] and st.prog.baseline[base_key].pack or nil
       local cur = st.prog.pack.opened or 0; local n = math.max(0, cur - ((base and base.opened) or 0)); return n>=1, n, 1
     end)
-  J('pack_open10', 'Booster Binge', 'Card Shop', 'Open 10 booster packs.',
+  J('pack_open10', 'Card Maniac', 'Card Shop', 'Open 10 booster packs.',
     function(pid, st, base_key)
       st.prog.pack = st.prog.pack or { opened = 0 }
       local base = st.prog.baseline and st.prog.baseline[base_key] and st.prog.baseline[base_key].pack or nil
       local cur = st.prog.pack.opened or 0; local n = math.max(0, cur - ((base and base.opened) or 0)); return n>=10, n, 10
     end)
+  -- ========= Fishing (your 5 lines) =========
+  -- Daily Angler (HowlerMan) - N: 3,6,9,12
+  J('fish_catch3',  'Daily Angler', 'HowlerMan', 'Me need at least 3 fish today, ook! Can you do that?',
+    function(pid, st, base_key)
+      st.prog.fish = st.prog.fish or {}
+      local base = st.prog.baseline and st.prog.baseline[base_key] and st.prog.baseline[base_key].fish or {}
+      local cur  = (st.prog.fish.catches or 0) - (base.catches or 0); return cur>=3, cur, 3
+    end)
+  J('fish_catch6',  'Daily Angler', 'HowlerMan', 'Me need at least 6 fish today, ook! Can you do that?',
+    function(pid, st, base_key)
+      st.prog.fish = st.prog.fish or {}
+      local base = st.prog.baseline and st.prog.baseline[base_key] and st.prog.baseline[base_key].fish or {}
+      local cur  = (st.prog.fish.catches or 0) - (base.catches or 0); return cur>=6, cur, 6
+    end)
+  J('fish_catch9',  'Daily Angler', 'HowlerMan', 'Me need at least 9 fish today, ook! Can you do that?',
+    function(pid, st, base_key)
+      st.prog.fish = st.prog.fish or {}
+      local base = st.prog.baseline and st.prog.baseline[base_key] and st.prog.baseline[base_key].fish or {}
+      local cur  = (st.prog.fish.catches or 0) - (base.catches or 0); return cur>=9, cur, 9
+    end)
+  J('fish_catch12', 'Daily Angler', 'HowlerMan', 'Me need at least 12 fish today, ook! Can you do that?',
+    function(pid, st, base_key)
+      st.prog.fish = st.prog.fish or {}
+      local base = st.prog.baseline and st.prog.baseline[base_key] and st.prog.baseline[base_key].fish or {}
+      local cur  = (st.prog.fish.catches or 0) - (base.catches or 0); return cur>=12, cur, 12
+    end)
+
+  -- Big Fish (HowlerMan) - N: 10,15,20 (single catch)
+  local function _big_single_check(pid, st, base_key, need_lb)
+    st.prog.fish = st.prog.fish or {}
+    local base = st.prog.baseline and st.prog.baseline[base_key] and st.prog.baseline[base_key].fish or {}
+    local cur_max  = tonumber(st.prog.fish.max_single or 0) or 0
+    local base_max = tonumber(base.max_single or 0) or 0
+    local done = (cur_max >= need_lb) and (cur_max > base_max)
+    local prog = math.min(cur_max, need_lb)
+    return done, prog, need_lb
+  end
+  J('fish_single_10lb', 'Big Fish', 'HowlerMan', 'Me hungry! Catch fish that weighs more than 10 lbs, ook!',
+    function(pid, st, base_key) return _big_single_check(pid, st, base_key, 10) end)
+  J('fish_single_15lb', 'Big Fish', 'HowlerMan', 'Me hungry! Catch fish that weighs more than 15 lbs, ook!',
+    function(pid, st, base_key) return _big_single_check(pid, st, base_key, 15) end)
+  J('fish_single_20lb', 'Big Fish', 'HowlerMan', 'Me hungry! Catch fish that weighs more than 20 lbs, ook!',
+    function(pid, st, base_key) return _big_single_check(pid, st, base_key, 20) end)
+
+  -- Total Weight (HowlerMan) - N: 40,60,90 (sum since accept)
+  local function _total_weight_check(pid, st, base_key, need_lb)
+    st.prog.fish = st.prog.fish or {}
+    local base = st.prog.baseline and st.prog.baseline[base_key] and st.prog.baseline[base_key].fish or {}
+    local cur = (tonumber(st.prog.fish.total_lb or 0) or 0) - (tonumber(base.total_lb or 0) or 0)
+    local prog = math.floor(cur + 0.0001)
+    return cur >= need_lb, prog, need_lb
+  end
+  J('fish_total_40lb', 'Total Weight', 'HowlerMan', 'Me catch many big fish today, ook! Can you catch 40 lbs of fish too, ook?',
+    function(pid, st, base_key) return _total_weight_check(pid, st, base_key, 40) end)
+  J('fish_total_60lb', 'Total Weight', 'HowlerMan', 'Me catch many big fish today, ook! Can you catch 60 lbs of fish too, ook?',
+    function(pid, st, base_key) return _total_weight_check(pid, st, base_key, 60) end)
+  J('fish_total_90lb', 'Total Weight', 'HowlerMan', 'Me catch many big fish today, ook! Can you catch 90 lbs of fish too, ook?',
+    function(pid, st, base_key) return _total_weight_check(pid, st, base_key, 90) end)
+
+  -- On a Roll (HowlerMan) - N: 3,4,5,6 (best streak since accept; failures reset live streak)
+  local function _streak_check(pid, st, base_key, need)
+    st.prog.fish = st.prog.fish or {}
+    local base_best = ((st.prog.baseline and st.prog.baseline[base_key] and st.prog.baseline[base_key].fish) or {}).streak or 0
+    local best_now  = st.prog.fish.streak or 0
+    local done = (best_now >= need) and (best_now > base_best)
+    local cur = math.min(best_now, need)
+    return done, cur, need
+  end
+  J('fish_streak3', 'On a Roll', 'HowlerMan', "Me a better fisher than you, ook! Bet you can't catch 3 fish in a row!",
+    function(pid, st, base_key) return _streak_check(pid, st, base_key, 3) end)
+  J('fish_streak4', 'On a Roll', 'HowlerMan', "Me a better fisher than you, ook! Bet you can't catch 4 fish in a row!",
+    function(pid, st, base_key) return _streak_check(pid, st, base_key, 4) end)
+  J('fish_streak5', 'On a Roll', 'HowlerMan', "Me a better fisher than you, ook! Bet you can't catch 5 fish in a row!",
+    function(pid, st, base_key) return _streak_check(pid, st, base_key, 5) end)
+  J('fish_streak6', 'On a Roll', 'HowlerMan', "Me a better fisher than you, ook! Bet you can't catch 6 fish in a row!",
+    function(pid, st, base_key) return _streak_check(pid, st, base_key, 6) end)
+
+  -- Clean the Pond (ProtoMan) - N: 3,6,9 (wins vs viruses spawned by fishing)
+  local function _virus_fish_wins(pid, st, base_key, need)
+    st.prog.fish = st.prog.fish or {}
+    local base = st.prog.baseline and st.prog.baseline[base_key] and st.prog.baseline[base_key].fish or {}
+    local cur = (st.prog.fish.virus_wins or 0) - (base.virus_wins or 0)
+    return cur >= need, cur, need
+  end
+  J('fish_virus_lake3', 'Clean the Pond', 'ProtoMan', 'Official NetBattler business, defeat 3 virus encounters that spawn in the lake.',
+    function(pid, st, base_key) return _virus_fish_wins(pid, st, base_key, 3) end)
+  J('fish_virus_lake6', 'Clean the Pond', 'ProtoMan', 'Official NetBattler business, defeat 6 virus encounters that spawn in the lake.',
+    function(pid, st, base_key) return _virus_fish_wins(pid, st, base_key, 6) end)
+  J('fish_virus_lake9', 'Clean the Pond', 'ProtoMan', 'Official NetBattler business, defeat 9 virus encounters that spawn in the lake.',
+    function(pid, st, base_key) return _virus_fish_wins(pid, st, base_key, 9) end)
 
   -- Categorize ids
   local CATS = {
@@ -724,6 +832,13 @@ local function jobs_pool()
 	'virus_turn1_3', 'virus_turn1_6', 'virus_turn1_9', 'virus_turn1_12', 'virus_fast3', 'virus_fast6', 'virus_fast9', 'virus_fast12' },
     duel    = { 'duel_win1', 'duel_win2', 'duel_win3' },
     pack    = { 'pack_open1', 'pack_open10' },
+    fish    = {
+      'fish_catch3','fish_catch6','fish_catch9','fish_catch12',
+      'fish_single_10lb','fish_single_15lb','fish_single_20lb',
+      'fish_total_40lb','fish_total_60lb','fish_total_90lb',
+      'fish_streak3','fish_streak4','fish_streak5','fish_streak6',
+      'fish_virus_lake3','fish_virus_lake6','fish_virus_lake9'
+    },
   }
   return P, CATS
 end
@@ -752,41 +867,20 @@ end
 
 local function ensure_jobs_for_today(pid, st, board_id)
   local B = get_board(st, board_id)
-  -- If we already built today's list, just reuse it
   if B.job_ids and B.day_key == st.day_key then return B end
-
-  local last_day = B.day_key
-
   local pool, cats = jobs_pool()
-  local order = { 'visit','npc','inspect','virus','duel','pack' }
+  local order = { 'visit','npc','inspect','virus','duel','pack', 'fish' }
   local ids = {}
   for _, cat in ipairs(order) do
     local list = cats[cat]
     local seed = table.concat({ player_key(pid), st.day_key, board_id, cat }, '|')
     ids[#ids+1] = pick_deterministic(list, seed)
   end
-
-  -- New day for this board? wipe per-day flags
-  if last_day ~= st.day_key then
-    B.accepted = {}
-    B.claimed  = {}
-    B.awaiting_kind, B.awaiting_idx, B.awaiting_base, B.awaiting_step = nil, nil, nil, nil
-
-    -- (nice-to-have) drop stale baselines for this board so progress re-snapshots cleanly
-    if st.prog and st.prog.baseline then
-      local esc = tostring(board_id):gsub("(%W)","%%%1")  -- escape pattern magic
-      for k in pairs(st.prog.baseline) do
-        if tostring(k):match('^'..esc..'/') then
-          st.prog.baseline[k] = nil
-        end
-      end
-    end
-  end
-
   B.job_ids = ids
   B.day_key = st.day_key
   return B
 end
+
 -- ===== Passive progress listeners =====
 if _G.Net and Net.on and not _G.__jobbbs_hooks_move_talk_v2 then
   _G.__jobbbs_hooks_move_talk_v2 = true
@@ -1047,6 +1141,13 @@ function JobBBS.handle_textbox_response(pid, response)
           },
           duel = { wins = (st.prog.duel and st.prog.duel.wins) or 0 },
           pack = { opened = (st.prog.pack and st.prog.pack.opened) or 0 },
+          fish = {
+            catches     = (st.prog.fish and st.prog.fish.catches)     or 0,
+            total_lb    = (st.prog.fish and st.prog.fish.total_lb)    or 0,
+            max_single  = (st.prog.fish and st.prog.fish.max_single)  or 0,
+            streak      = (st.prog.fish and st.prog.fish.streak)      or 0,
+            virus_wins  = (st.prog.fish and st.prog.fish.virus_wins)  or 0,
+          },
         }
         local cat = job_category(job.id)
         if cat then activate_category(st, cat) end
@@ -1223,6 +1324,51 @@ function JobBBS.on_pack_open(pid, info)
   if info then local c = tonumber(info.count or info.packs or info.n); if c and c>0 then n=c end end
   st.prog.pack.opened = (st.prog.pack.opened or 0) + n
   save_mem(pid, st)
+end
+
+function JobBBS.on_fish_catch(pid, info)
+  ensure_daily_reset(pid)
+  local st = attach_state(pid); if not st then return end
+  st.prog = st.prog or {}; st.prog.active = st.prog.active or {}
+  if not st.prog.active.fish then return end
+  st.prog.fish = st.prog.fish or { catches=0, total_lb=0, max_single=0, streak=0, streak_live=0, virus_wins=0 }
+
+  local F = st.prog.fish
+  local w = tonumber(info and (info.weight or info.weight_lb or info.w)) or 0
+  F.catches    = (F.catches or 0) + 1
+  F.total_lb   = (F.total_lb or 0) + w
+  if w > (F.max_single or 0) then F.max_single = w end
+  F.streak_live = (F.streak_live or 0) + 1
+  if (F.streak_live or 0) > (F.streak or 0) then F.streak = F.streak_live end
+  st.prog.fish = F
+  save_mem(pid, st)
+end
+
+function JobBBS.on_fish_fail(pid)
+  ensure_daily_reset(pid)
+  local st = attach_state(pid); if not st then return end
+  st.prog = st.prog or {}; st.prog.active = st.prog.active or {}
+  if not st.prog.active.fish then return end
+  st.prog.fish = st.prog.fish or { streak_live=0 }
+  st.prog.fish.streak_live = 0
+  save_mem(pid, st)
+end
+
+function JobBBS.on_fish_virus_start(pid, info)
+  -- Currently not needed for checks, but you can track attempts here if you like.
+end
+
+function JobBBS.on_fish_virus_result(pid, info)
+  ensure_daily_reset(pid)
+  local st = attach_state(pid); if not st then return end
+  st.prog = st.prog or {}; st.prog.active = st.prog.active or {}
+  if not st.prog.active.fish then return end
+  local stats = info and info.stats
+  if stats and not stats.ran then
+    st.prog.fish = st.prog.fish or { virus_wins=0 }
+    st.prog.fish.virus_wins = (st.prog.fish.virus_wins or 0) + 1
+    save_mem(pid, st)
+  end
 end
 
 return JobBBS
