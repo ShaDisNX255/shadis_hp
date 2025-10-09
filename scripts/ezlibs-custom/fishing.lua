@@ -1675,8 +1675,7 @@ end)
 local function _register_tap(pid)
   local s = SESS[pid]; if not s or not s.active then return end
   s.taps = (s.taps or 0) + 1.0
-  _play(pid, FISHING.SFX.tick)
-  _play(pid, FISHING.SFX.a_pressed)
+  -- _play(pid, FISHING.SFX.a_pressed)
 end
 
 Net:on("object_interaction", function(ev)
@@ -1707,6 +1706,7 @@ Net:on("object_interaction", function(ev)
       end
     else
       _register_tap(pid)
+      _play(pid, FISHING.SFX.a_pressed)
     end
     return
   end
