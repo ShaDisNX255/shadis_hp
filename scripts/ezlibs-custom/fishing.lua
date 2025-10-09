@@ -3,8 +3,8 @@
 -- Everything in one file.
 
 -- ====================== Requires ======================
-local helpers  = require('scripts/ezlibs-scripts/helpers')
-local ezmemory = require('scripts/ezlibs-scripts/ezmemory')
+local helpers      = require('scripts/ezlibs-scripts/helpers')
+local ezmemory     = require('scripts/ezlibs-scripts/ezmemory')
 local ezencounters = require('scripts/ezlibs-scripts/ezencounters/main')
 
 -- Resolve Async if not global
@@ -19,114 +19,114 @@ local function _now_s()
   return tonumber(os.time()) or 0
 end
 
-local Async = _resolve_async()
+local Async        = _resolve_async()
 -- Online presence cache so we can exclude for current non-owners
-local AREA_PLAYERS = {}   -- [area_id] = { [pid]=true, ... }
-local PLAYER_AREA  = {}   -- [pid] = area_id
+local AREA_PLAYERS = {} -- [area_id] = { [pid]=true, ... }
+local PLAYER_AREA  = {} -- [pid] = area_id
 
 -- ====================== Config you can edit ======================
-local FISHING = {
+local FISHING      = {
   -- Hidden layer where your meter prototype objects live
-  TEMPLATE_LAYER = "Fishing",
-  HOLD_SECONDS = 5.0,
-  FORCE_METER_DIMS_PX = nil,
+  TEMPLATE_LAYER         = "Fishing",
+  HOLD_SECONDS           = 5.0,
+  FORCE_METER_DIMS_PX    = nil,
   EXPECTED_METER_DIMS_PX = { w = 17, h = 91 },
-  DEBUG = false,
-  PRIVATE_METERS = true,
-  PRIVATE_MODE = "exclude",
-  RESULTS_CALLBACK = _default_fishing_rewards,
+  DEBUG                  = false,
+  PRIVATE_METERS         = true,
+  PRIVATE_MODE           = "exclude",
+  RESULTS_CALLBACK       = _default_fishing_rewards,
 
   -- Placement around the player
-  METER_FORWARD = 0,         -- a little in front of facing
-  METER_SIDE    = 0,     -- "left" | "right" | number (tiles). If number, exact side offset (tiles).
-  METER_DISTANCE = 0.8,        -- legacy fallback; kept for compatibility
+  METER_FORWARD          = 0,   -- a little in front of facing
+  METER_SIDE             = 0,   -- "left" | "right" | number (tiles). If number, exact side offset (tiles).
+  METER_DISTANCE         = 0.8, -- legacy fallback; kept for compatibility
 
   -- Extra world-space nudge after facing/side placement (tiles).
   -- Positive y moves the meter lower on the screen.
-  METER_SCREEN_SHIFT = { x = 1.5, y = 0.0, z = 0.0 },
+  METER_SCREEN_SHIFT     = { x = 1.5, y = 0.0, z = 0.0 },
 
   -- Total time window to hook the fish
-  MAX_DURATION_S = 10.0,
+  MAX_DURATION_S         = 10.0,
 
   -- Time you must hold inside the sweet band to succeed
-  HOLD_RANGE_S = { min = 3.0, max = 6.0 },
+  HOLD_RANGE_S           = { min = 3.0, max = 6.0 },
 
   -- Sweet spot width: number of consecutive pips that count as "sweet"
-  SWEET_WIDTH = 2,             -- e.g., 2 means [4..5] or [7..8], always within 1..9
+  SWEET_WIDTH            = 2, -- e.g., 2 means [4..5] or [7..8], always within 1..9
 
   -- Heaviness presets (higher decay = harder; mash is how much each A tap helps)
-  HEAVINESS = {
+  HEAVINESS              = {
     --  key            decay/s   mashGain  hold_mult
-    { key="light",       decay=1.2,  mash=1.20,  hold_mult=0.95 },
-    { key="medium",      decay=1.8,  mash=1.00,  hold_mult=1.00 },
-    { key="heavy",       decay=2.5,  mash=0.90,  hold_mult=1.10 },
+    { key = "light",      decay = 1.2, mash = 1.20, hold_mult = 0.95 },
+    { key = "medium",     decay = 1.8, mash = 1.00, hold_mult = 1.00 },
+    { key = "heavy",      decay = 2.5, mash = 0.90, hold_mult = 1.10 },
     -- Harder tiers
-    { key="very_heavy",  decay=3.6,  mash=0.85,  hold_mult=1.20 },
-    { key="brutal",      decay=4.8,  mash=0.80,  hold_mult=1.35 },
-    { key="legendary",   decay=5.4,  mash=0.75,  hold_mult=1.40 },
+    { key = "very_heavy", decay = 3.6, mash = 0.85, hold_mult = 1.20 },
+    { key = "brutal",     decay = 4.8, mash = 0.80, hold_mult = 1.35 },
+    { key = "legendary",  decay = 5.4, mash = 0.75, hold_mult = 1.40 },
   },
 
   -- Odds for each heaviness tier
-  HEAVINESS_CHANCES = {
-    light       = 25,
-    medium      = 25,
-    heavy       = 25,
-    very_heavy  = 10,
-    brutal      = 10,
-    legendary   = 5,
+  HEAVINESS_CHANCES      = {
+    light      = 25,
+    medium     = 25,
+    heavy      = 25,
+    very_heavy = 10,
+    brutal     = 10,
+    legendary  = 5,
   },
 
   -- Display-only: random weight ranges (in pounds) per heaviness
-  WEIGHT_RANGES_LB = {
-    light       = {  1.0,  3.0 },
-    medium      = {  3.0,  7.0 },
-    heavy       = {  7.0, 12.0 },
-    very_heavy  = { 12.0, 18.0 },
-    brutal      = { 18.0, 25.0 },
-    legendary   = { 25.0, 40.0 },
+  WEIGHT_RANGES_LB       = {
+    light      = { 1.0, 3.0 },
+    medium     = { 3.0, 7.0 },
+    heavy      = { 7.0, 12.0 },
+    very_heavy = { 12.0, 18.0 },
+    brutal     = { 18.0, 25.0 },
+    legendary  = { 25.0, 40.0 },
   },
 
   -- Leaderboard persistence (stored under this area)
-  LEADERBOARD = {
-    MEM_AREA = "fisharea",  -- << your fishing zone
+  LEADERBOARD            = {
+    MEM_AREA = "fisharea", -- << your fishing zone
     KEY      = "fish_top10",
     MAX      = 10,
   },
 
-  -- Your meter catalog (blue 0..10, yellow 0..10) – GIDs kept exactly
-  METERS = {
-    blue = {
-      [0]  = 275,  -- 0
-      [1]  = 276,  -- yellow-1
-      [2]  = 277,  -- yellow-2
-      [3]  = 278,  -- yellow-3
-      [4]  = 279,  -- yellow-4
-      [5]  = 280,  -- yellow-5
-      [6]  = 281,  -- yellow-6
-      [7]  = 282,  -- yellow-7
-      [8]  = 283,  -- yellow-8
-      [9]  = 284,  -- yellow-9
-      [10] = 285,  -- yellow-10
+  -- Your meter catalog (normal 0..10, sweet_spot 0..10) – GIDs kept exactly
+  METERS                 = {
+    normal = {
+      [0]  = 275, -- 0
+      [1]  = 276, -- sweet_spot-1
+      [2]  = 277, -- sweet_spot-2
+      [3]  = 278, -- sweet_spot-3
+      [4]  = 279, -- sweet_spot-4
+      [5]  = 280, -- sweet_spot-5
+      [6]  = 281, -- sweet_spot-6
+      [7]  = 282, -- sweet_spot-7
+      [8]  = 283, -- sweet_spot-8
+      [9]  = 284, -- sweet_spot-9
+      [10] = 285, -- sweet_spot-10
     },
-    yellow = {
-      [0]  = 0,    -- no yellow-0 asset (intentional)
-      [1]  = 286,  -- blue-1
-      [2]  = 288,  -- blue-2
-      [3]  = 289,  -- blue-3
-      [4]  = 290,  -- blue-4
-      [5]  = 291,  -- blue-5
-      [6]  = 292,  -- blue-6
-      [7]  = 293,  -- blue-7
-      [8]  = 294,  -- blue-8
-      [9]  = 295,  -- blue-9
-      [10] = 287,  -- blue-10
+    sweet_spot = {
+      [0]  = 0,   -- no sweet_spot-0 asset (intentional)
+      [1]  = 286, -- normal-1
+      [2]  = 288, -- normal-2
+      [3]  = 289, -- normal-3
+      [4]  = 290, -- normal-4
+      [5]  = 291, -- normal-5
+      [6]  = 292, -- normal-6
+      [7]  = 293, -- normal-7
+      [8]  = 294, -- normal-8
+      [9]  = 295, -- normal-9
+      [10] = 287, -- normal-10
     },
   },
 
   -- Timer meter (0..5 phases), horizontal bar above the player.
   -- Fill these GIDs to match your "Fishing" layer objects for the timer bar.
-  METERS_TIMER = {
-    [0] = 299,    -- replace 0 with your gid for empty bar
+  METERS_TIMER           = {
+    [0] = 299, -- replace 0 with your gid for empty bar
     [1] = 300,
     [2] = 301,
     [3] = 302,
@@ -135,194 +135,210 @@ local FISHING = {
   },
 
   -- Placement just for the timer meter (independent from fish meter)
-  TIMER_FORWARD      = 0.0,           -- a touch in front of the player (0.0 is fine)
-  TIMER_SIDE         = 0,             -- 0 keeps it centered; can be "left"/"right" or a number
-  TIMER_SCREEN_SHIFT = { x = -2.0, y = -2.0, z = 0.0 }, -- y<0 draws above the player
+  TIMER_FORWARD          = 0.0,                             -- a touch in front of the player (0.0 is fine)
+  TIMER_SIDE             = 0,                               -- 0 keeps it centered; can be "left"/"right" or a number
+  TIMER_SCREEN_SHIFT     = { x = -2.0, y = -2.0, z = 0.0 }, -- y<0 draws above the player
 
   -- Optional size enforcement for the timer bar (pixels -> tiles; isometric-safe)
-  FORCE_TIMER_DIMS_PX    = nil,                 -- e.g., { w = 91, h = 17 } if your timer is 91x17 px
-  EXPECTED_TIMER_DIMS_PX = { w = 94, h = 16 },                 -- e.g., { w = 91, h = 17 } to auto-correct if it ever drifts
+  FORCE_TIMER_DIMS_PX    = nil,                -- e.g., { w = 91, h = 17 } if your timer is 91x17 px
+  EXPECTED_TIMER_DIMS_PX = { w = 94, h = 16 }, -- e.g., { w = 91, h = 17 } to auto-correct if it ever drifts
 
   -- Optional sfx paths (set to nil if not wanted)
-  SFX = {
-    start  = "/server/assets/ezlibs-assets/sfx/select.ogg",
-    catch  = "/server/assets/ezlibs-assets/sfx/item_get.ogg",
-    fail   =  "/server/assets/ezlibs-assets/sfx/cancel.ogg",
-    tick   = nil,
+  SFX                    = {
+    start        = "/server/assets/ezlibs-assets/sfx/select.ogg",
+    catch        = "/server/assets/ezlibs-assets/sfx/item_get.ogg",
+    fail         = "/server/assets/ezlibs-assets/sfx/cancel.ogg",
+    fish_biting  = "/server/assets/sfx/WaterDeepSplash.ogg",
+    a_pressed    = "/server/assets/sfx/GuageRise.ogg",
+    caught_virus = "/server/assets/sfx/Alert.ogg",
+    tick         = nil,
   },
-  VIRUS_CHANCE = 0.30,                 -- 30 percent for eligible tiers
-  VIRUS_EXCLUDED = {                   -- tiers that never trigger a virus
+  VIRUS_CHANCE           = 0.30, -- 30 percent for eligible tiers
+  VIRUS_EXCLUDED         = {     -- tiers that never trigger a virus
     brutal = true,
     legendary = true,
   },
 
   -- Fishing virus encounters - you can edit or add more
   -- These are self-contained encounter infos passed to ezencounters
-  VIRUS_ENCOUNTERS = {
+  VIRUS_ENCOUNTERS       = {
     {
-      name   = "Encounter1", weight = 10,
-      path   = "/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
-    enemies={
-        {name="Shrimpy",rank=6},
-        {name="Shrimpy",rank=7},
-        {name="Shrimpy",rank=8},
-    },
-    obstacles={
-        {name="Rock"},
-        {name="Rock"},
-    },
-    positions={
-        {0,0,0,0,0,1},
-        {0,0,0,0,2,0},
-        {0,0,0,0,3,0},
-    },
-    obstacle_positions={
-        {0,0,1,0,0,0},
-        {0,0,0,2,0,0},
-        {0,0,0,0,0,0},
-    },
-    player_positions={
-        {0,0,0,0,0,0},
-        {0,1,0,0,0,0},
-        {0,0,0,0,0,0},
-    },
-    tiles={
-        {1,1,1,1,1,1},
-        {1,1,1,1,1,1},
-        {1,1,1,1,1,1},
-    },
-    teams={
-        {2,2,2,1,1,1},
-        {2,2,2,1,1,1},
-        {2,2,2,1,1,1},
-    },
-      music = { path="bn6_battle_xg.mid" },
+      name               = "Encounter1",
+      weight             = 10,
+      path               = "/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+      enemies            = {
+        { name = "Shrimpy", rank = 6 },
+        { name = "Shrimpy", rank = 7 },
+        { name = "Shrimpy", rank = 8 },
+      },
+      obstacles          = {
+        { name = "Rock" },
+        { name = "Rock" },
+      },
+      positions          = {
+        { 0, 0, 0, 0, 0, 1 },
+        { 0, 0, 0, 0, 2, 0 },
+        { 0, 0, 0, 0, 3, 0 },
+      },
+      obstacle_positions = {
+        { 0, 0, 1, 0, 0, 0 },
+        { 0, 0, 0, 2, 0, 0 },
+        { 0, 0, 0, 0, 0, 0 },
+      },
+      player_positions   = {
+        { 0, 0, 0, 0, 0, 0 },
+        { 0, 1, 0, 0, 0, 0 },
+        { 0, 0, 0, 0, 0, 0 },
+      },
+      tiles              = {
+        { 1, 1, 1, 1, 1, 1 },
+        { 1, 1, 1, 1, 1, 1 },
+        { 1, 1, 1, 1, 1, 1 },
+      },
+      teams              = {
+        { 2, 2, 2, 1, 1, 1 },
+        { 2, 2, 2, 1, 1, 1 },
+        { 2, 2, 2, 1, 1, 1 },
+      },
+      music              = { path = "bn6_battle_xg.mid" },
     },
     {
-      name   = "Encounter2", weight = 10,
-      path   = "/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
-    enemies={
-        {name="Piranha",rank=4},
-        {name="ColdHead",rank=1},
-        {name="Tark",rank=1},
+      name               = "Encounter2",
+      weight             = 10,
+      path               = "/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+      enemies            = {
+        { name = "Piranha",  rank = 4 },
+        { name = "ColdHead", rank = 1 },
+        { name = "Tark",     rank = 1 },
+      },
+      obstacles          = {
+        { name = "Rock" },
+      },
+      positions          = {
+        { 0, 0, 0, 0, 0, 2 },
+        { 0, 0, 0, 0, 1, 3 },
+        { 0, 0, 0, 0, 0, 0 },
+      },
+      obstacle_positions = {
+        { 0, 0, 0, 0, 0, 0 },
+        { 0, 0, 0, 0, 0, 0 },
+        { 0, 0, 0, 0, 0, 0 },
+      },
+      player_positions   = {
+        { 0, 0, 0, 0, 0, 0 },
+        { 0, 1, 0, 0, 0, 0 },
+        { 0, 0, 0, 0, 0, 0 },
+      },
+      tiles              = {
+        { 1, 1, 1, 1, 1, 1 },
+        { 1, 1, 1, 1, 1, 1 },
+        { 1, 1, 1, 1, 1, 1 },
+      },
+      teams              = {
+        { 2, 2, 2, 1, 1, 1 },
+        { 2, 2, 2, 1, 1, 1 },
+        { 2, 2, 2, 1, 1, 1 },
+      },
     },
-    obstacles={
-        {name="Rock"},
-    },
-    positions={
-        {0,0,0,0,0,2},
-        {0,0,0,0,1,3},
-        {0,0,0,0,0,0},
-    },
-    obstacle_positions={
-        {0,0,0,0,0,0},
-        {0,0,0,0,0,0},
-        {0,0,0,0,0,0},
-    },
-    player_positions={
-        {0,0,0,0,0,0},
-        {0,1,0,0,0,0},
-        {0,0,0,0,0,0},
-    },
-    tiles={
-        {1,1,1,1,1,1},
-        {1,1,1,1,1,1},
-        {1,1,1,1,1,1},
-    },
-    teams={
-        {2,2,2,1,1,1},
-        {2,2,2,1,1,1},
-        {2,2,2,1,1,1},
-    },
-	},
     {
-      name   = "Encounter3", weight = 10,
-      path   = "/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
-      enemies= { {name="Swordy",rank=1}, {name="Boomer",rank=1} },
-    enemies={
-        {name="SwordyEl",rank=5},
-        {name="SwordyEl",rank=2},
-        {name="SwordyEl",rank=8},
-    },
-    obstacles={
-    },
-    positions={
-        {0,0,0,0,3,0},
-        {0,0,0,0,1,0},
-        {0,0,0,0,2,0},
-    },
-    obstacle_positions={
-        {0,0,0,0,0,0},
-        {0,0,0,0,0,0},
-        {0,0,0,0,0,0},
-    },
-    player_positions={
-        {0,0,0,0,0,0},
-        {0,1,0,0,0,0},
-        {0,0,0,0,0,0},
-    },
-    tiles={
-        {1,1,1,1,1,1},
-        {1,1,1,1,1,1},
-        {1,1,1,1,1,1},
-    },
-    teams={
-        {2,2,2,1,1,1},
-        {2,2,2,1,1,1},
-        {2,2,2,1,1,1},
-    },
-      music = { path="bn6_battle_xg.mid" },
+      name               = "Encounter3",
+      weight             = 10,
+      path               = "/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+      enemies            = { { name = "Swordy", rank = 1 }, { name = "Boomer", rank = 1 } },
+      enemies            = {
+        { name = "SwordyEl", rank = 5 },
+        { name = "SwordyEl", rank = 2 },
+        { name = "SwordyEl", rank = 8 },
+      },
+      obstacles          = {
+      },
+      positions          = {
+        { 0, 0, 0, 0, 3, 0 },
+        { 0, 0, 0, 0, 1, 0 },
+        { 0, 0, 0, 0, 2, 0 },
+      },
+      obstacle_positions = {
+        { 0, 0, 0, 0, 0, 0 },
+        { 0, 0, 0, 0, 0, 0 },
+        { 0, 0, 0, 0, 0, 0 },
+      },
+      player_positions   = {
+        { 0, 0, 0, 0, 0, 0 },
+        { 0, 1, 0, 0, 0, 0 },
+        { 0, 0, 0, 0, 0, 0 },
+      },
+      tiles              = {
+        { 1, 1, 1, 1, 1, 1 },
+        { 1, 1, 1, 1, 1, 1 },
+        { 1, 1, 1, 1, 1, 1 },
+      },
+      teams              = {
+        { 2, 2, 2, 1, 1, 1 },
+        { 2, 2, 2, 1, 1, 1 },
+        { 2, 2, 2, 1, 1, 1 },
+      },
+      music              = { path = "bn6_battle_xg.mid" },
     },
   },
   -- Money per pound for normal fish (not viruses)
-  FISH_REWARD_PER_LB = 3000,  -- edit to taste
+  FISH_REWARD_PER_LB     = 3000, -- edit to taste
 
   -- Waiting phase: bite indicator (public, visible to everyone)
-  BITE = {
+  BITE                   = {
     -- Fill these with your GIDs (two frames: idle + bite flash)
-    GIDS = {
-      idle = 0,  -- e.g., 310
-      bite = 305,  -- e.g., 311
+    GIDS             = {
+      idle = 0,   -- e.g., 310
+      bite = 305, -- e.g., 311
     },
     -- Placement controls (separate from fish/timer meters)
-    FORWARD = 0.0,
-    SIDE    = 0,  -- number or "left"/"right"
-    SCREEN_SHIFT = { x = -1.0, y = -1.0, z = 0.0 }, -- above player a little
+    FORWARD          = 0.0,
+    SIDE             = 0,                               -- number or "left"/"right"
+    SCREEN_SHIFT     = { x = -1.0, y = -1.0, z = 0.0 }, -- above player a little
 
     -- Optional size enforcement just for the bite icon
-    FORCE_DIMS_PX    = nil,              -- e.g., { w=32, h=32 }
+    FORCE_DIMS_PX    = nil, -- e.g., { w=32, h=32 }
     EXPECTED_DIMS_PX = { w = 22, h = 22 },
 
     -- Random wait before a bite shows up
-    WAIT_RANGE_S = { min = 1.2, max = 3.0 },
+    WAIT_RANGE_S     = { min = 1.2, max = 3.0 },
 
     -- Window to press A when it bites (heavier = shorter)
-    WINDOW_S = {
-      light = 1.10,  medium = 0.95,  heavy = 0.80,
-      very_heavy = 0.65, brutal = 0.55, legendary = 0.45,
+    WINDOW_S         = {
+      light = 1.10,
+      medium = 0.95,
+      heavy = 0.80,
+      very_heavy = 0.65,
+      brutal = 0.55,
+      legendary = 0.45,
     },
 
     -- Optional sfx on bite popup
-    SFX_BITE = nil, -- "/server/assets/ezlibs-assets/sfx/select.ogg"
+    SFX_BITE         = "/server/assets/sfx/WaterDeepSplash.ogg",
   },
 
-  BAIT = {
+  BAIT                   = {
     ITEM_NAME = "bait",
     VIRUS_CHANCE = 0.10, -- reduced when used (default is 0.30)
-    HEAVINESS_CHANCES = { light=20, medium=20, heavy=20, very_heavy=15, brutal=15, legendary=10 },
+    HEAVINESS_CHANCES = { light = 20, medium = 20, heavy = 20, very_heavy = 15, brutal = 15, legendary = 10 },
   },
 }
 
 -- ====================== Minimal TMX helpers ======================
-local FLIP_H = 0x80000000
-local FLIP_V = 0x40000000
-local FLIP_D = 0x20000000
+local FLIP_H       = 0x80000000
+local FLIP_V       = 0x40000000
+local FLIP_D       = 0x20000000
 
 local function decode_gid_flags(raw)
   local g = tonumber(raw or 0) or 0
-  local fh = false; if g >= FLIP_H then fh = true; g = g - FLIP_H end
-  local fv = false; if g >= FLIP_V then fv = true; g = g - FLIP_V end
-  local fr = false; if g >= FLIP_D then fr = true; g = g - FLIP_D end
+  local fh = false; if g >= FLIP_H then
+    fh = true; g = g - FLIP_H
+  end
+  local fv = false; if g >= FLIP_V then
+    fv = true; g = g - FLIP_V
+  end
+  local fr = false; if g >= FLIP_D then
+    fr = true; g = g - FLIP_D
+  end
   return g, fh, fv, fr
 end
 
@@ -338,7 +354,9 @@ local function _tmx_flip_flags_from_layer(area_id, layer_name, base_gid)
   local body = nil
   for attrs, content in xml:gmatch('<objectgroup%s+([^>]*)>([%s%S]-)</objectgroup>') do
     local name = attrs:match('name="([^"]+)"')
-    if name == layer_name then body = content; break end
+    if name == layer_name then
+      body = content; break
+    end
   end
   if not body then return nil end
 
@@ -372,7 +390,7 @@ local function _tmx_read_map_tilesize(xml)
   -- Only read from the <map ...> tag
   local map_tag = xml:match("<map%s+[^>]*>")
   if not map_tag then return 0, 0 end
-  local tw = tonumber(map_tag:match('tilewidth="([%d%.]+)"'))  or 0
+  local tw = tonumber(map_tag:match('tilewidth="([%d%.]+)"')) or 0
   local th = tonumber(map_tag:match('tileheight="([%d%.]+)"')) or 0
   return tw, th
 end
@@ -386,7 +404,9 @@ local function get_template_dims_from_layer(area_id, layer_name, gid)
   local body = nil
   for attrs, content in xml:gmatch('<objectgroup%s+([^>]*)>([%s%S]-)</objectgroup>') do
     local name = attrs:match('name="([^"]+)"')
-    if name == layer_name then body = content; break end
+    if name == layer_name then
+      body = content; break
+    end
   end
   if not body then return nil, nil end
 
@@ -394,7 +414,7 @@ local function get_template_dims_from_layer(area_id, layer_name, gid)
   local best_wt, best_ht = nil, nil
   for obj_tag in body:gmatch('<object%s+[^>]*>') do
     local ogid = tonumber(obj_tag:match('gid="(%d+)"') or "")
-    local wpx  = tonumber(obj_tag:match('width="([%d%.]+)"')  or "") or 0
+    local wpx  = tonumber(obj_tag:match('width="([%d%.]+)"') or "") or 0
     local hpx  = tonumber(obj_tag:match('height="([%d%.]+)"') or "") or 0
     if wpx > 0 and hpx > 0 then
       local wt, ht = (wpx / tw), (hpx / th)
@@ -410,7 +430,7 @@ local function get_gid_dims_in_tiles(area_id, gid)
   local ok_map, xml = pcall(Net.map_to_string, area_id)
   if not ok_ts or not ts or not ok_map or type(xml) ~= "string" then return nil, nil end
   local map_tw, map_th = _tmx_read_map_tilesize(xml); if map_tw == 0 or map_th == 0 then return nil, nil end
-  local tile_px_w = tonumber(ts.tile_width  or ts.tilewidth  or ts.tileWidth)
+  local tile_px_w = tonumber(ts.tile_width or ts.tilewidth or ts.tileWidth)
   local tile_px_h = tonumber(ts.tile_height or ts.tileheight or ts.tileHeight)
   if not tile_px_w or not tile_px_h then return nil, nil end
   return (tile_px_w / map_tw), (tile_px_h / map_th)
@@ -431,8 +451,8 @@ local function resolve_preview_flip_flags(area_id, template_layer_name, base_gid
   if proto and proto.data then
     local td = proto.data
     return td.flipped_horizontally or false,
-           td.flipped_vertically   or false,
-           td.rotated              or false
+        td.flipped_vertically or false,
+        td.rotated or false
   end
   local try_layers = { template_layer_name, "Object Layer 1", "Object Layer 2" }
   for _, lname in ipairs(try_layers) do
@@ -449,15 +469,25 @@ local function get_cursor_point(player_id, dist)
   local dx, dy = 0, 1
   local ok_dir, dir = pcall(Net.get_player_direction, player_id)
   local function dir_to_offset(dirName)
-    if     dirName == "Left"       then return -1, 0
-    elseif dirName == "Right"      then return  1, 0
-    elseif dirName == "Up"         then return  0,-1
-    elseif dirName == "Down"       then return  0, 1
-    elseif dirName == "Up Left"    then return -1,-1
-    elseif dirName == "Up Right"   then return  1,-1
-    elseif dirName == "Down Left"  then return -1, 1
-    elseif dirName == "Down Right" then return  1, 1
-    else return 0,1 end
+    if dirName == "Left" then
+      return -1, 0
+    elseif dirName == "Right" then
+      return 1, 0
+    elseif dirName == "Up" then
+      return 0, -1
+    elseif dirName == "Down" then
+      return 0, 1
+    elseif dirName == "Up Left" then
+      return -1, -1
+    elseif dirName == "Up Right" then
+      return 1, -1
+    elseif dirName == "Down Left" then
+      return -1, 1
+    elseif dirName == "Down Right" then
+      return 1, 1
+    else
+      return 0, 1
+    end
   end
   if ok_dir and dir then
     dx, dy = dir_to_offset(dir)
@@ -473,15 +503,25 @@ local function get_offset_point(player_id, forward_dist, side_spec, side_default
   if not ok_pos or not pos then return nil end
 
   local function dir_to_offset(dirName)
-    if     dirName == "Left"       then return -1, 0
-    elseif dirName == "Right"      then return  1, 0
-    elseif dirName == "Up"         then return  0,-1
-    elseif dirName == "Down"       then return  0, 1
-    elseif dirName == "Up Left"    then return -1,-1
-    elseif dirName == "Up Right"   then return  1,-1
-    elseif dirName == "Down Left"  then return -1, 1
-    elseif dirName == "Down Right" then return  1, 1
-    else return 0,1 end
+    if dirName == "Left" then
+      return -1, 0
+    elseif dirName == "Right" then
+      return 1, 0
+    elseif dirName == "Up" then
+      return 0, -1
+    elseif dirName == "Down" then
+      return 0, 1
+    elseif dirName == "Up Left" then
+      return -1, -1
+    elseif dirName == "Up Right" then
+      return 1, -1
+    elseif dirName == "Down Left" then
+      return -1, 1
+    elseif dirName == "Down Right" then
+      return 1, 1
+    else
+      return 0, 1
+    end
   end
 
   local ok_dir, dir = pcall(Net.get_player_direction, player_id)
@@ -498,16 +538,16 @@ local function get_offset_point(player_id, forward_dist, side_spec, side_default
   elseif tostring(side_spec) == "left" then
     side = -(side_default or 2.0)
   else
-    side =  (side_default or 2.0) -- "right" or anything else
+    side = (side_default or 2.0) -- "right" or anything else
   end
 
   return pos.x + fdx * forward_dist + rdx * side,
-         pos.y + fdy * forward_dist + rdy * side,
-         (pos.z or 0)
+      pos.y + fdy * forward_dist + rdy * side,
+      (pos.z or 0)
 end
 
 -- ====================== Runtime state ======================
-local SESS = {}    -- [pid] = session
+local SESS = {} -- [pid] = session
 -- session fields:
 --   area_id, started_at, last_pos {x,y,z}, active,
 --   meter_color, meter_phase (0..10), meter_value (float), meter_oid,
@@ -527,7 +567,7 @@ local function _lb_bucket()
   local area = (FISHING.LEADERBOARD and FISHING.LEADERBOARD.MEM_AREA) or "fisharea"
   local key  = (FISHING.LEADERBOARD and FISHING.LEADERBOARD.KEY) or "fish_top10"
   local mem  = ezmemory.get_area_memory(area) or {}
-  mem[key] = mem[key] or {}
+  mem[key]   = mem[key] or {}
   return mem, mem[key], area, key
 end
 
@@ -541,13 +581,15 @@ local function _record_catch(pid, weight_lb)
   local mem, list, area = _lb_bucket()
   local rec = { weight = tonumber(weight_lb) or 0, player_name = tostring(name), pid = tostring(pid), ts = os.time() }
   table.insert(list, rec)
-  table.sort(list, function(a,b) return (a.weight or 0) > (b.weight or 0) end)
+  table.sort(list, function(a, b) return (a.weight or 0) > (b.weight or 0) end)
   local maxn = (FISHING.LEADERBOARD and FISHING.LEADERBOARD.MAX) or 10
   while #list > maxn do table.remove(list) end
 
   local rank = nil
   for i, r in ipairs(list) do
-    if r == rec then rank = i; break end
+    if r == rec then
+      rank = i; break
+    end
   end
   ezmemory.save_area_memory(area)
   return rank
@@ -562,7 +604,7 @@ local function _map_info(xml)
   local map_tag = xml:match("<map%s+[^>]*>")
   if not map_tag then return "orthogonal", 32, 32 end
   local orient = map_tag:match('orientation="([^"]+)"') or "orthogonal"
-  local tw = tonumber(map_tag:match('tilewidth="([%d%.]+)"'))  or 32
+  local tw = tonumber(map_tag:match('tilewidth="([%d%.]+)"')) or 32
   local th = tonumber(map_tag:match('tileheight="([%d%.]+)"')) or 32
   return orient, tw, th
 end
@@ -709,15 +751,16 @@ local function _hide_existing_meters_for_joiner(ev)
     if o then
       local cp = o.custom_properties or {}
       local is_meter =
-        (o.class == "FishingMeter") or (tostring(cp.fishing_meter or "") == "true") or
-        (o.class == "FishingTimer") or (tostring(cp.fishing_timer or "") == "true")
+          (o.class == "FishingMeter") or (tostring(cp.fishing_meter or "") == "true") or
+          (o.class == "FishingTimer") or (tostring(cp.fishing_timer or "") == "true")
       if is_meter and tostring(cp.fishing_pid or "") ~= tostring(pid) then
         -- Hide right now for the joiner…
         pcall(Net.exclude_object_for_player, pid, oid)
         -- …and also persist for this session
         pcall(ezmemory.hide_object_from_player_till_disconnect, pid, aid, oid)
         if FISHING.DEBUG then
-          print(("[fishing] joiner hide oid=%s owner=%s for pid=%s"):format(tostring(oid), tostring(cp.fishing_pid or ""), tostring(pid)))
+          print(("[fishing] joiner hide oid=%s owner=%s for pid=%s"):format(tostring(oid), tostring(cp.fishing_pid or ""),
+            tostring(pid)))
         end
       end
     end
@@ -754,7 +797,7 @@ local function _exclude_for_non_owners(owner_pid, area_id, object_id)
   do_exclude()
   -- …and again after a short delay so the client has definitely registered the object
   async(function()
-    await(Async.sleep(0.05))  -- ~1 tick
+    await(Async.sleep(0.05)) -- ~1 tick
     do_exclude()
   end)
 end
@@ -799,13 +842,13 @@ local function _spawn_or_update_bite(pid)
     return
   end
 
-  local base_gid = gid_base(raw_gid)
-  local fh,fv,fr = resolve_preview_flip_flags(area_id, FISHING.TEMPLATE_LAYER, base_gid, false,false,false)
-  local w,h = _resolve_bite_dims(area_id, base_gid)
+  local base_gid   = gid_base(raw_gid)
+  local fh, fv, fr = resolve_preview_flip_flags(area_id, FISHING.TEMPLATE_LAYER, base_gid, false, false, false)
+  local w, h       = _resolve_bite_dims(area_id, base_gid)
 
-  local forward = (FISHING.BITE and FISHING.BITE.FORWARD) or 0.0
-  local side    = (FISHING.BITE and FISHING.BITE.SIDE)
-  local x,y,z   = get_offset_point(pid, forward, side or 0, 0)
+  local forward    = (FISHING.BITE and FISHING.BITE.FORWARD) or 0.0
+  local side       = (FISHING.BITE and FISHING.BITE.SIDE)
+  local x, y, z    = get_offset_point(pid, forward, side or 0, 0)
   if not x then return end
   do
     local sh = (FISHING.BITE and FISHING.BITE.SCREEN_SHIFT) or {}
@@ -817,12 +860,19 @@ local function _spawn_or_update_bite(pid)
       :format(state, base_gid, w, h, x, y, z))
   end
 
-  local data = { type="tile", gid=base_gid, flipped_horizontally=fh, flipped_vertically=fv, rotated=fr }
+  local data = { type = "tile", gid = base_gid, flipped_horizontally = fh, flipped_vertically = fv, rotated = fr }
   local spec = {
     name = "",
-    class="FishingBite", visible=true,
-    x=x, y=y, z=z, width=w, height=h, rotation=0, data=data,
-    custom_properties = { fishing_bite="true", fishing_pid=tostring(pid or "") }
+    class = "FishingBite",
+    visible = true,
+    x = x,
+    y = y,
+    z = z,
+    width = w,
+    height = h,
+    rotation = 0,
+    data = data,
+    custom_properties = { fishing_bite = "true", fishing_pid = tostring(pid or "") }
   }
 
   local must_recreate = false
@@ -830,7 +880,8 @@ local function _spawn_or_update_bite(pid)
     must_recreate = true
   else
     local cur = Net.get_object_by_id(area_id, s.bite_oid)
-    if not cur then must_recreate = true
+    if not cur then
+      must_recreate = true
     else
       local cw = tonumber(cur.width) or 0; local ch = tonumber(cur.height) or 0
       if math.abs(cw - w) > 0.001 or math.abs(ch - h) > 0.001 then must_recreate = true end
@@ -839,11 +890,11 @@ local function _spawn_or_update_bite(pid)
 
   if must_recreate then
     if s.bite_oid then pcall(function() Net.remove_object(area_id, s.bite_oid) end) end
-    local ok,res = pcall(Net.create_object, area_id, spec)
+    local ok, res = pcall(Net.create_object, area_id, spec)
     if not ok then
       -- retry on template layer
       spec.layer = FISHING.TEMPLATE_LAYER
-      ok,res=pcall(Net.create_object, area_id, spec)
+      ok, res = pcall(Net.create_object, area_id, spec)
       if not ok then
         if FISHING.DEBUG then
           print("[fishing] bite create failed twice (check GID/tileset/layer).")
@@ -863,11 +914,13 @@ end
 
 local function _despawn_bite(pid)
   local s = SESS[pid]; if not s then return end
-  if s.bite_oid then pcall(function() Net.remove_object(s.area_id, s.bite_oid) end); s.bite_oid = nil end
+  if s.bite_oid then
+    pcall(function() Net.remove_object(s.area_id, s.bite_oid) end); s.bite_oid = nil
+  end
 end
 
 -- Tracks all areas where we have spawned a FishingMeter for a given player
-local _PID_AREAS = {}  -- pid -> { [area_id]=true, ... }
+local _PID_AREAS = {} -- pid -> { [area_id]=true, ... }
 
 -- ====================== Meter Preview ======================
 local function _meter_gid(area_id, color, phase)
@@ -885,7 +938,8 @@ local function _spawn_or_update_meter(pid)
   if not raw_gid or raw_gid == 0 then return end
 
   local base_gid = gid_base(raw_gid)
-  local want_fh, want_fv, want_fr = resolve_preview_flip_flags(area_id, FISHING.TEMPLATE_LAYER, base_gid, false, false, false)
+  local want_fh, want_fv, want_fr = resolve_preview_flip_flags(area_id, FISHING.TEMPLATE_LAYER, base_gid, false, false,
+    false)
   local w, h = _resolve_meter_dims(area_id, FISHING.TEMPLATE_LAYER, base_gid)
   w = tonumber(w) or 1
   h = tonumber(h) or 1
@@ -908,26 +962,29 @@ local function _spawn_or_update_meter(pid)
   do
     local shift = FISHING.METER_SCREEN_SHIFT or {}
     x = x + (shift.x or 0)
-    y = y + (shift.y or 0)   -- increase y to move lower
+    y = y + (shift.y or 0) -- increase y to move lower
     z = z + (shift.z or 0)
   end
 
   local data = {
-    type = "tile",
-    gid = tonumber(base_gid) or 0,
+    type                 = "tile",
+    gid                  = tonumber(base_gid) or 0,
     flipped_horizontally = not not want_fh,
     flipped_vertically   = not not want_fv,
     rotated              = not not want_fr,
   }
 
   local spec = {
-    name     = "",
-    class    = "FishingMeter",
-    visible  = not FISHING.PRIVATE_METERS,
-    x        = x, y = y, z = z,
-    width    = w, height = h,
-    rotation = 0,
-    data     = data,
+    name              = "",
+    class             = "FishingMeter",
+    visible           = not FISHING.PRIVATE_METERS,
+    x                 = x,
+    y                 = y,
+    z                 = z,
+    width             = w,
+    height            = h,
+    rotation          = 0,
+    data              = data,
     custom_properties = {
       fishing_meter = "true",
       fishing_pid   = tostring(pid or ""),
@@ -943,7 +1000,7 @@ local function _spawn_or_update_meter(pid)
       must_recreate = true
     else
       -- only recreate if size drifted; DO NOT compare gid
-      local cw = tonumber(cur.width)  or 0
+      local cw = tonumber(cur.width) or 0
       local ch = tonumber(cur.height) or 0
       if math.abs(cw - w) > 0.001 or math.abs(ch - h) > 0.001 then
         if FISHING.DEBUG then
@@ -966,7 +1023,7 @@ local function _spawn_or_update_meter(pid)
     if FISHING.PRIVATE_METERS then
       _exclude_for_non_owners(pid, area_id, s.meter_oid)
       async(function()
-        await(Async.sleep(0.05))  -- small delay so all clients know about the object first
+        await(Async.sleep(0.05)) -- small delay so all clients know about the object first
         pcall(Net.set_object_visibility, area_id, s.meter_oid, true)
         if FISHING.DEBUG then
           print(("[fishing] reveal meter oid=%s area=%s"):format(tostring(s.meter_oid), tostring(area_id)))
@@ -997,18 +1054,18 @@ local function _spawn_or_update_timer(pid)
   local raw_gid = _timer_gid(area_id, s.timer_phase or 0)
   if not raw_gid or raw_gid == 0 then return end
 
-  local base_gid = gid_base(raw_gid)
+  local base_gid                  = gid_base(raw_gid)
   local want_fh, want_fv, want_fr =
-    resolve_preview_flip_flags(area_id, FISHING.TEMPLATE_LAYER, base_gid, false, false, false)
+      resolve_preview_flip_flags(area_id, FISHING.TEMPLATE_LAYER, base_gid, false, false, false)
 
   -- Size (timer-specific)
-  local w, h = _resolve_timer_dims(area_id, FISHING.TEMPLATE_LAYER, base_gid)
+  local w, h                      = _resolve_timer_dims(area_id, FISHING.TEMPLATE_LAYER, base_gid)
 
   -- Position (timer-specific)
-  local forward  = FISHING.TIMER_FORWARD or 0.0
-  local side_spec = (FISHING.TIMER_SIDE ~= nil) and FISHING.TIMER_SIDE or 0
-  local side_default = 0  -- timer stays centered unless you pass a number or "left"/"right"
-  local x, y, z = get_offset_point(pid, forward, side_spec, side_default)
+  local forward                   = FISHING.TIMER_FORWARD or 0.0
+  local side_spec                 = (FISHING.TIMER_SIDE ~= nil) and FISHING.TIMER_SIDE or 0
+  local side_default              = 0 -- timer stays centered unless you pass a number or "left"/"right"
+  local x, y, z                   = get_offset_point(pid, forward, side_spec, side_default)
   if not x or not y then return end
   x = tonumber(x) or 0; y = tonumber(y) or 0; z = tonumber(z) or 0
 
@@ -1016,26 +1073,29 @@ local function _spawn_or_update_timer(pid)
   do
     local shift = FISHING.TIMER_SCREEN_SHIFT or {}
     x = x + (shift.x or 0)
-    y = y + (shift.y or 0)   -- negative draws above player
+    y = y + (shift.y or 0) -- negative draws above player
     z = z + (shift.z or 0)
   end
 
   local data = {
-    type = "tile",
-    gid = tonumber(base_gid) or 0,
+    type                 = "tile",
+    gid                  = tonumber(base_gid) or 0,
     flipped_horizontally = not not want_fh,
     flipped_vertically   = not not want_fv,
     rotated              = not not want_fr,
   }
 
   local spec = {
-    name     = "",
-    class    = "FishingTimer",
-    visible  = not FISHING.PRIVATE_METERS,
-    x        = x, y = y, z = z,
-    width    = w, height = h,
-    rotation = 0,
-    data     = data,
+    name              = "",
+    class             = "FishingTimer",
+    visible           = not FISHING.PRIVATE_METERS,
+    x                 = x,
+    y                 = y,
+    z                 = z,
+    width             = w,
+    height            = h,
+    rotation          = 0,
+    data              = data,
     custom_properties = {
       fishing_timer = "true",
       fishing_pid   = tostring(pid or ""),
@@ -1051,7 +1111,7 @@ local function _spawn_or_update_timer(pid)
       must_recreate = true
     else
       -- only recreate if size drifted; DO NOT compare gid
-      local cw = tonumber(cur.width)  or 0
+      local cw = tonumber(cur.width) or 0
       local ch = tonumber(cur.height) or 0
       if math.abs(cw - w) > 0.001 or math.abs(ch - h) > 0.001 then
         if FISHING.DEBUG then
@@ -1082,7 +1142,7 @@ local function _spawn_or_update_timer(pid)
         end
       end)
     end
-    else
+  else
     Net.move_object(area_id, s.timer_oid, x, y, z)
     Net.set_object_data(area_id, s.timer_oid, data)
   end
@@ -1151,9 +1211,9 @@ local function _cleanup_fishing_meters(area_id, only_pid)
     if o then
       local cp = o.custom_properties or {}
       local is_meter =
-        (o.class == "FishingMeter") or (tostring(cp.fishing_meter or "") == "true") or
-        (o.class == "FishingTimer") or (tostring(cp.fishing_timer or "") == "true") or
-        (o.class == "FishingBite")  or (tostring(cp.fishing_bite  or "") == "true")
+          (o.class == "FishingMeter") or (tostring(cp.fishing_meter or "") == "true") or
+          (o.class == "FishingTimer") or (tostring(cp.fishing_timer or "") == "true") or
+          (o.class == "FishingBite") or (tostring(cp.fishing_bite or "") == "true")
       if is_meter then
         local owner = tostring(cp.fishing_pid or "")
         local kill = false
@@ -1188,10 +1248,10 @@ local function _pick_virus_encounter()
 end
 
 -- Provide mob package once per area
-local _ASSET_PROVIDED = {}  -- key "area|path" -> true
+local _ASSET_PROVIDED = {} -- key "area|path" -> true
 local function _ensure_asset(area_id, path)
   if not area_id or not path or path == "" then return end
-  local key = tostring(area_id).."|"..tostring(path)
+  local key = tostring(area_id) .. "|" .. tostring(path)
   if not _ASSET_PROVIDED[key] then
     pcall(Net.provide_asset, area_id, path)
     _ASSET_PROVIDED[key] = true
@@ -1200,11 +1260,11 @@ end
 
 local function _default_fishing_rewards(player_id, encounter_info, stats)
   -- stats = { health, score, time, ran, emotion, turns, npcs = [...] }
-  if not stats or stats.ran then return end   -- no rewards if ran
+  if not stats or stats.ran then return end -- no rewards if ran
   local reward_monies = math.floor((stats.score or 0) * 5000)
   if reward_monies > 0 then
     ezmemory.spend_player_money(player_id, -reward_monies) -- negative spend = give money
-    Net.message_player(player_id, "Got $"..reward_monies.."!")
+    Net.message_player(player_id, "Got $" .. reward_monies .. "!")
     if FISHING.SFX and FISHING.SFX.catch then
       Net.play_sound_for_player(player_id, FISHING.SFX.catch)
     end
@@ -1216,20 +1276,21 @@ if FISHING.RESULTS_CALLBACK == nil then
 end
 
 -- When a player closes a message box, we start their queued encounter.
-local _PENDING_VIRUS = {}  -- pid -> { enc=table, area=string }
+local _PENDING_VIRUS = {} -- pid -> { enc=table, area=string }
 
 local function _queue_virus_battle(pid, enc, area_id)
   _PENDING_VIRUS[pid] = { enc = enc, area = area_id }
   Net.message_player(pid, "Oh no, it's a virus!")
+  _play(pid, FISHING.SFX.caught_virus)
 end
 
 local function _begin_pending_virus(pid)
   local rec = _PENDING_VIRUS[pid]
   if not rec then return end
-  _PENDING_VIRUS[pid] = nil  -- guard against double start
+  _PENDING_VIRUS[pid] = nil -- guard against double start
 
-  local enc  = rec.enc
-  local area = rec.area
+  local enc           = rec.enc
+  local area          = rec.area
   _ensure_asset(area, enc and enc.path)
 
   -- hook rewards just like WCity1
@@ -1252,8 +1313,11 @@ local function _stop(pid, msg, sfx)
   pcall(_cleanup_fishing_meters, s.area_id, pid) -- sweep this player's meters
   SESS[pid] = nil
   if msg and msg ~= "" then
-    if Async and Async.message_player then Async.message_player(pid, msg)
-    else Net.message_player(pid, msg) end
+    if Async and Async.message_player then
+      Async.message_player(pid, msg)
+    else
+      Net.message_player(pid, msg)
+    end
   end
   _play(pid, sfx)
 end
@@ -1266,7 +1330,7 @@ local function _quiet_restart_wait(pid)
   s.bite_until  = 0
   _spawn_or_update_bite(pid) -- will despawn if idle gid=0
 
-  local rng = (FISHING.BITE and FISHING.BITE.WAIT_RANGE_S) or {min=1.2, max=3.0}
+  local rng = (FISHING.BITE and FISHING.BITE.WAIT_RANGE_S) or { min = 1.2, max = 3.0 }
   local wmin = tonumber(rng.min or 1.2) or 1.2
   local wmax = tonumber(rng.max or 3.0) or 3.0
   local bite_in = wmin + math.random() * math.max(0, wmax - wmin)
@@ -1297,61 +1361,61 @@ local function _start_session(pid, opts)
   _cleanup_fishing_meters(area, pid)
 
   local used_bait = opts and opts.used_bait or false
-  local odds = used_bait and (FISHING.BAIT and FISHING.BAIT.HEAVINESS_CHANCES)
-               or FISHING.HEAVINESS_CHANCES
+  local odds      = used_bait and (FISHING.BAIT and FISHING.BAIT.HEAVINESS_CHANCES)
+      or FISHING.HEAVINESS_CHANCES
 
   -- pick heaviness and hold (uses per-session odds)
-  local H = _pick_heaviness_with_odds(odds)
+  local H         = _pick_heaviness_with_odds(odds)
   local base_hold = (FISHING.HOLD_SECONDS or (FISHING.HOLD_RANGE_S.min + math.random() *
-                    (FISHING.HOLD_RANGE_S.max - FISHING.HOLD_RANGE_S.min)))
+    (FISHING.HOLD_RANGE_S.max - FISHING.HOLD_RANGE_S.min)))
   local hold_req  = base_hold * (H.hold_mult or 1.0)
 
-  local W = math.max(1, math.min(3, tonumber(FISHING.SWEET_WIDTH or 2)))
-  local max_lo = 9 - (W - 1)
-  local sweet_lo = math.random(1, max_lo)
-  local sweet_hi = sweet_lo + (W - 1)
+  local W         = math.max(1, math.min(3, tonumber(FISHING.SWEET_WIDTH or 2)))
+  local max_lo    = 9 - (W - 1)
+  local sweet_lo  = math.random(1, max_lo)
+  local sweet_hi  = sweet_lo + (W - 1)
 
-  local px = Net.get_player_position(pid) or {x=0,y=0,z=0}
+  local px        = Net.get_player_position(pid) or { x = 0, y = 0, z = 0 }
 
-  local s = {
-    area_id     = area,
-    started_at  = _now_s(),
-    last_pos    = { x = px.x, y = px.y, z = px.z },
-    active      = true,
+  local s         = {
+    area_id      = area,
+    started_at   = _now_s(),
+    last_pos     = { x = px.x, y = px.y, z = px.z },
+    active       = true,
 
     -- waiting phase
-    phase       = "waiting",
-    bite_state  = "idle",
-    bite_active = false,
-    bite_until  = 0,
-    bite_oid    = nil,
+    phase        = "waiting",
+    bite_state   = "idle",
+    bite_active  = false,
+    bite_until   = 0,
+    bite_oid     = nil,
     next_bite_at = nil, -- important: session field
 
     -- reeling
-    meter_color = "blue",
-    meter_phase = 0,
-    meter_value = 0.0,
-    sweet_lo    = sweet_lo,
-    sweet_hi    = sweet_hi,
-    hold_req    = hold_req,
-    hold_accum  = 0.0,
-    heaviness   = H.key,
-    weight_lb   = _random_weight_lb(H.key),
-    decay       = H.decay,
-    mashGain    = H.mash,
-    used_bait   = used_bait and true or false,
+    meter_color  = "normal",
+    meter_phase  = 0,
+    meter_value  = 0.0,
+    sweet_lo     = sweet_lo,
+    sweet_hi     = sweet_hi,
+    hold_req     = hold_req,
+    hold_accum   = 0.0,
+    heaviness    = H.key,
+    weight_lb    = _random_weight_lb(H.key),
+    decay        = H.decay,
+    mashGain     = H.mash,
+    used_bait    = used_bait and true or false,
     virus_chance = used_bait and ((FISHING.BAIT and FISHING.BAIT.VIRUS_CHANCE) or FISHING.VIRUS_CHANCE)
-                              or (FISHING.VIRUS_CHANCE),
+        or (FISHING.VIRUS_CHANCE),
     odds_used    = odds,
-    taps        = 0.0,
-    timer_phase = 0,
+    taps         = 0.0,
+    timer_phase  = 0,
   }
-  SESS[pid] = s
+  SESS[pid]       = s
   _play(pid, FISHING.SFX.start)
 
   -- waiting loop
   async(function()
-    local wait_rng = (FISHING.BITE and FISHING.BITE.WAIT_RANGE_S) or {min=1.2,max=3.0}
+    local wait_rng = (FISHING.BITE and FISHING.BITE.WAIT_RANGE_S) or { min = 1.2, max = 3.0 }
     local wait_min = tonumber(wait_rng.min or 1.2) or 1.2
     local wait_max = tonumber(wait_rng.max or 3.0) or 3.0
     local step = 0.05
@@ -1380,9 +1444,9 @@ local function _start_session(pid, opts)
       if (not cur.bite_active) and _now_s() >= (cur.next_bite_at or 0) then
         cur.bite_state  = "bite"
         cur.bite_active = true
-        local win_tbl = (FISHING.BITE and FISHING.BITE.WINDOW_S) or {}
-        local win = tonumber(win_tbl[cur.heaviness] or 0.9) or 0.9
-        cur.bite_until = _now_s() + win
+        local win_tbl   = (FISHING.BITE and FISHING.BITE.WINDOW_S) or {}
+        local win       = tonumber(win_tbl[cur.heaviness] or 0.9) or 0.9
+        cur.bite_until  = _now_s() + win
         if FISHING.DEBUG then
           print(("[fishing] BITE! window=%.2fs gid=%d"):format(win, _bite_gid("bite") or -1))
         end
@@ -1403,9 +1467,9 @@ end
 
 local function _begin_reeling(pid)
   local s = SESS[pid]; if not s or not s.active then return end
-  s.phase = "reeling"
-  s.ends_at = _now_s() + math.ceil(FISHING.MAX_DURATION_S)
-  s.meter_color = "blue"
+  s.phase       = "reeling"
+  s.ends_at     = _now_s() + math.ceil(FISHING.MAX_DURATION_S)
+  s.meter_color = "normal"
   s.meter_phase = 0
   s.meter_value = 0.0
   s.hold_accum  = 0.0
@@ -1438,8 +1502,11 @@ local function _begin_reeling(pid)
       if phase ~= cur.meter_phase then cur.meter_phase = phase end
 
       local in_sweet = (cur.meter_phase >= cur.sweet_lo and cur.meter_phase <= cur.sweet_hi)
-      if in_sweet then cur.meter_color = "yellow"; cur.hold_accum = cur.hold_accum + step
-      else cur.meter_color = "blue" end
+      if in_sweet then
+        cur.meter_color = "sweet_spot"; cur.hold_accum = cur.hold_accum + step
+      else
+        cur.meter_color = "normal"
+      end
 
       -- timer bar progress (0..5)
       local ratio = 0
@@ -1504,7 +1571,7 @@ local function _consume_item(pid, name, qty)
 end
 
 -- queue: start fishing only after the player closes a message
-local _PENDING_START = {}  -- pid -> { used_bait = bool }
+local _PENDING_START = {} -- pid -> { used_bait = bool }
 local function _queue_start_after_message(pid, msg, used_bait)
   _PENDING_START[pid] = { used_bait = used_bait and true or false }
   Net.message_player(pid, msg or "Starting to fish...")
@@ -1518,7 +1585,7 @@ end
 -- ====================== FishBBS (Top 10 board) ======================
 local FISHBBS = {
   TITLE = "FishBBS - Top 10 Heaviest",
-  COLOR = { r=90, g=180, b=255 },
+  COLOR = { r = 90, g = 180, b = 255 },
 }
 
 local function _trunc(s, n)
@@ -1532,16 +1599,16 @@ local function _open_fishbbs(pid)
   local posts = {}
 
   if #list == 0 then
-    posts[#posts+1] = { id='__fishbbs:none', read=true, title='No catches yet. Be the first!', author='' }
+    posts[#posts + 1] = { id = '__fishbbs:none', read = true, title = 'No catches yet. Be the first!', author = '' }
   else
     local MAX_NAME = 20
     for i, rec in ipairs(list) do
       local nm = _trunc(tostring(rec.player_name or "Unknown"), MAX_NAME)
       local wt = tonumber(rec.weight or 0) or 0
-      posts[#posts+1] = {
-        id     = '__fishbbs:post:'..i,
+      posts[#posts + 1] = {
+        id     = '__fishbbs:post:' .. i,
         read   = true,
-        title  = string.format('%2d  %s', i, nm),   -- no '#'
+        title  = string.format('%2d  %s', i, nm), -- no '#'
         author = string.format('%.1f lb', wt),
       }
       if i >= 10 then break end
@@ -1563,14 +1630,19 @@ end)
 Net:on("textbox_response", function(a, b)
   local pid = (type(a) == "table") and (a.player_id or a[1]) or a
   if not pid then return end
-  if _PENDING_VIRUS[pid] then _begin_pending_virus(pid); return end
-  if _PENDING_START[pid] then _begin_pending_start(pid); return end
+  if _PENDING_VIRUS[pid] then
+    _begin_pending_virus(pid); return
+  end
+  if _PENDING_START[pid] then
+    _begin_pending_start(pid); return
+  end
 end)
 -- ====================== Input handling ======================
 local function _register_tap(pid)
   local s = SESS[pid]; if not s or not s.active then return end
   s.taps = (s.taps or 0) + 1.0
   _play(pid, FISHING.SFX.tick)
+  _play(pid, FISHING.SFX.a_pressed)
 end
 
 Net:on("object_interaction", function(ev)
@@ -1582,7 +1654,7 @@ Net:on("object_interaction", function(ev)
   local obj = Net.get_object_by_id(area_id, ev.object_id)
   if obj then
     local cls = tostring(obj.class or '')
-    local typ = tostring(obj.type  or '')
+    local typ = tostring(obj.type or '')
     -- Open FishBBS if this is a board
     if cls == 'FishBBS' or typ == 'FishBBS' then
       _open_fishbbs(pid)
@@ -1597,7 +1669,7 @@ Net:on("object_interaction", function(ev)
       if s.bite_active then
         _try_begin_reeling(pid)
       else
-        _quiet_restart_wait(pid)  -- was: _stop + _start_session
+        _quiet_restart_wait(pid) -- was: _stop + _start_session
       end
     else
       _register_tap(pid)
@@ -1623,7 +1695,7 @@ Net:on("object_interaction", function(ev)
     end
 
     local q = string.format("You have %d bait. Use 1 to start fishing?", have)
-    local ans = await(Async.question_player(pid, q, nil, nil))  -- returns 1 (Yes) or 0 (No)
+    local ans = await(Async.question_player(pid, q, nil, nil)) -- returns 1 (Yes) or 0 (No)
 
     if ans == 1 then
       _consume_item(pid, bait_name, 1)
@@ -1642,7 +1714,7 @@ Net:on("tile_interaction", function(ev)
     if s.bite_active then
       _try_begin_reeling(pid)
     else
-      _quiet_restart_wait(pid)  -- was: _stop + _start_session
+      _quiet_restart_wait(pid) -- was: _stop + _start_session
     end
     return
   end
@@ -1713,8 +1785,8 @@ local fishing = {}
 
 function fishing.set_meters(tbl)
   if type(tbl) == "table" then
-    if tbl.blue   then FISHING.METERS.blue   = tbl.blue   end
-    if tbl.yellow then FISHING.METERS.yellow = tbl.yellow end
+    if tbl.normal then FISHING.METERS.normal = tbl.normal end
+    if tbl.sweet_spot then FISHING.METERS.sweet_spot = tbl.sweet_spot end
   end
 end
 
