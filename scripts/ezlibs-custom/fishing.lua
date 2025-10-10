@@ -671,11 +671,6 @@ local function _enforce_expected_dims(area_id, w, h)
   return w, h, false
 end
 
-local function _timer_gid(area_id, phase)
-  local t = FISHING.METERS_TIMER or {}
-  return tonumber(t[phase or 0] or 0) or 0
-end
-
 -- Size resolver for the timer bar; mirrors your fish resolver but uses timer-specific overrides.
 local function _resolve_timer_dims(area_id, layer_name, base_gid)
   -- Force override (pixels -> tiles) if configured
@@ -805,8 +800,81 @@ local function _exclude_for_non_owners(owner_pid, area_id, object_id)
   end)
 end
 
+-- === Hardcoded asset lookup (no layer objects required) ===
+-- Directory layout you described:
+--   METERS.normal:      /server/assets/fishing/blue/0.tsx .. 10.tsx (and .png)
+--   METERS.sweet_spot:  /server/assets/fishing/yellow/0.tsx .. 10.tsx
+--   TIMER phases:       prefer /server/assets/fishing/timer/0.tsx .. 5.tsx (fallbacks below)
+--   BITE (flash):       /server/fishing/ex.tsx   (fallback: /server/assets/fishing/ex.tsx)
+
+local ASSET_FISHING_DIR   = "/server/assets/fishing/"
+local ASSET_NORMAL_DIR    = ASSET_FISHING_DIR .. "blue/"
+local ASSET_SWEET_DIR     = ASSET_FISHING_DIR .. "yellow/"
+-- Try a timer/ subdir first; fall back to reusing blue/ if that’s how you stored them.
+local ASSET_TIMER_DIRS    = { ASSET_FISHING_DIR .. "timer/", ASSET_NORMAL_DIR }
+-- Bite candidates (support both paths you mentioned)
+local BITE_TSX_CANDIDATES = { "/server/fishing/ex.tsx", ASSET_FISHING_DIR .. "ex.tsx" }
+
+-- Parse TMX once per call; keyed by lowercase, slash-normalized source path
+local function _tilesets_by_source(area_id)
+  local ok, xml = pcall(Net.map_to_string, area_id)
+  if not ok or type(xml) ~= "string" then return {} end
+  local out = {}
+  for firstgid, src in xml:gmatch('<tileset%s+[^>]-firstgid="(%d+)"[^>]-source="([^"]+)"[^>]*/>') do
+    local tail = tostring(src):gsub("\\","/"):lower()
+    out[tail] = tonumber(firstgid)
+  end
+  return out
+end
+
+-- Find firstgid for a TSX by matching the end of its path (robust to relative prefixes)
+local function _gid_for_tsx(area_id, tsx_path)
+  if not tsx_path or tsx_path == "" then return 0 end
+  local tail = tostring(tsx_path):gsub("\\","/"):lower()
+  local ts = _tilesets_by_source(area_id)
+  for src, first in pairs(ts) do
+    if src:sub(-#tail) == tail then
+      return tonumber(first) or 0
+    end
+  end
+  return 0
+end
+
+-- Build gid from your blue/yellow phase files (0..10)
+local function _meter_gid_from_assets(area_id, color, phase)
+  phase = tonumber(phase or 0) or 0
+  local dir = (color == "sweet_spot") and ASSET_SWEET_DIR or ASSET_NORMAL_DIR
+  local gid = _gid_for_tsx(area_id, dir .. tostring(phase) .. ".tsx")
+  return gid > 0 and gid or 0
+end
+
+-- Build gid for timer (0..5); tries /timer/ first, then reuses /blue/
+local function _timer_gid_from_assets(area_id, phase)
+  phase = tonumber(phase or 0) or 0
+  for _, d in ipairs(ASSET_TIMER_DIRS) do
+    local gid = _gid_for_tsx(area_id, d .. tostring(phase) .. ".tsx")
+    if gid > 0 then return gid end
+  end
+  return 0
+end
+
+-- Bite flash gid from ex.tsx
+local function _bite_gid_from_assets(area_id)
+  for _, p in ipairs(BITE_TSX_CANDIDATES) do
+    local gid = _gid_for_tsx(area_id, p)
+    if gid > 0 then return gid end
+  end
+  return 0
+end
+
 -- ---- Bite indicator (public) ----
-local function _bite_gid(state)
+local function _bite_gid(state, area_id)
+  -- Use file-based ex.tsx specifically for the “bite” flash if present
+  if state == "bite" then
+    local gid = _bite_gid_from_assets(area_id)
+    if gid > 0 then return gid end
+  end
+  -- Fallback to legacy table (idle=0 is fine → nothing displayed)
   local g = FISHING.BITE and FISHING.BITE.GIDS
   return tonumber(g and g[state] or 0) or 0
 end
@@ -833,7 +901,7 @@ local function _spawn_or_update_bite(pid)
   local area_id = s.area_id; if not area_id then return end
 
   local state = s.bite_state or "idle"
-  local raw_gid = _bite_gid(state)
+  local raw_gid = _bite_gid(state, area_id)
 
   -- If idle has gid=0 (your choice), hard-despawn so nothing lingers
   if raw_gid == 0 then
@@ -927,8 +995,22 @@ local _PID_AREAS = {} -- pid -> { [area_id]=true, ... }
 
 -- ====================== Meter Preview ======================
 local function _meter_gid(area_id, color, phase)
-  local catalog = FISHING.METERS[color] or {}
-  return tonumber(catalog[phase or 0] or 0) or 0
+  local gid = _meter_gid_from_assets(area_id, color, phase)
+  if gid == 0 then
+    -- Fallback to legacy GID table if the TSX isn’t present in the map
+    local catalog = FISHING.METERS[color] or {}
+    gid = tonumber(catalog[phase or 0] or 0) or 0
+  end
+  return gid
+end
+
+local function _timer_gid(area_id, phase)
+  local gid = _timer_gid_from_assets(area_id, phase)
+  if gid == 0 then
+    local t = FISHING.METERS_TIMER or {}
+    gid = tonumber(t[phase or 0] or 0) or 0
+  end
+  return gid
 end
 
 local function _spawn_or_update_meter(pid)
