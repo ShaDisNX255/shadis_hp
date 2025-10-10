@@ -154,7 +154,7 @@ local FISHING      = {
     fail         = "/server/assets/ezlibs-assets/sfx/cancel.ogg",
     fish_biting  = "/server/assets/sfx/WaterDeepSplash.ogg",
     a_pressed    = "/server/assets/sfx/GuageRise.ogg",
-    caught_virus = "/server/assets/sfx/Alert.ogg",
+    alert        = "/server/assets/sfx/Alert.ogg",
     tick         = nil,
   },
   VIRUS_CHANCE           = 0.30, -- 30 percent for eligible tiers
@@ -1366,8 +1366,9 @@ local _PENDING_VIRUS = {} -- pid -> { enc=table, area=string }
 
 local function _queue_virus_battle(pid, enc, area_id)
   _PENDING_VIRUS[pid] = { enc = enc, area = area_id }
+  Net.shake_player_camera(pid, 5, 1.5)
   Net.message_player(pid, "Oh no, it's a virus!")
-  _play(pid, FISHING.SFX.caught_virus)
+  _play(pid, FISHING.SFX.alert)
 end
 
 local function _begin_pending_virus(pid)
@@ -1652,7 +1653,7 @@ local function _start_session(pid, opts)
         local win        = tonumber(win_tbl[cur.heaviness] or 0.9) or 0.9
         cur.bite_until_rel = (cur.wait_elapsed or 0) + win
           Net.shake_player_camera(pid, 5, 0.1)
-          _play(pid, FISHING.SFX.caught_virus)
+          _play(pid, FISHING.SFX.alert)
         if FISHING.DEBUG then
           print(("[fishing] BITE! window=%.2fs gid=%d"):format(win, _bite_gid("bite") or -1))
         end
