@@ -92,7 +92,7 @@ local FISHING      = {
   -- Leaderboard persistence (stored under this area)
   LEADERBOARD            = {
     MEM_AREA = "fisharea", -- << your fishing zone
-    KEY      = "fish_top10",
+    KEY      = "fish_top10_v2",
     MAX      = 10,
   },
 
