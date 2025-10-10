@@ -211,18 +211,6 @@ end
 -- Ensure `custom` is visible to modules that expect a global (fallback)
 _G.custom = _G.custom or custom
 
--- Try to load the PVP module from either location, with clear logging.
-local function try_require(modname)
-  local ok, res = pcall(require, modname)
-  if ok then
-    print("[ygo] Loaded PVP module: " .. modname)
-    return res
-  else
-    print("[ygo] Require failed for " .. modname .. ": " .. tostring(res))
-    return nil
-  end
-end
-
 local JobBBS = (function()
   local ok, M = pcall(require, 'scripts/jobbbs/JobBBS')
   if ok and M then return M end
@@ -426,7 +414,6 @@ local function labels_for(st, seat_i)
 end
 
 -- Format one-liners
-local function fmt_you() return "You" end
 local function fmt_npc(st) return st.npc_name or "NPC" end
 
 -- Decide if our candidate ATK can beat oppATK using at most one affordable spell (by key).
@@ -832,21 +819,23 @@ end
 local function open_card_list(pid)
   card_list_open[pid] = true
   local safe_secret   = helpers.get_safe_player_secret(pid)
-  local player_memory = ezmemory.get_player_memory(safe_secret)
+  local player_memory = ezmemory.get_player_memory(safe_secret) or {}
 
   local entries = {}
   for item_id, qty in pairs(player_memory.items or {}) do
-    local info = ezmemory.get_item_info(item_id)
-    if info and info.name and string.find(info.name, "[", 1, true) ~= nil then
-      -- Put quantity on the RIGHT; omit when qty < 2
-      local right_qty = (qty and qty >= 2) and tostring(qty) or ""
-      entries[#entries+1] = {
-        id     = item_id,
-        read   = true,
-        title  = info.name,   -- left: just the name (with [C]/[R]/… tag)
-        author = right_qty,   -- right: "2", "3", ... (no "x")
-        _raw   = info.name,   -- keep raw for sorting
-      }
+    if (qty or 0) > 0 then  -- ⬅️ only list cards you actually have
+      local info = ezmemory.get_item_info(item_id)
+      if info and info.name and string.find(info.name, "[", 1, true) ~= nil then
+        -- Put quantity on the RIGHT; omit when qty < 2
+        local right_qty = (qty and qty >= 2) and tostring(qty) or ""
+        entries[#entries+1] = {
+          id     = item_id,
+          read   = true,
+          title  = info.name,   -- left: name with rarity tag ([C]/[R]/[SR]/[UR]/...)
+          author = right_qty,   -- right: "2", "3", ... (no "x")
+          _raw   = info.name,   -- keep raw for sorting
+        }
+      end
     end
   end
 
@@ -2073,12 +2062,6 @@ local function npc_take_turn(state)
   end_turn(state)
 end
 
--- === BBS building ===
-local function hand_label(card)  -- compact line for hand
-  local base = base_title(card.title)
-  return string.format("%s  A:%d D:%d", base, card.ATK or 0, card.DEF or 0)
-end
-
 -- Show name + position; mask Set names for opponent only
 local function name_pos_label(f, mask_set)
   if not f then return "(empty)" end
@@ -2245,12 +2228,6 @@ local function me_opp(st, pid)
   local me_i = seat_idx(st, pid)
   local opp_i = 3 - me_i
   return me_i, st.players[me_i], st.players[opp_i]
-end
-
--- In PVP: pick the correct side of any {p1=..., p2=...} structure
-local function side_for(st, pid, sides)
-  local me_i = seat_idx(st, pid)
-  return (me_i == 1) and sides.p1 or sides.p2
 end
 
 -- Broadcast small “announcer” messages to both players
@@ -2814,40 +2791,6 @@ local function _max_add_for_row(counts, row, poolmap)
   end
 end
 
--- Build a concrete 10-card deck list from counts (reads ATK/DEF now)
-local function _materialize_deck(pid, counts, poolmap)
-  local deck = {}
-  for id, n in pairs(counts or {}) do
-    local row = poolmap[id]
-    if row and n and n > 0 then
-      for i=1,n do
-        local meta = read_item_meta_flexible(pid, id)
-        local A, D = parse_atk_def_from_meta(meta)
-        deck[#deck+1] = { id=id, title=row.title, rarity=(row.rar or "C"), ATK=A or 0, DEF=D or 0 }
-      end
-    end
-  end
-  hydrate_card_from_id(pid, entry)
-  return deck
-end
-
--- Preload counts from persisted memory (fallback to RAM deck)
-local function _rar_tag(r)
-  r = tostring(r or ""):upper()
-  if r == "UR" or r == "GDR" or r == "SR" or r == "R" or r == "C" then
-    return "[" .. r .. "]"
-  end
-  return "[C]"
-end
-
--- Trim long names to fit single-line boards better (ASCII "..." only)
-local function _trim_name(s, maxlen)
-  s = tostring(s or "")
-  maxlen = maxlen or 22
-  if #s <= maxlen then return s end
-  return s:sub(1, maxlen - 3) .. "..."
-end
-
 -- Prefer persisted counts; fall back to RAM deck counts
 local function _counts_from_saved(pid)
   local c = load_persisted_deck_counts and load_persisted_deck_counts(pid)
@@ -3381,5 +3324,56 @@ Net:on("player_disconnect", function(event)
   open_list_after_close[pid] = false
   trader_by_pid[pid] = nil
 end)
+
+function custom.clear_last_loaded_card(pid, title_opt)
+  local cur = last_viewed_card_by_player[pid]
+  if not cur then return end
+  if (not title_opt) or tostring(cur.name) == tostring(title_opt) then
+    last_viewed_card_by_player[pid] = nil
+  end
+end
+
+-- === exports used by oncehub "Card Frame" ================================
+
+-- 1) expose the last "loaded" card that was viewed (desc shown)
+function custom.get_last_loaded_card(pid)
+  -- last_viewed_card_by_player is defined earlier in this file
+  return last_viewed_card_by_player and last_viewed_card_by_player[pid] or nil
+end
+
+-- 2) expose the display-name rule so other scripts can match bot names
+function custom.display_name_for_title(title)
+  return get_summon_display_name(title)
+end
+
+-- 3) let others reuse your in-front spawner if they want
+custom.spawn_card_npc_for_all = spawn_card_npc_for_all
+
+-- 4) coord-based spawner (same assets/name pipeline you already use)
+function custom.spawn_card_npc_at(area_id, x, y, z, info)
+  info = info or {}
+  local raw_name  = info.name or info.title or "Card"
+  local disp_name = get_summon_display_name(raw_name)
+
+  -- prefer provided OW assets; otherwise derive from name just like your summoner
+  local ow_png  = info.ow_png
+  local ow_anim = info.ow_anim
+  if not ow_png or not ow_anim then
+    ow_png, ow_anim = build_overworld_paths_for_name(disp_name)
+  end
+
+  local ok, bot_id = pcall(Net.create_bot, {
+    name               = disp_name,
+    area_id            = area_id,
+    x = x or 0, y = y or 0, z = z,
+    texture_path       = ow_png,
+    animation_path     = ow_anim,
+    mug_animation_path = info.anim,
+    animation          = "IDLE",
+  })
+  if not ok or not bot_id then return nil end
+  pcall(Net.set_bot_name, bot_id, disp_name)
+  return bot_id
+end
 
 print("[cards] custom plugin ready"); return custom

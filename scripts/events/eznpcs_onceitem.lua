@@ -20,6 +20,7 @@ local helpers  = require('scripts/ezlibs-scripts/helpers')
 local ezmemory = require('scripts/ezlibs-scripts/ezmemory')
 local ezmenus  = require('scripts/ezlibs-scripts/ezmenus')
 local ezweather = require('scripts/ezlibs-scripts/ezweather')
+local custom   = require('scripts/ezlibs-custom/custom')
 
 -- ====================== Text Defaults ======================
 local DEFAULTS = {
@@ -91,6 +92,7 @@ local ONCEHUB_CATALOG = {
   { id = "okenko_doll",  name = "Okenko Doll",  ts_source = "../assets/objects/BoktaiDolls28x33.tsx", gid = 2147483944, layer = "Object Layer 2" },
   { id = "bass_doll",  name = "Bass Doll",  ts_source = "../assets/objects/bass_plush.tsx", gid = 302, layer = "Object Layer 2" },
   { id = "bug_frag",  name = "Bug Frag",  ts_source = "../assets/objects/frag.tsx", gid = 301, layer = "Object Layer 2" },
+  { id = "card_frame", name = "Card Frame" },
 }
 
 local MENU_COLOR = {
@@ -987,11 +989,10 @@ local function snapshot_oncehub_placements(area_id, once_key)
     local cp = o and o.custom_properties
     if cp and cp.placed_by_oncehub == "true" and (cp.oncehub_key or "") == (once_key or "") then
       table.insert(out, {
-        visible  = true,
+        visible  = (o.visible ~= false),   -- keep actual visibility
         x = o.x, y = o.y, z = o.z,
         width = o.width, height = o.height,
         rotation = o.rotation or 0,
-        -- minimal data required to recreate the tile object:
         data = o.data and {
           type = o.data.type or "tile",
           gid  = tonumber(o.data.gid or 0),
@@ -999,7 +1000,6 @@ local function snapshot_oncehub_placements(area_id, once_key)
           flipped_vertically   = o.data.flipped_vertically   or false,
           rotated              = o.data.rotated              or false,
         } or nil,
-        -- keep metadata so removal/limits still work after reboot:
         custom_properties = {
           placed_by_oncehub = "true",
           oncehub_gid  = (cp.oncehub_gid  or ""),
@@ -1008,6 +1008,12 @@ local function snapshot_oncehub_placements(area_id, once_key)
           oncehub_key  = (cp.oncehub_key  or (once_key or "")),
           visitor_secret = cp.visitor_secret,
           owner_secret   = cp.owner_secret,
+          cf_title       = cp.cf_title,     -- already present
+          cf_png         = cp.cf_png,       -- NEW: persist exact OW png
+          cf_anim        = cp.cf_anim,      -- NEW: persist exact OW anim
+          cf_bot_id      = cp.cf_bot_id,
+          cf_item_id     = cp.cf_item_id,       -- NEW
+          cf_owner_secret= cp.cf_owner_secret,
         }
       })
     end
@@ -1042,7 +1048,8 @@ end
 -- Recreate objects from saved list if none currently exist (prevents duplicates)
 local function rehydrate_placements(area_id, bucket_area_id, once_key)
   local mem = ezmemory.get_area_memory(bucket_area_id or area_id) or {}
-  local saved = mem[PLACEMENTS_MEM_KEY] and mem[PLACEMENTS_MEM_KEY][once_key or ("area:"..area_id)]
+  local key = once_key or ("area:"..area_id)
+  local saved = mem[PLACEMENTS_MEM_KEY] and mem[PLACEMENTS_MEM_KEY][key]
   if not (saved and #saved > 0) then return false end
 
   -- If there are already objects for this once_key, do nothing.
@@ -1055,30 +1062,90 @@ local function rehydrate_placements(area_id, bucket_area_id, once_key)
   end
 
   for _, obj in ipairs(saved) do
-    -- defensive shallow copy
-    Net.create_object(area_id, {
-      visible  = obj.visible ~= false,
-      x = obj.x, y = obj.y, z = obj.z,
-      width = obj.width, height = obj.height,
-      rotation = obj.rotation or 0,
-      data = obj.data and {
-        type = obj.data.type or "tile",
-        gid  = tonumber(obj.data.gid or 0),
-        flipped_horizontally = obj.data.flipped_horizontally or false,
-        flipped_vertically   = obj.data.flipped_vertically   or false,
-        rotated              = obj.data.rotated              or false,
-      } or nil,
-      custom_properties = {
-        placed_by_oncehub = "true",
-        oncehub_gid  = (obj.custom_properties and obj.custom_properties.oncehub_gid)  or "",
-        oncehub_name = (obj.custom_properties and obj.custom_properties.oncehub_name) or "Object",
-        oncehub_id   = (obj.custom_properties and obj.custom_properties.oncehub_id)   or "object",
-        oncehub_key  = (obj.custom_properties and obj.custom_properties.oncehub_key)  or (once_key or ""),
-        visitor_secret = obj.custom_properties and obj.custom_properties.visitor_secret or nil,
-        owner_secret   = obj.custom_properties and obj.custom_properties.owner_secret   or nil,
+    local cp = obj.custom_properties or {}
+    local is_card_frame = ((cp.oncehub_id or "") == "card_frame")
+
+    if is_card_frame then
+      -- 1) Spawn the bot FIRST, using the exact saved OW assets if present
+      local spawn_info = {
+        name   = cp.cf_title or "Card",
+        ow_png = cp.cf_png,
+        ow_anim= cp.cf_anim,
       }
-    })
+      local bid = nil
+      if custom and custom.spawn_card_npc_at then
+        bid = custom.spawn_card_npc_at(area_id, obj.x, obj.y, obj.z, spawn_info)
+        if bid and type(_cf_record_bot) == "function" then
+          pcall(_cf_record_bot, area_id, once_key, obj.x, obj.y, obj.z, bid)
+        end
+      end
+
+      -- 2) Recreate the invisible anchor and WRITE back cf_bot_id + owner/item ids
+      Net.create_object(area_id, {
+        visible  = obj.visible ~= false,
+        x = obj.x, y = obj.y, z = obj.z,
+        width = obj.width, height = obj.height,
+        rotation = obj.rotation or 0,
+        data = obj.data and {
+          type = obj.data.type or "tile",
+          gid  = tonumber(obj.data.gid or 0),
+          flipped_horizontally = obj.data.flipped_horizontally or false,
+          flipped_vertically   = obj.data.flipped_vertically   or false,
+          rotated              = obj.data.rotated              or false,
+        } or nil,
+        custom_properties = {
+          placed_by_oncehub = "true",
+          oncehub_gid  = (cp.oncehub_gid  or ""),
+          oncehub_name = (cp.oncehub_name or "Card Frame"),
+          oncehub_id   = "card_frame",
+          oncehub_key  = (cp.oncehub_key  or (once_key or "")),
+          visitor_secret = cp.visitor_secret,
+          owner_secret   = cp.owner_secret,
+
+          -- Persist Card Frame specifics
+          cf_title        = cp.cf_title,
+          cf_png          = cp.cf_png,
+          cf_anim         = cp.cf_anim,
+          cf_bot_id       = bid and tostring(bid) or (cp.cf_bot_id or nil),
+          cf_item_id      = cp.cf_item_id,        -- keep same item id for refund
+          cf_owner_secret = cp.cf_owner_secret,   -- who to refund to
+        }
+      })
+
+    else
+      -- Generic object/anchor path
+      Net.create_object(area_id, {
+        visible  = obj.visible ~= false,
+        x = obj.x, y = obj.y, z = obj.z,
+        width = obj.width, height = obj.height,
+        rotation = obj.rotation or 0,
+        data = obj.data and {
+          type = obj.data.type or "tile",
+          gid  = tonumber(obj.data.gid or 0),
+          flipped_horizontally = obj.data.flipped_horizontally or false,
+          flipped_vertically   = obj.data.flipped_vertically   or false,
+          rotated              = obj.data.rotated              or false,
+        } or nil,
+        custom_properties = {
+          placed_by_oncehub = "true",
+          oncehub_gid  = (cp.oncehub_gid  or ""),
+          oncehub_name = (cp.oncehub_name or "Object"),
+          oncehub_id   = (cp.oncehub_id   or "object"),
+          oncehub_key  = (cp.oncehub_key  or (once_key or "")),
+          visitor_secret = cp.visitor_secret,
+          owner_secret   = cp.owner_secret,
+          -- pass-through any card-frame fields if present
+          cf_title        = cp.cf_title,
+          cf_png          = cp.cf_png,
+          cf_anim         = cp.cf_anim,
+          cf_bot_id       = cp.cf_bot_id,
+          cf_item_id      = cp.cf_item_id,
+          cf_owner_secret = cp.cf_owner_secret,
+        }
+      })
+    end
   end
+
   return true
 end
 
@@ -1177,6 +1244,128 @@ do
   end
 end
 
+-- --- Card Frame: bot-id bookkeeping in area memory -----------------------
+local function _cf_key(area_id, once_key, x, y, z)
+  return table.concat({
+    tostring(area_id),
+    tostring(once_key or ""),
+    string.format("%.3f", tonumber(x) or 0),
+    string.format("%.3f", tonumber(y) or 0),
+    tostring(z or "")
+  }, "|")
+end
+
+local function _cf_mem(area_id)
+  local mem = ezmemory.get_area_memory(area_id)
+  mem.oncehub_cardframe_bots = mem.oncehub_cardframe_bots or {}
+  return mem.oncehub_cardframe_bots, mem
+end
+
+local function _cf_record_bot(area_id, once_key, x, y, z, bot_id)
+  local map, mem = _cf_mem(area_id)
+  map[_cf_key(area_id, once_key, x, y, z)] = bot_id
+  ezmemory.save_area_memory(area_id)
+end
+
+local function _cf_remove_bot(area_id, once_key, x, y, z, direct_id)
+  -- Try an explicit id first, if provided
+  if direct_id then
+    pcall(Net.remove_bot, direct_id)
+    -- still clear the map entry if present
+  end
+
+  local map, mem = _cf_mem(area_id)
+  local k = _cf_key(area_id, once_key, x, y, z)
+  local bid = map[k]
+
+  if bid then
+    pcall(Net.remove_bot, bid)
+    map[k] = nil
+    ezmemory.save_area_memory(area_id)
+    return true
+  end
+
+  -- Fallback scan only if the engine supports it
+  if type(Net.list_bots) == "function" and type(Net.get_bot_by_id) == "function" then
+    local ids = Net.list_bots(area_id) or {}
+    for _, id in ipairs(ids) do
+      local b = Net.get_bot_by_id(area_id, id)
+      if b and b.z == z and math.abs((b.x or 0) - (tonumber(x) or 0)) < 0.01
+              and math.abs((b.y or 0) - (tonumber(y) or 0)) < 0.01 then
+        pcall(Net.remove_bot, id)
+        return true
+      end
+    end
+  end
+
+  return false
+end
+
+-- Find a player's item_id for an exact card title (e.g. "[GR]DMGirl")
+local function _find_card_item_id_by_title(pid, title)
+  local secret = helpers.get_safe_player_secret(pid)
+  local pmem = ezmemory.get_player_memory(secret) or {}
+  local items = pmem.items or {}
+  for item_id, qty in pairs(items) do
+    if (qty or 0) > 0 then
+      local info = ezmemory.get_item_info(item_id)
+      if info and info.name == title then
+        return item_id, qty
+      end
+    end
+  end
+  return nil, 0
+end
+
+-- Decrement a player's item count and persist
+local function _dec_player_item_count(pid, item_id, n)
+  n = n or 1
+  local secret = helpers.get_safe_player_secret(pid)
+  local pmem = ezmemory.get_player_memory(secret) or {}
+  pmem.items = pmem.items or {}
+  local cur = tonumber(pmem.items[item_id] or 0) or 0
+  pmem.items[item_id] = math.max(0, cur - n)
+  if ezmemory.set_player_memory then ezmemory.set_player_memory(secret, pmem)
+  else ezmemory.save_player_memory(secret, pmem) end
+  return pmem.items[item_id]
+end
+
+-- Increment by account secret (works even if user is offline)
+local function _inc_inventory_by_secret(secret, item_id, n)
+  if not secret or not item_id then return false end
+  n = n or 1
+  local pmem = ezmemory.get_player_memory(secret) or {}
+  pmem.items = pmem.items or {}
+  local cur = tonumber(pmem.items[item_id] or 0) or 0
+  pmem.items[item_id] = cur + n
+  if ezmemory.set_player_memory then ezmemory.set_player_memory(secret, pmem)
+  else ezmemory.save_player_memory(secret, pmem) end
+  return true
+end
+
+-- Refund 1 copy to the Card Frame owner (the player who placed it)
+local function _refund_card_to_frame_owner(cp)
+  if not cp then return false end
+  local placer_secret = cp.cf_owner_secret  -- we will store this at placement time
+  if not placer_secret then return false end
+
+  local item_id = cp.cf_item_id
+  if not item_id or item_id == "" then
+    -- Fallback: find by title in the placer's inventory
+    if not cp.cf_title then return false end
+    local pmem = ezmemory.get_player_memory(placer_secret) or {}
+    local items = pmem.items or {}
+    for iid, _ in pairs(items) do
+      local info = ezmemory.get_item_info(iid)
+      if info and info.name == cp.cf_title then item_id = iid; break end
+    end
+    if not item_id then return false end
+  end
+
+  return _inc_inventory_by_secret(placer_secret, item_id, 1)
+end
+
+
 -- ---------- Actions ----------
 -- Save both the legacy XML and the structured placements into *both*
 -- the live area AND (if present) the bucket area memory.
@@ -1216,6 +1405,88 @@ local function place_current(player_id)
   local preview = Net.get_object_by_id(s.area_id, s.preview_id)
   if not preview then return end
 
+  -- === Special case: Card Frame (NPC) ===
+  if s.object_id == "card_frame" then
+    -- requires custom.get_last_loaded_card & custom.spawn_card_npc_at
+    if not (custom and custom.get_last_loaded_card and custom.spawn_card_npc_at) then
+      Net.message_player(player_id, "Card Frame requires custom.get_last_loaded_card & custom.spawn_card_npc_at.") -- no await
+      return
+    end
+
+    local lc = custom.get_last_loaded_card(player_id)
+    if not lc or not lc.name then
+      Net.message_player(player_id, "Open the card list and read a card’s description first.") -- no await (prevents coroutine yield error)
+      return
+    end
+
+    -- Ensure the placer owns a copy of THIS exact title
+    local item_id, qty = _find_card_item_id_by_title(player_id, lc.name)
+    if not item_id or qty <= 0 then
+      Net.message_player(player_id, "You don’t own a copy of "..tostring(lc.name).." to frame.") -- no await
+      return
+    end
+
+    -- Spawn bot at preview coords with the exact cached OW assets
+    local bid = custom.spawn_card_npc_at(
+      s.area_id, preview.x, preview.y, preview.z,
+      { name = lc.name, ow_png = lc.ow_png, ow_anim = lc.ow_anim, png = lc.png, anim = lc.anim }
+    )
+    if not bid then
+      Net.message_player(player_id, "Couldn’t spawn the Card Frame bot right now. Try again.") -- no await
+      return
+    end
+
+    -- Consume ONE copy from the placer
+    local new_qty = _dec_player_item_count(player_id, item_id, 1) or 0
+
+    -- >>> THIS is the exact spot to clear the "last loaded" cache when qty hits 0 <<<
+    if new_qty <= 0 and custom and custom.clear_last_loaded_card then
+      pcall(custom.clear_last_loaded_card, player_id, lc.name)
+    end
+    -- >>> END cache clear <<<
+
+    -- Track bot id for cleanups
+    if type(_cf_record_bot) == "function" then
+      pcall(_cf_record_bot, s.area_id, s.once_key or "", preview.x, preview.y, preview.z, bid)
+    end
+
+    -- Invisible anchor (reuse preview tile data)
+    local placer_secret = helpers.get_safe_player_secret(player_id)
+    local anchor = {
+      name = "",
+      class = "Decor",
+      visible = false,
+      x = preview.x, y = preview.y, z = preview.z,
+      width = preview.width, height = preview.height,
+      rotation = 0,
+      data = preview.data,  -- table (remove-cursor tile)
+      custom_properties = {
+        placed_by_oncehub = "true",
+        oncehub_gid  = tostring(s.object_gid or ""),
+        oncehub_name = "Card Frame",
+        oncehub_id   = "card_frame",
+        oncehub_key  = tostring(s.once_key or ""),
+        visitor_secret = s.is_visitor and s.visitor_secret or nil,
+        owner_secret   = (not s.is_visitor) and (s.owner_secret or nil) or nil,
+
+        -- Persist exactly what we used
+        cf_title        = (custom.display_name_for_title and custom.display_name_for_title(lc.name))
+                          or (custom.get_summon_display_name and custom.get_summon_display_name(lc.name))
+                          or lc.name,
+        cf_png          = lc.ow_png or lc.png,
+        cf_anim         = lc.ow_anim or lc.anim,
+        cf_bot_id       = tostring(bid),
+        cf_item_id      = item_id,
+        cf_owner_secret = placer_secret,
+      }
+    }
+    Net.create_object(s.area_id, anchor)
+    persist_area(s.area_id, s.bucket_area_id, s.once_key)
+    stop_session(player_id, "Placed Card Frame. (1 copy consumed)")
+    return
+  end
+
+  -- === Default behavior for normal decor (unchanged) ===
   local permanent = {
     name = "",
     class = "Decor",
@@ -1223,13 +1494,13 @@ local function place_current(player_id)
     x = preview.x, y = preview.y, z = preview.z,
     width = preview.width, height = preview.height,
     rotation = 0,
-    data = preview.data,
+    data = preview.data,  -- ✅ must be a table
     custom_properties = {
       placed_by_oncehub = "true",
       oncehub_gid       = tostring(s.object_gid or ""),
       oncehub_name      = tostring(s.object_name or "Object"),
       oncehub_id        = tostring(s.object_id   or "object"),
-	  oncehub_key       = tostring(s.once_key    or ""),
+      oncehub_key       = tostring(s.once_key    or ""),
       visitor_secret    = s.is_visitor and s.visitor_secret or nil,
       owner_secret      = (not s.is_visitor) and (s.owner_secret or nil) or nil,
     }
@@ -1255,6 +1526,18 @@ local function remove_current(player_id)
     name = (e and e.name) or "object"
   end
 
+  local cp = obj.custom_properties or {}
+  if (cp.oncehub_id or "") == "card_frame" then
+    -- Refund to the Card Frame owner (placer)
+    pcall(_refund_card_to_frame_owner, cp)
+
+    -- Despawn bot (prefer stored id, then map, then fallback scan)
+    local direct = cp.cf_bot_id and tostring(cp.cf_bot_id) or nil
+    if direct and direct ~= "" then pcall(Net.remove_bot, direct) end
+    if type(_cf_remove_bot) == "function" then
+      pcall(_cf_remove_bot, s.area_id, s.once_key, obj.x, obj.y, obj.z, direct)
+    end
+  end
   Net.remove_object(s.area_id, oid)
   persist_area(s.area_id, s.bucket_area_id, s.once_key)
   stop_session(player_id, "Removed "..name..".")
@@ -1339,23 +1622,32 @@ local function open_place_catalog_menu(player_id, dialogue)
     -- Need the once_key to calculate "left" correctly per HP
     local once_key = normalize_key(dprop(dialogue, "Once Key", ""))
     if once_key == "" then
-      await(Async.message_player(player_id, "This butler needs an 'Once Key' property.")); return
+      await(Async.message_player(player_id, "This butler needs an 'Once Key' property."))
+      return
     end
-	ensure_rehydrated(player_id, dialogue)
+    ensure_rehydrated(player_id, dialogue)
 
     -- Build menu from catalog, but only show items the player owns; label with (left/owned)
     local posts, index = {}, {}
     for _, e in ipairs(ONCEHUB_CATALOG) do
       local gid = catalog_resolve_gid(area_id, e) or e.gid
+      local is_card_frame = (e.id == "card_frame")
+      if is_card_frame and not gid then
+        gid = resolve_removal_cursor_gid(area_id)
+      end
+      local left, owned = decor_left_to_place(player_id, area_id, once_key, e.id)
       if gid then
         local left, owned = decor_left_to_place(player_id, area_id, once_key, e.id)
-        if owned > 0 then -- hide completely if never purchased
-          if left > 0 then
+        if owned > 0 and left > 0 and (gid or is_card_frame) then
             local label = string.format("%s (%d/%d)", e.name, left, owned)
             table.insert(posts, helpers.create_bbs_option(label))
-            index[#posts] = { gid = gid, name = e.name, id = e.id, layer = e.layer or "Object Layer 2" }
+            index[#posts] = {
+              gid   = gid,                              -- may be nil for Card Frame; handled at selection
+              name  = e.name,
+              id    = e.id,
+              layer = e.layer or "Object Layer 2"
+            }
           end
-        end
       end
     end
 
@@ -1366,9 +1658,9 @@ local function open_place_catalog_menu(player_id, dialogue)
 
     local board = _open_menu_ignoring_custom(player_id, "Choose decoration", {r=60,g=170,b=90}, posts, "oncehub:catalog")
     local sel = await(board.selection_once())
-	_oh_log(player_id, "selection from '"..(title or "board").."': "..tostring(sel))
-	menu_closed_now(player_id, 0.5)
-	fast_close_board(player_id)
+    _oh_log(player_id, "selection from 'oncehub:catalog': "..tostring(sel))
+    menu_closed_now(player_id, 0.5)
+    fast_close_board(player_id)
     if not sel then return end
 
     -- selection is the post.id/title; find the chosen entry
@@ -1376,21 +1668,29 @@ local function open_place_catalog_menu(player_id, dialogue)
       local pid = post.id or post.title or ""
       if sel == pid then
         local chosen = index[i]
-        if chosen and chosen.gid then
-          start_place_session(player_id, dialogue, chosen.gid, chosen.name, chosen.id, chosen.layer)
-          -- Kick the preview loop
-          async(function ()
-            while true do
-              local s = ONCEHUB.sessions[player_id]
-              if not s or not s.active then break end
-              ensure_preview(player_id)
-              await(Async.sleep(0.08))
-            end
-          end)
-        else
-          await(Async.message_player(player_id, "Couldn’t resolve that object’s gid."))
+        if chosen then
+          local gid = chosen.gid
+          -- Card Frame: preview with edit_mode_tile_removal_cursor
+          if chosen.id == "card_frame" then
+            gid = resolve_removal_cursor_gid(area_id)
+          end
+
+          if gid then
+            start_place_session(player_id, dialogue, gid, chosen.name, chosen.id, chosen.layer)
+            -- keep the preview alive while session is active
+            async(function ()
+              while true do
+                local s = ONCEHUB.sessions[player_id]
+                if not s or not s.active then break end
+                ensure_preview(player_id)
+                await(Async.sleep(0.08))
+              end
+            end)
+          else
+            await(Async.message_player(player_id, "Couldn’t resolve that object’s gid."))
+          end
+          return
         end
-        return
       end
     end
 
@@ -1561,6 +1861,18 @@ local function open_decorate_menu(player_id, dialogue)
         local cp = o and o.custom_properties
         if cp and (cp.oncehub_key or "") == once_key then
           if cp.placed_by_oncehub == "true" or cp.oncehub_preview == "true" then
+            if (cp.oncehub_id or "") == "card_frame" then
+              -- Refund to the Card Frame owner (placer)
+              pcall(_refund_card_to_frame_owner, cp)
+
+              -- Despawn bot
+              local direct = cp.cf_bot_id and tostring(cp.cf_bot_id) or nil
+              if direct and direct ~= "" then pcall(Net.remove_bot, direct) end
+              if type(_cf_remove_bot) == "function" then
+                pcall(_cf_remove_bot, area_id, once_key, o.x, o.y, o.z, direct)
+              end
+            end
+
             Net.remove_object(area_id, oid)
           end
         end

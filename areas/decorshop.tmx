@@ -86,6 +86,7 @@
     <property name="Price 2" type="int" value="40000"/>
     <property name="Price 20" type="int" value="700000"/>
     <property name="Price 21" type="int" value="40000"/>
+    <property name="Price 22" type="int" value="100000"/>
     <property name="Price 3" type="int" value="50000"/>
     <property name="Price 4" type="int" value="50000"/>
     <property name="Price 5" type="int" value="60000"/>
@@ -107,6 +108,7 @@
     <property name="Sell 2" value="robot_toy"/>
     <property name="Sell 20" value="bass_doll"/>
     <property name="Sell 21" value="bug_frag"/>
+    <property name="Sell 22" value="card_frame"/>
     <property name="Sell 3" value="green_tree"/>
     <property name="Sell 4" value="blue_tree"/>
     <property name="Sell 5" value="stuffed_bear"/>
