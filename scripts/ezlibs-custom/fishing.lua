@@ -1651,6 +1651,7 @@ local function _start_session(pid, opts)
         local win_tbl    = (FISHING.BITE and FISHING.BITE.WINDOW_S) or {}
         local win        = tonumber(win_tbl[cur.heaviness] or 0.9) or 0.9
         cur.bite_until_rel = (cur.wait_elapsed or 0) + win
+          Net.shake_player_camera(pid, 5, 0.1)
           _play(pid, FISHING.SFX.caught_virus)
         if FISHING.DEBUG then
           print(("[fishing] BITE! window=%.2fs gid=%d"):format(win, _bite_gid("bite") or -1))
