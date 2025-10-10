@@ -152,8 +152,7 @@ local FISHING      = {
     start        = "/server/assets/ezlibs-assets/sfx/select.ogg",
     catch        = "/server/assets/ezlibs-assets/sfx/item_get.ogg",
     fail         = "/server/assets/ezlibs-assets/sfx/cancel.ogg",
-    fish_biting  = "/server/assets/sfx/WaterDeepSplash.ogg",
-    a_pressed    = "/server/assets/sfx/GuageRise.ogg",
+    increment    = "/server/assets/sfx/GuageRise.ogg",
     alert        = "/server/assets/sfx/Alert.ogg",
     tick         = nil,
   },
@@ -1868,8 +1867,8 @@ end)
 local function _register_tap(pid)
   local s = SESS[pid]; if not s or not s.active then return end
   s.taps = (s.taps or 0) + 1.0
-  _play(pid, FISHING.SFX.fish_biting)
-end
+  _play(pid, FISHING.SFX.increment)
+  end
 
 Net:on("object_interaction", function(ev)
   if ev.button ~= 0 then return end -- A only
