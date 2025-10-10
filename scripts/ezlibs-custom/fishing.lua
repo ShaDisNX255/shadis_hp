@@ -92,8 +92,9 @@ local FISHING      = {
   -- Leaderboard persistence (stored under this area)
   LEADERBOARD            = {
     MEM_AREA = "fisharea", -- << your fishing zone
-    KEY      = "fish_top10_v2",
+    KEY      = "fish_top10_v3",
     MAX      = 10,
+    UNIQUE_PER = "player_id",  -- or "name" if you prefer name-based uniqueness
   },
 
   -- Your meter catalog (normal 0..10, sweet_spot 0..10) – GIDs kept exactly
@@ -1448,6 +1449,110 @@ local function _pick_heaviness_with_odds(odds)
   return H[#H]
 end
 
+-- ===== Leaderboard: one-entry-per-player helpers =====
+local function _lb_cfg()
+  local L = FISHING.LEADERBOARD or {}
+  return (L.MEM_AREA or "fisharea"), (L.KEY or "fish_top10"), (L.MAX or 10), (L.UNIQUE_PER or "player_id")
+end
+
+local function _lb_load()
+  local area, key = _lb_cfg()
+  local mem = ezmemory.get_area_memory(area) or {}
+  local list = mem[key]
+  if type(list) ~= "table" then list = {} end
+  return area, key, mem, list
+end
+
+local function _lb_save(area, key, mem, list)
+  mem[key] = list
+  ezmemory.save_area_memory(area)
+end
+
+-- Dedup existing board to max weight per player
+local function _lb_migrate_unique()
+  local area, key, mem, list = _lb_load()
+  if #list <= 1 then return end
+  local _, _, _, uniq_by = _lb_cfg()
+  local best = {}
+  for _, e in ipairs(list) do
+    local pid = tostring(e.player_id or "")
+    local name = tostring(e.name or "")
+    local k = (uniq_by == "name") and name or pid
+    local w = tonumber(e.weight) or 0
+    local cur = best[k]
+    if not cur or w > (tonumber(cur.weight) or 0) then
+      best[k] = { player_id = pid, name = name, weight = w, when = tonumber(e.when) or os.time() }
+    end
+  end
+  local dedup = {}
+  for _, e in pairs(best) do table.insert(dedup, e) end
+  table.sort(dedup, function(a,b) return (a.weight or 0) > (b.weight or 0) end)
+  local _, _, max = _lb_cfg()
+  while #dedup > max do dedup[#dedup] = nil end
+  _lb_save(area, key, mem, dedup)
+  if FISHING.DEBUG then
+    print(string.format("[fishing] leaderboard migrated to unique-per-%s (%d rows)", uniq_by, #dedup))
+  end
+end
+
+-- Upsert: keep only the player’s best weight
+local function _lb_upsert(pid, weight_lb)
+  local name = Net.get_player_name(pid) or pid
+  local area, key, mem, list = _lb_load()
+  local _, _, max, uniq_by = _lb_cfg()
+
+  local k_new = (uniq_by == "name") and tostring(name) or tostring(pid)
+  local idx = nil
+  for i, e in ipairs(list) do
+    local k_row = (uniq_by == "name") and tostring(e.name or e.player_name or "")
+                                   or tostring(e.player_id or "")
+    if k_row == k_new then idx = i; break end
+  end
+
+  local improved = false
+  if idx then
+    if weight_lb > (tonumber(list[idx].weight) or 0) then
+      list[idx].weight       = weight_lb
+      list[idx].name         = name
+      list[idx].player_name  = name   -- keep legacy key too
+      list[idx].when         = os.time()
+      improved = true
+    end
+  else
+    table.insert(list, {
+      player_id   = pid,
+      name        = name,
+      player_name = name,            -- legacy key for BBS
+      weight      = weight_lb,
+      when        = os.time()
+    })
+    improved = true
+  end
+
+  table.sort(list, function(a,b) return (a.weight or 0) > (b.weight or 0) end)
+  while #list > max do list[#list] = nil end
+
+  _lb_save(area, key, mem, list)
+
+  -- compute current rank
+  local rank = nil
+  if uniq_by == "name" then
+    for i, e in ipairs(list) do
+      if tostring(e.name or e.player_name or "") == k_new then rank = i; break end
+    end
+  else
+    for i, e in ipairs(list) do
+      if tostring(e.player_id or "") == tostring(pid) then rank = i; break end
+    end
+  end
+
+  return rank, improved
+end
+
+-- Run migration once at load
+pcall(_lb_migrate_unique)
+-- ===== end helpers =====
+
 local function _start_session(pid, opts)
   local area = Net.get_player_area(pid); if not area then return end
   _cleanup_fishing_meters(area, pid)
@@ -1644,10 +1749,13 @@ local function _begin_reeling(pid)
           local monies = math.floor((w * pay_per_lb) + 0.5)
           if monies > 0 then ezmemory.spend_player_money(pid, -monies) end
 
-          local rank = _record_catch(pid, w)
+          local rank, improved = _lb_upsert(pid, w)
           local msg = ("You caught a fish! It weighed %.1f lb. You earned $%d!"):format(w, monies)
-          if rank and rank <= ((FISHING.LEADERBOARD and FISHING.LEADERBOARD.MAX) or 10) then
-            msg = msg .. ("  New leaderboard %d!"):format(rank)
+          if improved then
+            msg = msg .. " New personal best!"
+            if rank and rank <= ((FISHING.LEADERBOARD and FISHING.LEADERBOARD.MAX) or 10) then
+              msg = msg .. (" New leaderboard %d!"):format(rank)
+            end
           end
           -- ADD THIS (notify JobBBS about a successful catch)
           if JobBBS and JobBBS.on_fish_catch then
@@ -1720,7 +1828,7 @@ local function _open_fishbbs(pid)
   else
     local MAX_NAME = 20
     for i, rec in ipairs(list) do
-      local nm = _trunc(tostring(rec.player_name or "Unknown"), MAX_NAME)
+      local nm = _trunc(tostring(rec.name or rec.player_name or "Unknown"), MAX_NAME)
       local wt = tonumber(rec.weight or 0) or 0
       posts[#posts + 1] = {
         id     = '__fishbbs:post:' .. i,
