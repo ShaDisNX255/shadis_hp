@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.8" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="50" height="50" tilewidth="64" tileheight="32" infinite="0" nextlayerid="14" nextobjectid="328">
+<map version="1.8" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="50" height="50" tilewidth="64" tileheight="32" infinite="0" nextlayerid="14" nextobjectid="336">
  <properties>
   <property name="Background" value="custom"/>
   <property name="Background Animation" value="/server/assets/custom/backgrounds/home/kottouhinyanodennou.animation"/>
@@ -60,6 +60,13 @@
  <tileset firstgid="322" source="../assets/fishing/yellow/8.tsx"/>
  <tileset firstgid="323" source="../assets/fishing/yellow/9.tsx"/>
  <tileset firstgid="324" source="../assets/tiles/EXE6_Shortcuts.tsx"/>
+ <tileset firstgid="356" source="../assets/fishing/ex.tsx"/>
+ <tileset firstgid="398" source="../assets/fishing/timer/0.tsx"/>
+ <tileset firstgid="399" source="../assets/fishing/timer/1.tsx"/>
+ <tileset firstgid="400" source="../assets/fishing/timer/2.tsx"/>
+ <tileset firstgid="401" source="../assets/fishing/timer/3.tsx"/>
+ <tileset firstgid="402" source="../assets/fishing/timer/4.tsx"/>
+ <tileset firstgid="403" source="../assets/fishing/timer/5.tsx"/>
  <layer id="1" name="Tile Layer 1" width="50" height="50">
   <data encoding="csv">
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -87,7 +94,7 @@
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,11,8,9,8,9,8,11,0,0,8,9,8,9,8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,8,7,0,0,10,9,6,7,6,9,10,0,0,9,9,9,9,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8,7,8,13,13,11,8,7,5,7,8,11,9,9,8,9,9,9,8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,8,7,0,0,10,9,6,7,6,9,10,0,0,9,9,9,9,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,8,7,0,10,10,9,6,7,6,9,10,0,0,9,9,9,9,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,11,8,9,6,9,8,11,0,0,8,9,8,9,8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,10,11,10,7,10,11,10,0,0,0,0,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -723,7 +730,7 @@
    </properties>
    <point/>
   </object>
-  <object id="307" name="fisharea" type="Custom Warp" gid="2147483972" x="672" y="800" width="64" height="40">
+  <object id="307" name="fisharea" type="Custom Warp" gid="2147483972" x="640" y="800" width="64" height="40">
    <properties>
     <property name="Direction" value="Down Right"/>
     <property name="Target Area" value="fisharea"/>
