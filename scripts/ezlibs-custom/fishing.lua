@@ -6,12 +6,15 @@
 local helpers      = require('scripts/ezlibs-scripts/helpers')
 local ezmemory     = require('scripts/ezlibs-scripts/ezmemory')
 local ezencounters = require('scripts/ezlibs-scripts/ezencounters/main')
+-- local ezcache = require('scripts/ezlibs-scripts/ezcache')
 
 local okJobBBS, JobBBS = pcall(require, 'scripts/jobbbs/JobBBS')
 if not okJobBBS then JobBBS = nil end
 
+
 -- Resolve Async if not global
 local function _resolve_async()
+
   if _G and _G.Async then return _G.Async end
   local ok, A = pcall(require, 'scripts/ezlibs-scripts/async')
   if ok and A then return A end
@@ -247,7 +250,6 @@ local FISHING      = {
       name               = "Encounter3",
       weight             = 10,
       path               = "/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
-      enemies            = { { name = "Swordy", rank = 1 }, { name = "Boomer", rank = 1 } },
       enemies            = {
         { name = "SwordyEl", rank = 5 },
         { name = "SwordyEl", rank = 2 },
