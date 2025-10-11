@@ -38,7 +38,7 @@ local FISHING      = {
   TEMPLATE_LAYER         = Constants.TEMPLATE_LAYER,
   HOLD_SECONDS           = Constants.HOLD_SECONDS,
   FORCE_METER_DIMS_PX    = nil,
-  EXPECTED_METER_DIMS_PX = { w = Constants.METER_WIDTH, h = Constants.METER_HEIGHT },
+  EXPECTED_METER_DIMS_PX = Constants.EXPECTED_METER_SIZE,
   DEBUG                  = false,
   PRIVATE_METERS         = true,
   PRIVATE_MODE           = "exclude",
