@@ -14,7 +14,6 @@ local function _handle_set(set_this, value)
         print("`set_this` was not a string. Please provide a string value that is the name of the `key` in `CONFIG`") 
         return   
     end
-    
     local copy = helpers.deep_copy(value)
     CONFIG[set_this] = copy
 end

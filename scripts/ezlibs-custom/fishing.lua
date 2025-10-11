@@ -36,10 +36,10 @@ local FISHING      = {
   -- Hidden layer where your meter prototype objects live
   TEMPLATE_LAYER         = Constants.TEMPLATE_LAYER,
   HOLD_SECONDS           = Constants.HOLD_SECONDS,
-  FORCE_METER_DIMS_PX    = nil,
+  FORCE_METER_DIMS_PX    = Constants.FORCE_METER_SIZE,
   EXPECTED_METER_DIMS_PX = Constants.EXPECTED_METER_SIZE,
-  DEBUG                  = false,
-  PRIVATE_METERS         = true,
+  DEBUG                  = Constants.DEBUG,
+  PRIVATE_METERS         = Constants.PRIVATE_METERS,
   PRIVATE_MODE           = "exclude",
   RESULTS_CALLBACK       = _default_fishing_rewards,
 
@@ -50,28 +50,19 @@ local FISHING      = {
 
   -- Extra world-space nudge after facing/side placement (tiles).
   -- Positive y moves the meter lower on the screen.
-  METER_SCREEN_SHIFT     = { x = 1.5, y = 0.0, z = 0.0 },
+  METER_SCREEN_SHIFT     = Constants.METER_SCREEN_SHIFT,
 
   -- Total time window to hook the fish
   MAX_DURATION_S         = Constants.MAX_DURATION_S,
 
   -- Time you must hold inside the sweet band to succeed
-  HOLD_RANGE_S           = { min = 3.0, max = 6.0 },
+  HOLD_RANGE_S           = Constants.SUCCESS_RANGE,
 
   -- Sweet spot width: number of consecutive pips that count as "sweet"
   SWEET_WIDTH            = Constants.SWEET_WIDTH, -- e.g., 2 means [4..5] or [7..8], always within 1..9
 
   -- Heaviness presets (higher decay = harder; mash is how much each A tap helps)
-  HEAVINESS              = {
-    --  key            decay/s   mashGain  hold_mult
-    { key = "light",      decay = 1.2, mash = 1.20, hold_mult = 0.95 },
-    { key = "medium",     decay = 1.8, mash = 1.00, hold_mult = 1.00 },
-    { key = "heavy",      decay = 2.5, mash = 0.90, hold_mult = 1.10 },
-    -- Harder tiers
-    { key = "very_heavy", decay = 3.6, mash = 0.85, hold_mult = 1.15 },
-    { key = "brutal",     decay = 4.8, mash = 0.80, hold_mult = 1.20 },
-    { key = "legendary",  decay = 5.4, mash = 0.75, hold_mult = 1.30 },
-  },
+  HEAVINESS              = Constants.HEAVINESS,
 
   -- Odds for each heaviness tier
   HEAVINESS_CHANCES      = {
@@ -145,11 +136,11 @@ local FISHING      = {
   -- Placement just for the timer meter (independent from fish meter)
   TIMER_FORWARD          = 0.0,                             -- a touch in front of the player (0.0 is fine)
   TIMER_SIDE             = 0,                               -- 0 keeps it centered; can be "left"/"right" or a number
-  TIMER_SCREEN_SHIFT     = { x = -2.0, y = -2.0, z = 0.0 }, -- y<0 draws above the player
+  TIMER_SCREEN_SHIFT     = Constants.TIMER_SCREEN_SHIFT, -- y<0 draws above the player
 
   -- Optional size enforcement for the timer bar (pixels -> tiles; isometric-safe)
-  FORCE_TIMER_DIMS_PX    = nil,                -- e.g., { w = 91, h = 17 } if your timer is 91x17 px
-  EXPECTED_TIMER_DIMS_PX = { w = 94, h = 16 }, -- e.g., { w = 91, h = 17 } to auto-correct if it ever drifts
+  FORCE_TIMER_DIMS_PX    = Constants.FORCE_TIMER_SIZE,                -- e.g., { w = 91, h = 17 } if your timer is 91x17 px
+  EXPECTED_TIMER_DIMS_PX =  Constants.EXPECTED_TIMER_SIZE, -- e.g., { w = 91, h = 17 } to auto-correct if it ever drifts
 
   -- Optional sfx paths (set to nil if not wanted)
   SFX                    = {
@@ -161,7 +152,7 @@ local FISHING      = {
     tick         = nil,
   },
 
-  VIRUS_CHANCE           = 0.30, -- 30 percent for eligible tiers
+  VIRUS_CHANCE           = Constants.VIRUS_CHANCE, -- 30 percent for eligible tiers
   VIRUS_EXCLUDED         = {     -- tiers that never trigger a virus
     brutal = true,
     legendary = true,
@@ -183,14 +174,14 @@ local FISHING      = {
     -- Placement controls (separate from fish/timer meters)
     FORWARD          = 0.0,
     SIDE             = 0,                               -- number or "left"/"right"
-    SCREEN_SHIFT     = { x = -1.0, y = -1.0, z = 0.0 }, -- above player a little
+    SCREEN_SHIFT     = Constants.EX_SCREEN_SHIFT, -- above player a little
 
     -- Optional size enforcement just for the bite icon
-    FORCE_DIMS_PX    = nil, -- e.g., { w=32, h=32 }
-    EXPECTED_DIMS_PX = { w = 22, h = 22 },
+    FORCE_DIMS_PX    = Constants.FORCE_EX_SIZE, -- e.g., { w=32, h=32 }
+    EXPECTED_DIMS_PX = Constants.EXPECTED_EX_SIZE,
 
     -- Random wait before a bite shows up
-    WAIT_RANGE_S     = { min = 1.2, max = 3.0 },
+    WAIT_RANGE_S     = Constants.BITE_WAIT_RANGE,
 
     -- Window to press A when it bites (heavier = shorter)
     WINDOW_S         = {
@@ -1236,7 +1227,7 @@ end
 local function _default_fishing_rewards(player_id, encounter_info, stats)
   -- stats = { health, score, time, ran, emotion, turns, npcs = [...] }
   if not stats or stats.ran then return end -- no rewards if ran
-  local reward_monies = math.floor((stats.score or 0) * Constants.DEFAULT_MONEY_MULTIPLYER)
+  local reward_monies = math.floor((stats.score or 0) * Constants.MONEY_MULTIPLYER)
   if reward_monies > 0 then
     ezmemory.spend_player_money(player_id, -reward_monies) -- negative spend = give money
     Net.message_player(player_id, "Got $" .. reward_monies .. "!")
