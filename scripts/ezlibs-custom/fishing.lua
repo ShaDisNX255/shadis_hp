@@ -54,13 +54,13 @@ local FISHING      = {
   METER_SCREEN_SHIFT     = { x = 1.5, y = 0.0, z = 0.0 },
 
   -- Total time window to hook the fish
-  MAX_DURATION_S         = tonumber(Constants.MAX_DURATION_S),
+  MAX_DURATION_S         = Constants.MAX_DURATION_S,
 
   -- Time you must hold inside the sweet band to succeed
   HOLD_RANGE_S           = { min = 3.0, max = 6.0 },
 
   -- Sweet spot width: number of consecutive pips that count as "sweet"
-  SWEET_WIDTH            = tonumber(Constants.SWEET_WIDTH), -- e.g., 2 means [4..5] or [7..8], always within 1..9
+  SWEET_WIDTH            = Constants.SWEET_WIDTH, -- e.g., 2 means [4..5] or [7..8], always within 1..9
 
   -- Heaviness presets (higher decay = harder; mash is how much each A tap helps)
   HEAVINESS              = {
@@ -161,6 +161,7 @@ local FISHING      = {
     alert        = "/server/assets/sfx/Alert.ogg",
     tick         = nil,
   },
+
   VIRUS_CHANCE           = 0.30, -- 30 percent for eligible tiers
   VIRUS_EXCLUDED         = {     -- tiers that never trigger a virus
     brutal = true,
@@ -694,12 +695,12 @@ end
 --   TIMER phases:       prefer /server/assets/fishing/timer/0.tsx .. 5.tsx (fallbacks below)
 --   BITE (flash):       /server/fishing/ex.tsx   (fallback: /server/assets/fishing/ex.tsx)
 
-local fishingDir   = tostring(Constants.ASSET_FISHING_DIR)
-local normalDir    = fishingDir .. tostring(Constants.ASSET_NORMAL_DIR)
-local sweetDir     = fishingDir .. tostring(Constants.ASSET_SWEET_DIR)
-local timerDir     = fishingDir .. tostring(Constants.ASSET_TIMER_DIR)
-local exPath       = tostring(Constants.EX_ALERT_PATH)
-local exTsx        = tostring(Constants.EX_ALERT_TSX)
+local fishingDir   = Constants.ASSET_FISHING_DIR
+local normalDir    = fishingDir .. Constants.ASSET_NORMAL_DIR
+local sweetDir     = fishingDir .. Constants.ASSET_SWEET_DIR
+local timerDir     = fishingDir .. Constants.ASSET_TIMER_DIR
+local exPath       = Constants.EX_ALERT_PATH
+local exTsx        = Constants.EX_ALERT_TSX
 -- Try a timer/ subdir first; fall back to reusing blue/ if that’s how you stored them.
 local ASSET_TIMER_DIRS    = { timerDir, normalDir }
 -- Bite candidates (support both paths you mentioned)
