@@ -7,6 +7,7 @@ local helpers      = require('scripts/ezlibs-scripts/helpers')
 local ezmemory     = require('scripts/ezlibs-scripts/ezmemory')
 local ezencounters = require('scripts/ezlibs-scripts/ezencounters/main')
 local config = require('scripts/fishing-config/main')
+local Constants = config.CONSTANTS
 
 local okJobBBS, JobBBS = pcall(require, 'scripts/jobbbs/JobBBS')
 if not okJobBBS then JobBBS = nil end
@@ -29,8 +30,6 @@ local Async        = _resolve_async()
 -- Online presence cache so we can exclude for current non-owners
 local AREA_PLAYERS = {} -- [area_id] = { [pid]=true, ... }
 local PLAYER_AREA  = {} -- [pid] = area_id
-
-local Constants = config.CONSTANTS
 
 -- ====================== Config you can edit ======================
 local FISHING      = {
@@ -1237,7 +1236,7 @@ end
 local function _default_fishing_rewards(player_id, encounter_info, stats)
   -- stats = { health, score, time, ran, emotion, turns, npcs = [...] }
   if not stats or stats.ran then return end -- no rewards if ran
-  local reward_monies = math.floor((stats.score or 0) * 5000)
+  local reward_monies = math.floor((stats.score or 0) * Constants.DEFAULT_MONEY_MULTIPLYER)
   if reward_monies > 0 then
     ezmemory.spend_player_money(player_id, -reward_monies) -- negative spend = give money
     Net.message_player(player_id, "Got $" .. reward_monies .. "!")

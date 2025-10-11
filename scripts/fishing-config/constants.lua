@@ -1,8 +1,9 @@
 local CONSTANTS = {
   FISH_REWARD_PER_LB     = 1800,
+  DEFAULT_MONEY_MULTIPLYER = 5000,
   TEMPLATE_LAYER         = "Fishing",
   HOLD_SECONDS           = 5.0,
-  EXPECTED_METER_SIZE = {w = 17, h = 91},
+  EXPECTED_METER_SIZE    = {w = 17, h = 91},
   MAX_DURATION_S         = 12.0,
   SWEET_WIDTH            = 2,
   ASSET_FISHING_DIR      = "/server/assets/fishing/",
