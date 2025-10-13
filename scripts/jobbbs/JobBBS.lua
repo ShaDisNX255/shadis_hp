@@ -777,10 +777,22 @@ local function jobs_pool()
   -- Big Fish (HowlerMan) - N: 10,15,20 (single catch)
   local function _big_single_check(pid, st, base_key, need_lb)
     st.prog.fish = st.prog.fish or {}
-    local base = st.prog.baseline and st.prog.baseline[base_key] and st.prog.baseline[base_key].fish or {}
-    local cur_max  = tonumber(st.prog.fish.max_single or 0) or 0
-    local base_max = tonumber(base.max_single or 0) or 0
-    local done = (cur_max >= need_lb) and (cur_max > base_max)
+    local base = (st.prog.baseline and st.prog.baseline[base_key]
+                 and st.prog.baseline[base_key].fish) or {}
+
+    local F         = st.prog.fish
+    local cur_max   = tonumber(F.max_single or 0) or 0
+    local base_max  = tonumber(base.max_single or 0) or 0
+    local cur_c     = tonumber(F.catches or 0)     or 0
+    local base_c    = tonumber(base.catches or 0)  or 0
+    local last_w    = tonumber(F.last_w or 0)      or 0
+
+    -- “complete” if you’ve met the threshold, AND either:
+    -- (1) you beat your snapshot lifetime best, OR
+    -- (2) you’ve made at least one catch since accepting and that catch hit the threshold
+    local met_since_accept = (cur_c > base_c) and (last_w >= need_lb)
+    local done = (cur_max >= need_lb) and ((cur_max > base_max) or met_since_accept)
+
     local prog = math.min(cur_max, need_lb)
     return done, prog, need_lb
   end
@@ -1183,6 +1195,7 @@ function JobBBS.handle_textbox_response(pid, response)
             max_single  = (st.prog.fish and st.prog.fish.max_single)  or 0,
             streak      = (st.prog.fish and st.prog.fish.streak)      or 0,
             virus_wins  = (st.prog.fish and st.prog.fish.virus_wins)  or 0,
+            last_w      = (st.prog.fish and st.prog.fish.last_w)      or 0,
           },
         }
         local cat = job_category(job.id)
@@ -1374,6 +1387,7 @@ function JobBBS.on_fish_catch(pid, info)
   F.catches    = (F.catches or 0) + 1
   F.total_lb   = (F.total_lb or 0) + w
   if w > (F.max_single or 0) then F.max_single = w end
+  F.last_w     = w
   F.streak_live = (F.streak_live or 0) + 1
   if (F.streak_live or 0) > (F.streak or 0) then F.streak = F.streak_live end
   st.prog.fish = F

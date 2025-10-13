@@ -94,7 +94,7 @@ local FISHING      = {
     MEM_AREA = "fisharea", -- << your fishing zone
     KEY      = "fish_top10_v3",
     MAX      = 10,
-    UNIQUE_PER = "player_id",  -- or "name" if you prefer name-based uniqueness
+    UNIQUE_PER = "secret",  -- or "name" if you prefer name-based uniqueness
   },
 
   -- Your meter catalog (normal 0..10, sweet_spot 0..10) – GIDs kept exactly
@@ -1528,13 +1528,23 @@ local function _lb_upsert(pid, weight_lb)
   local area, key, mem, list = _lb_load()
   local _, _, max, uniq_by = _lb_cfg()
 
-  local k_new = (uniq_by == "name") and tostring(name) or tostring(pid)
+  local secret = nil
+  if uniq_by == "secret" and helpers.get_safe_player_secret then
+    pcall(function() secret = helpers.get_safe_player_secret(pid) end)
+  end
+  local k_new = (uniq_by == "name") and tostring(name)
+            or (uniq_by == "secret") and tostring(secret or pid)
+            or tostring(pid)
 
+  -- find existing
   local idx = nil
   for i, e in ipairs(list) do
-    local row_pid  = tostring(e.player_id or e.pid or "")
-    local row_name = tostring(e.name or e.player_name or "")
-    local k_row    = (uniq_by == "name") and row_name or row_pid
+    local row_pid    = tostring(e.player_id or e.pid or "")
+    local row_name   = tostring(e.name or e.player_name or "")
+    local row_secret = tostring(e.player_secret or e.secret or e.sid or "")
+    local k_row = (uniq_by == "name") and row_name
+              or (uniq_by == "secret") and row_secret
+              or row_pid
     if k_row == k_new then idx = i; break end
   end
 
@@ -1543,18 +1553,20 @@ local function _lb_upsert(pid, weight_lb)
     if weight_lb > (tonumber(list[idx].weight) or 0) then
       list[idx].weight       = weight_lb
       list[idx].name         = name
-      list[idx].player_name  = name  -- legacy key for BBS
-      list[idx].player_id    = pid   -- ensure modern key is present
+      list[idx].player_name  = name
+      list[idx].player_id    = pid
+      list[idx].player_secret= secret   -- NEW
       list[idx].when         = os.time()
       improved = true
     end
   else
     table.insert(list, {
-      player_id   = pid,
-      name        = name,
-      player_name = name,
-      weight      = weight_lb,
-      when        = os.time()
+      player_id     = pid,
+      player_secret = secret,           -- NEW
+      name          = name,
+      player_name   = name,
+      weight        = weight_lb,
+      when          = os.time()
     })
     improved = true
   end
@@ -1565,16 +1577,12 @@ local function _lb_upsert(pid, weight_lb)
   mem[key] = list
   ezmemory.save_area_memory(area)
 
-  -- rank
   local rank = nil
-  if uniq_by == "name" then
-    for i, e in ipairs(list) do
-      if tostring(e.name or e.player_name or "") == k_new then rank = i; break end
-    end
-  else
-    for i, e in ipairs(list) do
-      if tostring(e.player_id or e.pid or "") == tostring(pid) then rank = i; break end
-    end
+  for i, e in ipairs(list) do
+    local k_row = (uniq_by == "name") and tostring(e.name or e.player_name or "")
+              or (uniq_by == "secret") and tostring(e.player_secret or e.secret or e.sid or "")
+              or tostring(e.player_id or e.pid or "")
+    if k_row == k_new then rank = i; break end
   end
 
   return rank, improved
@@ -1856,6 +1864,7 @@ local function _open_fishbbs(pid)
   if #list == 0 then
     posts[#posts + 1] = { id = '__fishbbs:none', read = true, title = 'No catches yet. Be the first!', author = '' }
   else
+    _lb_migrate_unique()
     local MAX_NAME = 20
     for i, rec in ipairs(list) do
       local nm = _trunc(tostring(rec.name or rec.player_name or "Unknown"), MAX_NAME)
