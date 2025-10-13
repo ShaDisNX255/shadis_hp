@@ -1471,41 +1471,70 @@ end
 -- Dedup existing board to max weight per player
 local function _lb_migrate_unique()
   local area, key, mem, list = _lb_load()
-  if #list <= 1 then return end
-  local _, _, _, uniq_by = _lb_cfg()
+  if type(list) ~= "table" or #list <= 1 then return end
+  local _, _, max, uniq_by = _lb_cfg()
+
   local best = {}
+  local kept_count = 0
   for _, e in ipairs(list) do
-    local pid = tostring(e.player_id or "")
-    local name = tostring(e.name or "")
-    local k = (uniq_by == "name") and name or pid
-    local w = tonumber(e.weight) or 0
-    local cur = best[k]
-    if not cur or w > (tonumber(cur.weight) or 0) then
-      best[k] = { player_id = pid, name = name, weight = w, when = tonumber(e.when) or os.time() }
+    local pid  = tostring(e.player_id or e.pid or "")            -- legacy: pid
+    local name = tostring(e.name or e.player_name or "")          -- legacy: player_name
+    local w    = tonumber(e.weight) or 0
+
+    -- choose key based on UNIQUE_PER, but NEVER drop rows: fall back to name if pid is missing
+    local k
+    if uniq_by == "name" then
+      k = (name ~= "" and name) or (pid ~= "" and pid) or nil
+    else
+      -- default: player_id uniqueness; if missing pid, fall back to name to keep the row
+      k = (pid ~= "" and pid) or (name ~= "" and name) or nil
+    end
+
+    if k then
+      kept_count = kept_count + 1
+      local cur = best[k]
+      if not cur or w > (tonumber(cur.weight) or 0) then
+        best[k] = {
+          player_id   = (pid ~= "" and pid or nil),
+          name        = (name ~= "" and name or nil),
+          player_name = (name ~= "" and name or nil),  -- legacy for BBS
+          weight      = w,
+          when        = tonumber(e.when or e.ts) or os.time()
+        }
+      end
     end
   end
+
+  -- build result
   local dedup = {}
   for _, e in pairs(best) do table.insert(dedup, e) end
   table.sort(dedup, function(a,b) return (a.weight or 0) > (b.weight or 0) end)
-  local _, _, max = _lb_cfg()
   while #dedup > max do dedup[#dedup] = nil end
-  _lb_save(area, key, mem, dedup)
-  if FISHING.DEBUG then
-    print(string.format("[fishing] leaderboard migrated to unique-per-%s (%d rows)", uniq_by, #dedup))
+
+  -- SAFETY: never overwrite with empty if we had data
+  if #list > 0 and #dedup == 0 then
+    print("[fishing] WARNING: migrate_unique produced empty set; aborting save to avoid wipe.")
+    return
   end
+
+  mem[key] = dedup
+  ezmemory.save_area_memory(area)
+  print(("[fishing] migrate_unique kept %d of %d rows (uniq_by=%s)"):format(#dedup, #list, tostring(uniq_by)))
 end
 
--- Upsert: keep only the player’s best weight
+-- Upsert: keep only the player’s best weight; return (rank, improved)
 local function _lb_upsert(pid, weight_lb)
   local name = Net.get_player_name(pid) or pid
   local area, key, mem, list = _lb_load()
   local _, _, max, uniq_by = _lb_cfg()
 
   local k_new = (uniq_by == "name") and tostring(name) or tostring(pid)
+
   local idx = nil
   for i, e in ipairs(list) do
-    local k_row = (uniq_by == "name") and tostring(e.name or e.player_name or "")
-                                   or tostring(e.player_id or "")
+    local row_pid  = tostring(e.player_id or e.pid or "")
+    local row_name = tostring(e.name or e.player_name or "")
+    local k_row    = (uniq_by == "name") and row_name or row_pid
     if k_row == k_new then idx = i; break end
   end
 
@@ -1514,7 +1543,8 @@ local function _lb_upsert(pid, weight_lb)
     if weight_lb > (tonumber(list[idx].weight) or 0) then
       list[idx].weight       = weight_lb
       list[idx].name         = name
-      list[idx].player_name  = name   -- keep legacy key too
+      list[idx].player_name  = name  -- legacy key for BBS
+      list[idx].player_id    = pid   -- ensure modern key is present
       list[idx].when         = os.time()
       improved = true
     end
@@ -1522,7 +1552,7 @@ local function _lb_upsert(pid, weight_lb)
     table.insert(list, {
       player_id   = pid,
       name        = name,
-      player_name = name,            -- legacy key for BBS
+      player_name = name,
       weight      = weight_lb,
       when        = os.time()
     })
@@ -1532,9 +1562,10 @@ local function _lb_upsert(pid, weight_lb)
   table.sort(list, function(a,b) return (a.weight or 0) > (b.weight or 0) end)
   while #list > max do list[#list] = nil end
 
-  _lb_save(area, key, mem, list)
+  mem[key] = list
+  ezmemory.save_area_memory(area)
 
-  -- compute current rank
+  -- rank
   local rank = nil
   if uniq_by == "name" then
     for i, e in ipairs(list) do
@@ -1542,15 +1573,13 @@ local function _lb_upsert(pid, weight_lb)
     end
   else
     for i, e in ipairs(list) do
-      if tostring(e.player_id or "") == tostring(pid) then rank = i; break end
+      if tostring(e.player_id or e.pid or "") == tostring(pid) then rank = i; break end
     end
   end
 
   return rank, improved
 end
 
--- Run migration once at load
-pcall(_lb_migrate_unique)
 -- ===== end helpers =====
 
 local function _start_session(pid, opts)
