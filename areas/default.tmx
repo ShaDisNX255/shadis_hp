@@ -1220,9 +1220,14 @@
     <property name="common 5" type="object" value="224"/>
     <property name="common 6" type="object" value="223"/>
     <property name="common 7" type="object" value="222"/>
-    <property name="common rate" type="int" value="157"/>
+    <property name="common rate" type="int" value="153"/>
+    <property name="ghost rare 1" type="object" value="322"/>
+    <property name="ghost rare 2" type="object" value="323"/>
+    <property name="ghost rare 3" type="object" value="324"/>
+    <property name="ghost rare rate" type="int" value="5"/>
     <property name="gold rare 1" type="object" value="234"/>
-    <property name="gold rare rate" type="int" value="3"/>
+    <property name="gold rare 2" type="object" value="336"/>
+    <property name="gold rare rate" type="int" value="2"/>
     <property name="rare 1" type="object" value="196"/>
     <property name="rare 2" type="object" value="194"/>
     <property name="rare 3" type="object" value="227"/>

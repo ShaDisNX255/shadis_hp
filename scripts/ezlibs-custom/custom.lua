@@ -46,6 +46,14 @@ local function item_info_from_field_card(card)
   return nil
 end
 
+-- === Parse rarity from title like "[SR]Dark Magician" (respects your existing tags) ===
+local function parse_rarity_tag(title)
+  local rar = title and title:match("^%[([A-Za-z]+)%]") or title and title:match("%[([A-Za-z]+)%]")
+  rar = rar and rar:upper() or nil
+  if rar == "URARE" then rar = "UR" end  -- tolerate "URare" in Description vs title tag
+  return rar
+end
+
 -- --- Card Viewer cross-talk guard -----------------------------------------
 local card_list_open = card_list_open or {}
 
@@ -594,7 +602,7 @@ local SUMMON_NAME_OVERRIDE = {
 }
 
 -- Rarity sort order
-local RARITY_ORDER = { C = 1, R = 2, SR = 3, UR = 4, GDR = 5, GR = 5 }
+local RARITY_ORDER = { C = 1, R = 2, SR = 3, UR = 4, GR = 5, GDR = 6 }
 
 -- === STATE ===
 local player_using_card_bbs       = {}
@@ -1123,6 +1131,81 @@ local function open_trade_board(pid)
   Net.open_board(pid, title, TRADE_BOARD_COLOR, posts)
 end
 
+-- Adjust group weights based on what the player fed (SR/UR/GR/GDR)
+-- Scheme: UR feed → UR up to +90% (9% per UR); SR feed → SR up to +90% (9% per SR) and UR up to +30% (3% per SR).
+-- UR feed also grants a combined +10% to GDR/GR (1% per UR, split across the present pools).
+local function _apply_trade_boosts_for_picks(pid, groups, picks)
+  -- count fed rarities
+  local fed = { C=0, R=0, SR=0, UR=0, GDR=0, GR=0 }
+  for item_id_str, n in pairs(picks or {}) do
+    n = tonumber(n or 0) or 0
+    if n > 0 then
+      local info = ezmemory.get_item_info(item_id_str) or ezmemory.get_item_info(tonumber(item_id_str))
+      local rar  = (info and info.name and (parse_rarity_tag(info.name) or "C") or "C"):upper()
+      if fed[rar] ~= nil then fed[rar] = fed[rar] + n end
+    end
+  end
+
+  -- copy current weights
+  local labels, baseW, totalW, idx = {}, {}, 0, {}
+  for i,g in ipairs(groups or {}) do
+    labels[i] = g.label
+    baseW[i]  = tonumber(g.weight) or 0
+    totalW    = totalW + baseW[i]
+    idx[g.label] = i
+  end
+  if totalW <= 0 then return groups end
+
+  local function add_share(label, share)  -- share is fraction of 1.0 of total mass
+    local i = idx[label]; if not i or share <= 0 then return end
+    baseW[i] = baseW[i] + share * totalW
+  end
+
+  -- compute boosts (fractions of 1.0), clamped
+  local ur_major = math.min(0.90, 0.09 * (fed.UR or 0))
+  local sr_major = math.min(0.90, 0.09 * (fed.SR or 0))
+  local ur_cross = math.min(0.30, 0.03 * (fed.SR or 0))
+  local sp_total = math.min(0.10, 0.01 * (fed.UR or 0)) -- for Gold/Ghost combined
+
+  -- apply boosts
+  add_share("Ultra Rare", ur_major)
+  add_share("Ultra Rare", ur_cross)  -- SRs nudge UR too
+  add_share("Super Rare", sr_major)
+
+  -- split special bump across whichever of GDR/GR pools are present
+  local present = {}
+  if idx["Gold Rare"]  then present[#present+1] = "Gold Rare" end
+  if idx["Ghost Rare"] then present[#present+1] = "Ghost Rare" end
+  if #present > 0 and sp_total > 0 then
+    local each = sp_total / #present
+    for _,lab in ipairs(present) do add_share(lab, each) end
+  end
+
+  -- remove the added mass proportionally from Common/Rare reservoir
+  local added = 0
+  for i,g in ipairs(groups or {}) do added = added + (baseW[i] - (tonumber(g.weight) or 0)) end
+  if added > 0 then
+    local res = 0
+    local CR = {}
+    for _,lab in ipairs({"Common","Rare"}) do
+      local i = idx[lab]; if i then res = res + baseW[i]; CR[#CR+1] = i end
+    end
+    if res > 0 then
+      for _,i in ipairs(CR) do
+        local cut = added * (baseW[i] / res)
+        baseW[i] = math.max(0, baseW[i] - cut)
+      end
+    end
+  end
+
+  -- return adjusted groups (same shape)
+  local out = {}
+  for i,g in ipairs(groups or {}) do
+    out[i] = { label = g.label, items = g.items, weight = baseW[i] }
+  end
+  return out
+end
+
 local function trade_pick_weighted(groups)
   local total = 0; for _,g in ipairs(groups or {}) do total = total + (tonumber(g.weight) or 0) end
   if total <= 0 then return nil end
@@ -1133,7 +1216,9 @@ end
 
 local function grant_trade_return(pid)
   local st = trader_by_pid[pid]; if not st then return nil end
-  local g = trade_pick_weighted(st.groups); if not g or not g.items or #g.items==0 then return nil end
+  -- NEW: adjust weights using what the player fed before we roll the group
+  local adjusted = _apply_trade_boosts_for_picks(pid, st.groups, st.picks)
+  local g = trade_pick_weighted(adjusted); if not g or not g.items or #g.items == 0 then return nil end
   local obj_id = g.items[math.random(1, #g.items)]
   local info = helpers.read_item_information(Net.get_player_area(pid), obj_id)
   if not info then return nil end
@@ -1397,14 +1482,6 @@ end
 local function clamp(n, a, b) if n < a then return a elseif n > b then return b else return n end end
 local function deepcopy(t) if type(t)~="table" then return t end local r={} for k,v in pairs(t) do r[k]=deepcopy(v) end return r end
 local function shuffle(arr) for i=#arr,2,-1 do local j=math.random(i) arr[i],arr[j]=arr[j],arr[i] end return arr end
-
--- === Parse rarity from title like "[SR]Dark Magician" (respects your existing tags) ===
-local function parse_rarity_tag(title)
-  local rar = title and title:match("^%[([A-Za-z]+)%]") or title and title:match("%[([A-Za-z]+)%]")
-  rar = rar and rar:upper() or nil
-  if rar == "URARE" then rar = "UR" end  -- tolerate "URare" in Description vs title tag
-  return rar
-end
 
 -- === Parse ATK/DEF from the card's custom property "Description" ===
 -- Expected examples:
