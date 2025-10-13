@@ -92,7 +92,7 @@ local FISHING      = {
   -- Leaderboard persistence (stored under this area)
   LEADERBOARD            = {
     MEM_AREA = "fisharea", -- << your fishing zone
-    KEY      = "fish_top10_v3",
+    KEY      = "fish_top10_v4",
     MAX      = 10,
     UNIQUE_PER = "secret",  -- or "name" if you prefer name-based uniqueness
   },
@@ -1468,60 +1468,6 @@ local function _lb_save(area, key, mem, list)
   ezmemory.save_area_memory(area)
 end
 
--- Dedup existing board to max weight per player
-local function _lb_migrate_unique()
-  local area, key, mem, list = _lb_load()
-  if type(list) ~= "table" or #list <= 1 then return end
-  local _, _, max, uniq_by = _lb_cfg()
-
-  local best = {}
-  local kept_count = 0
-  for _, e in ipairs(list) do
-    local pid  = tostring(e.player_id or e.pid or "")            -- legacy: pid
-    local name = tostring(e.name or e.player_name or "")          -- legacy: player_name
-    local w    = tonumber(e.weight) or 0
-
-    -- choose key based on UNIQUE_PER, but NEVER drop rows: fall back to name if pid is missing
-    local k
-    if uniq_by == "name" then
-      k = (name ~= "" and name) or (pid ~= "" and pid) or nil
-    else
-      -- default: player_id uniqueness; if missing pid, fall back to name to keep the row
-      k = (pid ~= "" and pid) or (name ~= "" and name) or nil
-    end
-
-    if k then
-      kept_count = kept_count + 1
-      local cur = best[k]
-      if not cur or w > (tonumber(cur.weight) or 0) then
-        best[k] = {
-          player_id   = (pid ~= "" and pid or nil),
-          name        = (name ~= "" and name or nil),
-          player_name = (name ~= "" and name or nil),  -- legacy for BBS
-          weight      = w,
-          when        = tonumber(e.when or e.ts) or os.time()
-        }
-      end
-    end
-  end
-
-  -- build result
-  local dedup = {}
-  for _, e in pairs(best) do table.insert(dedup, e) end
-  table.sort(dedup, function(a,b) return (a.weight or 0) > (b.weight or 0) end)
-  while #dedup > max do dedup[#dedup] = nil end
-
-  -- SAFETY: never overwrite with empty if we had data
-  if #list > 0 and #dedup == 0 then
-    print("[fishing] WARNING: migrate_unique produced empty set; aborting save to avoid wipe.")
-    return
-  end
-
-  mem[key] = dedup
-  ezmemory.save_area_memory(area)
-  print(("[fishing] migrate_unique kept %d of %d rows (uniq_by=%s)"):format(#dedup, #list, tostring(uniq_by)))
-end
-
 -- Upsert: keep only the player’s best weight; return (rank, improved)
 local function _lb_upsert(pid, weight_lb)
   local name = Net.get_player_name(pid) or pid
@@ -1864,7 +1810,6 @@ local function _open_fishbbs(pid)
   if #list == 0 then
     posts[#posts + 1] = { id = '__fishbbs:none', read = true, title = 'No catches yet. Be the first!', author = '' }
   else
-    _lb_migrate_unique()
     local MAX_NAME = 20
     for i, rec in ipairs(list) do
       local nm = _trunc(tostring(rec.name or rec.player_name or "Unknown"), MAX_NAME)
