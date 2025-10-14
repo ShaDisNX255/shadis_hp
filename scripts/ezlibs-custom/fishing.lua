@@ -6,12 +6,16 @@
 local helpers      = require('scripts/ezlibs-scripts/helpers')
 local ezmemory     = require('scripts/ezlibs-scripts/ezmemory')
 local ezencounters = require('scripts/ezlibs-scripts/ezencounters/main')
+local config = require('scripts/fishing-config/main')
+local Constants = config.CONSTANTS
 
 local okJobBBS, JobBBS = pcall(require, 'scripts/jobbbs/JobBBS')
 if not okJobBBS then JobBBS = nil end
 
+
 -- Resolve Async if not global
 local function _resolve_async()
+
   if _G and _G.Async then return _G.Async end
   local ok, A = pcall(require, 'scripts/ezlibs-scripts/async')
   if ok and A then return A end
@@ -30,12 +34,12 @@ local PLAYER_AREA  = {} -- [pid] = area_id
 -- ====================== Config you can edit ======================
 local FISHING      = {
   -- Hidden layer where your meter prototype objects live
-  TEMPLATE_LAYER         = "Fishing",
-  HOLD_SECONDS           = 5.0,
-  FORCE_METER_DIMS_PX    = nil,
-  EXPECTED_METER_DIMS_PX = { w = 17, h = 91 },
-  DEBUG                  = false,
-  PRIVATE_METERS         = true,
+  TEMPLATE_LAYER         = Constants.TEMPLATE_LAYER,
+  HOLD_SECONDS           = Constants.HOLD_SECONDS,
+  FORCE_METER_DIMS_PX    = Constants.FORCE_METER_SIZE,
+  EXPECTED_METER_DIMS_PX = Constants.EXPECTED_METER_SIZE,
+  DEBUG                  = Constants.DEBUG,
+  PRIVATE_METERS         = Constants.PRIVATE_METERS,
   PRIVATE_MODE           = "exclude",
   RESULTS_CALLBACK       = _default_fishing_rewards,
 
@@ -46,28 +50,19 @@ local FISHING      = {
 
   -- Extra world-space nudge after facing/side placement (tiles).
   -- Positive y moves the meter lower on the screen.
-  METER_SCREEN_SHIFT     = { x = 1.5, y = 0.0, z = 0.0 },
+  METER_SCREEN_SHIFT     = Constants.METER_SCREEN_SHIFT,
 
   -- Total time window to hook the fish
-  MAX_DURATION_S         = 12.0,
+  MAX_DURATION_S         = Constants.MAX_DURATION_S,
 
   -- Time you must hold inside the sweet band to succeed
-  HOLD_RANGE_S           = { min = 3.0, max = 6.0 },
+  HOLD_RANGE_S           = Constants.SUCCESS_RANGE,
 
   -- Sweet spot width: number of consecutive pips that count as "sweet"
-  SWEET_WIDTH            = 2, -- e.g., 2 means [4..5] or [7..8], always within 1..9
+  SWEET_WIDTH            = Constants.SWEET_WIDTH, -- e.g., 2 means [4..5] or [7..8], always within 1..9
 
   -- Heaviness presets (higher decay = harder; mash is how much each A tap helps)
-  HEAVINESS              = {
-    --  key            decay/s   mashGain  hold_mult
-    { key = "light",      decay = 1.2, mash = 1.20, hold_mult = 0.95 },
-    { key = "medium",     decay = 1.8, mash = 1.00, hold_mult = 1.00 },
-    { key = "heavy",      decay = 2.5, mash = 0.90, hold_mult = 1.10 },
-    -- Harder tiers
-    { key = "very_heavy", decay = 3.6, mash = 0.85, hold_mult = 1.15 },
-    { key = "brutal",     decay = 4.8, mash = 0.80, hold_mult = 1.20 },
-    { key = "legendary",  decay = 5.4, mash = 0.75, hold_mult = 1.30 },
-  },
+  HEAVINESS              = Constants.HEAVINESS,
 
   -- Odds for each heaviness tier
   HEAVINESS_CHANCES      = {
@@ -141,11 +136,11 @@ local FISHING      = {
   -- Placement just for the timer meter (independent from fish meter)
   TIMER_FORWARD          = 0.0,                             -- a touch in front of the player (0.0 is fine)
   TIMER_SIDE             = 0,                               -- 0 keeps it centered; can be "left"/"right" or a number
-  TIMER_SCREEN_SHIFT     = { x = -2.0, y = -2.0, z = 0.0 }, -- y<0 draws above the player
+  TIMER_SCREEN_SHIFT     = Constants.TIMER_SCREEN_SHIFT, -- y<0 draws above the player
 
   -- Optional size enforcement for the timer bar (pixels -> tiles; isometric-safe)
-  FORCE_TIMER_DIMS_PX    = nil,                -- e.g., { w = 91, h = 17 } if your timer is 91x17 px
-  EXPECTED_TIMER_DIMS_PX = { w = 94, h = 16 }, -- e.g., { w = 91, h = 17 } to auto-correct if it ever drifts
+  FORCE_TIMER_DIMS_PX    = Constants.FORCE_TIMER_SIZE,                -- e.g., { w = 91, h = 17 } if your timer is 91x17 px
+  EXPECTED_TIMER_DIMS_PX =  Constants.EXPECTED_TIMER_SIZE, -- e.g., { w = 91, h = 17 } to auto-correct if it ever drifts
 
   -- Optional sfx paths (set to nil if not wanted)
   SFX                    = {
@@ -156,7 +151,8 @@ local FISHING      = {
     alert        = "/server/assets/sfx/Alert.ogg",
     tick         = nil,
   },
-  VIRUS_CHANCE           = 0.30, -- 30 percent for eligible tiers
+
+  VIRUS_CHANCE           = Constants.VIRUS_CHANCE, -- 30 percent for eligible tiers
   VIRUS_EXCLUDED         = {     -- tiers that never trigger a virus
     brutal = true,
     legendary = true,
@@ -164,127 +160,9 @@ local FISHING      = {
 
   -- Fishing virus encounters - you can edit or add more
   -- These are self-contained encounter infos passed to ezencounters
-  VIRUS_ENCOUNTERS       = {
-    {
-      name               = "Encounter1",
-      weight             = 10,
-      path               = "/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
-      enemies            = {
-        { name = "Shrimpy", rank = 6 },
-        { name = "Shrimpy", rank = 7 },
-        { name = "Shrimpy", rank = 8 },
-      },
-      obstacles          = {
-        { name = "Rock" },
-        { name = "Rock" },
-      },
-      positions          = {
-        { 0, 0, 0, 0, 0, 1 },
-        { 0, 0, 0, 0, 2, 0 },
-        { 0, 0, 0, 0, 3, 0 },
-      },
-      obstacle_positions = {
-        { 0, 0, 1, 0, 0, 0 },
-        { 0, 0, 0, 2, 0, 0 },
-        { 0, 0, 0, 0, 0, 0 },
-      },
-      player_positions   = {
-        { 0, 0, 0, 0, 0, 0 },
-        { 0, 1, 0, 0, 0, 0 },
-        { 0, 0, 0, 0, 0, 0 },
-      },
-      tiles              = {
-        { 1, 1, 1, 1, 1, 1 },
-        { 1, 1, 1, 1, 1, 1 },
-        { 1, 1, 1, 1, 1, 1 },
-      },
-      teams              = {
-        { 2, 2, 2, 1, 1, 1 },
-        { 2, 2, 2, 1, 1, 1 },
-        { 2, 2, 2, 1, 1, 1 },
-      },
-      music              = { path = "bn6_battle_xg.mid" },
-    },
-    {
-      name               = "Encounter2",
-      weight             = 10,
-      path               = "/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
-      enemies            = {
-        { name = "Piranha",  rank = 4 },
-        { name = "ColdHead", rank = 1 },
-        { name = "Tark",     rank = 1 },
-      },
-      obstacles          = {
-        { name = "Rock" },
-      },
-      positions          = {
-        { 0, 0, 0, 0, 0, 2 },
-        { 0, 0, 0, 0, 1, 3 },
-        { 0, 0, 0, 0, 0, 0 },
-      },
-      obstacle_positions = {
-        { 0, 0, 0, 0, 0, 0 },
-        { 0, 0, 0, 0, 0, 0 },
-        { 0, 0, 0, 0, 0, 0 },
-      },
-      player_positions   = {
-        { 0, 0, 0, 0, 0, 0 },
-        { 0, 1, 0, 0, 0, 0 },
-        { 0, 0, 0, 0, 0, 0 },
-      },
-      tiles              = {
-        { 1, 1, 1, 1, 1, 1 },
-        { 1, 1, 1, 1, 1, 1 },
-        { 1, 1, 1, 1, 1, 1 },
-      },
-      teams              = {
-        { 2, 2, 2, 1, 1, 1 },
-        { 2, 2, 2, 1, 1, 1 },
-        { 2, 2, 2, 1, 1, 1 },
-      },
-    },
-    {
-      name               = "Encounter3",
-      weight             = 10,
-      path               = "/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
-      enemies            = { { name = "Swordy", rank = 1 }, { name = "Boomer", rank = 1 } },
-      enemies            = {
-        { name = "SwordyEl", rank = 5 },
-        { name = "SwordyEl", rank = 2 },
-        { name = "SwordyEl", rank = 8 },
-      },
-      obstacles          = {
-      },
-      positions          = {
-        { 0, 0, 0, 0, 3, 0 },
-        { 0, 0, 0, 0, 1, 0 },
-        { 0, 0, 0, 0, 2, 0 },
-      },
-      obstacle_positions = {
-        { 0, 0, 0, 0, 0, 0 },
-        { 0, 0, 0, 0, 0, 0 },
-        { 0, 0, 0, 0, 0, 0 },
-      },
-      player_positions   = {
-        { 0, 0, 0, 0, 0, 0 },
-        { 0, 1, 0, 0, 0, 0 },
-        { 0, 0, 0, 0, 0, 0 },
-      },
-      tiles              = {
-        { 1, 1, 1, 1, 1, 1 },
-        { 1, 1, 1, 1, 1, 1 },
-        { 1, 1, 1, 1, 1, 1 },
-      },
-      teams              = {
-        { 2, 2, 2, 1, 1, 1 },
-        { 2, 2, 2, 1, 1, 1 },
-        { 2, 2, 2, 1, 1, 1 },
-      },
-      music              = { path = "bn6_battle_xg.mid" },
-    },
-  },
+  VIRUS_ENCOUNTERS       = config.FISHING_VIRUS,
   -- Money per pound for normal fish (not viruses)
-  FISH_REWARD_PER_LB     = 1800, -- edit to taste
+  FISH_REWARD_PER_LB     = Constants.FISH_REWARD_PER_LB, -- edit to taste
 
   -- Waiting phase: bite indicator (public, visible to everyone)
   BITE                   = {
@@ -296,14 +174,14 @@ local FISHING      = {
     -- Placement controls (separate from fish/timer meters)
     FORWARD          = 0.0,
     SIDE             = 0,                               -- number or "left"/"right"
-    SCREEN_SHIFT     = { x = -1.0, y = -1.0, z = 0.0 }, -- above player a little
+    SCREEN_SHIFT     = Constants.EX_SCREEN_SHIFT, -- above player a little
 
     -- Optional size enforcement just for the bite icon
-    FORCE_DIMS_PX    = nil, -- e.g., { w=32, h=32 }
-    EXPECTED_DIMS_PX = { w = 22, h = 22 },
+    FORCE_DIMS_PX    = Constants.FORCE_EX_SIZE, -- e.g., { w=32, h=32 }
+    EXPECTED_DIMS_PX = Constants.EXPECTED_EX_SIZE,
 
     -- Random wait before a bite shows up
-    WAIT_RANGE_S     = { min = 1.2, max = 3.0 },
+    WAIT_RANGE_S     = Constants.BITE_WAIT_RANGE,
 
     -- Window to press A when it bites (heavier = shorter)
     WINDOW_S         = {
@@ -807,13 +685,16 @@ end
 --   TIMER phases:       prefer /server/assets/fishing/timer/0.tsx .. 5.tsx (fallbacks below)
 --   BITE (flash):       /server/fishing/ex.tsx   (fallback: /server/assets/fishing/ex.tsx)
 
-local ASSET_FISHING_DIR   = "/server/assets/fishing/"
-local ASSET_NORMAL_DIR    = ASSET_FISHING_DIR .. "blue/"
-local ASSET_SWEET_DIR     = ASSET_FISHING_DIR .. "yellow/"
+local fishingDir   = Constants.ASSET_FISHING_DIR
+local normalDir    = fishingDir .. Constants.ASSET_NORMAL_DIR
+local sweetDir     = fishingDir .. Constants.ASSET_SWEET_DIR
+local timerDir     = fishingDir .. Constants.ASSET_TIMER_DIR
+local exPath       = Constants.EX_ALERT_PATH
+local exTsx        = Constants.EX_ALERT_TSX
 -- Try a timer/ subdir first; fall back to reusing blue/ if that’s how you stored them.
-local ASSET_TIMER_DIRS    = { ASSET_FISHING_DIR .. "timer/", ASSET_NORMAL_DIR }
+local ASSET_TIMER_DIRS    = { timerDir, normalDir }
 -- Bite candidates (support both paths you mentioned)
-local BITE_TSX_CANDIDATES = { "/server/fishing/ex.tsx", ASSET_FISHING_DIR .. "ex.tsx" }
+local BITE_TSX_CANDIDATES = { exPath, fishingDir .. exTsx }
 
 -- Parse TMX once per call; keyed by lowercase, slash-normalized source path
 local function _tilesets_by_source(area_id)
@@ -843,7 +724,7 @@ end
 -- Build gid from your blue/yellow phase files (0..10)
 local function _meter_gid_from_assets(area_id, color, phase)
   phase = tonumber(phase or 0) or 0
-  local dir = (color == "sweet_spot") and ASSET_SWEET_DIR or ASSET_NORMAL_DIR
+  local dir = (color == "sweet_spot") and fishingDir or normalDir
   local gid = _gid_for_tsx(area_id, dir .. tostring(phase) .. ".tsx")
   return gid > 0 and gid or 0
 end
@@ -1346,7 +1227,7 @@ end
 local function _default_fishing_rewards(player_id, encounter_info, stats)
   -- stats = { health, score, time, ran, emotion, turns, npcs = [...] }
   if not stats or stats.ran then return end -- no rewards if ran
-  local reward_monies = math.floor((stats.score or 0) * 5000)
+  local reward_monies = math.floor((stats.score or 0) * Constants.MONEY_MULTIPLYER)
   if reward_monies > 0 then
     ezmemory.spend_player_money(player_id, -reward_monies) -- negative spend = give money
     Net.message_player(player_id, "Got $" .. reward_monies .. "!")
