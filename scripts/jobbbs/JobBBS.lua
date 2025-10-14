@@ -892,26 +892,37 @@ end
 local function ensure_jobs_for_today(pid, st, board_id)
   local B = get_board(st, board_id)
 
-  -- If we already have today's list for this board, reuse it
-  if B.job_ids and B.day_key == st.day_key then return B end
-
-  -- Day changed for this board? Nuke per-day flags + pending prompts
-  if B.day_key ~= st.day_key then
+  -- Day-flip guard (normal case): board day differs from player day → wipe flags
+  if B.day_key and B.day_key ~= st.day_key then
     B.accepted, B.claimed = {}, {}
     B.awaiting_kind, B.awaiting_idx, B.awaiting_base, B.awaiting_step = nil, nil, nil, nil
-
-    -- Drop stale baselines for this board so progress snapshots are fresh
     if st.prog and st.prog.baseline then
-      local esc = tostring(board_id):gsub("(%W)", "%%%1") -- escape pattern chars
-      for k in pairs(st.prog.baseline) do
-        if tostring(k):match('^'..esc..'/') then
-          st.prog.baseline[k] = nil
-        end
+      for k,_ in pairs(st.prog.baseline) do
+        if k:match('^'..board_id..'/') then st.prog.baseline[k] = nil end
       end
     end
+    -- mark that flags are clean for this day
+    B.flags_stamp = st.day_key
   end
 
-  -- Pick today's jobs deterministically
+  -- If jobs already exist for "today", do a one-time repair if they were picked by an old build
+  -- Old builds set B.day_key but never stamped; that left yesterday's claimed flags intact.
+  if B.job_ids and B.day_key == st.day_key then
+    if B.flags_stamp ~= st.day_key then
+      -- repair: nuke stale flags once
+      B.accepted, B.claimed = {}, {}
+      B.awaiting_kind, B.awaiting_idx, B.awaiting_base, B.awaiting_step = nil, nil, nil, nil
+      if st.prog and st.prog.baseline then
+        for k,_ in pairs(st.prog.baseline) do
+          if k:match('^'..board_id..'/') then st.prog.baseline[k] = nil end
+        end
+      end
+      B.flags_stamp = st.day_key
+    end
+    return B
+  end
+
+  -- (Re)pick today's jobs deterministically
   local pool, cats = jobs_pool()
   local order = { 'visit','npc','inspect','virus','duel','pack','fish' }
   local ids = {}
@@ -920,9 +931,10 @@ local function ensure_jobs_for_today(pid, st, board_id)
     local seed = table.concat({ player_key(pid), st.day_key, board_id, cat }, '|')
     ids[#ids+1] = pick_deterministic(list, seed)
   end
-
   B.job_ids = ids
   B.day_key = st.day_key
+  -- when we generate a fresh list for the day, flags should be considered clean
+  B.flags_stamp = st.day_key
   return B
 end
 
