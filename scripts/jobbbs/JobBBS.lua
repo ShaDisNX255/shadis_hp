@@ -294,22 +294,19 @@ local function ensure_daily_reset(pid)
     st.prog.objects    = {}
     st.prog.obj_areas  = {}
 
-    -- NEW: wipe all boards so nothing carries over
+    -- wipe all boards so nothing carries over
     if st.boards then
-      for board_id, B in pairs(st.boards) do
-        if not B then goto continue end
-        if B.day_key ~= today then
+      for _, B in pairs(st.boards) do
+        if B then
           B.accepted, B.claimed = {}, {}
           B.awaiting_kind, B.awaiting_idx, B.awaiting_base, B.awaiting_step = nil, nil, nil, nil
           B.job_ids = nil
           B.day_key = nil
         end
-        ::continue::
       end
     end
 
     save_mem(pid, st)
-    if dbg then dbg('daily reset -> cleared per-day sets + board flags', pid, today) end
   end
 end
 
