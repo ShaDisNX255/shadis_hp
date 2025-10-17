@@ -9,6 +9,7 @@ local ezencounters = require('scripts/ezlibs-scripts/ezencounters/main')
 local helpers = require('scripts/ezlibs-scripts/helpers')
 local custom = require('scripts/ezlibs-custom/custom')
 local onceitem = require('scripts/events/eznpcs_onceitem')   -- loads the onceitem rental type
+local teams = require('scripts/teams/teams')
 
 
 local sfx = {

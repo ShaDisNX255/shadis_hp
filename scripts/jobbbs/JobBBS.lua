@@ -816,14 +816,31 @@ local function jobs_pool()
     function(pid, st, base_key) return _total_weight_check(pid, st, base_key, 90) end)
 
   -- On a Roll (HowlerMan) - N: 3,4,5,6 (best streak since accept; failures reset live streak)
-  local function _streak_check(pid, st, base_key, need)
-    st.prog.fish = st.prog.fish or {}
-    local base_best = ((st.prog.baseline and st.prog.baseline[base_key] and st.prog.baseline[base_key].fish) or {}).streak or 0
-    local best_now  = st.prog.fish.streak or 0
-    local done = (best_now >= need) and (best_now > base_best)
-    local cur = math.min(best_now, need)
-    return done, cur, need
-  end
+local function _streak_check(pid, st, base_key, need)
+  st.prog.fish = st.prog.fish or {}
+  local base = (st.prog.baseline and st.prog.baseline[base_key]
+               and st.prog.baseline[base_key].fish) or {}
+
+  local best_now  = tonumber(st.prog.fish.streak or 0) or 0        -- best streak today
+  local base_best = tonumber(base.streak or 0) or 0                -- best streak at accept
+  local live      = tonumber(st.prog.fish.streak_live or 0) or 0   -- current ongoing streak
+  local cur_c     = tonumber(st.prog.fish.catches or 0) or 0       -- total catches today (after gating)
+  local base_c    = tonumber(base.catches or 0) or 0               -- catches at accept
+
+  -- A) Classic path: you beat your baseline best
+  local beat_baseline = (best_now >= need) and (best_now > base_best)
+
+  -- B) Exact “since accept” path: you are currently on a live streak of length >= need,
+  --    and that entire live streak happened after accepting (no pre-accept carryover).
+  local catches_since_accept = math.max(0, cur_c - base_c)
+  local live_since_accept    = (live >= need) and (catches_since_accept >= live)
+
+  local done = beat_baseline or live_since_accept
+
+  -- progress UI: show whichever looks more informative (live vs best), clamped to need
+  local prog = math.min(math.max(live, best_now), need)
+  return done, prog, need
+end
   J('fish_streak3', 'On a Roll', 'HowlerMan', "Me a better fisher than you, ook! Bet you can't catch 3 fish in a row!",
     function(pid, st, base_key) return _streak_check(pid, st, base_key, 3) end)
   J('fish_streak4', 'On a Roll', 'HowlerMan', "Me a better fisher than you, ook! Bet you can't catch 4 fish in a row!",

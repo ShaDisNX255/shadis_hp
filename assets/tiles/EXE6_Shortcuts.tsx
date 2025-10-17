@@ -36,6 +36,13 @@
    <frame tileid="5" duration="80"/>
   </animation>
  </tile>
+ <tile id="8">
+  <objectgroup draworder="index" id="2">
+   <object id="1" x="5" y="15">
+    <polygon points="0,0 27,14 54,0 27,-14"/>
+   </object>
+  </objectgroup>
+ </tile>
  <tile id="12">
   <animation>
    <frame tileid="12" duration="220"/>
