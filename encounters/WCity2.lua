@@ -87,9 +87,6 @@ local Encounter1 = {
         {2,2,2,1,1,1},
         {2,2,2,1,1,1},
     },
-    music={
-        path="bn6_battle_xg.mid"
-    },
     results_callback = give_result_awards
 }
 
@@ -127,9 +124,6 @@ local Encounter2 = {
         {2,2,2,1,1,1},
         {2,2,2,1,1,1},
         {2,2,2,1,1,1},
-    },
-    music={
-        path="bn6_battle_xg.mid"
     },
     results_callback = give_result_awards
 }
@@ -169,9 +163,6 @@ local Encounter3 = {
         {2,2,2,1,1,1},
         {2,2,2,1,1,1},
     },
-    music={
-        path="bn6_battle_xg.mid"
-    },
     results_callback = give_result_awards
 }
 
@@ -209,9 +200,6 @@ local Encounter4 = {
         {2,2,2,1,1,1},
         {2,2,2,1,1,1},
         {2,2,2,1,1,1},
-    },
-    music={
-        path="bn6_battle_xg.mid"
     },
     results_callback = give_result_awards
 }
@@ -252,9 +240,6 @@ local Encounter5 = {
         {2,2,2,1,1,1},
         {2,2,2,1,1,1},
     },
-    music={
-        path="bn6_battle_xg.mid"
-    },
     results_callback = give_result_awards
 }
 
@@ -292,9 +277,6 @@ local Encounter6 = {
         {2,2,2,1,1,1},
         {2,2,2,1,1,1},
         {2,2,2,1,1,1},
-    },
-    music={
-        path="bn6_battle_xg.mid"
     },
     results_callback = give_result_awards
 }
@@ -335,9 +317,6 @@ local Encounter7 = {
         {2,2,2,1,1,1},
         {2,2,2,1,1,1},
     },
-    music={
-        path="bn6_battle_xg.mid"
-    },
     results_callback = give_result_awards
 }
 
@@ -376,9 +355,6 @@ local Encounter8 = {
         {2,2,2,1,1,1},
         {2,2,2,1,1,1},
         {2,2,2,1,1,1},
-    },
-    music={
-        path="bn6_battle_xg.mid"
     },
     results_callback = give_result_awards
 }
@@ -421,9 +397,6 @@ local Encounter9 = {
         {2,2,2,1,1,1},
         {2,2,2,1,1,1},
     },
-    music={
-        path="bn6_battle_xg.mid"
-    },
     results_callback = give_result_awards
 }
 
@@ -462,9 +435,6 @@ local Encounter10 = {
         {2,2,2,1,1,1},
         {2,2,2,1,1,1},
         {2,2,2,1,1,1},
-    },
-    music={
-        path="bn6_battle_xg.mid"
     },
     results_callback = give_result_awards
 }
