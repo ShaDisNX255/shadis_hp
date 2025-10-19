@@ -7,11 +7,23 @@ local CONSTANTS = {
   -- Game Feel
   PRIVATE_METERS         = true,
   VIRUS_CHANCE           = 0.30,
+  VIRUS_EXCLUDED          = {
+    brutal = true,
+    legendary = true,
+  },
   HOLD_SECONDS           = 5.0,
   MAX_DURATION_S         = 12.0,
   SWEET_WIDTH            = 2,
   BITE_WAIT_RANGE        = { min = 1.2, max = 3.0 },
   SUCCESS_RANGE          = { min = 3.0, max = 6.0 },
+  WINDOW_S              = {
+    light = 0.85,
+    medium = 0.75,
+    heavy = 0.65,
+    very_heavy = 0.45,
+    brutal = 0.35,
+    legendary = 0.25,
+  },
   HEAVINESS              = {
     --  key            decay/s   mashGain  hold_mult
     { key = "light",      decay = 1.2, mash = 1.20, hold_mult = 0.95 },
@@ -42,7 +54,37 @@ local CONSTANTS = {
   EX_SCREEN_SHIFT        = { x = -1.0, y = -1.0, z = 0.0 },
   -- Catch/Reward Values
   FISH_REWARD_PER_LB     = 1000,
-  MONEY_MULTIPLYER       = 500,  
+  MONEY_MULTIPLYER       = 500,
+  -- Odds for each heaviness tier (percent-like weights; they don't need to sum to 100)
+  HEAVINESS_CHANCES = {
+    light      = 25,
+    medium     = 25,
+    heavy      = 25,
+    very_heavy = 10,
+    brutal     = 10,
+    legendary  = 5,
+  },
+
+  -- Display-only: random weight ranges (in pounds) per heaviness bucket
+  WEIGHT_RANGES_LB = {
+    light      = { 1.0, 3.0 },
+    medium     = { 3.0, 7.0 },
+    heavy      = { 7.0, 12.0 },
+    very_heavy = { 12.0, 18.0 },
+    brutal     = { 18.0, 25.0 },
+    legendary  = { 25.0, 40.0 },
+  },
+  BAIT = {
+    VIRUS_CHANCE = 0.10,
+    HEAVINESS_CHANCES = {
+      light      = 20,
+      medium     = 20,
+      heavy      = 20,
+      very_heavy = 15,
+      brutal     = 15,
+      legendary  = 10,
+    },
+  },
 }
 
 return CONSTANTS

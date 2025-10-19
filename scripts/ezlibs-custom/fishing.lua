@@ -9,6 +9,14 @@ local ezencounters = require('scripts/ezlibs-scripts/ezencounters/main')
 local config = require('scripts/fishing-config/main')
 local Constants = config.CONSTANTS
 
+-- Per-area resolvers (fallback to defaults if not defined)
+local function _C_for(area_id)
+  return (config.get_constants_for_area and config.get_constants_for_area(area_id)) or Constants
+end
+local function _V_for(area_id)
+  return (config.get_viruses_for_area and config.get_viruses_for_area(area_id)) or config.FISHING_VIRUS
+end
+
 local okJobBBS, JobBBS = pcall(require, 'scripts/jobbbs/JobBBS')
 if not okJobBBS then JobBBS = nil end
 
@@ -65,24 +73,10 @@ local FISHING      = {
   HEAVINESS              = Constants.HEAVINESS,
 
   -- Odds for each heaviness tier
-  HEAVINESS_CHANCES      = {
-    light      = 25,
-    medium     = 25,
-    heavy      = 25,
-    very_heavy = 10,
-    brutal     = 10,
-    legendary  = 5,
-  },
+  HEAVINESS_CHANCES      = Constants.HEAVINESS_CHANCES,
 
   -- Display-only: random weight ranges (in pounds) per heaviness
-  WEIGHT_RANGES_LB       = {
-    light      = { 1.0, 3.0 },
-    medium     = { 3.0, 7.0 },
-    heavy      = { 7.0, 12.0 },
-    very_heavy = { 12.0, 18.0 },
-    brutal     = { 18.0, 25.0 },
-    legendary  = { 25.0, 40.0 },
-  },
+  WEIGHT_RANGES_LB       = Constants.WEIGHT_RANGES_LB,
 
   -- Leaderboard persistence (stored under this area)
   LEADERBOARD            = {
@@ -153,10 +147,7 @@ local FISHING      = {
   },
 
   VIRUS_CHANCE           = Constants.VIRUS_CHANCE, -- 30 percent for eligible tiers
-  VIRUS_EXCLUDED         = {     -- tiers that never trigger a virus
-    brutal = true,
-    legendary = true,
-  },
+  VIRUS_EXCLUDED         = Constants.VIRUS_EXCLUDED,
 
   -- Fishing virus encounters - you can edit or add more
   -- These are self-contained encounter infos passed to ezencounters
@@ -184,23 +175,18 @@ local FISHING      = {
     WAIT_RANGE_S     = Constants.BITE_WAIT_RANGE,
 
     -- Window to press A when it bites (heavier = shorter)
-    WINDOW_S         = {
-      light = 0.85,
-      medium = 0.75,
-      heavy = 0.65,
-      very_heavy = 0.45,
-      brutal = 0.35,
-      legendary = 0.25,
-    },
+    WINDOW_S         = Constants.WINDOW_S,
 
     -- Optional sfx on bite popup
     SFX_BITE         = "/server/assets/sfx/WaterDeepSplash.ogg",
   },
 
-  BAIT                   = {
+  BAIT = {
     ITEM_NAME = "bait",
-    VIRUS_CHANCE = 0.10, -- reduced when used (default is 0.30)
-    HEAVINESS_CHANCES = { light = 20, medium = 20, heavy = 20, very_heavy = 15, brutal = 15, legendary = 10 },
+    VIRUS_CHANCE = (Constants.BAIT and Constants.BAIT.VIRUS_CHANCE) or 0.10,
+    HEAVINESS_CHANCES = (Constants.BAIT and Constants.BAIT.HEAVINESS_CHANCES) or {
+      light=20, medium=20, heavy=20, very_heavy=15, brutal=15, legendary=10
+    },
   },
 }
 
@@ -476,11 +462,6 @@ local function _record_catch(pid, weight_lb)
   return rank
 end
 
-local function _lb_top10()
-  local _, list = _lb_bucket()
-  return list
-end
-
 local function _map_info(xml)
   local map_tag = xml:match("<map%s+[^>]*>")
   if not map_tag then return "orthogonal", 32, 32 end
@@ -531,9 +512,24 @@ local function _resolve_meter_dims(area_id, template_layer_name, base_gid)
 end
 
 local function _enforce_expected_dims(area_id, w, h)
-  local exp = FISHING.EXPECTED_METER_DIMS_PX
-  if not exp or not exp.w or not exp.h then return w, h, false end
-  local ew, eh = _px_to_tiles(area_id, exp.w, exp.h)
+  local C = _C_for and _C_for(area_id) or nil
+
+  -- pick per-area expectation if present (tiles wins over pixels), else global pixels
+  local area_tiles = C and C.EXPECTED_METER_DIMS_TILES
+  local area_px    = C and (C.EXPECTED_METER_DIMS_PX or C.EXPECTED_METER_SIZE)
+  local base_px    = FISHING and FISHING.EXPECTED_METER_DIMS_PX
+
+  local ew, eh, src
+  if area_tiles and area_tiles.w and area_tiles.h then
+    ew, eh, src = tonumber(area_tiles.w), tonumber(area_tiles.h), "area-tiles"
+  elseif area_px and area_px.w and area_px.h then
+    ew, eh = _px_to_tiles(area_id, tonumber(area_px.w), tonumber(area_px.h)); src = "area-px"
+  elseif base_px and base_px.w and base_px.h then
+    ew, eh = _px_to_tiles(area_id, tonumber(base_px.w), tonumber(base_px.h)); src = "global-px"
+  else
+    -- nothing to enforce
+    return w, h, false
+  end
 
   -- relative error against expected
   local dw = math.abs((tonumber(w) or 0) - ew) / (ew == 0 and 1 or ew)
@@ -541,8 +537,8 @@ local function _enforce_expected_dims(area_id, w, h)
 
   if dw > 0.15 or dh > 0.15 then
     if FISHING.DEBUG then
-      print(("[fishing] size auto-correct: had %.3fx%.3f, expect %.3fx%.3f (from %dx%d px)")
-        :format(w, h, ew, eh, exp.w, exp.h))
+      print(("[fishing] size auto-correct (%s): had %.3fx%.3f, expect %.3fx%.3f")
+        :format(src or "?", w, h, ew, eh))
     end
     return ew, eh, true
   end
@@ -689,7 +685,7 @@ local fishingDir   = Constants.ASSET_FISHING_DIR
 local normalDir    = fishingDir .. Constants.ASSET_NORMAL_DIR
 local sweetDir     = fishingDir .. Constants.ASSET_SWEET_DIR
 local timerDir     = fishingDir .. Constants.ASSET_TIMER_DIR
-local exPath       = Constants.EX_ALERT_PATH
+local exPath       = Constants.D_BITE_TSX_CANIDATE
 local exTsx        = Constants.EX_ALERT_TSX
 -- Try a timer/ subdir first; fall back to reusing blue/ if that’s how you stored them.
 local ASSET_TIMER_DIRS    = { timerDir, normalDir }
@@ -724,26 +720,41 @@ end
 -- Build gid from your blue/yellow phase files (0..10)
 local function _meter_gid_from_assets(area_id, color, phase)
   phase = tonumber(phase or 0) or 0
-  local dir = (color == "sweet_spot") and fishingDir or normalDir
+  local C = _C_for(area_id)
+  local fishingDir = C.ASSET_FISHING_DIR
+  local dir = (color == "sweet_spot")
+    and (fishingDir .. C.ASSET_SWEET_DIR)
+    or  (fishingDir .. C.ASSET_NORMAL_DIR)
   local gid = _gid_for_tsx(area_id, dir .. tostring(phase) .. ".tsx")
-  return gid > 0 and gid or 0
+  return (gid and gid > 0) and gid or 0
 end
 
--- Build gid for timer (0..5); tries /timer/ first, then reuses /blue/
+-- Timer (0..5), prefer timer/ then fallback to normal/
 local function _timer_gid_from_assets(area_id, phase)
   phase = tonumber(phase or 0) or 0
-  for _, d in ipairs(ASSET_TIMER_DIRS) do
+  local C = _C_for(area_id)
+  local fishingDir = C.ASSET_FISHING_DIR
+  local dirs = {
+    fishingDir .. C.ASSET_TIMER_DIR,
+    fishingDir .. C.ASSET_NORMAL_DIR,
+  }
+  for _, d in ipairs(dirs) do
     local gid = _gid_for_tsx(area_id, d .. tostring(phase) .. ".tsx")
-    if gid > 0 then return gid end
+    if gid and gid > 0 then return gid end
   end
   return 0
 end
 
--- Bite flash gid from ex.tsx
+-- Bite flash gid from ex.tsx (try file candidates)
 local function _bite_gid_from_assets(area_id)
-  for _, p in ipairs(BITE_TSX_CANDIDATES) do
+  local C = _C_for(area_id)
+  local candidates = {
+    C.D_BITE_TSX_CANIDATE,     -- e.g., "/server/fishing/ex.tsx"
+    C.ASSET_FISHING_DIR .. C.EX_ALERT_TSX, -- e.g., "/server/assets/fishing/ex.tsx"
+  }
+  for _, p in ipairs(candidates) do
     local gid = _gid_for_tsx(area_id, p)
-    if gid > 0 then return gid end
+    if gid and gid > 0 then return gid end
   end
   return 0
 end
@@ -926,10 +937,15 @@ local function _spawn_or_update_meter(pid)
 
   -- Apply world-space nudge
   do
-    local shift = FISHING.METER_SCREEN_SHIFT or {}
-    x = x + (shift.x or 0)
-    y = y + (shift.y or 0) -- increase y to move lower
-    z = z + (shift.z or 0)
+    local C          = _C_for(area_id)
+    local base       = FISHING.METER_SCREEN_SHIFT or {}
+    local area_shift = C and C.METER_SCREEN_SHIFT or nil
+    local sx = (area_shift and area_shift.x ~= nil) and area_shift.x or base.x or 0
+    local sy = (area_shift and area_shift.y ~= nil) and area_shift.y or base.y or 0
+    local sz = (area_shift and area_shift.z ~= nil) and area_shift.z or base.z or 0
+    x = x + sx
+    y = y + sy  -- increase y to move lower
+    z = z + sz
   end
 
   local data = {
@@ -1138,33 +1154,12 @@ local function _cleanup_all_for_pid(pid)
 end
 
 -- ====================== Difficulty / weight helpers ======================
-local function _pick_heaviness()
-  local H = FISHING.HEAVINESS
-  local odds = FISHING.HEAVINESS_CHANCES
-  if not odds then
-    return H[math.random(1, #H)]
-  end
-  local total = 0
-  for _, h in ipairs(H) do
-    total = total + (odds[h.key] or 0)
-  end
-  if total <= 0 then
-    return H[math.random(1, #H)]
-  end
-  local roll = math.random() * total
-  local acc = 0
-  for _, h in ipairs(H) do
-    acc = acc + (odds[h.key] or 0)
-    if roll <= acc then return h end
-  end
-  return H[#H]
-end
-
-local function _random_weight_lb(key)
-  local r = FISHING.WEIGHT_RANGES_LB and FISHING.WEIGHT_RANGES_LB[key]
+local function _random_weight_lb(area_id, key)
+  local C = _C_for and _C_for(area_id) or nil
+  local r = (C and C.WEIGHT_RANGES_LB and C.WEIGHT_RANGES_LB[key])
+        or (FISHING.WEIGHT_RANGES_LB and FISHING.WEIGHT_RANGES_LB[key])
   if not r then return nil end
   local lo, hi = r[1] or 1, r[2] or 1
-  -- 1 decimal place
   return math.floor(((lo + math.random() * (hi - lo)) * 10) + 0.5) / 10
 end
 
@@ -1200,8 +1195,8 @@ local function _cleanup_fishing_meters(area_id, only_pid)
 end
 
 -- Weighted pick from FISHING.VIRUS_ENCOUNTERS
-local function _pick_virus_encounter()
-  local list = (FISHING.VIRUS_ENCOUNTERS or {})
+local function _pick_virus_encounter(area_id)
+  local list = _V_for(area_id) or {}
   local total = 0
   for _, e in ipairs(list) do total = total + (e.weight or 1) end
   if total <= 0 then return list[1] end
@@ -1227,7 +1222,10 @@ end
 local function _default_fishing_rewards(player_id, encounter_info, stats)
   -- stats = { health, score, time, ran, emotion, turns, npcs = [...] }
   if not stats or stats.ran then return end -- no rewards if ran
-  local reward_monies = math.floor((stats.score or 0) * Constants.MONEY_MULTIPLYER)
+  local aid = Net.get_player_area(player_id)
+  local C = _C_for(aid)
+  local mult = tonumber((C and C.MONEY_MULTIPLYER) or Constants.MONEY_MULTIPLYER or 0) or 0
+  local reward_monies = math.floor((stats.score or 0) * mult)
   if reward_monies > 0 then
     ezmemory.spend_player_money(player_id, -reward_monies) -- negative spend = give money
     Net.message_player(player_id, "Got $" .. reward_monies .. "!")
@@ -1303,7 +1301,10 @@ local function _quiet_restart_wait(pid)
   s.bite_until_rel = 0
   _spawn_or_update_bite(pid)
 
-  local rng = (FISHING.BITE and FISHING.BITE.WAIT_RANGE_S) or { min = 1.2, max = 3.0 }
+  -- NEW: resolve per-area wait range
+  local aid = s.area_id or Net.get_player_area(pid)
+  local C = (aid and _C_for(aid)) or nil
+  local rng = (C and C.BITE_WAIT_RANGE) or (FISHING.BITE and FISHING.BITE.WAIT_RANGE_S) or { min = 1.2, max = 3.0 }
   local wmin = tonumber(rng.min or 1.2) or 1.2
   local wmax = tonumber(rng.max or 3.0) or 3.0
   local bite_in = wmin + math.random() * math.max(0, wmax - wmin)
@@ -1315,14 +1316,28 @@ local function _quiet_restart_wait(pid)
   end
 end
 
+local function _H_for(area_id)
+  local C = _C_for(area_id)
+  return (C and C.HEAVINESS) or FISHING.HEAVINESS
+end
+
 -- pick heaviness using a custom odds table
-local function _pick_heaviness_with_odds(odds)
-  local H = FISHING.HEAVINESS
-  local o = odds or FISHING.HEAVINESS_CHANCES
-  if not o then return H[math.random(1, #H)] end
-  local total = 0; for _, h in ipairs(H) do total = total + (o[h.key] or 0) end
-  if total <= 0 then return H[math.random(1, #H)] end
-  local roll = math.random() * total; local acc = 0
+local function _pick_heaviness_with_odds(area_id, odds)
+  local H = _H_for(area_id)
+  local o = odds
+  if not o then
+    local C = _C_for(area_id)
+    o = (C and C.HEAVINESS_CHANCES) or FISHING.HEAVINESS_CHANCES
+  end
+  if not o or #H == 0 then
+    return H[math.random(1, #H)]
+  end
+  local total = 0
+  for _, h in ipairs(H) do total = total + (o[h.key] or 0) end
+  if total <= 0 then
+    return H[math.random(1, #H)]
+  end
+  local roll, acc = math.random() * total, 0
   for _, h in ipairs(H) do
     acc = acc + (o[h.key] or 0)
     if roll <= acc then return h end
@@ -1331,17 +1346,29 @@ local function _pick_heaviness_with_odds(odds)
 end
 
 -- ===== Leaderboard: one-entry-per-player helpers =====
-local function _lb_cfg()
-  local L = FISHING.LEADERBOARD or {}
-  return (L.MEM_AREA or "fisharea"), (L.KEY or "fish_top10"), (L.MAX or 10), (L.UNIQUE_PER or "player_id")
+local function _lb_cfg(area_id)
+  local C = _C_for and _C_for(area_id) or nil
+  local L = (C and C.LEADERBOARD) or FISHING.LEADERBOARD or {}
+  local mem_area = L.MEM_AREA or L.mem_area or "fisharea"
+  local key      = L.KEY or L.key or "fish_top10"
+  local max      = L.MAX or (FISHING.LEADERBOARD and FISHING.LEADERBOARD.MAX) or 10
+  local uniq_by  = L.UNIQUE_PER or L.unique_per
+                or (FISHING.LEADERBOARD and FISHING.LEADERBOARD.UNIQUE_PER)
+                or "player_id"
+  return mem_area, key, max, uniq_by
 end
 
-local function _lb_load()
-  local area, key = _lb_cfg()
-  local mem = ezmemory.get_area_memory(area) or {}
+local function _lb_load(area_id)
+  local area, key = _lb_cfg(area_id)
+  local mem  = ezmemory.get_area_memory(area) or {}
   local list = mem[key]
   if type(list) ~= "table" then list = {} end
   return area, key, mem, list
+end
+
+local function _lb_top10(area_id)
+  local _, _, _, list = _lb_load(area_id)
+  return list
 end
 
 local function _lb_save(area, key, mem, list)
@@ -1350,10 +1377,22 @@ local function _lb_save(area, key, mem, list)
 end
 
 -- Upsert: keep only the player’s best weight; return (rank, improved)
-local function _lb_upsert(pid, weight_lb)
+local function _lb_upsert(pid, weight_lb, area_id)
+  -- area-aware leaderboard gate (opt-in only)
+  local C = _C_for and _C_for(area_id) or nil
+  local LB = C and C.LEADERBOARD or nil
+  -- If no per-area leaderboard declared, do nothing
+  if not LB or LB == false or (LB.enabled == false) or (LB.ENABLED == false) then
+    return nil, false
+  end
+  -- Require a target memory area to write to
+  local mem_area = LB.MEM_AREA or LB.mem_area
+  if not mem_area or mem_area == "" then
+    return nil, false
+  end
   local name = Net.get_player_name(pid) or pid
-  local area, key, mem, list = _lb_load()
-  local _, _, max, uniq_by = _lb_cfg()
+  local area, key, mem, list = _lb_load(area_id)
+  local _, _, max, uniq_by    = _lb_cfg(area_id)
 
   local secret = nil
   if uniq_by == "secret" and helpers.get_safe_player_secret then
@@ -1415,28 +1454,54 @@ local function _lb_upsert(pid, weight_lb)
   return rank, improved
 end
 
+local function _bait_for(area_id)
+  local C = _C_for(area_id)  -- you already have this resolver
+  local base = FISHING.BAIT or {}
+  return {
+    VIRUS_CHANCE = (C.BAIT and C.BAIT.VIRUS_CHANCE) or base.VIRUS_CHANCE,
+    HEAVINESS_CHANCES = (C.BAIT and C.BAIT.HEAVINESS_CHANCES) or base.HEAVINESS_CHANCES,
+  }
+end
+
 -- ===== end helpers =====
 
 local function _start_session(pid, opts)
   local area = Net.get_player_area(pid); if not area then return end
+  -- Resolve constants for THIS player’s area
+  local C    = _C_for(area)
+  local bait = _bait_for(area)  -- << new: per-area bait overrides (with global fallback)
   _cleanup_fishing_meters(area, pid)
 
-  local used_bait = opts and opts.used_bait or false
-  local odds      = used_bait and (FISHING.BAIT and FISHING.BAIT.HEAVINESS_CHANCES)
-      or FISHING.HEAVINESS_CHANCES
+  local used_bait = (opts and opts.used_bait) or false
+
+  -- Heaviness odds: bait overrides when used; else area constants; else global defaults
+  local heaviness_weights =
+      (used_bait and bait.HEAVINESS_CHANCES)
+      or (C.HEAVINESS_CHANCES or FISHING.HEAVINESS_CHANCES)
+
+  -- Hold requirement (seconds): prefer C.HOLD_SECONDS, else pick from C.SUCCESS_RANGE
+  local base_hold = tonumber(C.HOLD_SECONDS)
+  if not base_hold then
+    local r  = C.SUCCESS_RANGE or FISHING.HOLD_RANGE_S
+    local lo = tonumber(r and r.min) or 3.0
+    local hi = tonumber(r and r.max) or 6.0
+    base_hold = lo + math.random() * math.max(0, hi - lo)
+  end
 
   -- pick heaviness and hold (uses per-session odds)
-  local H         = _pick_heaviness_with_odds(odds)
-  local base_hold = (FISHING.HOLD_SECONDS or (FISHING.HOLD_RANGE_S.min + math.random() *
-    (FISHING.HOLD_RANGE_S.max - FISHING.HOLD_RANGE_S.min)))
-  local hold_req  = base_hold * (H.hold_mult or 1.0)
-
-  local W         = math.max(1, math.min(3, tonumber(FISHING.SWEET_WIDTH or 2)))
+  local H         = _pick_heaviness_with_odds(area, heaviness_weights)
+  local hold_req  = (base_hold * (H.hold_mult or 1.0))
+  local W         = math.max(1, math.min(3, tonumber(C.SWEET_WIDTH or FISHING.SWEET_WIDTH or 2)))
   local max_lo    = 9 - (W - 1)
   local sweet_lo  = math.random(1, max_lo)
   local sweet_hi  = sweet_lo + (W - 1)
 
   local px        = Net.get_player_position(pid) or { x = 0, y = 0, z = 0 }
+
+  -- Virus chance: bait override when used; else area constant; else global default
+  local virus_chance =
+      (used_bait and tonumber(bait.VIRUS_CHANCE))
+      or tonumber(C.VIRUS_CHANCE or FISHING.VIRUS_CHANCE)
 
   local s         = {
     area_id      = area,
@@ -1461,13 +1526,12 @@ local function _start_session(pid, opts)
     hold_req     = hold_req,
     hold_accum   = 0.0,
     heaviness    = H.key,
-    weight_lb    = _random_weight_lb(H.key),
+    weight_lb    = _random_weight_lb(area, H.key),
     decay        = H.decay,
     mashGain     = H.mash,
     used_bait    = used_bait and true or false,
-    virus_chance = used_bait and ((FISHING.BAIT and FISHING.BAIT.VIRUS_CHANCE) or FISHING.VIRUS_CHANCE)
-        or (FISHING.VIRUS_CHANCE),
-    odds_used    = odds,
+    virus_chance = virus_chance,
+    odds_used    = heaviness_weights,
     taps         = 0.0,
     timer_phase  = 0,
   }
@@ -1476,7 +1540,7 @@ local function _start_session(pid, opts)
 
   -- waiting loop
   async(function()
-    local wait_rng = (FISHING.BITE and FISHING.BITE.WAIT_RANGE_S) or { min = 1.2, max = 3.0 }
+    local wait_rng = C.BITE_WAIT_RANGE or (FISHING.BITE and FISHING.BITE.WAIT_RANGE_S) or { min = 1.2, max = 3.0 }
     local wait_min = tonumber(wait_rng.min or 1.2) or 1.2
     local wait_max = tonumber(wait_rng.max or 3.0) or 3.0
     local step = 0.05
@@ -1510,15 +1574,17 @@ local function _start_session(pid, opts)
 
       -- time to bite?
       if (not cur.bite_active) and (cur.wait_elapsed >= (cur.next_bite_at or math.huge)) then
-        cur.bite_state   = "bite"
-        cur.bite_active  = true
-        local win_tbl    = (FISHING.BITE and FISHING.BITE.WINDOW_S) or {}
-        local win        = tonumber(win_tbl[cur.heaviness] or 0.9) or 0.9
+        cur.bite_state     = "bite"
+        cur.bite_active    = true
+        local win_tbl      = (C and C.BITE and C.BITE.WINDOW_S)
+                            or (FISHING.BITE and FISHING.BITE.WINDOW_S)
+                            or {}
+        local win          = tonumber(win_tbl[cur.heaviness] or 0.9) or 0.9
         cur.bite_until_rel = (cur.wait_elapsed or 0) + win
-          Net.shake_player_camera(pid, 5, 0.1)
-          _play(pid, FISHING.SFX.alert)
+        Net.shake_player_camera(pid, 5, 0.1)
+        _play(pid, FISHING.SFX.alert)
         if FISHING.DEBUG then
-          print(("[fishing] BITE! window=%.2fs gid=%d"):format(win, _bite_gid("bite") or -1))
+          print(("[fishing] BITE! window=%.2fs gid=%d"):format(win, _bite_gid("bite", s.area_id) or -1))
         end
         _spawn_or_update_bite(pid)
         local sfx = FISHING.BITE and FISHING.BITE.SFX_BITE; _play(pid, sfx)
@@ -1536,10 +1602,13 @@ local function _start_session(pid, opts)
   end)
 end
 
+
 local function _begin_reeling(pid)
   local s = SESS[pid]; if not s or not s.active then return end
+  local aid = s.area_id or Net.get_player_area(pid)
+  local C = (aid and _C_for(aid)) or nil
   s.phase       = "reeling"
-  s.ends_at     = _now_s() + math.ceil(FISHING.MAX_DURATION_S)
+  s.ends_at     = _now_s() + math.ceil( tonumber(C.MAX_DURATION_S or FISHING.MAX_DURATION_S or 12) )
   s.meter_color = "normal"
   s.meter_phase = 0
   s.meter_value = 0.0
@@ -1593,13 +1662,14 @@ local function _begin_reeling(pid)
       -- success
       if cur.hold_accum >= cur.hold_req then
         local tier = tostring(cur.heaviness or "")
-        local eligible = not (FISHING.VIRUS_EXCLUDED and FISHING.VIRUS_EXCLUDED[tier])
+        local excluded = (C and C.VIRUS_EXCLUDED) or FISHING.VIRUS_EXCLUDED or {}
+        local eligible = not excluded[tier]
         local chance = tonumber(cur.virus_chance or FISHING.VIRUS_CHANCE or 0) or 0
         local roll = math.random()
 
         if eligible and roll < chance then
-          local enc = _pick_virus_encounter()
           local aid = cur.area_id
+          local enc = _pick_virus_encounter(aid)
           -- ADD: mark that a fishing virus started (for “Clean the Pond” jobs)
           if JobBBS and JobBBS.on_fish_virus_start then
             pcall(JobBBS.on_fish_virus_start, pid, { area = aid })
@@ -1610,15 +1680,19 @@ local function _begin_reeling(pid)
         else
           -- fish catch: pay money and show message (+ leaderboard)
           local w = cur.weight_lb or 0
-          local pay_per_lb = tonumber(FISHING.FISH_REWARD_PER_LB or 0) or 0
+          local Cpay = _C_for(cur.area_id)
+          local pay_per_lb = tonumber((Cpay and Cpay.FISH_REWARD_PER_LB) or FISHING.FISH_REWARD_PER_LB or 0) or 0
           local monies = math.floor((w * pay_per_lb) + 0.5)
           if monies > 0 then ezmemory.spend_player_money(pid, -monies) end
 
-          local rank, improved = _lb_upsert(pid, w)
+          local rank, improved = _lb_upsert(pid, w, cur.area_id)
           local msg = ("You caught a fish! It weighed %.1f lb. You earned $%d!"):format(w, monies)
           if improved then
             msg = msg .. " New personal best!"
-            if rank and rank <= ((FISHING.LEADERBOARD and FISHING.LEADERBOARD.MAX) or 10) then
+            local LBmax = ((C and C.LEADERBOARD and C.LEADERBOARD.MAX)
+                          or (FISHING.LEADERBOARD and FISHING.LEADERBOARD.MAX)
+                          or 10)
+            if rank and rank <= LBmax then
               msg = msg .. (" New leaderboard %d!"):format(rank)
             end
           end
@@ -1685,7 +1759,9 @@ local function _trunc(s, n)
 end
 
 local function _open_fishbbs(pid)
-  local list = _lb_top10() or {}
+  local aid  = Net.get_player_area(pid)
+  local list = _lb_top10(aid) or {}
+  local _, _, LBmax = _lb_cfg(aid)
   local posts = {}
 
   if #list == 0 then
@@ -1698,10 +1774,10 @@ local function _open_fishbbs(pid)
       posts[#posts + 1] = {
         id     = '__fishbbs:post:' .. i,
         read   = true,
-        title  = string.format('%2d  %s', i, nm), -- no '#'
+        title  = string.format('%2d  %s', i, nm),
         author = string.format('%.1f lb', wt),
       }
-      if i >= 10 then break end
+      if i >= LBmax then break end  -- was hardcoded 10
     end
   end
 
@@ -1788,7 +1864,7 @@ Net:on("object_interaction", function(ev)
 
     if ans == 1 then
       _consume_item(pid, bait_name, 1)
-      _queue_start_after_message(pid, "Using bait... virus chance reduced.", true)
+      _queue_start_after_message(pid, "Using bait...", true)
     else -- ans == 0
       _queue_start_after_message(pid, "Starting to fish without bait", false)
     end
