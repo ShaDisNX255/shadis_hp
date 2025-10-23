@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.8" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="50" height="50" tilewidth="64" tileheight="32" infinite="0" nextlayerid="3" nextobjectid="5">
+<map version="1.8" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="50" height="50" tilewidth="64" tileheight="32" infinite="0" nextlayerid="3" nextobjectid="9">
  <properties>
   <property name="Background" value="custom"/>
   <property name="Background Animation" value="/server/assets/custom/backgrounds/teamshq/14-weatherkunnodennou1.animation"/>
@@ -90,6 +90,39 @@
     <property name="Target Area" value="default"/>
     <property name="Target Object" value="339"/>
    </properties>
+  </object>
+  <object id="5" name="Teams Prog" type="NPC" x="995" y="1317">
+   <properties>
+    <property name="Asset Name" value="prog"/>
+    <property name="Dialogue Type" value="question"/>
+    <property name="Direction" value="Down Left"/>
+    <property name="Next 1" type="object" value="6"/>
+    <property name="Next 2" type="object" value="7"/>
+    <property name="Text 1" value="Hello there, would you like me to explain how teams work?"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="6" name="Explain" type="Dialogue" x="959.5" y="1280.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="8"/>
+    <property name="Text 1" value="Every month, you're allowed to select or switch teams. Your main objective will be to obtain GP by completing jobs on the JobBBS. The team who ends with the most points by the end of the month, wins and earns exclusive rewards. You must obtain a minimum of 5GP in your team to be allowed to reclaim rewards."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="7" name="Don't explain" type="Dialogue" x="971" y="1275">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Text 1" value="Alright then, do your best!"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="8" name="Test period" type="Dialogue" x="940.5" y="1251.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Text 1" value="This is the test period, so you can switch teams endlessly and everyone who participates and makes at least 5GP will be eligible for the exclusive rewards."/>
+   </properties>
+   <point/>
   </object>
  </objectgroup>
 </map>

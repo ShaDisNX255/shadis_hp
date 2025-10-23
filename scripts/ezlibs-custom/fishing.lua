@@ -188,6 +188,12 @@ local FISHING      = {
       light=20, medium=20, heavy=20, very_heavy=15, brutal=15, legendary=10
     },
   },
+  BUGFRAG = {
+    ITEM_NAME = (Constants.BUGFRAG and Constants.BUGFRAG.ITEM_NAME) or "bugfrag",
+    VIRUS_CHANCE = (Constants.BUGFRAG and Constants.BUGFRAG.VIRUS_CHANCE) or 0.60,
+    HEAVINESS_CHANCES = (Constants.BUGFRAG and Constants.BUGFRAG.HEAVINESS_CHANCES) or
+      { light=30, medium=30, heavy=30, very_heavy=4, brutal=4, legendary=2 },
+  },
 }
 
 -- ====================== Minimal TMX helpers ======================
@@ -1463,21 +1469,47 @@ local function _bait_for(area_id)
   }
 end
 
+local function _bugfrag_for(area_id)
+  local C = _C_for(area_id)
+  local base = FISHING.BUGFRAG or {}
+  return {
+    ITEM_NAME = (C.BUGFRAG and C.BUGFRAG.ITEM_NAME) or base.ITEM_NAME or "bugfrag",
+    VIRUS_CHANCE = (C.BUGFRAG and C.BUGFRAG.VIRUS_CHANCE) or base.VIRUS_CHANCE or 0.60,
+    HEAVINESS_CHANCES = (C.BUGFRAG and C.BUGFRAG.HEAVINESS_CHANCES) or base.HEAVINESS_CHANCES,
+  }
+end
+
+local function _consume_item(pid, name, qty)
+  pcall(ezmemory.remove_player_item, pid, name, qty or 1)
+end
+
 -- ===== end helpers =====
 
 local function _start_session(pid, opts)
   local area = Net.get_player_area(pid); if not area then return end
   -- Resolve constants for THIS player’s area
-  local C    = _C_for(area)
-  local bait = _bait_for(area)  -- << new: per-area bait overrides (with global fallback)
+  local C        = _C_for(area)
+  local bait     = _bait_for(area)      -- per-area bait overrides (with global fallback)
+  local bugfrag  = _bugfrag_for(area)   -- per-area bugfrag overrides (with global fallback)
   _cleanup_fishing_meters(area, pid)
 
-  local used_bait = (opts and opts.used_bait) or false
+  local used_bait     = (opts and opts.used_bait) or false
+  local used_bugfrag  = (opts and opts.used_bugfrag) or false
 
-  -- Heaviness odds: bait overrides when used; else area constants; else global defaults
+  -- Consume 1 item when actually starting (if chosen)
+  local bait_name = (bait and bait.ITEM_NAME) or (FISHING.BAIT and FISHING.BAIT.ITEM_NAME) or "bait"
+  local bug_name  = (bugfrag and bugfrag.ITEM_NAME) or (FISHING.BUGFRAG and FISHING.BUGFRAG.ITEM_NAME) or "bugfrag"
+  if used_bait then _consume_item(pid, bait_name, 1) end
+  if used_bugfrag then _consume_item(pid, bug_name, 1) end
+
+  -- Heaviness odds:
+  --   bait      -> use bait.HEAVINESS_CHANCES
+  --   bugfrag   -> use bugfrag.HEAVINESS_CHANCES
+  --   otherwise -> area constants or global defaults
   local heaviness_weights =
-      (used_bait and bait.HEAVINESS_CHANCES)
-      or (C.HEAVINESS_CHANCES or FISHING.HEAVINESS_CHANCES)
+      (used_bait    and bait.HEAVINESS_CHANCES)
+   or (used_bugfrag and bugfrag.HEAVINESS_CHANCES)
+   or (C.HEAVINESS_CHANCES or FISHING.HEAVINESS_CHANCES)
 
   -- Hold requirement (seconds): prefer C.HOLD_SECONDS, else pick from C.SUCCESS_RANGE
   local base_hold = tonumber(C.HOLD_SECONDS)
@@ -1498,10 +1530,14 @@ local function _start_session(pid, opts)
 
   local px        = Net.get_player_position(pid) or { x = 0, y = 0, z = 0 }
 
-  -- Virus chance: bait override when used; else area constant; else global default
+  -- Virus chance:
+  --   bait      -> bait.VIRUS_CHANCE (usually lower)
+  --   bugfrag   -> bugfrag.VIRUS_CHANCE (usually higher)
+  --   otherwise -> area or global default
   local virus_chance =
-      (used_bait and tonumber(bait.VIRUS_CHANCE))
-      or tonumber(C.VIRUS_CHANCE or FISHING.VIRUS_CHANCE)
+      (used_bait    and tonumber(bait.VIRUS_CHANCE))
+   or (used_bugfrag and tonumber(bugfrag.VIRUS_CHANCE))
+   or tonumber(C.VIRUS_CHANCE or FISHING.VIRUS_CHANCE)
 
   local s         = {
     area_id      = area,
@@ -1529,9 +1565,13 @@ local function _start_session(pid, opts)
     weight_lb    = _random_weight_lb(area, H.key),
     decay        = H.decay,
     mashGain     = H.mash,
+
+    -- item usage + odds chosen
     used_bait    = used_bait and true or false,
+    used_bugfrag = used_bugfrag and true or false,
     virus_chance = virus_chance,
     odds_used    = heaviness_weights,
+
     taps         = 0.0,
     timer_phase  = 0,
   }
@@ -1730,14 +1770,19 @@ local function _count_item(pid, name)
   local ok, n = pcall(ezmemory.count_player_item, pid, name)
   return (ok and tonumber(n) or 0) or 0
 end
-local function _consume_item(pid, name, qty)
-  pcall(ezmemory.remove_player_item, pid, name, qty or 1)
-end
 
 -- queue: start fishing only after the player closes a message
 local _PENDING_START = {} -- pid -> { used_bait = bool }
-local function _queue_start_after_message(pid, msg, used_bait)
-  _PENDING_START[pid] = { used_bait = used_bait and true or false }
+local function _queue_start_after_message(pid, msg, choice)
+  _PENDING_START = _PENDING_START or {}
+  local used_bait, used_bugfrag = false, false
+  if type(choice) == "table" then
+    used_bait    = choice.used_bait and true or false
+    used_bugfrag = choice.used_bugfrag and true or false
+  else
+    used_bait = choice and true or false
+  end
+  _PENDING_START[pid] = { used_bait = used_bait, used_bugfrag = used_bugfrag }
   Net.message_player(pid, msg or "Starting to fish...")
 end
 local function _begin_pending_start(pid)
@@ -1850,23 +1895,44 @@ Net:on("object_interaction", function(ev)
 
   -- Ask to use bait (yes/no). Start after the player closes the message.
   async(function()
-    local bait_conf = FISHING.BAIT or {}
-    local bait_name = bait_conf.ITEM_NAME or "bait"
-    local have = _count_item(pid, bait_name)
+    local area_id       = Net.get_player_area(pid)
+    local bait_conf     = _bait_for(area_id)
+    local bugfrag_conf  = _bugfrag_for(area_id)
+    local bait_name     = bait_conf.ITEM_NAME or "bait"
+    local bug_name      = bugfrag_conf.ITEM_NAME or "bugfrag"
 
-    if have <= 0 then
-      _queue_start_after_message(pid, "Starting to fish without bait", false)
-      return
-    end
+    local have_bait = _count_item(pid, bait_name)
+    local have_bug  = _count_item(pid, bug_name)
 
-    local q = string.format("You have %d bait. Use 1 to start fishing?", have)
-    local ans = await(Async.question_player(pid, q, nil, nil)) -- returns 1 (Yes) or 0 (No)
+    -- 1) Show counts as a standalone message (waits for close)
+    local prompt = string.format("You have %d bait and %d bugfrags.", have_bait, have_bug)
+    await(Async.message_player(pid, prompt))
+
+    -- 2) Then ask how to proceed with a quiz
+    -- NOTE: ezlibs Async.quiz_player returns 0/1/2 (NOT 1/2/3)
+    local ans = await(Async.quiz_player(pid,
+      "No item",  -- 0
+      "Use bait",            -- 1
+      "Use bugfrag"          -- 2
+    ))
 
     if ans == 1 then
-      _consume_item(pid, bait_name, 1)
-      _queue_start_after_message(pid, "Using bait...", true)
-    else -- ans == 0
-      _queue_start_after_message(pid, "Starting to fish without bait", false)
+      -- Use bait
+      if have_bait <= 0 then
+        _queue_start_after_message(pid, "No bait left, fishing without bait...", { used_bait=false, used_bugfrag=false })
+      else
+        _queue_start_after_message(pid, "Using bait...", { used_bait=true, used_bugfrag=false })
+      end
+    elseif ans == 2 then
+      -- Use bugfrag
+      if have_bug <= 0 then
+        _queue_start_after_message(pid, "No bugfrags left, fishing without bugfrags...", { used_bait=false, used_bugfrag=false })
+      else
+        _queue_start_after_message(pid, "Using bugfrag...", { used_bait=false, used_bugfrag=true })
+      end
+    else
+      -- Fish without items
+      _queue_start_after_message(pid, "Starting to fish...", { used_bait=false, used_bugfrag=false })
     end
   end)
 end)

@@ -85,6 +85,18 @@ local CONSTANTS = {
       legendary  = 10,
     },
   },
+  BUGFRAG = {
+    ITEM_NAME = "bugfrag",
+    VIRUS_CHANCE = 0.70,
+    HEAVINESS_CHANCES = {
+      light      = 30,
+      medium     = 30,
+      heavy      = 30,
+      very_heavy = 4,
+      brutal     = 4,
+      legendary  = 2,
+    },
+  },
 }
 
 return CONSTANTS
