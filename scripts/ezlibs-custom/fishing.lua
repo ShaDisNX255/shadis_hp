@@ -645,10 +645,6 @@ local function _hide_existing_meters_for_joiner(ev)
   end
 end
 
--- Hook join/transfer so late arrivals do not see others' meters
-Net:on("player_join_area", _hide_existing_meters_for_joiner)
-Net:on("player_area_transfer", _hide_existing_meters_for_joiner)
-
 -- Exclude for everyone except the owner, both immediately and again one tick later.
 local function _exclude_for_non_owners(owner_pid, area_id, object_id)
   if not (FISHING.PRIVATE_METERS and area_id and object_id) then return end
@@ -1144,21 +1140,6 @@ local function _despawn_timer(pid)
   end
 end
 
-local function _cleanup_all_for_pid(pid)
-  -- Clean in every area we know this player had a meter
-  local areas = _PID_AREAS[pid]
-  if areas then
-    for aid, _ in pairs(areas) do
-      pcall(_cleanup_fishing_meters, aid, pid)
-    end
-    _PID_AREAS[pid] = nil
-  else
-    -- Fallback: try current area if still available
-    local ok, aid = pcall(Net.get_player_area, pid)
-    if ok and aid then pcall(_cleanup_fishing_meters, aid, pid) end
-  end
-end
-
 -- ====================== Difficulty / weight helpers ======================
 local function _random_weight_lb(area_id, key)
   local C = _C_for and _C_for(area_id) or nil
@@ -1197,6 +1178,21 @@ local function _cleanup_fishing_meters(area_id, only_pid)
         if kill then pcall(Net.remove_object, area_id, oid) end
       end
     end
+  end
+end
+
+local function _cleanup_all_for_pid(pid)
+  -- Clean in every area we know this player had a meter
+  local areas = _PID_AREAS[pid]
+  if areas then
+    for aid, _ in pairs(areas) do
+      pcall(_cleanup_fishing_meters, aid, pid)
+    end
+    _PID_AREAS[pid] = nil
+  else
+    -- Fallback: try current area if still available
+    local ok, aid = pcall(Net.get_player_area, pid)
+    if ok and aid then pcall(_cleanup_fishing_meters, aid, pid) end
   end
 end
 
