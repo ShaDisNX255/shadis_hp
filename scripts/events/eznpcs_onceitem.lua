@@ -309,12 +309,38 @@ end
 
 local function get_record_and_prune(BUCKET_AREA_ID, once_key)
   local mem = ensure_bucket_mem(BUCKET_AREA_ID)
-  local rec = mem.onceitems[once_key]
-  if not rec then return mem, nil end
-  if not rec.expires_at or rec.expires_at <= os.time() then
-    if rec.password then rec.password = nil; ezmemory.save_area_memory(BUCKET_AREA_ID) end
+  local rec = mem.onceitems and mem.onceitems[once_key]
+  if not rec then
+    -- No lease record; nothing to prune here. (Rehydrate path still treats this as expired.)
+    return mem, nil
+  end
+
+  if (not rec.expires_at) or (rec.expires_at <= os.time()) then
+    -- 1) Clear checkpoint password if present
+    if rec.password then
+      rec.password = nil
+      ezmemory.save_area_memory(BUCKET_AREA_ID)
+    end
+
+    -- 2) Resolve the owning area for this once_key (same bucket first)
+    local owner_area = mem.oncehub_key_areas and mem.oncehub_key_areas[once_key] or nil
+
+    -- Fallback: mapping may live in DEFAULT_MEM_AREA
+    if (not owner_area) and DEFAULT_MEM_AREA and DEFAULT_MEM_AREA ~= BUCKET_AREA_ID then
+      local mem2 = ezmemory.get_area_memory(DEFAULT_MEM_AREA)
+      if mem2 and mem2.oncehub_key_areas then
+        owner_area = mem2.oncehub_key_areas[once_key] or owner_area
+      end
+    end
+
+    -- 3) Despawn any placed objects and persist an empty placement list
+    if owner_area and type(_cleanup_expired_hp) == "function" then
+      pcall(_cleanup_expired_hp, owner_area, BUCKET_AREA_ID, once_key)
+    end
+
     return mem, rec
   end
+
   return mem, rec
 end
 
@@ -1158,31 +1184,78 @@ local function ensure_rehydrated(player_id, dialogue)
   rehydrate_placements(area_id, BUCKET, once_key)
 end
 
+local persist_area          -- defined later ~1372 (don't re-declare 'local' there)
+local _cleanup_expired_hp   -- defined below; used by rehydrate_all_for_area
+
+_cleanup_expired_hp = function(area_id, bucket_area_id, once_key)
+  if not area_id or not once_key or once_key == "" then return false end
+
+  -- remove live objects (with Card Frame refund + bot despawn)
+  for _, oid in ipairs(Net.list_objects(area_id) or {}) do
+    local o  = Net.get_object_by_id(area_id, oid)
+    local cp = o and o.custom_properties
+    if cp and cp.placed_by_oncehub == "true" and (cp.oncehub_key or "") == once_key then
+      if (cp.oncehub_id or "") == "card_frame" then
+        pcall(_refund_card_to_frame_owner, cp)
+        local direct = cp.cf_bot_id and tostring(cp.cf_bot_id) or nil
+        if direct and direct ~= "" then pcall(Net.remove_bot, direct) end
+        if type(_cf_remove_bot) == "function" then
+          pcall(_cf_remove_bot, area_id, once_key, o.x, o.y, o.z, direct)
+        end
+      end
+      pcall(Net.remove_object, area_id, oid)
+    end
+  end
+
+  -- persist empty so rehydrate won't bring them back
+  if type(persist_area) == "function" then
+    persist_area(area_id, bucket_area_id, once_key)
+  end
+  return true
+end
+
 -- ====================== Auto-rehydrate on area enter/transfer ======================
 local function rehydrate_all_for_area(area_id)
   local tried = {}
+
   local function try_from(bucket_area_id)
     local mem = ezmemory.get_area_memory(bucket_area_id or area_id)
     local map = mem and mem[PLACEMENTS_MEM_KEY]
     if type(map) ~= "table" then return end
+
     for key, _ in pairs(map) do
       if not tried[key] then
-        local allow = false
+        local allow   = false
+        local expired = false
 
         if type(key) == "string" and key:sub(1,5) == "area:" then
-          -- area-scoped snapshot: only rehydrate in the same area
-          allow = (key == ("area:"..area_id))
+          -- Area-scoped snapshot: only rehydrate in the exact same area.
+          allow = (key == ("area:" .. area_id))
         else
-          -- once_key snapshot: only if mapping says this area owns it
-          local areas = mem.oncehub_key_areas
+          -- once_key snapshot: only if this area owns it, then check lease.
+          local areas = mem and mem.oncehub_key_areas
           if areas and areas[key] == area_id then
-            allow = true
+            -- Look up the lease record in the same memory bucket we're scanning.
+            local rec = mem.onceitems and mem.onceitems[key]
+            local now = os.time()
+            -- Treat missing/invalid rec as expired to avoid rehydrating stale decor.
+            if (not rec) or (not rec.expires_at) or (rec.expires_at <= now) then
+              expired = true
+            else
+              allow = true
+            end
           end
         end
 
-        if allow then
+        if expired then
+          -- Auto-clean (despawn + persist empty + Card Frame refunds/bot despawn)
+          if type(_cleanup_expired_hp) == "function" then
+            pcall(_cleanup_expired_hp, area_id, bucket_area_id, key)
+          end
+        elseif allow then
           rehydrate_placements(area_id, bucket_area_id, key)
         end
+
         tried[key] = true
       end
     end
@@ -1191,7 +1264,7 @@ local function rehydrate_all_for_area(area_id)
   -- 1) try live area first
   try_from(nil)
 
-  -- 2) also try the default bucket (covers older saves & your current bucket config)
+  -- 2) also try the default bucket (covers older saves & current bucket config)
   if DEFAULT_MEM_AREA and DEFAULT_MEM_AREA ~= area_id then
     try_from(DEFAULT_MEM_AREA)
   end
@@ -1369,7 +1442,7 @@ end
 -- ---------- Actions ----------
 -- Save both the legacy XML and the structured placements into *both*
 -- the live area AND (if present) the bucket area memory.
-local function persist_area(area_id, bucket_area_id, once_key)
+persist_area = function(area_id, bucket_area_id, once_key)
   local key = once_key or ("area:"..area_id)
   local snapshot = Net.map_to_string(area_id)
   local placements = snapshot_oncehub_placements(area_id, once_key)
