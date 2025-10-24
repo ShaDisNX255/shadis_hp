@@ -1214,6 +1214,13 @@ _cleanup_expired_hp = function(area_id, bucket_area_id, once_key)
   return true
 end
 
+local function _lease_rec_for_key(bucket_area_id, key)
+  local where = bucket_area_id or DEFAULT_MEM_AREA
+  if not where then return nil end
+  local m = ezmemory.get_area_memory(where)
+  return (m and m.onceitems) and m.onceitems[key] or nil
+end
+
 -- ====================== Auto-rehydrate on area enter/transfer ======================
 local function rehydrate_all_for_area(area_id)
   local tried = {}
@@ -1224,50 +1231,55 @@ local function rehydrate_all_for_area(area_id)
     if type(map) ~= "table" then return end
 
     for key, _ in pairs(map) do
+      -- Only skip if we've already ACTED on this key.
       if not tried[key] then
-        local allow   = false
-        local expired = false
+        local allow, do_cleanup = false, false
 
         if type(key) == "string" and key:sub(1,5) == "area:" then
           -- Area-scoped snapshot: only rehydrate in the exact same area.
-          allow = (key == ("area:" .. area_id))
+          allow = (key == ("area:" .. tostring(area_id)))
         else
-          -- once_key snapshot: only if this area owns it, then check lease.
+          -- once_key snapshot: only if this area owns it, then check lease in the right memory.
           local areas = mem and mem.oncehub_key_areas
           if areas and areas[key] == area_id then
-            -- Look up the lease record in the same memory bucket we're scanning.
-            local rec = mem.onceitems and mem.onceitems[key]
+            local rec = _lease_rec_for_key(bucket_area_id, key)
             local now = os.time()
-            -- Treat missing/invalid rec as expired to avoid rehydrating stale decor.
-            if (not rec) or (not rec.expires_at) or (rec.expires_at <= now) then
-              expired = true
+
+            -- Only call something "expired" if we actually found a record and it's expired.
+            if rec then
+              if (not rec.expires_at) or (rec.expires_at <= now) then
+                do_cleanup = true
+              else
+                allow = true
+              end
             else
-              allow = true
+              -- No record visible from this mem scope:
+              --  - Do NOT clean (we might just be looking at the wrong mem).
+              --  - Let the other pass (bucket-first) handle it.
+              allow, do_cleanup = false, false
             end
           end
         end
 
-        if expired then
-          -- Auto-clean (despawn + persist empty + Card Frame refunds/bot despawn)
-          if type(_cleanup_expired_hp) == "function" then
-            pcall(_cleanup_expired_hp, area_id, bucket_area_id, key)
-          end
+        if do_cleanup and type(_cleanup_expired_hp) == "function" then
+          pcall(_cleanup_expired_hp, area_id, bucket_area_id, key)
+          tried[key] = true
         elseif allow then
           rehydrate_placements(area_id, bucket_area_id, key)
+          tried[key] = true
         end
-
-        tried[key] = true
+        -- If neither allow nor cleanup, we didn't act; leave it untried so the other pass can handle it.
       end
     end
   end
 
-  -- 1) try live area first
-  try_from(nil)
-
-  -- 2) also try the default bucket (covers older saves & current bucket config)
+  -- 1) BUCKET FIRST: this is where onceitems lives (prevents false "expired" on the live area pass)
   if DEFAULT_MEM_AREA and DEFAULT_MEM_AREA ~= area_id then
     try_from(DEFAULT_MEM_AREA)
   end
+
+  -- 2) Then scan the live area (acts only on leftover keys we didn't handle from the bucket pass)
+  try_from(nil)
 end
 
 local function _rehydrate_from_event(ev)
