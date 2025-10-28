@@ -857,11 +857,11 @@ end
     local cur = (st.prog.fish.virus_wins or 0) - (base.virus_wins or 0)
     return cur >= need, cur, need
   end
-  J('fish_virus_lake3', 'Clean the Pond', 'ProtoMan', 'Official NetBattler business, defeat 3 virus encounters that spawn in the lake.',
+  J('fish_virus_lake3', 'Clean Pond', 'ProtoMan', 'Official NetBattler business, defeat 3 virus encounters that spawn in the lake.',
     function(pid, st, base_key) return _virus_fish_wins(pid, st, base_key, 3) end)
-  J('fish_virus_lake6', 'Clean the Pond', 'ProtoMan', 'Official NetBattler business, defeat 6 virus encounters that spawn in the lake.',
+  J('fish_virus_lake6', 'Clean Pond', 'ProtoMan', 'Official NetBattler business, defeat 6 virus encounters that spawn in the lake.',
     function(pid, st, base_key) return _virus_fish_wins(pid, st, base_key, 6) end)
-  J('fish_virus_lake9', 'Clean the Pond', 'ProtoMan', 'Official NetBattler business, defeat 9 virus encounters that spawn in the lake.',
+  J('fish_virus_lake9', 'Clean Pond', 'ProtoMan', 'Official NetBattler business, defeat 9 virus encounters that spawn in the lake.',
     function(pid, st, base_key) return _virus_fish_wins(pid, st, base_key, 9) end)
 
   -- Categorize ids

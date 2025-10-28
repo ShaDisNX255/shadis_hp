@@ -79,7 +79,8 @@ end
 
 -- Optional: allows the cards module to skip itself during battles if you add a check there.
 function custom.is_battle_open_for(pid)
-  local st = battle_by_pid and battle_by_pid[pid]
+  local map = rawget(_G, "battle_by_pid")
+  local st  = map and map[pid]
   return (st ~= nil) and (st.finished ~= true)
 end
 -- === Battle UI globals (declare once, at top of helpers) ===
@@ -487,7 +488,8 @@ end
 local function cleanup_zero_def(state)
   for idx = 1, 2 do
     local f = state.players[idx].field
-    if f and f.pos ~= "SET" and (f.curDEF or 0) <= 0 then
+    -- Only destroy if: face-up DEF, DEF <= 0, came from an effect (spell), and no grace flag.
+    if f and f.pos == "DEF" and (f.curDEF or 0) <= 0 and f._zero_def_from_effect and not f._zero_def_grace then
       local _, poss = labels_for(state, idx)
       local nm = short_name(f.card.title)
       battle_announce(state, poss .. " " .. nm .. " was destroyed (0 DEF).")
@@ -599,6 +601,7 @@ local SUMMON_NAME_OVERRIDE = {
     ["BabyDrgn"] = "Baby Dragon",
     ["SilverFng"] = "Silver Fang",
     ["GSoStone"] = "Giant Soldier of Stone",
+	["F.A.V.Lord"] = "Vampire Lord",
 }
 
 -- Rarity sort order
@@ -1413,9 +1416,9 @@ local BTL_PAY_PICK   = "__b_pay__:"            -- +item_id
 local BTL_TARGET     = "__b_target__:"         -- +who / +noop
 
 -- guard flags / reopen like Trader
-local battle_by_pid      = battle_by_pid or {}   -- [pid] = state
-local battle_reopen      = battle_reopen or {}   -- [pid] = true to reopen after close
-local battle_refreshing  = battle_refreshing or {}
+battle_by_pid      = battle_by_pid or {}   -- [pid] = state
+battle_reopen      = battle_reopen or {}   -- [pid] = true to reopen after close
+battle_refreshing  = battle_refreshing or {}
 
 -- simple helpers
 -- === Battle BBS "lock" (prevents accidental closing with B) ===
@@ -1619,6 +1622,33 @@ local function can_attack(state, me_idx)
   return (me.field and me.field.pos == "ATK") and (opp.field ~= nil)
 end
 
+-- Per-player last duel result (so NPC scripts can read outcome later)
+local _last_duel_result = _last_duel_result or {}
+
+local function _record_duel_result_for_all_viewers(st)
+  if not st or not st.winner then return end
+  local w = st.winner
+  local function put(pid, idx)
+    if not pid then return end
+    _last_duel_result[pid] = {
+      player_won = (w == idx),
+      winner     = w,
+      npc_name   = st.npc_name
+    }
+  end
+  if st.pids then
+    put(st.pids[1], 1)
+    put(st.pids[2], 2)
+  else
+    put(st.pid, 1)
+  end
+end
+
+-- (optional) expose for debugging or other scripts
+function custom.get_last_duel_result(pid)
+  return _last_duel_result and _last_duel_result[pid] or nil
+end
+
 do_KO = function(state, victim_idx)
   local vic = state.players[victim_idx]
   if vic.field then
@@ -1646,6 +1676,7 @@ do_KO = function(state, victim_idx)
     state.finished = true
     state.winner   = killer_idx
 
+    _record_duel_result_for_all_viewers(state)
     _duel_cleanup_overworld(state)
 
     -- Free the duel table only for PVP matches
@@ -1713,6 +1744,7 @@ local function resolve_attack(state)
       D.curDEF = math.max(0, D.curDEF - H)
       battle_announce(state, defPoss .. " " .. dn .. " DEF reduced to " .. D.curDEF .. "/" .. D.card.DEF)
       A.pos = "DEF" -- Counter-Set only if defender survived
+	  A._zero_def_grace = true
 	  state.turn_flags.hasSwitched = true
     end
 
@@ -1752,7 +1784,9 @@ SPELLS = {
     apply=function(state, me_idx)
       local opp = state.players[3 - me_idx]
       if opp.field and opp.field.pos == "DEF" then
+        opp.field._zero_def_grace = nil
         opp.field.curDEF = math.max(0, opp.field.curDEF - 500)
+        opp.field._zero_def_from_effect = true
         return "Opponent DEF -500 (persistent)."
       end
       return "No valid face-up DEF target."
@@ -1786,7 +1820,9 @@ SPELLS = {
     apply=function(state, me_idx)
       local opp = state.players[3 - me_idx]
       if opp.field and opp.field.pos == "DEF" then
+        opp.field._zero_def_grace = nil
         opp.field.curDEF = math.max(0, opp.field.curDEF - 1000)
+        opp.field._zero_def_from_effect = true
         return "Opponent DEF -1000 (persistent)."
       end
       return "No valid face-up DEF target."
@@ -1922,13 +1958,20 @@ retune_spells()
 
 -- === Utility: draw, reshuffle from grave when needed ===
 local function draw_one(p)
+  -- hard hand cap
+  if #p.hand >= 4 then return end
+
   if #p.deck == 0 then
     if #p.grave > 0 then
-      for i=#p.grave,1,-1 do table.insert(p.deck, p.grave[i]); p.grave[i]=nil end
+      for i = #p.grave, 1, -1 do
+        table.insert(p.deck, p.grave[i]); p.grave[i] = nil
+      end
       shuffle(p.deck)
     end
   end
-  if #p.deck > 0 then table.insert(p.hand, table.remove(p.deck)) end
+  if #p.deck > 0 then
+    table.insert(p.hand, table.remove(p.deck))
+  end
 end
 
 -- === Start-of-turn cleanup / end-of-turn cleanup ===
@@ -2014,42 +2057,45 @@ local function npc_take_turn(state)
     if me.field and me.field.pos ~= "ATK" then
       me.field.pos = "ATK"
       battle_announce(state, fmt_npc(state) .. " switched its monster to ATK.")
+      -- NOTE: not marking hasSwitched here because this helper is used before buffs;
+      -- we only mark when we *decide* to switch for strategy below.
     end
   end
+
+  local opp_is_def = (opp.field and (opp.field.pos == "DEF" or opp.field.pos == "SET")) or false
 
   -- ---------- PRE-ACTION: improve stance ----------
   if me.field and can_switch_now and can_switch_now(state, 2) then
     if me.field.pos == "SET" then
       me.field.pos = "ATK"
+      state.turn_flags.hasSwitched = true
       battle_announce(state, fmt_npc(state) .. " flipped its monster to ATK.")
     elseif me.field.pos == "DEF" then
-      local goATK = false
-      if not opp.field then
-        goATK = true
-      elseif opp.field.pos == "SET" then
-        goATK = true
-      elseif opp.field.pos == "DEF" then
-        local H = chip_from_atk(me.field.card.ATK or 0)
-        local theirDEF = opp.field.curDEF or (opp.field.card.DEF or 0)
-        goATK = (H >= theirDEF)
-      else -- opp ATK
-        local plan = npc_plan_to_beat(opp.field.card.ATK or 0, me.field.card.ATK or 0, #me.hand)
-        if plan then
-          goATK = true
-          -- be in ATK before using ATK buffs (they only apply to face-up ATK)
-          ensure_atk()
-          if not state.turn_flags.hasCast and plan.use ~= "none" then
-            if plan.use == "axe"       then npc_cast("axe",        "Axe of Despair (+1000 ATK).") end
-            if plan.use == "reinforce" then npc_cast("reinforce",  "Reinforcements (+500 ATK).") end
-            if plan.use == "shrink" and opp.field and opp.field.pos ~= "SET" then
-              npc_cast("shrink", "Shrink (-1000 ATK).")
+      -- CHANGED: if opponent is DEF/SET, always go ATK (safe to swing)
+      if opp_is_def then
+        me.field.pos = "ATK"
+        state.turn_flags.hasSwitched = true
+        battle_announce(state, fmt_npc(state) .. " switched its monster to ATK.")
+      else
+        -- vs opponent ATK: keep your original “try to beat them” logic
+        if opp.field and opp.field.pos == "ATK" then
+          local plan = npc_plan_to_beat(opp.field.card.ATK or 0, me.field.card.ATK or 0, #me.hand)
+          if plan then
+            -- be in ATK before using ATK buffs (they only apply to face-up ATK)
+            if me.field.pos ~= "ATK" then
+              me.field.pos = "ATK"
+              state.turn_flags.hasSwitched = true
+              battle_announce(state, fmt_npc(state) .. " switched its monster to ATK.")
+            end
+            if not state.turn_flags.hasCast and plan.use ~= "none" then
+              if plan.use == "axe"       then npc_cast("axe",        "Axe of Despair (+1000 ATK).") end
+              if plan.use == "reinforce" then npc_cast("reinforce",  "Reinforcements (+500 ATK).") end
+              if plan.use == "shrink" and opp.field and opp.field.pos ~= "SET" then
+                npc_cast("shrink", "Shrink (-1000 ATK).")
+              end
             end
           end
         end
-      end
-      if goATK and me.field.pos ~= "ATK" then
-        me.field.pos = "ATK"
-        battle_announce(state, fmt_npc(state) .. " switched its monster to ATK.")
       end
     end
   end
@@ -2059,6 +2105,7 @@ local function npc_take_turn(state)
     if #me.hand == 0 then draw_one(me) end
     if #me.hand > 0 then
       if opp.field and opp.field.pos == "ATK" then
+        -- unchanged: try to find a plan to beat their ATK; else Set best DEF
         local oppATK = opp.field.card.ATK or 0
         local found_plan, best_idx = nil, 1
         table.sort(me.hand, function(a,b) return (a.ATK - a.DEF) > (b.ATK - b.DEF) end)
@@ -2086,31 +2133,15 @@ local function npc_take_turn(state)
           battle_announce(state, fmt_npc(state) .. " Set a monster.")
         end
 
-      elseif opp.field and opp.field.pos == "DEF" then
-        -- Try to crack DEF; else Set best DEF
-        table.sort(me.hand, function(a,b) return (a.ATK or 0) > (b.ATK or 0) end)
-        local c = me.hand[1]
-        local H = chip_from_atk(c.ATK or 0)
-        local theirDEF = opp.field.curDEF or (opp.field.card.DEF or 0)
-        if H >= theirDEF then
-          do_summon(me, 1); state.turn_flags.hasSummoned = true; me.field._enteredTurn = state.turn_num
-          battle_announce(state, fmt_npc(state) .. " Summoned " .. short_name(c.title) .. " [ATK " .. (c.ATK or 0) .. "]")
-        else
-          table.sort(me.hand, function(a,b) return (a.DEF or 0) > (b.DEF or 0) end)
-          c = me.hand[1]
-          do_set(me, 1); state.turn_flags.hasSummoned = true; me.field._enteredTurn = state.turn_num
-          battle_announce(state, fmt_npc(state) .. " Set a monster.")
-        end
-
-      elseif opp.field and opp.field.pos == "SET" then
-        -- Unknown card: pressure by Summoning ATK with our best attacker
+      elseif opp_is_def then
+        -- CHANGED: opponent in DEF/SET → ALWAYS summon best attacker and swing
         table.sort(me.hand, function(a,b) return (a.ATK or 0) > (b.ATK or 0) end)
         local c = me.hand[1]
         do_summon(me, 1); state.turn_flags.hasSummoned = true; me.field._enteredTurn = state.turn_num
         battle_announce(state, fmt_npc(state) .. " Summoned " .. short_name(c.title) .. " [ATK " .. (c.ATK or 0) .. "]")
 
       else
-        -- Opponent empty: best attacker
+        -- Opponent empty: best attacker (unchanged)
         table.sort(me.hand, function(a,b) return (a.ATK or 0) > (b.ATK or 0) end)
         local c = me.hand[1]
         do_summon(me, 1); state.turn_flags.hasSummoned = true; me.field._enteredTurn = state.turn_num
@@ -2120,8 +2151,15 @@ local function npc_take_turn(state)
   end
 
   -- Anti-DEF utility (optional). npc_cast checks cost & validity itself.
-  if not state.turn_flags.hasCast and opp.field and opp.field.pos == "DEF" then
+  if not state.turn_flags.hasCast and opp_is_def then
     npc_cast("shield1000", "Shield Crush (-1000 DEF).")
+  end
+
+  -- CHANGED: if we still have a monster in DEF but opponent is DEF/SET, try to flip to ATK right before attacking
+  if me.field and opp_is_def and me.field.pos ~= "ATK" and can_switch_now and can_switch_now(state, 2) then
+    me.field.pos = "ATK"
+    state.turn_flags.hasSwitched = true
+    battle_announce(state, fmt_npc(state) .. " switched its monster to ATK.")
   end
 
   -- Attack if possible
@@ -2129,7 +2167,7 @@ local function npc_take_turn(state)
     resolve_attack(state)
   end
 
-    -- Announce end of NPC turn (PVP shows both players; PvE shows local)
+  -- Announce end of NPC turn (PVP shows both players; PvE shows local)
   if state.pids then
     announce_both(state, (fmt_npc(state) .. " ended their turn."))
   else
@@ -2432,6 +2470,41 @@ local function pay_cost_from_hand(st, me_idx, cost, chosen_idxs_descending)
   return true
 end
 
+-- Build a 10-card deck from a list of object IDs in the current area.
+local function _build_deck_from_id_list_for_area(area_id, id_list)
+  if type(id_list) ~= "table" or #id_list ~= 10 then return nil end
+  local deck = {}
+
+  for _, obj_id in ipairs(id_list) do
+    local info = helpers.read_item_information(area_id, obj_id)
+    if not info then return nil end
+
+    local card_tbl = info.custom and info.custom.card
+    if type(card_tbl) == "table" then
+      -- Use embedded card data, but make sure id/ATK/DEF exist
+      local c = deepcopy(card_tbl)
+      c.id    = c.id or (area_id .. "," .. tostring(obj_id))
+      if c.ATK == nil or c.DEF == nil then
+        local A, D = parse_atk_def_from_text(info.description or "")
+        c.ATK = c.ATK or (A or 0)
+        c.DEF = c.DEF or (D or 0)
+      end
+      deck[#deck+1] = c
+    else
+      -- Build from the item’s name/description like the pack/trader flow
+      local A, D = parse_atk_def_from_text(info.description or "")
+      deck[#deck+1] = {
+        id    = area_id .. "," .. tostring(obj_id),
+        title = info.name or ("Card "..tostring(obj_id)),
+        ATK   = A or 0,
+        DEF   = D or 0
+      }
+    end
+  end
+
+  return (#deck == 10) and deck or nil
+end
+
 -- === Public entry point ===
 function custom.start_card_battle(pid, cfg)
   -- 1) Build Player deck: prefer persisted deck, else random
@@ -2450,8 +2523,19 @@ function custom.start_card_battle(pid, cfg)
   end
 
   -- 2) NPC deck: random from your collection
-  local deck2, err2 = build_random_deck_from_collection(pid)
-  if not deck2 then Net.message_player(pid, err2 or "NPC could not build a deck."); return end
+  local deck2
+  do
+    local ids = cfg and cfg.npc_deck_ids
+    if ids then
+      local area_id = Net.get_player_area(pid)
+      deck2 = _build_deck_from_id_list_for_area(area_id, ids)
+    end
+    if not deck2 then
+      local err2
+      deck2, err2 = build_random_deck_from_collection(pid)
+      if not deck2 then Net.message_player(pid, err2 or "NPC could not build a deck."); return end
+    end
+  end
 
   -- Ensure both decks have ATK/DEF (safety)
   rehydrate_deck_stats(pid, deck1)
@@ -2478,7 +2562,8 @@ function custom.start_card_battle(pid, cfg)
     finished      = false,
     noDrawThisTurn= { [1]=true, [2]=true }, -- no one draws on their very first turn
     turn_flags    = { hasSummoned=false, hasCast=false, hasAttacked=false, megaNext=false, rrkNext=false },
-    pid           = pid
+    pid           = pid,
+    on_finish = cfg and (cfg.on_finish or cfg._on_finish),
   }
 
   battle_by_pid[pid] = state
@@ -2509,15 +2594,26 @@ local function handle_battle_post_selection(event)
 
   -- If finished, any click closes (keep your JobBBS hook)
   if st.finished then
-    if JobBBS and JobBBS.on_npc_duel_result then
-      pcall(JobBBS.on_npc_duel_result, pid, { winner = st.winner, npc_name = st.npc_name, kos = 3 })
-    end
     local who = (st.winner == me_i) and "You win! (3 KOs)"
              or (st.winner and "Opponent wins! (3 KOs)" or "Duel ended.")
     Net.message_player(pid, who)
     _duel_cleanup_overworld(st)
     battle_by_pid[pid] = nil
     pcall(Net.close_bbs, pid)
+
+    -- notify AFTER closing, in the order you want
+    if st.on_finish and not st._finish_notified then
+      st._finish_notified = true
+      local player_won = (st.winner == me_i)
+      pcall(st.on_finish, { player_won = player_won, winner = st.winner, npc_name = st.npc_name })
+    end
+
+    if JobBBS and JobBBS.on_npc_duel_result then
+      pcall(JobBBS.on_npc_duel_result, pid, { winner = st.winner, npc_name = st.npc_name, kos = 3 })
+    end
+
+    _record_duel_result_for_all_viewers(st)  -- fine to keep here if you like
+
     return true
   end
 
@@ -3451,6 +3547,67 @@ function custom.spawn_card_npc_at(area_id, x, y, z, info)
   if not ok or not bot_id then return nil end
   pcall(Net.set_bot_name, bot_id, disp_name)
   return bot_id
+end
+
+function custom.begin_card_battle_await(pid, cfg)
+  return async(function()
+    -- clear any stale result for this player
+    if _last_duel_result then _last_duel_result[pid] = nil end
+
+    local co      = coroutine.running()
+    local resumed = false
+    local result  = nil
+
+    local function resume_now()
+      if not resumed then
+        resumed = true
+        local A = rawget(_G, "Async")
+        if A and A.defer then
+          A.defer(function() coroutine.resume(co) end)
+        else
+          coroutine.resume(co)
+        end
+      end
+    end
+
+    -- piggyback JobBBS (fallback path) so we always resume on duel end
+    local prev_cb = JobBBS and JobBBS.on_npc_duel_result
+    if JobBBS then
+      JobBBS.on_npc_duel_result = function(p, t)
+        -- chain the original callback first
+        if prev_cb then pcall(prev_cb, p, t) end
+        -- our waiter only cares about this player
+        if p == pid then
+          result = result or {
+            player_won = (t and t.winner == 1) or false,
+            winner     = t and t.winner,
+            npc_name   = t and t.npc_name,
+          }
+          resume_now()
+          -- restore once we’ve resumed
+          JobBBS.on_npc_duel_result = prev_cb
+        end
+      end
+    end
+
+    -- inject an on_finish that resumes this coroutine immediately on KO/concede
+    local cfg2 = {}
+    for k, v in pairs(cfg or {}) do cfg2[k] = v end
+    cfg2.on_finish = function(res)
+      result = res or (custom.get_last_duel_result and custom.get_last_duel_result(pid))
+      resume_now()
+      if JobBBS then JobBBS.on_npc_duel_result = prev_cb end
+    end
+
+    -- start the duel (don’t immediately bail if the state isn’t visible yet)
+    custom.start_card_battle(pid, cfg2)
+
+    -- park here until on_finish / JobBBS resumes us
+    coroutine.yield()
+
+    -- hand the resolved result back to the NPC event
+    return result or (_last_duel_result and _last_duel_result[pid]) or nil
+  end)
 end
 
 print("[cards] custom plugin ready"); return custom

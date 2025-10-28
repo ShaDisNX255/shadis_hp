@@ -709,9 +709,56 @@ eznpcs.add_event{
   action = function(npc, player_id, dialogue, relay_object)
     return async(function()
       local mug = eznpcs.get_dialogue_mugshot(npc, player_id, dialogue)
-      await(Async.message_player(player_id, "Let's duel! I'll build decks from your collection.\n(10 cards; UR/GDR/GR=1, SR≤2, R≤3, C=any)", mug.texture_path, mug.animation_path))
-      custom.start_card_battle(player_id, { npc_name = (dialogue and dialogue.custom_properties and (dialogue.custom_properties["NPC Name"] or dialogue.custom_properties["Npc Name"])) or "NPC Duelist" })
-      return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+      await(Async.message_player(
+        player_id,
+        "Let's duel! I'll build decks from your collection.\n(10 cards; UR/GDR=1, SR≤2, R≤3, C=any)",
+        mug.texture_path, mug.animation_path
+      ))
+
+      local npc_name =
+        (dialogue and dialogue.custom_properties and
+         (dialogue.custom_properties["NPC Name"] or dialogue.custom_properties["Npc Name"])) or "NPC Duelist"
+
+      -- We’ll wait for this to flip true
+      local done, result = false, nil
+
+      local ci = build_ci_props(dialogue)
+      -- Accept either “Deck 1..10” or (fallback) “Card 1..10”
+      local deck_ids = extract_seq_ci(ci, "deck ")
+      if #deck_ids == 0 then
+        deck_ids = extract_seq_ci(ci, "card ")
+      end
+      -- Optional: enforce exactly 10; otherwise leave nil to fall back to random
+      if #deck_ids ~= 10 then deck_ids = nil end
+
+      -- Start the duel and inject an on_finish that completes our wait
+      custom.start_card_battle(player_id, {
+        npc_name = npc_name,
+        npc_deck_ids = deck_ids,
+        on_finish = function(res)
+          result = res
+          done   = true
+        end
+      })
+
+      -- tick helper that always returns a real awaitable
+      local function _tick()
+        if Async.sleep_frames then return Async.sleep_frames(1) end
+        if Async.sleep        then return Async.sleep(0.016) end
+        -- fall back to deferring one turn; ezlibs usually supports this
+        return Async.defer()
+      end
+
+      -- Wait here until on_finish runs
+      while not done do
+        await(_tick())
+      end
+
+      if result and result.player_won then
+        return dialogue.custom_properties["Battle Won"]
+      else
+        return dialogue.custom_properties["Battle Lost"]
+      end
     end)
   end
 }

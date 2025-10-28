@@ -1,11 +1,11 @@
 -- /server/scripts/teams/teams.lua
--- Monthly two-team system with BBS boards + JobBBS hook
--- Area-memory backed (set TEAM_DATA_AREA_ID below).
+-- Monthly two-team system with BBS boards + JobBBS hook + month.lua reward catalog
 
 local ezmemory = require('scripts/ezlibs-scripts/ezmemory')
 local helpers  = require('scripts/ezlibs-scripts/helpers')
+local Month    = require('scripts/teams/month')  -- << define rewards in this file
 
--- Optional JobBBS hook
+-- Try JobBBS from either path; if present we will hook job-claim to +1 GP.
 local JobBBS = (function()
   local ok, M = pcall(require, 'scripts/jobbbs/JobBBS')
   if ok and M then return M end
@@ -18,51 +18,33 @@ local Teams = {}
 -- =========================
 -- ====== CONFIG AREA ======
 -- =========================
--- IMPORTANT: this must be the area (map) where your team boards live.
--- "HomePage" is a good default for your setup. Change if needed.
+-- IMPORTANT: must be a real area id that always exists (e.g., the map where these boards live)
 local TEAM_DATA_AREA_ID = "teamshq"
 
--- Change team names here:
+-- Team names (reusable for other servers; nothing hard-coded)
 local TEAM_NAMES = {
   [1] = "Team Protoman",
   [2] = "Team Colonel",
 }
 
--- Object types for map objects (A-button):
+-- Object types for map objects (press A to open)
 local OBJ_TEAM_1   = "Team1BBS"
 local OBJ_TEAM_2   = "Team2BBS"
 local OBJ_SCORES   = "TeamScoresBBS"
 
--- Last day (inclusive) of the month players may join a team (set to 31 for testing past the 14th)
-local JOIN_WINDOW_LAST_DAY = 30
+-- Last day (inclusive) of the month players may join a team (set to 31 for testing)
+local JOIN_WINDOW_LAST_DAY = 31
 
--- Testing toggle: allow unlimited team switching in the current month
-local TEST_ALLOW_INFINITE_SWITCH = true
+-- Test toggles
+local TEST_ALLOW_INFINITE_SWITCH = true  -- if true, switch teams unlimited times in a month
+local TEST_ALWAYS_ALLOW_CLAIM     = false -- if true, claim monthly rewards every press (uses current month)
 
--- Payout requires at least this many GP on the winning team that month
-local MIN_GP_FOR_PAYOUT = 5
-
--- Reward payloads (edit to taste)
-local REWARDS = {
-  team_win = {
-    money = 10000,
-    items = {
-      -- { id = 123, qty = 1 },
-    }
-  },
-  top_player = {
-    money = 20000,
-    items = {
-      -- { id = 456, qty = 1 },
-    }
-  }
-}
-
--- BBS colors
+-- BBS header colors
 local TEAM_COLORS = {
-  [1] = { r=220, g=70,  b=70  },
-  [2] = { r=0,  g=88,  b=216 },
+  [1] = { r=220, g=70,  b=70  }, -- Team 1: red
+  [2] = { r=70,  g=90,  b=170 }, -- Team 2: darker blue
 }
+local COLOR_TEAM  = { r=160, g=220, b=255 } -- fallback
 local COLOR_SCORE = { r=255, g=230, b=160 }
 
 -- =========================
@@ -72,24 +54,36 @@ local function _now() return os.time() end
 local function _month_key(ts) return os.date("%Y-%m", ts or _now()) end
 local function _day_of_month(ts) return tonumber(os.date("%d", ts or _now())) end
 
--- Robust totals and unique member counts
 local function _sum_values(t)
   local s = 0
   for _, v in pairs(t or {}) do s = s + (tonumber(v) or 0) end
   return s
 end
 
-local function _union_len(a, b)
-  local seen, n = {}, 0
-  for k in pairs(a or {}) do if not seen[k] then seen[k] = true; n = n + 1 end end
-  for k in pairs(b or {}) do if not seen[k] then seen[k] = true; n = n + 1 end end
+local function _count_keys(tbl)
+  local n = 0
+  for _ in pairs(tbl or {}) do n = n + 1 end
   return n
+end
+
+-- Weighted picker for { weight = N, ... } entries
+local function _pick_weighted(entries)
+  local total = 0
+  for _, e in ipairs(entries or {}) do total = total + (tonumber(e.weight) or 0) end
+  if total <= 0 then return nil end
+  local roll, acc = math.random() * total, 0
+  for _, e in ipairs(entries) do
+    acc = acc + (tonumber(e.weight) or 0)
+    if roll <= acc then return e end
+  end
+  return entries[#entries]
 end
 
 -- =========================
 -- ====== PERSISTENCE ======
 -- =========================
--- mem (area): mem.teams = {
+-- Area memory layout:
+-- mem.teams = {
 --   month_key = "YYYY-MM",
 --   month     = {
 --     [1] = { total=0, roster = { [secret]=true }, gp_by_secret = { [secret]=n } },
@@ -105,17 +99,15 @@ end
 --   }
 -- }
 --
--- pmem.teams per player (by safe secret):
---   current = { team=1|2|nil, month="YYYY-MM", gp=0, last_switch_month="YYYY-MM" }
---   hist    = { ["YYYY-MM"] = { team=1|2, gp=N } }
---   claimed = { ["YYYY-MM"] = { team=true, top=true } }
---   last_name = "cached display name"
+-- Player memory (by safe secret):
+-- pmem.teams.current = { team=1|2|nil, month="YYYY-MM", gp=0, last_switch_month="YYYY-MM" }
+-- pmem.teams.hist    = { ["YYYY-MM"] = { team=1|2, gp=N } }
+-- pmem.teams.claimed = { ["YYYY-MM"] = { team=true, top=true, losing=true } }
+-- pmem.teams.events_claimed = { [event_id]=true }
 
 local function _amem()
-  -- get area memory for the configured area
   local mem = ezmemory.get_area_memory(TEAM_DATA_AREA_ID)
   if not mem then
-    -- If this prints, TEAM_DATA_AREA_ID is wrong. Set it to your hub area id.
     print("[teams] WARNING: get_area_memory returned nil for area", TEAM_DATA_AREA_ID)
     mem = {}
   end
@@ -124,11 +116,8 @@ local function _amem()
 end
 
 local function _save_area()
-  -- save back to area storage
   if ezmemory.save_area_memory then
     ezmemory.save_area_memory(TEAM_DATA_AREA_ID)
-  else
-    -- some stacks auto-save; leave silent fallback
   end
 end
 
@@ -149,10 +138,7 @@ local function _roll_month_if_needed()
     t.prev = {
       month_key = t.month_key,
       totals    = { [1]=p1.total or 0, [2]=p2.total or 0 },
-      roster    = {
-        [1]=_union_len(p1.roster, p1.gp_by_secret),
-        [2]=_union_len(p2.roster, p2.gp_by_secret),
-      },
+      roster    = { [1]=_count_keys(p1.roster), [2]=_count_keys(p2.roster) },
       top       = { [1]={secret=s1, gp=g1 or 0}, [2]={secret=s2, gp=g2 or 0} },
       winner    = ((p1.total or 0) == (p2.total or 0)) and 0 or (((p1.total or 0) > (p2.total or 0)) and 1 or 2),
     }
@@ -181,12 +167,13 @@ local function _pmem(pid)
     pmem.teams.current = { team = cur.team, month = _month_key(), gp = 0, last_switch_month = cur.last_switch_month }
   end
   pmem.teams.claimed = pmem.teams.claimed or {}
+  pmem.teams.events_claimed = pmem.teams.events_claimed or {}
   if ezmemory.set_player_memory then ezmemory.set_player_memory(secret, pmem) else ezmemory.save_player_memory(secret, pmem) end
   return secret, pmem
 end
 
 -- =========================
--- ====== NAME CACHE  ======
+-- ====== NAMES/ROSTER =====
 -- =========================
 local function _team_name(i) return TEAM_NAMES[i] or ("Team "..tostring(i)) end
 
@@ -203,7 +190,6 @@ local function _remember_name(pid, secret)
   if not name then return end
   local mem, t = _roll_month_if_needed()
   t.names[secret] = name
-  -- also stash in pmem so we can fallback if needed
   local pm = ezmemory.get_player_memory(secret) or {}
   pm.teams = pm.teams or {}
   pm.teams.last_name = name
@@ -211,7 +197,17 @@ local function _remember_name(pid, secret)
   _save_area()
 end
 
--- Sync this player's per-player data into the team area memory (current month).
+local function _add_to_roster(t_mem, team, secret)
+  local slot = t_mem.month[team]
+  slot.roster[secret] = true
+end
+
+local function _remove_from_roster(t_mem, team, secret)
+  local slot = t_mem.month[team]
+  if slot then slot.roster[secret] = nil end
+end
+
+-- Optional, safe "self-sync" to backfill from pmem once (will not duplicate GP on switches)
 local function _sync_self_into_area(pid)
   local mem, t_mem = _roll_month_if_needed()
   local secret, pmem = _pmem(pid)
@@ -223,16 +219,14 @@ local function _sync_self_into_area(pid)
   local g1 = tonumber(slot1.gp_by_secret[secret] or 0)
   local g2 = tonumber(slot2.gp_by_secret[secret] or 0)
 
-  -- If this player already has any GP logged in either team, DO NOT mirror totals.
+  -- If any GP exists for this player in either team this month, do not mirror totals again.
   if (g1 > 0) or (g2 > 0) then
-    -- still keep roster + name fresh for the team they are currently on
     (t_mem.month[cur.team].roster)[secret] = true
     _remember_name(pid, secret)
     _save_area()
     return
   end
 
-  -- One-time migration path (for old data before area storage existed)
   local want = tonumber(cur.gp or 0)
   local slot = t_mem.month[cur.team]
   slot.roster[secret] = true
@@ -245,40 +239,161 @@ local function _sync_self_into_area(pid)
 end
 
 -- =========================
--- ====== CORE  ============
+-- ====== REWARDS ==========
 -- =========================
-local function _add_to_roster(t_mem, team, secret)
-  local slot = t_mem.month[team]
-  slot.roster[secret] = true
+local function _give_inline_item(pid, info, notify)
+  local area_id = Net.get_player_area(pid) or TEAM_DATA_AREA_ID
+  local item_info = {
+    type        = info.type or "item",   -- "item" or "keyitem"
+    name        = tostring(info.name or "Item"),
+    description = tostring(info.description or ""),
+    amount      = tonumber(info.amount or info.qty or 1),
+  }
+  pcall(ezmemory.give_item_with_optional_notify, pid, area_id, nil, item_info, notify ~= false)
 end
 
-local function _remove_from_roster(t_mem, team, secret)
-  local slot = t_mem.month[team]
-  if slot then slot.roster[secret] = nil end
+local DECOR_MEM_KEY = "oncehub_decor_inventory_v1"
+
+local _DECOR_FRIENDLY = {
+
+}
+
+local function _decor_name_for(id)
+  -- 1) Prefer the local mapping declared in this file
+  if _DECOR_FRIENDLY and _DECOR_FRIENDLY[id] then
+    return _DECOR_FRIENDLY[id]
+  end
+
+  -- 2) Optional: also honor a global mapping if you ever set one elsewhere
+  local t = rawget(_G, "_DECOR_FRIENDLY")
+  if t and t[id] then return t[id] end
+
+  -- 3) Fallback: try to read a label from ONCEHUB_CATALOG
+  local cat = rawget(_G, "ONCEHUB_CATALOG")
+  if cat and cat[id] then
+    local e = cat[id]
+    if e.name and e.name ~= "" then return e.name end
+    if e.Name and e.Name ~= "" then return e.Name end
+    if e.title and e.title ~= "" then return e.title end
+    if e.Title and e.Title ~= "" then return e.Title end
+    if e.props then
+      local p = e.props
+      if p.Name and p.Name ~= "" then return p.Name end
+      if p.name and p.name ~= "" then return p.name end
+      if p.Title and p.Title ~= "" then return p.Title end
+      if p.title and p.title ~= "" then return p.title end
+    end
+  end
+
+  -- 4) Last resort: raw id
+  return tostring(id)
 end
 
+-- ===== and replace the message line inside _grant_decor_owned =====
+-- Net.message_player(pid, ("Got decor: %s x%d."):format(_decor_name_for(id), qty))
+local function _grant_decor_owned(pid, id, qty, label)
+  qty = math.max(1, tonumber(qty or 1))
+  local secret = helpers.get_safe_player_secret(pid)
+  local pm = ezmemory.get_player_memory(secret) or {}
+  pm[DECOR_MEM_KEY] = pm[DECOR_MEM_KEY] or {}
+  pm[DECOR_MEM_KEY][id] = math.max(0, tonumber(pm[DECOR_MEM_KEY][id] or 0)) + qty
+  if ezmemory.set_player_memory then
+    ezmemory.set_player_memory(secret, pm)
+  else
+    ezmemory.save_player_memory(secret, pm)
+  end
+
+  local pretty = (label and label ~= "" and label) or _decor_name_for(id)
+  Net.message_player(pid, ("Got decor: %s x%d."):format(pretty, qty))
+  if Net.play_sound_for_player then
+    pcall(Net.play_sound_for_player, pid, "/server/assets/ezlibs-assets/sfx/item_get.ogg")
+  end
+end
+
+-- Grants money, inline items, card pack(s), fixed decor, and decor pack(s)
 local function _grant_reward(pid, spec)
   if not spec then return end
+
+  -- Money with explicit message
   if spec.money and spec.money ~= 0 then
-    local ok = pcall(ezmemory.spend_player_money, pid, -math.floor(tonumber(spec.money) or 0))
+    local amt = math.floor(tonumber(spec.money) or 0)
+    local ok = pcall(ezmemory.spend_player_money, pid, -amt)
     if not ok then
       local secret = helpers.get_safe_player_secret(pid)
       local pm     = ezmemory.get_player_memory(secret) or {}
-      pm.money = math.max(0, (tonumber(pm.money) or 0) + math.floor(tonumber(spec.money) or 0))
+      pm.money = math.max(0, (tonumber(pm.money) or 0) + amt)
       if ezmemory.set_player_memory then ezmemory.set_player_memory(secret, pm) else ezmemory.save_player_memory(secret, pm) end
     end
+    Net.message_player(pid, "Got "..tostring(amt).."$!")
   end
-  if spec.items then
-    local area_id = Net.get_player_area(pid)
-    for _, it in ipairs(spec.items) do
-      local id  = it.id; local qty = it.qty or 1
-      for i=1,qty do pcall(ezmemory.give_item_with_optional_notify, pid, area_id, id, nil, true) end
+
+  -- Fixed inline items (cards/keys via ezmemory)
+  if spec.items_inline then
+    for _, info in ipairs(spec.items_inline) do
+      local area_id = Net.get_player_area(pid) or TEAM_DATA_AREA_ID
+      local item_info = {
+        type        = info.type or "item",
+        name        = tostring(info.name or "Item"),
+        description = tostring(info.description or ""),
+        amount      = tonumber(info.amount or info.qty or 1),
+      }
+      pcall(ezmemory.give_item_with_optional_notify, pid, area_id, nil, item_info, true)
     end
   end
-  if Net.play_sound_for_player then pcall(Net.play_sound_for_player, pid, '/server/assets/ezlibs-assets/sfx/item_get.ogg') end
+
+  -- FIXED DECOR (no pack banner; just grants)
+  -- spec.decor = { { id="skull_1", qty=1, label="DOTD Skull (Black)" }, ... }
+  if spec.decor then
+    for _, d in ipairs(spec.decor) do
+      if d and d.id then
+        _grant_decor_owned(pid, tostring(d.id), tonumber(d.qty or d.amount or 1), d.label)
+      end
+    end
+  end
+
+  -- DECOR PACK (weighted), prints pack name once
+  -- spec.decor_pack_name, spec.decor_rolls, spec.decor_pool = { {id=..., weight=..., qty=..., label=...}, ... }
+  if spec.decor_pool and #spec.decor_pool > 0 then
+    local pack_name = spec.decor_pack_name or "Decor Pack"
+    Net.message_player(pid, "Got "..pack_name..".")
+    local rolls = tonumber(spec.decor_rolls or 1) or 1
+    for i=1,rolls do
+      local pick = _pick_weighted(spec.decor_pool)
+      if pick and pick.id then
+        _grant_decor_owned(pid, tostring(pick.id), tonumber(pick.qty or pick.amount or 1), pick.label)
+      end
+    end
+  end
+
+  -- CARD PACK (weighted), prints pack name and an “Opened pack and got …” line per roll
+  if spec.pack_pool and #spec.pack_pool > 0 then
+    local pack_name = spec.pack_name or "Card Pack"
+    Net.message_player(pid, "Got "..pack_name..".")
+    local rolls = tonumber(spec.pack_rolls or 1)
+    for i = 1, rolls do
+      local pick = _pick_weighted(spec.pack_pool)
+      if pick then
+        Net.message_player(pid, "Opened pack and got: "..tostring(pick.name)..".")
+        local area_id = Net.get_player_area(pid) or TEAM_DATA_AREA_ID
+        local item_info = {
+          type="item",
+          name=tostring(pick.name),
+          description=tostring(pick.description or ""),
+          amount=tonumber(pick.amount or 1),
+        }
+        pcall(ezmemory.give_item_with_optional_notify, pid, area_id, nil, item_info, false)
+        if Net.play_sound_for_player then
+          pcall(Net.play_sound_for_player, pid, "/server/assets/ezlibs-assets/sfx/item_get.ogg")
+        end
+      end
+    end
+  end
 end
 
--- Add GP to player and team (writes to TEAM_DATA_AREA_ID)
+
+-- =========================
+-- ====== GP EARNING  ======
+-- =========================
 local function _add_gp(pid, amount, why)
   local mem, t_mem = _roll_month_if_needed()
   local secret, pmem = _pmem(pid)
@@ -319,7 +434,6 @@ local function _sanitize_posts(posts)
   end
 end
 
--- Consume two closes from custom.lua
 local function _guard_next_two_closes(pid)
   if _G._guard_ignore_next_close then
     _G._guard_ignore_next_close(pid, "teams")
@@ -327,10 +441,11 @@ local function _guard_next_two_closes(pid)
   end
 end
 
--- Deferred open after close
 local _pending_open = {}  -- [pid] = { kind="members"|"team"|"scores", team=number|nil }
 
--- Build main Team board posts
+-- =========================
+-- ====== OPEN BOARDS  =====
+-- =========================
 local function _team_posts(pid, team)
   _roll_month_if_needed()
   local _, pmem = _pmem(pid)
@@ -340,17 +455,17 @@ local function _team_posts(pid, team)
   local day         = _day_of_month()
   local last_day    = (JOIN_WINDOW_LAST_DAY or 14)
   local can_join    = (not cur.team) and (day >= 1 and day <= last_day)
-  local can_switch  = (cur.team ~= nil)
-                      and (cur.team ~= team)
-                      and (TEST_ALLOW_INFINITE_SWITCH or (cur.last_switch_month ~= _month_key()))
+
+  local can_switch = (cur.team ~= nil) and (cur.team ~= team) and
+                     (TEST_ALLOW_INFINITE_SWITCH or (cur.last_switch_month ~= _month_key()))
 
   local label
   if is_member then
-    label = "Current Team"
+    label = "You are in this team"
   elseif cur.team then
-    label = "Switch Team"
+    label = "Switch to this team"
   else
-    label = "Join Team"
+    label = "Join this team"
   end
 
   local author = ""
@@ -358,36 +473,55 @@ local function _team_posts(pid, team)
     author = "(Locked)"
   end
 
+  -- Count active unclaimed events
+  local unclaimed_events = 0
+  do
+    local claimed = pmem.teams.events_claimed or {}
+    for _, evt in ipairs(Month.get_active_events()) do
+      if not claimed[evt.id] then unclaimed_events = unclaimed_events + 1 end
+    end
+  end
+
   local posts = {
     { id="__team:join:"..team,    read=true, title=label,                    author=author },
     { id="__team:checkin:"..team, read=true, title="Daily Check-In (+1 GP)", author=""     },
     { id="__team:status:"..team,  read=true, title="My Status",              author=""     },
     { id="__team:members:"..team, read=true, title="Members List",           author=""     },
-    { id="__team:claim",          read=true, title="Claim Monthly Rewards",  author=""     },
-    { id="__team:close",          read=true, title="Close",                  author=""     },
   }
+
+  if unclaimed_events > 0 then
+    posts[#posts+1] = { id="__team:event_claim", read=true,
+                        title=("Claim Event Reward ("..tostring(unclaimed_events).." active)"),
+                        author="" }
+  end
+
+  posts[#posts+1] = { id="__team:claim",          read=true, title="Claim Monthly Rewards",  author="" }
+  posts[#posts+1] = { id="__team:close",          read=true, title="Close",                  author="" }
   return posts
 end
 
 local function _open_team_board(pid, team)
   _roll_month_if_needed()
+  -- optional, safe; keeps roster and name fresh without duplicating GP
+  _sync_self_into_area(pid)
+
   local title = string.format("%s - %s", "Team Board", _team_name(team))
   local posts = _team_posts(pid, team)
-  local color = (TEAM_COLORS and TEAM_COLORS[team]) or COLOR_TEAM
-  _sync_self_into_area(pid)
   _sanitize_posts(posts)
   _guard_next_two_closes(pid)
+  local color = (TEAM_COLORS and TEAM_COLORS[team]) or COLOR_TEAM
   Net.open_board(pid, title, color, posts)
 end
 
--- Build and open the Members scoreboard board
 local function _open_members_board(pid, team)
+  -- optional, safe; keeps roster and name fresh without duplicating GP
   _sync_self_into_area(pid)
+
   local mem, t_mem = _roll_month_if_needed()
   local slot = t_mem.month[team] or { roster={}, gp_by_secret={} }
   local color = (TEAM_COLORS and TEAM_COLORS[team]) or COLOR_TEAM
 
-  -- Build rows from CURRENT ROSTER ONLY (no union with gp_by_secret)
+  -- CURRENT ROSTER ONLY (do not union with gp_by_secret)
   local rows = {}
   for s,_ in pairs(slot.roster or {}) do
     local gp = slot.gp_by_secret[s] or 0
@@ -421,14 +555,10 @@ local function _open_members_board(pid, team)
   Net.open_board(pid, "Team Members", color, posts)
 end
 
-local function _count_keys(tbl)
-  local n = 0
-  for _ in pairs(tbl or {}) do n = n + 1 end
-  return n
-end
-
 local function _open_scores_board(pid)
+  -- optional, safe; keeps roster and name fresh without duplicating GP
   _sync_self_into_area(pid)
+
   local _, t_mem = _roll_month_if_needed()
   local title = "Teams - Scores"
   local posts = {}
@@ -487,6 +617,7 @@ local function _handle_team_action(pid, post_id)
   if team and (team == 1 or team == 2) then
     local day = _day_of_month()
     if not cur.team then
+      -- Join (days 1..JOIN_WINDOW_LAST_DAY)
       if not (day >= 1 and day <= (JOIN_WINDOW_LAST_DAY or 14)) then
         Net.message_player(pid, "Joining is only allowed on days 1-"..tostring(JOIN_WINDOW_LAST_DAY or 14)..".")
         return true
@@ -497,6 +628,7 @@ local function _handle_team_action(pid, post_id)
       _remember_name(pid, secret)
       Net.message_player(pid, "Joined ".._team_name(team).."!")
     else
+      -- Switch (once per month unless testing)
       if cur.team == team then Net.message_player(pid, "You are already in this team."); return true end
       if (not TEST_ALLOW_INFINITE_SWITCH) and cur.last_switch_month == _month_key() then
         Net.message_player(pid, "You can only switch teams once this month.")
@@ -545,7 +677,7 @@ local function _handle_team_action(pid, post_id)
     return true
   end
 
-  -- Members: open scoreboard board (defer)
+  -- Members list
   local list_team = tonumber(post_id:match("^__team:members:(%d+)$") or "")
   if list_team then
     _pending_open[pid] = { kind="members", team=list_team }
@@ -554,7 +686,7 @@ local function _handle_team_action(pid, post_id)
     return true
   end
 
-  -- Back from members list to team board (defer)
+  -- Back from members to team
   local back_team = tonumber(post_id:match("^__team:back:(%d+)$") or "")
   if back_team then
     _pending_open[pid] = { kind="team", team=back_team }
@@ -563,40 +695,113 @@ local function _handle_team_action(pid, post_id)
     return true
   end
 
+  -- Claim Special Event Reward(s)
+  if post_id == "__team:event_claim" then
+    local secret2, pm = _pmem(pid)
+    pm.teams.events_claimed = pm.teams.events_claimed or {}
+    local claimed = pm.teams.events_claimed
+    local active = Month.get_active_events()
+    local gave_any = false
+
+    for _, evt in ipairs(active) do
+      if not claimed[evt.id] then
+        Net.message_player(pid, "Event: "..(evt.name or "Special event"))
+        local spec = evt.rewards or {}
+        if spec.pack_pool and not spec.pack_name then
+          spec = { pack_name = (evt.name or "Event").." Pack",
+                   pack_rolls = spec.pack_rolls or 1,
+                   pack_pool  = spec.pack_pool }
+        end
+        _grant_reward(pid, spec)
+        claimed[evt.id] = true
+        gave_any = true
+      end
+    end
+
+    if ezmemory.set_player_memory then ezmemory.set_player_memory(secret2, pm) else ezmemory.save_player_memory(secret2, pm) end
+    Net.message_player(pid, gave_any and "Special event reward claimed." or "No special event rewards available now.")
+    return true
+  end
+
   -- Claim Monthly Rewards
   if post_id == "__team:claim" then
+    local secret2, pm2 = _pmem(pid)
     local _, tmem = _roll_month_if_needed()
+
+    -- TEST MODE: pay out using CURRENT month rewards (DEFAULT + MONTHS[current])
+    if TEST_ALWAYS_ALLOW_CLAIM then
+      local rset_now = Month.get_rewards_for(tmem.month_key)
+      Net.message_player(pid, "Test mode - Your team won!")
+      _grant_reward(pid, rset_now.team_win)
+      Net.message_player(pid, "Test mode - You were the highest scorer from your team!")
+      _grant_reward(pid, rset_now.top_player)
+      Net.message_player(pid, "Test mode - Losing team consolation.")
+      _grant_reward(pid, rset_now.losing_team)
+      return true
+    end
+
+    -- NORMAL: claim LAST month (DEFAULT + MONTHS[last])
     local prev = tmem.prev
-    if not (prev and prev.month_key) then Net.message_player(pid, "No monthly rewards available yet."); return true end
+    if not (prev and prev.month_key) then
+      Net.message_player(pid, "No monthly rewards available yet.")
+      return true
+    end
 
     local month_key = prev.month_key
-    pmem.teams.claimed[month_key] = pmem.teams.claimed[month_key] or { team=false, top=false }
-    local flags = pmem.teams.claimed[month_key]
+    local rset = Month.get_rewards_for(month_key)
+    local min_win = tonumber(rset.min_gp_for_payout or 0)
+    local min_con = tonumber(rset.min_gp_for_consolation or 0)
 
-    local hist = pmem.teams.hist and pmem.teams.hist[month_key]
+    pm2.teams.claimed[month_key] = pm2.teams.claimed[month_key] or { team=false, top=false, losing=false }
+    local flags = pm2.teams.claimed[month_key]
+
+    local hist = pm2.teams.hist and pm2.teams.hist[month_key]
     if not hist or not hist.team then
       Net.message_player(pid, "You were not on a team last month.")
       return true
     end
 
+    local my_team = hist.team
+    local my_gp   = tonumber(hist.gp or 0)
     local gave_any = false
 
-    -- Team win reward (requires MIN_GP_FOR_PAYOUT)
+    -- Team win reward
     if not flags.team then
-      if prev.winner ~= 0 and hist.team == prev.winner and (hist.gp or 0) >= MIN_GP_FOR_PAYOUT then
-        _grant_reward(pid, REWARDS.team_win); flags.team = true; gave_any = true
+      if prev.winner ~= 0 and my_team == prev.winner then
+        if my_gp >= min_win then
+          Net.message_player(pid, "Your team won last month!")
+          _grant_reward(pid, rset.team_win)
+          flags.team = true
+          gave_any = true
+        else
+          Net.message_player(pid, "Your team won, but you only had "..my_gp.." GP (need "..min_win..").")
+        end
       end
     end
 
-    -- Top-player reward (per-team)
+    -- Losing team consolation (not on tie)
+    if not flags.losing then
+      if prev.winner ~= 0 and my_team ~= prev.winner and my_gp >= min_con then
+        Net.message_player(pid, "Your team lost last month. Consolation reward:")
+        _grant_reward(pid, rset.losing_team)
+        flags.losing = true
+        gave_any = true
+      end
+    end
+
+    -- Top player reward (independent; can stack with either of the above)
     if not flags.top then
-      local top = prev.top and prev.top[hist.team]
-      if top and top.secret == secret then
-        _grant_reward(pid, REWARDS.top_player); flags.top = true; gave_any = true
+      local top = prev.top and prev.top[my_team]
+      local me  = helpers.get_safe_player_secret(pid)
+      if top and top.secret == me then
+        Net.message_player(pid, "You were the highest scorer from your team last month!")
+        _grant_reward(pid, rset.top_player)
+        flags.top = true
+        gave_any = true
       end
     end
 
-    if ezmemory.set_player_memory then ezmemory.set_player_memory(secret, pmem) else ezmemory.save_player_memory(secret, pmem) end
+    if ezmemory.set_player_memory then ezmemory.set_player_memory(secret2, pm2) else ezmemory.save_player_memory(secret2, pm2) end
     Net.message_player(pid, gave_any and "Rewards claimed!" or "No rewards available for you.")
     return true
   end
@@ -615,7 +820,7 @@ end
 -- ====== HOOK EVENTS  =====
 -- =========================
 Net:on("object_interaction", function(ev)
-  if ev.button ~= 0 then return end
+  if ev.button ~= 0 then return end -- A/Confirm only
   local pid = ev.player_id
   local area_id = Net.get_player_area(pid)
   local obj = area_id and Net.get_object_by_id(area_id, ev.object_id)
@@ -661,6 +866,7 @@ do
   end
 end
 
+-- Optional debug helper
 function Teams.debug_add_gp(pid, n) _add_gp(pid, n or 1, "debug") end
 
 return Teams
