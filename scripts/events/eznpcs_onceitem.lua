@@ -314,16 +314,16 @@ local function get_record_and_prune(BUCKET_AREA_ID, once_key)
   local mem = ensure_bucket_mem(BUCKET_AREA_ID)
   local rec = mem.onceitems and mem.onceitems[once_key]
   if not rec then
-    -- No lease record; nothing to prune here. (Rehydrate path still treats this as expired.)
+    -- No lease record; nothing to prune here.
     return mem, nil
   end
 
   if (not rec.expires_at) or (rec.expires_at <= os.time()) then
-    -- 1) Clear checkpoint password if present
-    if rec.password then
-      rec.password = nil
-      ezmemory.save_area_memory(BUCKET_AREA_ID)
-    end
+    -- 1) Clear checkpoint password AND public access if present
+    local mutated = false
+    if rec.password then rec.password = nil; mutated = true end
+    if rec.public_access then rec.public_access = nil; mutated = true end
+    if mutated then ezmemory.save_area_memory(BUCKET_AREA_ID) end
 
     -- 2) Resolve the owning area for this once_key (same bucket first)
     local owner_area = mem.oncehub_key_areas and mem.oncehub_key_areas[once_key] or nil
@@ -1976,38 +1976,74 @@ end
 
 local function open_pass_menu(player_id, npc, dialogue)
   return async(function ()
-    local opts = {
-      helpers.create_bbs_option("Set visitor password"),
-      helpers.create_bbs_option("Clear visitor password"),
-    }
-    local board = _open_menu_ignoring_custom(player_id, "Visitor Password", MENU_COLOR.BLUE, opts, "oncehub:pass")
-    local sel = await(board.selection_once())
-	_oh_log(player_id, "pass selection: "..tostring(sel))
-	menu_closed_now(player_id, 0.5)
-	fast_close_board(player_id)
-
+    local mug = eznpcs.get_dialogue_mugshot(npc, player_id, dialogue)
     local once_key = normalize_key(dprop(dialogue, "Once Key", ""))
-    if once_key == "" then await(Async.message_player(player_id, "This butler needs an 'Once Key' property.")); return end
+    if once_key == "" then await(say(player_id, "This butler needs an 'Once Key' property.", mug)); return nil end
+
     local BUCKET = resolve_mem_area_id(dialogue, player_id, nil)
     local mem = ezmemory.get_area_memory(BUCKET); mem.onceitems = mem.onceitems or {}
     local rec = mem.onceitems[once_key]
     local now = os.time()
-    if (not rec) or (not rec.expires_at) or (rec.expires_at <= now) or (helpers.get_safe_player_secret(player_id) ~= rec.owner_secret) then
-      await(Async.message_player(player_id, "Only the current renter can change the password.")); return
+    if (not rec) or (not rec.expires_at) or (rec.expires_at <= now)
+       or (helpers.get_safe_player_secret(player_id) ~= rec.owner_secret) then
+      await(say(player_id, "Only the current renter can change visitor access.", mug))
+      return nil
     end
 
-    if sel == "Clear visitor password" then
-      rec.password = nil; ezmemory.save_area_memory(BUCKET); await(Async.message_player(player_id, "Password cleared."))
-    elseif sel == "Set visitor password" then
-      await(Async.message_player(player_id, "Enter a password (1-24 chars):"))
+    -- Dynamic labels
+    local LABEL_SET    = "Set visitor password"
+    local LABEL_CLEAR  = "Clear visitor password"
+    local LABEL_TOGGLE = (rec.public_access == true) and "Require password to enter"
+                                                    or  "Open to everyone"
+
+    -- Build & open board
+    local opts = {
+      helpers.create_bbs_option(LABEL_SET),
+      helpers.create_bbs_option(LABEL_CLEAR),
+      helpers.create_bbs_option(LABEL_TOGGLE),
+    }
+    local board = _open_menu_ignoring_custom(player_id, "Visitor Access", MENU_COLOR.BLUE, opts, "oncehub:pass")
+    local sel = await(board.selection_once())
+    menu_closed_now(player_id, 0.5)
+    fast_close_board(player_id)
+    if not sel then return nil end
+
+    if sel == LABEL_CLEAR then
+      rec.password = nil
+      rec.public_access = false
+      ezmemory.save_area_memory(BUCKET)
+      await(say(player_id, "Password cleared. (Visitors are still blocked unless you open access.)", mug))
+      return nil
+
+    elseif sel == LABEL_SET then
+      await(say(player_id, "Enter a password (1-24 chars):", mug))
       local pw = await(Async.prompt_player(player_id)) or ""
       pw = pw:gsub("^%s+",""):gsub("%s+$","")
       if #pw < 1 or #pw > 24 then
-        await(Async.message_player(player_id, "Password must be 1–24 characters."))
+        await(say(player_id, "Password must be 1–24 characters.", mug))
       else
-        rec.password = pw; ezmemory.save_area_memory(BUCKET); await(Async.message_player(player_id, "Password saved."))
+        rec.password = pw
+        rec.public_access = false  -- setting a pw disables public mode
+        ezmemory.save_area_memory(BUCKET)
+        await(say(player_id, "Password saved.", mug))
       end
+      return nil
+
+    elseif sel == LABEL_TOGGLE then
+      if rec.public_access == true then
+        rec.public_access = false
+        ezmemory.save_area_memory(BUCKET)
+        await(say(player_id, "Visitors must enter a password to enter. (Set one with “Set visitor password”.)", mug))
+      else
+        rec.public_access = true
+        rec.password = nil          -- public mode ignores pw; clear it to avoid confusion
+        ezmemory.save_area_memory(BUCKET)
+        await(say(player_id, "This HP is now open to everyone (no password).", mug))
+      end
+      return nil
     end
+
+    return nil
   end)
 end
 
@@ -2373,6 +2409,7 @@ eznpcs.add_event({
       local action = string.lower(dprop(dialogue, "Pass Action", DEFAULTS.PassAction))
       if action == "clear" then
         rec.password = nil
+        rec.public_access = false
         ezmemory.save_area_memory(BUCKET_AREA_ID)
         await(say(player_id, dprop(dialogue, "Pass Cleared Text", DEFAULTS.PassClearedText), mug))
         return nil
@@ -2555,20 +2592,25 @@ Net:on("object_interaction", function(event)
       if is_owner then
         unlocked = true
       else
-        local pw = rec.password
-        if pw and #pw > 0 then
-          if with_lock then
-            await(Async.message_player(player_id, cprop(cp, "Visitor Password Prompt", DEFAULTS.CP_VisitorPasswordPrompt)))
-            local input = await(Async.prompt_player(player_id))
-            if tostring(input or "") == pw then
-              unlocked = true
-            else
+        if rec.public_access == true then
+          -- Renter has allowed open access; let visitors through with no prompt.
+          unlocked = true
+        else
+          local pw = rec.password
+          if pw and #pw > 0 then
+            if with_lock then
+              await(Async.message_player(player_id, cprop(cp, "Visitor Password Prompt", DEFAULTS.CP_VisitorPasswordPrompt)))
+              local input = await(Async.prompt_player(player_id))
+              if tostring(input or "") == pw then
+                unlocked = true
+              else
+                await(Async.message_player(player_id, cprop(cp, "Wrong Password Message", DEFAULTS.CP_WrongPasswordMessage)))
+              end
+            end
+          else
+            if with_lock then
               await(Async.message_player(player_id, cprop(cp, "Wrong Password Message", DEFAULTS.CP_WrongPasswordMessage)))
             end
-          end
-        else
-          if with_lock then
-            await(Async.message_player(player_id, cprop(cp, "Wrong Password Message", DEFAULTS.CP_WrongPasswordMessage)))
           end
         end
       end
