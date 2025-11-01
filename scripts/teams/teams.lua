@@ -66,6 +66,13 @@ local function _count_keys(tbl)
   return n
 end
 
+local function _coin_flip(month_key, salt)
+  local s = tostring(month_key or "") .. "|" .. tostring(salt or "")
+  local h = 0
+  for i = 1, #s do h = (h * 131 + s:byte(i)) % 1000000007 end
+  return (h % 2 == 0) and 1 or 2  -- returns 1 or 2
+end
+
 -- Weighted picker for { weight = N, ... } entries
 local function _pick_weighted(entries)
   local total = 0
@@ -124,32 +131,77 @@ end
 local function _roll_month_if_needed()
   local mem, t = _amem()
   local now_key = _month_key()
+
+  -- Month rollover: finalize last month into t.prev
   if t.month_key and t.month_key ~= now_key and t.month then
-    local p1 = t.month[1] or { total=0, roster={}, gp_by_secret={} }
-    local p2 = t.month[2] or { total=0, roster={}, gp_by_secret={} }
-    local function top_of(tb)
-      local best_s, best_gp = nil, -1
-      for s,gp in pairs(tb.gp_by_secret or {}) do
-        if gp > best_gp then best_gp, best_s = gp, s end
+    -- Ensure check-in fields exist on old month buckets
+    local p1 = t.month[1] or { total=0, roster={}, gp_by_secret={}, checkins_total=0, checkins_by_secret={} }
+    local p2 = t.month[2] or { total=0, roster={}, gp_by_secret={}, checkins_total=0, checkins_by_secret={} }
+
+    -- Deterministic coin flip based on month key + salt; returns 1 or 2
+    local function coin_flip(month_key, salt)
+      local s = tostring(month_key or "") .. "|" .. tostring(salt or "")
+      local h = 0
+      for i = 1, #s do h = (h * 131 + s:byte(i)) % 1000000007 end
+      return (h % 2 == 0) and 1 or 2
+    end
+
+    -- Per-team MVP selection with tie-break on MOST check-ins, then coin flip
+    local function top_of(tb, mkey, team_tag)
+      local best_s, best_gp, best_chk, best_coin = nil, -1, nil, nil
+      for s, gp in pairs(tb.gp_by_secret or {}) do
+        gp = tonumber(gp or 0)
+        local chk = tonumber((tb.checkins_by_secret and tb.checkins_by_secret[s]) or 0)
+        local cf  = coin_flip(mkey, "mvp|"..tostring(team_tag).."|"..tostring(s))  -- 1 or 2
+        if gp > best_gp
+           or (gp == best_gp and (best_chk == nil or chk > best_chk))   -- most check-ins wins
+           or (gp == best_gp and chk == best_chk and (best_coin == nil or cf < best_coin)) then
+          best_gp, best_s, best_chk, best_coin = gp, s, chk, cf
+        end
       end
+      if not best_s then return nil, 0 end
       return best_s, best_gp
     end
-    local s1,g1 = top_of(p1); local s2,g2 = top_of(p2)
+
+    local mkey = t.month_key
+    local s1, g1 = top_of(p1, mkey, 1)
+    local s2, g2 = top_of(p2, mkey, 2)
+
+    local tot1 = tonumber(p1.total or 0)
+    local tot2 = tonumber(p2.total or 0)
+
+    local win
+    if tot1 ~= tot2 then
+      win = (tot1 > tot2) and 1 or 2
+    else
+      -- Team tie: MOST total check-ins wins; else deterministic coin flip
+      local c1 = tonumber(p1.checkins_total or 0)
+      local c2 = tonumber(p2.checkins_total or 0)
+      if c1 ~= c2 then
+        win = (c1 > c2) and 1 or 2
+      else
+        win = coin_flip(mkey, "team") -- 1 or 2
+      end
+    end
+
     t.prev = {
       month_key = t.month_key,
-      totals    = { [1]=p1.total or 0, [2]=p2.total or 0 },
+      totals    = { [1]=tot1, [2]=tot2 },
       roster    = { [1]=_count_keys(p1.roster), [2]=_count_keys(p2.roster) },
       top       = { [1]={secret=s1, gp=g1 or 0}, [2]={secret=s2, gp=g2 or 0} },
-      winner    = ((p1.total or 0) == (p2.total or 0)) and 0 or (((p1.total or 0) > (p2.total or 0)) and 1 or 2),
+      winner    = win
     }
   end
+
+  -- Start a fresh current month if needed
   if t.month_key ~= now_key or not t.month then
     t.month_key = now_key
     t.month     = {
-      [1] = { total=0, roster={}, gp_by_secret={} },
-      [2] = { total=0, roster={}, gp_by_secret={} },
+      [1] = { total=0, roster={}, gp_by_secret={}, checkins_total=0, checkins_by_secret={} },
+      [2] = { total=0, roster={}, gp_by_secret={}, checkins_total=0, checkins_by_secret={} },
     }
   end
+
   t.names = t.names or {}
   _save_area()
   return mem, t
@@ -164,7 +216,7 @@ local function _pmem(pid)
   if cur.month ~= _month_key() then
     pmem.teams.hist = pmem.teams.hist or {}
     pmem.teams.hist[cur.month] = { team = cur.team, gp = cur.gp or 0 }
-    pmem.teams.current = { team = cur.team, month = _month_key(), gp = 0, last_switch_month = cur.last_switch_month }
+    pmem.teams.current = { team = cur.team, month = _month_key(), gp = 0, checkins = 0, last_switch_month = cur.last_switch_month }
   end
   pmem.teams.claimed = pmem.teams.claimed or {}
   pmem.teams.events_claimed = pmem.teams.events_claimed or {}
@@ -654,14 +706,37 @@ local function _handle_team_action(pid, post_id)
   -- Daily check-in
   local chk_team = tonumber(post_id:match("^__team:checkin:(%d+)$") or "")
   if chk_team then
-    if cur.team ~= chk_team then Net.message_player(pid, "Join this team first."); return true end
+    if cur.team ~= chk_team then
+      Net.message_player(pid, "Join this team first.")
+      return true
+    end
+
     pmem.teams._last_checkin = pmem.teams._last_checkin or ""
     local today = os.date("%Y-%m-%d", _now())
+
     if pmem.teams._last_checkin == today then
       Net.message_player(pid, "Already checked in today.")
     else
+      -- mark today's check-in
       pmem.teams._last_checkin = today
-      if ezmemory.set_player_memory then ezmemory.set_player_memory(secret, pmem) else ezmemory.save_player_memory(secret, pmem) end
+
+      -- count player check-ins this month (used for MVP tie-breaker)
+      pmem.teams.current.checkins = (pmem.teams.current.checkins or 0) + 1
+      if ezmemory.set_player_memory then
+        ezmemory.set_player_memory(secret, pmem)
+      else
+        ezmemory.save_player_memory(secret, pmem)
+      end
+
+      -- count team check-ins this month (used for team tie-breaker)
+      local _, t_mem_i = _roll_month_if_needed()
+      local slot = t_mem_i.month[cur.team]
+      slot.checkins_total = (slot.checkins_total or 0) + 1
+      slot.checkins_by_secret = slot.checkins_by_secret or {}
+      slot.checkins_by_secret[secret] = (slot.checkins_by_secret[secret] or 0) + 1
+      _save_area()
+
+      -- award GP
       _add_gp(pid, 1, "daily check-in")
     end
     return true

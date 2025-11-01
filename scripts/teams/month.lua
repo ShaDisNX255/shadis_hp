@@ -28,18 +28,16 @@ Month.MONTHS = {
   -- October 2025
   ["2025-10"] = {
     top_player = {
-      items_inline = {
-        { type="item", name="[GDR]Kbo", description="GDRare: Kuriboh - A: 300 / D: 200", amount=2 }
-      }
+
     },
     team_win = {
       items_inline = {
-        { type="item", name="[GDR]Kbo", description="GDRare: Kuriboh - A: 300 / D: 200", amount=2 }
+        { type="item", name="[GDR]Kbo", description="GDRare: Kuriboh - A: 300 / D: 200", amount=1 }
       }
     },
     losing_team = {
       items_inline = {
-        { type="item", name="[GDR]Kbo", description="GDRare: Kuriboh - A: 300 / D: 200", amount=2 }
+        { type="item", name="[GDR]Kbo", description="GDRare: Kuriboh - A: 300 / D: 200", amount=1 }
       }
     },
   },
@@ -48,13 +46,11 @@ Month.MONTHS = {
   ["2025-11"] = {
     top_player = {
       items_inline = {
-        { type="item", name="[GDR]Kbo", description="GDRare: Kuriboh - A: 300 / D: 200", amount=2 }
+        { type="item", name="[SR]F.A.DMGirl", description="FullArt: Dark Magician Girl - A: 2000 / D: 1700", amount=1 }
       }
     },
     team_win = {
-      items_inline = {
-        { type="item", name="[GDR]Kbo", description="GDRare: Kuriboh - A: 300 / D: 200", amount=2 }
-      }
+      decor = {{ id="nov_fountain", qty=1, label="Blue Fountain" }}
     },
     losing_team = {
       pack_name = "Team Pack Vol. 1",

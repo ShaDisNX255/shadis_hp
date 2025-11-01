@@ -569,6 +569,7 @@ local SUMMON_NAME_OVERRIDE = {
     ["C.Dragon"] = "Curse of Dragon",
     ["C.Guard"] = "Celtic Guardian",
     ["DMGirl"] = "Dark Magician Girl",
+    ["F.A.DMGirl"] = "Dark Magician Girl",
     ["DMag"] = "Dark Magician",
     ["F.Imp"] = "Feral Imp",
     ["Gaia"] = "Gaia The Fierce Knight",
@@ -2505,8 +2506,27 @@ local function _build_deck_from_id_list_for_area(area_id, id_list)
   return (#deck == 10) and deck or nil
 end
 
--- === Public entry point ===
+local function _finish_early(reason, msg)
+  local cb = cfg and (cfg.on_finish or cfg._on_finish)
+  if cb then pcall(cb, { player_won=false, reason=reason or "deck_build_failed", error=msg }) end
+end
+
 function custom.start_card_battle(pid, cfg)
+  cfg = cfg or {}
+
+  -- Ensure the NPC coroutine is always released even on early failure
+  local function _finish_early(reason, msg)
+    local cb = (cfg.on_finish or cfg._on_finish)
+    if cb then
+      local ok, err = pcall(cb, {
+        player_won = false,
+        reason     = reason or "deck_build_failed",
+        error      = msg
+      })
+      if not ok then print("[card_battle] on_finish callback error: " .. tostring(err)) end
+    end
+  end
+
   -- 1) Build Player deck: prefer persisted deck, else random
   local deck1
   do
@@ -2518,11 +2538,15 @@ function custom.start_card_battle(pid, cfg)
     if not deck1 then
       local err
       deck1, err = build_random_deck_from_collection(pid)
-      if not deck1 then Net.message_player(pid, err or "Could not build your deck."); return end
+      if not deck1 then
+        Net.message_player(pid, err or "Could not build your deck.")
+        _finish_early("deck1_failed", err)
+        return  -- IMPORTANT: we now notify and exit
+      end
     end
   end
 
-  -- 2) NPC deck: random from your collection
+  -- 2) NPC deck: random from your collection (or cfg list)
   local deck2
   do
     local ids = cfg and cfg.npc_deck_ids
@@ -2533,7 +2557,11 @@ function custom.start_card_battle(pid, cfg)
     if not deck2 then
       local err2
       deck2, err2 = build_random_deck_from_collection(pid)
-      if not deck2 then Net.message_player(pid, err2 or "NPC could not build a deck."); return end
+      if not deck2 then
+        Net.message_player(pid, err2 or "NPC could not build a deck.")
+        _finish_early("deck2_failed", err2)
+        return  -- IMPORTANT: we now notify and exit
+      end
     end
   end
 

@@ -94,6 +94,7 @@ local ONCEHUB_CATALOG = {
   { id = "bug_frag",  name = "Bug Frag",  ts_source = "../assets/objects/frag.tsx", gid = 301, layer = "Object Layer 2" },
   { id = "skull_1",  name = "DOTD Skull Blk",  ts_source = "../assets/objects/skull_1.tsx", gid = 303, layer = "Object Layer 2" },
   { id = "skull_2",  name = "DOTD Skull Wht",  ts_source = "../assets/objects/skull_2.tsx", gid = 304, layer = "Object Layer 2" },
+  { id = "nov_fountain",  name = "Blue Fountain",  ts_source = "../assets/objects/fountain.tsx", gid = 305, layer = "Object Layer 2" },
   { id = "card_frame", name = "Card Frame" },
 }
 
