@@ -105,7 +105,6 @@
   <object id="6" name="Explain" type="Dialogue" x="959.5" y="1280.5">
    <properties>
     <property name="Dialogue Type" value="first"/>
-    <property name="Next 1" type="object" value="8"/>
     <property name="Text 1" value="Every month, you're allowed to select or switch teams. Your main objective will be to obtain GP by completing jobs on the JobBBS. The team who ends with the most points by the end of the month, wins and earns exclusive rewards. You must obtain a minimum of 5GP in your team to be allowed to reclaim rewards."/>
    </properties>
    <point/>
@@ -114,13 +113,6 @@
    <properties>
     <property name="Dialogue Type" value="first"/>
     <property name="Text 1" value="Alright then, do your best!"/>
-   </properties>
-   <point/>
-  </object>
-  <object id="8" name="Test period" type="Dialogue" x="940.5" y="1251.5">
-   <properties>
-    <property name="Dialogue Type" value="first"/>
-    <property name="Text 1" value="This is the test period, so you can switch teams endlessly and everyone who participates and makes at least 5GP will be eligible for the exclusive rewards."/>
    </properties>
    <point/>
   </object>

@@ -4,6 +4,7 @@
 local ezmemory = require('scripts/ezlibs-scripts/ezmemory')
 local helpers  = require('scripts/ezlibs-scripts/helpers')
 local Month    = require('scripts/teams/month')  -- << define rewards in this file
+local raids    = require('scripts/raids/main')
 
 -- Try JobBBS from either path; if present we will hook job-claim to +1 GP.
 local JobBBS = (function()
@@ -36,7 +37,7 @@ local OBJ_SCORES   = "TeamScoresBBS"
 local JOIN_WINDOW_LAST_DAY = 31
 
 -- Test toggles
-local TEST_ALLOW_INFINITE_SWITCH = true  -- if true, switch teams unlimited times in a month
+local TEST_ALLOW_INFINITE_SWITCH = false  -- if true, switch teams unlimited times in a month
 local TEST_ALWAYS_ALLOW_CLAIM     = false -- if true, claim monthly rewards every press (uses current month)
 
 -- BBS header colors
