@@ -4,7 +4,7 @@
 local ezmemory = require('scripts/ezlibs-scripts/ezmemory')
 local helpers  = require('scripts/ezlibs-scripts/helpers')
 local Month    = require('scripts/teams/month')  -- << define rewards in this file
-local raids    = require('scripts/raids/main')
+local raids    = require('scripts/raids/raids')
 
 -- Try JobBBS from either path; if present we will hook job-claim to +1 GP.
 local JobBBS = (function()
