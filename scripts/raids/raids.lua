@@ -230,48 +230,83 @@ end
 
 local function _open_raid_board(pid, area_id, raid_id)
   local s = _ensure_state(area_id, raid_id)
-  local title = string.format("Raid - %s", raid_id)
+  local title = "Raid - " .. raid_id
   local color = { r=255, g=230, b=140 }
 
-  local rows = {}
-  for secret, c in pairs(s.contributions or {}) do
-    local name = "Unknown"
-    local pm = ezmemory.get_player_memory(secret) or {}
-    if pm.teams and pm.teams.last_name and pm.teams.last_name ~= "" then
-      name = pm.teams.last_name
-    elseif pm.last_name and pm.last_name ~= "" then
-      name = pm.last_name
+  local function short(sv, n)
+    sv = tostring(sv or "Unknown")
+    return (#sv > n) and sv:sub(1, n) or sv
+  end
+  local function rows_from_contribs(field)
+    local rows = {}
+    for secret, c in pairs(s.contributions or {}) do
+      local v = tonumber(c[field] or 0)
+      if v and v > 0 then                    -- only show contributors for this section
+        local name = c.name
+        if not name or name == "" then
+          local pm = ezmemory.get_player_memory(secret) or {}
+          name = pm.last_name or (pm.teams and pm.teams.last_name) or "Unknown"
+        end
+        rows[#rows+1] = { name = name, v = v }
+      end
     end
-    rows[#rows+1] = { name=name, points=tonumber(c.points or 0), boss=tonumber(c.boss_dmg or 0) }
+    table.sort(rows, function(a,b)
+      if a.v ~= b.v then return a.v > b.v end
+      return a.name < b.name
+    end)
+    return rows
   end
 
-  table.sort(rows, function(a,b)
-    if a.points ~= b.points then return (a.points > b.points) end
-    return a.name < b.name
-  end)
+  local w1 = rows_from_contribs("w1")
+  local w2 = rows_from_contribs("w2")
+  local bd = rows_from_contribs("boss_dmg")
+  local N  = 10
 
   local posts = {}
-  posts[#posts+1] = { id="__raidbbs:hdr", read=true,
-                      title=(("Wave1: %d/%d  -  Wave2: %d/%d  -  Boss HP: %d/%d")
-                              :format(s.wave1_points or 0, s.wave2_points_required or 0,
-                                      s.wave2_points or 0, s.wave3_points_required or 0,
-                                      s.boss_pool_hp or 0, s.boss_pool_max or 0)),
-                      author="" }
 
-  if #rows == 0 then
-    posts[#posts+1] = { id="__raidbbs:none", read=true, title="No contributors yet.", author="" }
+  posts[#posts+1] = {
+    id="__raidbbs:h1", read=true,
+    title=string.format("-- Wave 1 %d/%d --", s.wave1_points or 0, s.wave2_points_required or 0),
+    author=""
+  }
+  if #w1 == 0 then
+    posts[#posts+1] = { id="__raidbbs:w1none", read=true, title="(No Data)", author="" }
   else
-    local limit = 20
-    for i=1, math.min(limit, #rows) do
-      local r = rows[i]
-      posts[#posts+1] = { id=("__raidbbs:row:"..i), read=true,
-                           title=(("%d. %s  %dpt  %dDMG"):format(i, r.name, r.points, r.boss)),
-                           author="" }
+    for i=1, math.min(N, #w1) do
+      local r = w1[i]
+      posts[#posts+1] = { id="__raidbbs:w1:"..i, read=true, title=string.format("%d. %s %d", i, short(r.name, 14), r.v), author="" }
     end
   end
-  posts[#posts+1] = { id="__raidbbs:close", read=true, title="Close", author="" }
 
-  -- Use Net.open_board directly (short single-page board).
+  posts[#posts+1] = {
+    id="__raidbbs:h2", read=true,
+    title=string.format("-- Wave 2 %d/%d --", s.wave2_points or 0, s.wave3_points_required or 0),
+    author=""
+  }
+  if #w2 == 0 then
+    posts[#posts+1] = { id="__raidbbs:w2none", read=true, title="(No Data)", author="" }
+  else
+    for i=1, math.min(N, #w2) do
+      local r = w2[i]
+      posts[#posts+1] = { id="__raidbbs:w2:"..i, read=true, title=string.format("%d. %s %d", i, short(r.name, 14), r.v), author="" }
+    end
+  end
+
+  posts[#posts+1] = {
+    id="__raidbbs:h3", read=true,
+    title=string.format("-- Boss %d/%d --", s.boss_pool_hp or 0, s.boss_pool_max or 0),
+    author=""
+  }
+  if #bd == 0 then
+    posts[#posts+1] = { id="__raidbbs:bdnone", read=true, title="(No Data)", author="" }
+  else
+    for i=1, math.min(N, #bd) do
+      local r = bd[i]
+      posts[#posts+1] = { id="__raidbbs:bd:"..i, read=true, title=string.format("%d. %s %d", i, short(r.name, 14), r.v), author="" }
+    end
+  end
+
+  posts[#posts+1] = { id="__raidbbs:close", read=true, title="Close", author="" }
   Net.open_board(pid, title, color, posts)
 end
 
@@ -447,27 +482,37 @@ end
         await(Async.message_player(pid, "No points earned."))
         return nil
       end
+
       local pts = _calc_points_from_stats(stats)
       pts = math.max(0, math.floor(pts or 0))
+
       local secret = _safe_secret(pid)
+      local pname  = Net.get_player_name(pid)           -- NEW
       local c = s.contributions[secret] or { points=0, wins=0, boss_dmg=0 }
       c.points = (c.points or 0) + pts
       c.wins   = (c.wins   or 0) + 1
+      c.name   = pname or c.name                        -- NEW
       s.contributions[secret] = c
 
       if s.wave == 1 then
+        c.w1 = (c.w1 or 0) + pts                        -- NEW
+        s.contributions[secret] = c                     -- (re-stash after mutating c)
+
         s.wave1_points = (s.wave1_points or 0) + pts
         local was = s.wave
         _maybe_advance_wave(s)
         ezmemory.save_area_memory(mem_area)
         if was == 1 and s.wave == 2 then
-          -- Wave 1 just cleared -> reward hook
           if Config.on_wave1_cleared then pcall(Config.on_wave1_cleared, pid, raid_id, s) end
           await(Async.message_player(pid, ("Wave 1 cleared! Progress: %d/%d"):format(s.wave1_points, s.wave2_points_required)))
         else
-          await(Async.message_player(pid, ("+%d pt  •  Wave 1: %d/%d"):format(pts, s.wave1_points, s.wave2_points_required)))
+          await(Async.message_player(pid, ("+%d pt • Wave 1: %d/%d"):format(pts, s.wave1_points, s.wave2_points_required)))
         end
+
       else -- wave 2
+        c.w2 = (c.w2 or 0) + pts                        -- NEW
+        s.contributions[secret] = c
+
         s.wave2_points = (s.wave2_points or 0) + pts
         local was = s.wave
         _maybe_advance_wave(s)
@@ -476,30 +521,32 @@ end
           if Config.on_wave2_cleared then pcall(Config.on_wave2_cleared, pid, raid_id, s) end
           await(Async.message_player(pid, ("Wave 2 cleared! Progress: %d/%d"):format(s.wave2_points, s.wave3_points_required)))
         else
-          await(Async.message_player(pid, ("+%d pt  •  Wave 2: %d/%d"):format(pts, s.wave2_points, s.wave3_points_required)))
+          await(Async.message_player(pid, ("+%d pt • Wave 2: %d/%d"):format(pts, s.wave2_points, s.wave3_points_required)))
         end
       end
       return nil
+
     else
       -- Boss wave
       local dmg = _boss_damage_from_enemies_list(stats, s.boss_encounter_hp, s.boss_id_match)
-      -- If we didn't find the boss entry:
       if not dmg then
-        -- If the player WON (player HP > 0), assume full encounter damage
         if tonumber(stats and stats.health or 0) > 0 and s.boss_encounter_hp and s.boss_encounter_hp > 0 then
           dmg = s.boss_encounter_hp
         else
-          -- Otherwise fall back to your old heuristic (kept as a safety net)
           dmg = _boss_damage_from_stats(stats, s.boss_win_damage)
         end
       end
+
       if dmg > 0 then
         local secret = _safe_secret(pid)
+        local pname  = Net.get_player_name(pid)         -- NEW
         local c = s.contributions[secret] or { points=0, wins=0, boss_dmg=0 }
-        c.boss_dmg = (c.boss_dmg or 0) + dmg
+        c.boss_dmg = (c.boss_dmg or 0) + dmg            -- NEW
+        c.name     = pname or c.name                    -- NEW
         s.contributions[secret] = c
         s.boss_pool_hp = math.max(0, (s.boss_pool_hp or 0) - dmg)
       end
+
       local msg = ("Boss HP: %d/%d"):format(s.boss_pool_hp or 0, s.boss_pool_max or 0)
       if s.boss_pool_hp <= 0 then
         s.defeated = true
@@ -507,7 +554,6 @@ end
         ezmemory.save_area_memory(mem_area)
         if Config.on_boss_defeated then pcall(Config.on_boss_defeated, pid, raid_id, s) end
         await(Async.message_player(pid, "Boss defeated!"))
-        -- Auto-reset if repeat
         _try_reset_if_repeat(s)
         ezmemory.save_area_memory(mem_area)
       else
