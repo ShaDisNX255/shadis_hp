@@ -4,7 +4,6 @@
 local ezmemory = require('scripts/ezlibs-scripts/ezmemory')
 local helpers  = require('scripts/ezlibs-scripts/helpers')
 local Month    = require('scripts/teams/month')  -- << define rewards in this file
-local raids    = require('scripts/raids/raids')
 
 -- Try JobBBS from either path; if present we will hook job-claim to +1 GP.
 local JobBBS = (function()
@@ -47,6 +46,26 @@ local TEAM_COLORS = {
 }
 local COLOR_TEAM  = { r=160, g=220, b=255 } -- fallback
 local COLOR_SCORE = { r=255, g=230, b=160 }
+
+-- == GP from Raids ==
+local RAID_GP = {
+  -- conversion: how much progress equals 1 GP
+  w1_points_per_gp    = 50,     -- Wave 1 points → GP
+  w2_points_per_gp    = 30,     -- Wave 2 points → GP
+  boss_damage_per_gp  = 1000,   -- Boss damage → GP
+
+  -- daily caps
+  player_daily_cap    = 10,     -- max GP/player/day from raids
+  team_cap_per_active = 10,     -- team cap/day = active_contributors_today * this
+  team_daily_cap_min  = 10,     -- floor
+  team_daily_cap_max  = 80,     -- ceiling
+
+  -- underdog multiplier (updates daily; disabled in the last 48h)
+  underdog_enabled        = true,
+  underdog_mul            = 1.20,  -- applied to losing team
+  leading_mul             = 1.00,  -- applied to leading team
+  bonus_off_last_hours    = 48,    -- disable multipliers in last 48h of month
+}
 
 -- =========================
 -- ====== UTILITIES  =======
@@ -443,6 +462,18 @@ local function _grant_reward(pid, spec)
   end
 end
 
+local function _now() return os.time() end
+local function _today_key() return os.date("%Y-%m-%d", _now()) end
+local function _hours_until_month_end()
+  local now  = os.date("*t", _now())
+  local last = os.date("*t", os.time{year=now.year, month=now.month+1, day=0, hour=23, min=59, sec=59})
+  local sec  = os.difftime(os.time(last), _now())
+  return math.max(0, math.floor(sec/3600))
+end
+local function _is_last_48h_of_month()
+  return _hours_until_month_end() <= (RAID_GP.bonus_off_last_hours or 48)
+end
+
 
 -- =========================
 -- ====== GP EARNING  ======
@@ -473,6 +504,134 @@ local function _add_gp(pid, amount, why)
   _save_area()
 
   if why then Net.message_player(pid, ("+%d GP for %s."):format(amount, why)) end
+end
+
+-- Tracks daily GP cap usage & actives (by secret) + today's team multipliers
+local function _ensure_daily_bucket()
+  local mem, t_mem = _roll_month_if_needed()
+  t_mem.daily = t_mem.daily or {}
+  local key = _today_key()
+  local d = t_mem.daily[key]
+  if d then return d, t_mem end
+
+  d = {
+    active_by_team = { [1] = {}, [2] = {} },  -- set of secrets that contributed today
+    team_used      = { [1] = 0,   [2] = 0   },-- GP used by team today
+    player_used    = {},                      -- [secret] = GP used today
+    mul_today      = { [1] = 1.0, [2] = 1.0 }
+  }
+
+  -- compute underdog multipliers (once per day)
+  if RAID_GP.underdog_enabled and not _is_last_48h_of_month() then
+    t_mem.month[1] = t_mem.month[1] or { total=0, roster={}, gp_by_secret={} }
+    t_mem.month[2] = t_mem.month[2] or { total=0, roster={}, gp_by_secret={} }
+    local t1 = tonumber(t_mem.month[1].total or 0) or 0
+    local t2 = tonumber(t_mem.month[2].total or 0) or 0
+    if t1 > t2 then
+      d.mul_today[1] = RAID_GP.leading_mul or 1.0
+      d.mul_today[2] = RAID_GP.underdog_mul or 1.0
+    elseif t2 > t1 then
+      d.mul_today[2] = RAID_GP.leading_mul or 1.0
+      d.mul_today[1] = RAID_GP.underdog_mul or 1.0
+    else
+      d.mul_today[1], d.mul_today[2] = 1.0, 1.0 -- tie → no boost
+    end
+  end
+
+  t_mem.daily[key] = d
+  _save_area()
+  return d, t_mem
+end
+
+-- Award GP by secret (works if player is offline). pid_opt only used for an optional toast.
+local function _add_gp_by_secret(secret, amount, why, pid_opt)
+  amount = math.floor(tonumber(amount) or 0); if amount <= 0 then return end
+
+  local pm = ezmemory.get_player_memory(secret) or {}
+  pm.teams = pm.teams or {}
+  pm.teams.current = pm.teams.current or { team=nil, month=_month_key(), gp=0, last_switch_month=nil }
+  local cur = pm.teams.current
+  if not cur.team then return end
+
+  -- monthly rollover for player
+  if cur.month ~= _month_key() then
+    pm.teams.hist = pm.teams.hist or {}
+    pm.teams.hist[cur.month] = { team = cur.team, gp = cur.gp or 0 }
+    pm.teams.current = { team = cur.team, month = _month_key(), gp = 0, checkins = cur.checkins, last_switch_month = cur.last_switch_month }
+    cur = pm.teams.current
+  end
+
+  local mem, t_mem = _roll_month_if_needed()
+  local slot = t_mem.month[cur.team]
+  cur.gp = (cur.gp or 0) + amount
+  slot.total = (slot.total or 0) + amount
+  slot.gp_by_secret[secret] = (slot.gp_by_secret[secret] or 0) + amount
+  _add_to_roster(t_mem, cur.team, secret)
+
+  if pm.teams and pm.teams.last_name and pm.teams.last_name ~= "" then
+    t_mem.names[secret] = pm.teams.last_name
+  end
+
+  if ezmemory.set_player_memory then ezmemory.set_player_memory(secret, pm) else ezmemory.save_player_memory(secret, pm) end
+  _save_area()
+
+  if pid_opt and why then pcall(Net.message_player, pid_opt, ("+%d GP for %s."):format(amount, why)) end
+end
+
+-- Offline-safe payout used by Raids (called on wave clear / boss death)
+-- kind = "w1" | "w2" | "boss"; amount = points (w1/w2) or damage (boss)
+function Teams.on_raid_contribution_secret(secret, raid_id, kind, amount, pid_opt)
+  amount = tonumber(amount) or 0
+  if amount <= 0 then return end
+
+  local per = (kind == "w1" and RAID_GP.w1_points_per_gp)
+           or (kind == "w2" and RAID_GP.w2_points_per_gp)
+           or (kind == "boss" and RAID_GP.boss_damage_per_gp)
+           or 0
+  if per <= 0 then return end
+  local base = math.floor(amount / per)
+  if base <= 0 then return end
+
+  -- resolve team
+  local pm = ezmemory.get_player_memory(secret) or {}
+  pm.teams = pm.teams or {}; pm.teams.current = pm.teams.current or { team=nil, month=_month_key(), gp=0, last_switch_month=nil }
+  local cur = pm.teams.current
+  if not cur.team then return end
+  local team = cur.team
+
+  -- caps + today's multiplier
+  local d = _ensure_daily_bucket()
+  local mul  = (d.mul_today and d.mul_today[team]) or 1.0
+  local gp   = math.floor(base * mul)
+  if gp <= 0 then return end
+
+  local actives = d.active_by_team[team] or {}; actives[secret] = true; d.active_by_team[team] = actives
+  local active_n = 0; for _ in pairs(actives) do active_n = active_n + 1 end
+
+  local team_cap = math.max(RAID_GP.team_daily_cap_min or 0,
+                    math.min(RAID_GP.team_daily_cap_max or 9999,
+                      math.max(active_n,1) * (RAID_GP.team_cap_per_active or 0)))
+  local team_used = tonumber(d.team_used[team] or 0)
+  local team_room = math.max(0, team_cap - team_used)
+
+  local p_used = tonumber(d.player_used[secret] or 0)
+  local p_cap  = RAID_GP.player_daily_cap or 10
+  local p_room = math.max(0, p_cap - p_used)
+
+  local give = math.max(0, math.min(gp, p_room, team_room))
+  if give <= 0 then return end
+
+  d.player_used[secret] = p_used + give
+  d.team_used[team]     = team_used + give
+  _save_area()
+
+  _add_gp_by_secret(secret, give, "raids", pid_opt)
+end
+
+-- Convenience wrapper (online toast if present)
+function Teams.on_raid_contribution(pid, raid_id, kind, amount)
+  local secret = helpers.get_safe_player_secret(pid)
+  Teams.on_raid_contribution_secret(secret, raid_id, kind, amount, pid)
 end
 
 -- =========================
@@ -895,41 +1054,45 @@ end
 -- =========================
 -- ====== HOOK EVENTS  =====
 -- =========================
-Net:on("object_interaction", function(ev)
-  if ev.button ~= 0 then return end -- A/Confirm only
-  local pid = ev.player_id
-  local area_id = Net.get_player_area(pid)
-  local obj = area_id and Net.get_object_by_id(area_id, ev.object_id)
-  if not obj then return end
-  if obj.type == OBJ_TEAM_1 then _open_team_board(pid, 1)
-  elseif obj.type == OBJ_TEAM_2 then _open_team_board(pid, 2)
-  elseif obj.type == OBJ_SCORES then _open_scores_board(pid)
-  end
-end)
+if not _G.__TEAMS_WIRED then
+  _G.__TEAMS_WIRED = true
 
-Net:on("post_selection", function(ev)
-  local pid = ev.player_id
-  local id  = tostring(ev.post_id or "")
-  if id:match("^__team:") then
-    _handle_team_action(pid, id)
-  elseif id:match("^__teamscores:") then
-    _handle_scores_action(pid, id)
-  end
-end)
+  Net:on("object_interaction", function(ev)
+    if ev.button ~= 0 then return end
+    local pid = ev.player_id
+    local area_id = Net.get_player_area(pid)
+    local obj = area_id and Net.get_object_by_id(area_id, ev.object_id)
+    if not obj then return end
+    if obj.type == OBJ_TEAM_1 then _open_team_board(pid, 1)
+    elseif obj.type == OBJ_TEAM_2 then _open_team_board(pid, 2)
+    elseif obj.type == OBJ_SCORES then _open_scores_board(pid)
+    end
+  end)
 
-Net:on("board_close", function(ev)
-  local pid = ev.player_id
-  local pending = _pending_open[pid]
-  if not pending then return end
-  _pending_open[pid] = nil
-  if pending.kind == "members" then
-    _open_members_board(pid, pending.team)
-  elseif pending.kind == "team" then
-    _open_team_board(pid, pending.team)
-  elseif pending.kind == "scores" then
-    _open_scores_board(pid)
-  end
-end)
+  Net:on("post_selection", function(ev)
+    local pid = ev.player_id
+    local id  = tostring(ev.post_id or "")
+    if id:match("^__team:") then
+      _handle_team_action(pid, id)
+    elseif id:match("^__teamscores:") then
+      _handle_scores_action(pid, id)
+    end
+  end)
+
+  Net:on("board_close", function(ev)
+    local pid = ev.player_id
+    local pending = _pending_open[pid]
+    if not pending then return end
+    _pending_open[pid] = nil
+    if pending.kind == "members" then
+      _open_members_board(pid, pending.team)
+    elseif pending.kind == "team" then
+      _open_team_board(pid, pending.team)
+    elseif pending.kind == "scores" then
+      _open_scores_board(pid)
+    end
+  end)
+end
 
 -- Hook into JobBBS: +1 GP on every successful job CLAIM (after JobBBS grants its reward).
 do

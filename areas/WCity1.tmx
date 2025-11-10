@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.8" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="75" height="75" tilewidth="64" tileheight="32" infinite="0" nextlayerid="13" nextobjectid="210">
+<map version="1.10" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="75" height="75" tilewidth="64" tileheight="32" infinite="0" nextlayerid="13" nextobjectid="210">
  <properties>
   <property name="Background" value="custom"/>
   <property name="Background Animation" value="/server/assets/custom/backgrounds/wcity/01-generic1.animation"/>
@@ -1170,7 +1170,7 @@
    </properties>
    <point/>
   </object>
-  <object id="206" name="???" type="NPC" x="1387.5" y="994.5">
+  <object id="206" name="???" type="NPC" x="1392" y="992">
    <properties>
     <property name="Asset Name" value="ranked-navi-bn3"/>
     <property name="Dialogue Type" value="first"/>
@@ -1184,7 +1184,7 @@
    <properties>
     <property name="Dialogue Type" value="none"/>
     <property name="Event Name" value="raid"/>
-    <property name="Raid ID" value="RaidTest"/>
+    <property name="Raid ID" value="RaidTest2"/>
    </properties>
    <point/>
   </object>
@@ -1192,7 +1192,7 @@
    <properties>
     <property name="Color" type="color" value="#ffff0000"/>
     <property name="Name" value="RaidBBS"/>
-    <property name="Raid ID" value="RaidTest"/>
+    <property name="Raid ID" value="RaidTest2"/>
    </properties>
   </object>
  </objectgroup>

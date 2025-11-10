@@ -1,43 +1,3 @@
--- /server/scripts/raids/main.lua
--- Modular, ezlibs-only Raid Framework
--- Usage:
---   1) Put this file + config.lua + encounters.lua in /server/scripts/raids/
---   2) Ensure this file is required at boot by *some* loaded script, e.g. add:
---        helpers.safe_require('scripts/raids/main')
---      to your scripts/eznpcs_events.lua (or require it from anywhere that always loads).
---   3) In Tiled, set an NPC Dialogue with:  Dialogue Type = "raid"
---      Optional custom properties on the Dialogue:
---        - Raid ID         : string key (defaults to "default")
---        - Raid Style      : "Repeat" | "Once"   (defaults from config.lua)
---        - Wave2 Points    : number (override threshold to unlock wave 2)
---        - Wave3 Points    : number (override threshold to unlock wave 3)
---        - Boss Pool HP    : number (override boss shared HP pool max)
---        - Boss Win Damage : number (damage applied to pool when player wins; default 500)
---        - Memory Area     : area_id string to store shared progress (defaults to current area)
---        - Raid Done Msg   : message to show if Raid Style is Once and already cleared
---   4) To show the leaderboard, place an object with type = "RaidBBS"
---      (optional property "Raid ID" to select a specific raid id; else "default").
---
--- Flow (no menus > 3 options):
---   • Player talks to a "raid" NPC -> we show a short info line and ask "Fight? Yes/No".
---   • We immediately toss the player into the correct wave based on shared progress:
---       Wave 1 until Wave2 Points reached, then Wave 2 until Wave3 Points reached,
---       then Wave 3 (boss) until the Boss Pool HP hits 0.
---   • Wave 1/2 points are awarded from busting level (S=10, 9..1 -> 9..1). No points on run/defeat.
---   • Boss reduces the shared HP pool. On win: Boss Win Damage (or from stats if exposed).
---     On loss: we try to subtract partial damage if stats expose enemy remaining HP (best effort).
---   • After each battle we message progress to the player.
---   • When boss pool reaches 0:
---       - If style == "Repeat": the raid auto-resets to Wave 1.
---       - If style == "Once"  : further attempts show Raid Done Msg (or a default) and do nothing.
---   • Reward hooks are defined in config.lua (no hard ties to other systems).
---
--- Public API (returned as module table):
---   raids.get_state(area_id, raid_id)
---   raids.reset(area_id, raid_id)
---   raids.report_points(pid, amount, raid_id?)          -- optional manual hook
---   raids.report_boss_damage(pid, damage, raid_id?)     -- optional manual hook
-
 local eznpcs       = require('scripts/ezlibs-scripts/eznpcs/eznpcs')
 local ezencounters = require('scripts/ezlibs-scripts/ezencounters/main')
 local ezmemory     = require('scripts/ezlibs-scripts/ezmemory')
@@ -45,6 +5,99 @@ local helpers      = require('scripts/ezlibs-scripts/helpers')
 
 local Config       = require('scripts/raids/config')
 local Enc          = require('scripts/raids/encounters')
+
+local TeamsOK, Teams = pcall(require, 'scripts/teams/teams')
+-- ===== Force-init Displayer once (boot-safe) =====
+if not _G.__DISPLAYER_READY then
+  -- Try the primary module
+  local ok, D = pcall(require, 'scripts/displayer/displayer')
+  if ok and type(D) == 'table' then
+    -- Many builds return an instance that must be initialized
+    if D.init then pcall(D.init, D) end
+    -- Publish to global so every script can find the same instance
+    _G.Displayer = D
+  end
+
+  -- Some builds register subsystems on require; make sure text subsystem is loaded
+  if not (_G.Displayer and _G.Displayer.Text and _G.Displayer.Text.drawMarqueeText) then
+    pcall(require, 'scripts/displayer/text-display')
+  end
+
+  -- Final sanity: if we still only have the table but not the methods, init now
+  if _G.Displayer and _G.Displayer.init
+     and not (_G.Displayer.Text and _G.Displayer.Text.drawMarqueeText) then
+    pcall(_G.Displayer.init, _G.Displayer)
+  end
+
+  _G.__DISPLAYER_READY = (_G.Displayer and _G.Displayer.Text and _G.Displayer.Text.drawMarqueeText) or false
+  print("[RAIDS] Displayer init:", _G.__DISPLAYER_READY and "OK" or "FAILED")
+end
+-- ===== /Force-init Displayer =====
+
+-- ===== Login test marquee (local toggle) =====
+local TEST_LOGIN_MARQUEE = false   -- set true to show a test marquee on login
+local TEST_LOGIN_TEXT    = "Login test marquee - tweak in raids.lua"
+local TEST_LOGIN_OPTS    = { loops = 2 }  -- you can add width/height/scale/speed/etc here
+-- ===== /Login test marquee =====
+
+-- Peek current raid store for an area without creating anything
+local function _peek_store(area_id)
+  local mem = ezmemory.get_area_memory(area_id)
+  return (mem and mem.raids) or {}
+end
+
+-- true if a raid is “active” (has actually started)
+local function _is_active(s)
+  if not s then return false end
+  -- Active as soon as wave1 has any points, wave advanced, or boss HP moved.
+  return (tonumber(s.wave1_points or 0) > 0)
+      or (tonumber(s.wave or 1) > 1)
+      or (tonumber(s.boss_pool_hp or s.boss_pool_max or 0) < tonumber(s.boss_pool_max or 0))
+end
+
+-- Find any active raid in area (prefer truly active; else most progressed)
+local function _find_active_or_progress(area_id)
+  local store = _peek_store(area_id)
+  local best_id, best_s, best_score = nil, nil, -1
+
+  for rid, s in pairs(store) do
+    if _is_active(s) then
+      return rid, s
+    end
+    -- Not active: choose the most progressed as a fallback
+    local wave  = tonumber(s.wave or 1) or 1
+    local wsum  = (tonumber(s.wave1_points or 0) or 0) + (tonumber(s.wave2_points or 0) or 0)
+    local score = (wave * 100000) + wsum
+    if score > best_score then
+      best_id, best_s, best_score = rid, s, score
+    end
+  end
+
+  return best_id, best_s  -- may be nil/nil if no raids exist yet
+end
+
+-- ==== Online tracking (global, area-agnostic) ====
+local ONLINE = {}  -- [pid] = true
+
+-- Keep ONLINE in sync (cover both common event names)
+if not _G.__RAIDS_ONLINE_WIRED then
+  _G.__RAIDS_ONLINE_WIRED = true
+
+  Net:on("player_join", function(ev)
+    ONLINE[ev.player_id] = true
+  end)
+
+  Net:on("player_disconnect", function(ev)
+    ONLINE[ev.player_id] = nil
+  end)
+  Net:on("player_left", function(ev)   -- some builds use a different name
+    ONLINE[ev.player_id] = nil
+  end)
+end
+-- ==== /Online tracking ====
+
+local CFG_DEFAULTS  = (Config and Config.get_defaults and Config.get_defaults("default")) or {}
+local RAID_MEM_AREA = CFG_DEFAULTS.raid_memory_area
 
 local Raids = {}
 
@@ -115,6 +168,176 @@ local function _boss_damage_from_stats(stats, fallback_on_win)
   return 0
 end
 
+-- Right-side marquee look (tweak as you like)
+local UI = {
+  scale        = 1.2,
+  z            = 220,
+  speed        = "slow",   -- slow | medium | quick
+  width        = 200,
+  height       = 38,
+  padding_x    = 6,
+  padding_y    = 4,
+  margin_right = -90,          -- distance from the right edge
+  y            = 6,          -- top Y of the box
+  loops        = 2,          -- exactly two passes, as requested
+  font         = "THICK",
+}
+
+local function _screen_w() return 240 end
+local function _screen_h() return 160 end
+
+-- get all connected player ids (global or area-scoped)
+local function _all_pids(area_id)
+  local ids = {}
+
+  -- Primary source: our ONLINE set
+  if area_id then
+    for pid,_ in pairs(ONLINE) do
+      local ok, a = pcall(Net.get_player_area, pid)
+      if ok and a == area_id then
+        ids[#ids+1] = pid
+      end
+    end
+  else
+    for pid,_ in pairs(ONLINE) do
+      ids[#ids+1] = pid
+    end
+  end
+
+  -- Fallback if ONLINE is empty (e.g., server boot race)
+  if #ids == 0 then
+    if Net.get_player_ids then
+      local ok, v = pcall(Net.get_player_ids)
+      if ok and type(v) == "table" then ids = v end
+    elseif Net.get_players then
+      local ok, m = pcall(Net.get_players)
+      if ok and type(m) == "table" then
+        for pid,_ in pairs(m) do ids[#ids+1] = pid end
+      end
+    elseif Net.list_players then
+      -- try all areas we can infer from connected players
+      -- (no-op here if we truly don't know any areas yet)
+      for pid,_ in pairs(ONLINE) do
+        local ok, a = pcall(Net.get_player_area, pid)
+        if ok and a then
+          local ok2, v = pcall(Net.list_players, a)
+          if ok2 and type(v) == "table" then
+            for _,p in ipairs(v) do ids[#ids+1] = p end
+          end
+        end
+      end
+    end
+  end
+
+  -- Deduplicate in case multiple sources added the same pid
+  if #ids > 1 then
+    local seen, out = {}, {}
+    for _,p in ipairs(ids) do
+      if not seen[p] then seen[p] = true; out[#out+1] = p end
+    end
+    ids = out
+  end
+
+  return ids
+end
+
+-- draw a right-side marquee for one player
+local function _marquee(pid, text, opts)
+  local D = _G.Displayer
+  if not (D and D.Text and D.Text.drawMarqueeText) then
+    print("[RAIDS] ERROR: Displayer.Text.drawMarqueeText unavailable after init; aborting draw")
+    return
+  end
+
+  opts = opts or {}
+  local scale       = opts.scale or UI.scale
+  local width       = opts.width or UI.width
+  local height      = opts.height or UI.height
+  local padding_x   = opts.padding_x or UI.padding_x
+  local padding_y   = opts.padding_y or UI.padding_y
+  local margin_right= opts.margin_right or UI.margin_right
+  local y           = opts.y or UI.y
+  local z           = opts.z or UI.z
+  local speed       = opts.speed or UI.speed
+  local loops       = (opts.loops ~= nil) and opts.loops or UI.loops
+  local font        = opts.font or UI.font
+
+  local line_h   = math.ceil(9 * scale)  -- THICK baseline ~9px
+  local x        = _screen_w() - margin_right - width
+  local baseline = y + padding_y + line_h - 2
+
+  D.Text.drawMarqueeText(
+    pid,
+    "__raid_announce",
+    tostring(text or ""),
+    baseline,
+    font, scale,
+    z,
+    speed,
+    {
+      x=x, y=y, width=width, height=height,
+      padding_x=padding_x, padding_y=padding_y,
+      loops=loops,
+    }
+  )
+end
+
+-- broadcast marquee to ALL currently connected players
+local function _announce_all(text, opts, area_id)
+  local pids = _all_pids(area_id)  -- pass nil for global; pass area_id to target one area
+  print(("[RAIDS] announce area=%s text=%s -> recipients=%d")
+        :format(tostring(area_id or "<global>"), tostring(text), #pids))
+  for _, pid in ipairs(pids) do
+    local ok, err = pcall(_marquee, pid, text, opts)
+    if not ok then
+      print(("[RAIDS] marquee error pid=%s: %s"):format(tostring(pid), tostring(err)))
+    end
+  end
+end
+
+-- make a short contributions list for a wave: "Name - 15, Name2 - 8, ..."
+local function _contrib_list(s, field, max_names)
+  max_names = max_names or 6
+  local rows = {}
+  for _, c in pairs(s.contributions or {}) do
+    local v = tonumber(c[field] or 0)
+    if v and v > 0 then
+      local name = c.name
+      if (not name) or name == "" then
+        local pm = ezmemory.get_player_memory(_safe_secret(c._last_pid)) or {}
+        name = pm.last_name or (pm.teams and pm.teams.last_name) or "Unknown"
+      end
+      rows[#rows+1] = { name = name, v = v }
+    end
+  end
+  table.sort(rows, function(a,b) if a.v ~= b.v then return a.v > b.v end return a.name < b.name end)
+  local parts = {}
+  for i=1, math.min(#rows, max_names) do
+    parts[#parts+1] = string.format("%s - %d", rows[i].name, rows[i].v)
+  end
+  if #rows > max_names then parts[#parts+1] = "..." end
+  return table.concat(parts, ", ")
+end
+
+-- optional team GP summary hook (shows only if your Teams module exposes it)
+local function _try_team_gp_summary(raid_id, wave_label)
+  if TeamsOK and Teams and Teams.get_raid_wave_gp_summary then
+    local ok, r = pcall(Teams.get_raid_wave_gp_summary, raid_id, wave_label)
+    if ok and r and (r.t1 or r.t2) then
+      local t1n = r.team1_name or "Team 1"
+      local t2n = r.team2_name or "Team 2"
+      local t1d = tonumber(r.t1 or 0) or 0
+      local t2d = tonumber(r.t2 or 0) or 0
+      if t1d ~= 0 or t2d ~= 0 then
+        local s1 = string.format("%s %s%d GP", t1n, (t1d>=0 and "+" or ""), t1d)
+        local s2 = string.format("%s %s%d GP", t2n, (t2d>=0 and "+" or ""), t2d)
+        return s1 .. ", " .. s2
+      end
+    end
+  end
+  return nil -- no data / no Teams support
+end
+
 -- =========================
 -- ===== State =========
 -- =========================
@@ -149,6 +372,8 @@ local function _ensure_state(area_id, raid_id, overrides)
       defeated_at          = nil,
       contributions        = {},   -- [secret] = { points = n, wins = n, boss_dmg = n }
       claims               = { wave1 = {}, wave2 = {}, boss = {} }, -- for reward hooks (opt-in)
+      repeat_cooldown_secs  = tonumber(cfg.repeat_cooldown_secs or 1800),
+      cooldown_until        = nil,
     }
     -- Apply overrides from Dialogue custom properties (if present)
     if overrides then
@@ -372,6 +597,7 @@ local function _raid_action(npc, pid, dialogue, relay_object)
     local done_msg  = (dialogue.custom_properties and dialogue.custom_properties["Raid Done Msg"]) or "The raid has already been cleared."
     local boss_enc_hp = dialogue.custom_properties and tonumber(dialogue.custom_properties["Boss Encounter HP"])
     local boss_match  = dialogue.custom_properties and dialogue.custom_properties["Boss ID Match"]
+    local repeat_cd   = dialogue.custom_properties and tonumber(dialogue.custom_properties["Repeat Cooldown Secs"])
 
     raid_id = tostring(raid_id or "default")
     mem_area = tostring(mem_area or Net.get_player_area(pid))
@@ -383,37 +609,58 @@ local function _raid_action(npc, pid, dialogue, relay_object)
       boss_win_damage = boss_win,
       boss_encounter_hp = boss_enc_hp,
       boss_id_match = boss_match,
+      repeat_cooldown_secs = repeat_cd,
     }
     local s, mem, store = _ensure_state(mem_area, raid_id, overrides)
 
-    -- If style is "Repeat" and previously defeated, reset immediately on interaction.
-    _try_reset_if_repeat(s)
+    -- Repeat cooldown gate
+    if s.style == "Repeat" and s.defeated then
+      local now = _now()
+      if s.cooldown_until and now < s.cooldown_until then
+        local mins = math.ceil((s.cooldown_until - now)/60)
+        await(Async.message_player(pid, ("Raid inactive. Try again in %d min."):format(mins)))
+        return nil
+      else
+        -- cooldown elapsed -> reset now
+        s.cooldown_until = nil
+        s.defeated = false
+        s.defeated_at = nil
+        s.wave = 1
+        s.wave1_points, s.wave2_points = 0, 0
+        s.boss_pool_hp = s.boss_pool_max
+        s.contributions = {}
+        s.claims = { wave1 = {}, wave2 = {}, boss = {} }
+        ezmemory.save_area_memory(mem_area)
+      end
+    end
 
     if s.style == "Once" and s.defeated then
       await(Async.message_player(pid, done_msg))
       return nil
     end
 
-    -- Wave advance (in case thresholds were externally tweaked)
     _maybe_advance_wave(s)
 
-    -- Short info -> YES/NO
-    await(Async.message_player(pid, 
-      ("Raid '%s' • Wave %d/3 • W2:%d/%d • W3:%d/%d • Boss:%d/%d")
-      :format(raid_id, s.wave, s.wave1_points, s.wave2_points_required,
-              s.wave2_points, s.wave3_points_required,
-              s.boss_pool_hp, s.boss_pool_max)))
-
+    -- Quiz with ONLY options (no preface)
     local ans = await(Async.quiz_player(pid, "Fight", "Info", "Leave"))
+
     if ans == 1 then  -- "Info"
-      await(Async.message_player(pid,
-        "Three waves:\n- Wave1/2: earn points by Busting LV (S=10..1=1).\n- Wave3: chip away a shared Boss HP pool.\nNo farming of wave 1 once cleared."))
+      local status
+      if s.wave == 1 then
+        status = ("W1: %d/%d"):format(s.wave1_points or 0, s.wave2_points_required or 0)
+      elseif s.wave == 2 then
+        status = ("W2: %d/%d"):format(s.wave2_points or 0, s.wave3_points_required or 0)
+      else
+        status = ("Boss: %d/%d"):format(s.boss_pool_hp or 0, s.boss_pool_max or 0)
+      end
+      await(Async.message_player(pid, status))
       return nil
     elseif ans ~= 0 then
-      return nil
+      return nil -- "Leave" or closed
     end
 
-    -- Select encounter for current wave
+    -- Select encounter snapshot
+    local wave_at_start = s.wave
     local pack_list
     if s.wave == 1 then pack_list = Enc.get_pack(raid_id, 1)
     elseif s.wave == 2 then pack_list = Enc.get_pack(raid_id, 2)
@@ -429,99 +676,223 @@ local function _raid_action(npc, pid, dialogue, relay_object)
     -- Begin encounter and await result
     local stats = await(ezencounters.begin_encounter(pid, spec))
 
--- ==== RAID DEBUG: dump all boss stats to server log ====
+-- ==== RAID DEBUG (enhanced: full, flattened, typed) ====
 do
-  local function _dump(prefix, v, seen, depth)
-    seen  = seen  or {}
-    depth = depth or 0
-    local ind = string.rep("  ", depth)
-    local tv  = type(v)
+  -- Flattens any Lua value into dotted paths with deterministic key order.
+  local function _flatten(value, base, out, seen)
+    out  = out  or {}
+    seen = seen or {}
+    local tv = type(value)
+
     if tv ~= "table" then
-      print(string.format("[RAID DBG] %s%s", prefix or "", tostring(v)))
-      return
+      out[#out+1] = string.format("%s = %s (%s)", base, tostring(value), tv)
+      return out
     end
-    if seen[v] then
-      print(string.format("[RAID DBG] %s{<cycle>}", prefix or ""))
-      return
+
+    if seen[value] then
+      out[#out+1] = string.format("%s = <cycle> (table)", base)
+      return out
     end
-    seen[v] = true
-    for k,val in pairs(v) do
-      local line = string.format("%s[%s] = ", ind, tostring(k))
-      if type(val) == "table" then
-        print(string.format("[RAID DBG] %s{", line))
-        _dump(ind, val, seen, depth + 1)
-        print(string.format("[RAID DBG] %s}", ind))
-      else
-        print(string.format("[RAID DBG] %s%s", line, tostring(val)))
+    seen[value] = true
+
+    -- Array part first (1..n)
+    local n = #value
+    for i = 1, n do
+      _flatten(value[i], string.format("%s[%d]", base, i), out, seen)
+    end
+
+    -- Then non-array keys, sorted by tostring(key)
+    local keys = {}
+    for k,_ in pairs(value) do
+      if not (type(k) == "number" and k >= 1 and k <= n and k == math.floor(k)) then
+        keys[#keys+1] = k
       end
     end
+    table.sort(keys, function(a,b) return tostring(a) < tostring(b) end)
+
+    for _,k in ipairs(keys) do
+      local child_base
+      if type(k) == "string" and k:match("^[%a_][%w_]*$") then
+        child_base = base .. "." .. k
+      else
+        child_base = base .. "[" .. tostring(k) .. "]"
+      end
+      _flatten(value[k], child_base, out, seen)
+    end
+    return out
   end
 
-  print("[RAID DBG] -------- Boss encounter stats (raw) --------")
-  _dump("", stats)
+  print("[RAID DBG] -------- Encounter stats (flattened) --------")
+  local lines = _flatten(stats or {}, "stats")
+  for _,line in ipairs(lines) do
+    print("[RAID DBG] " .. line)
+  end
 
-  -- Heuristic summary (common field names across ezencounters builds)
-  local rem = stats and (stats.boss_hp_left or stats.enemy_remaining_hp or stats.enemy_hp or
-                         stats.hp_left or stats.remaining_hp or stats.enemy_remaining)
-  local tot = stats and (stats.enemy_total_hp or stats.total_enemy_hp or stats.enemy_total or stats.total_hp)
+  -- Helpful summary + what our points parser thinks
   local ran = stats and (stats.ran or stats.fled or stats.escape)
   local php = stats and (stats.health or stats.player_hp or stats.hp)
   local won = (not ran) and (tonumber(php or 0) > 0)
+  local derived = _calc_points_from_stats and _calc_points_from_stats(stats) or "n/a"
 
-  print(string.format(
-    "[RAID DBG] -------- Boss summary -------- won=%s ran=%s player_hp=%s enemy_remaining=%s enemy_total=%s",
-    tostring(won), tostring(ran), tostring(php), tostring(rem), tostring(tot)
-  ))
-  print("[RAID DBG] -------------------------------------------")
+  print(string.format("[RAID DBG] summary won=%s ran=%s player_hp=%s derived_points=%s",
+                      tostring(won), tostring(ran), tostring(php), tostring(derived)))
+  print("[RAID DBG] --------------------------------------------")
 end
 -- ==== /RAID DEBUG ====
 
-    -- Handle result per wave
-    if s.wave < 3 then
-      if stats.ran or tonumber(stats.health or 0) <= 0 then
+    -- Handle result per wave (use snapshot)
+    if wave_at_start < 3 then
+      local ran      = (stats and stats.ran) or false
+      local defeated = tonumber(stats.health or 0) <= 0
+
+      if ran then
+        local secret = _safe_secret(pid)
+        local c = s.contributions[secret] or { points=0, wins=0, boss_dmg=0 }
+        c.chain2 = 0
+        s.contributions[secret] = c
+        ezmemory.save_area_memory(mem_area)
+        await(Async.message_player(pid, "No points - chain reset"))
+        return nil
+      end
+
+      if defeated then
         await(Async.message_player(pid, "No points earned."))
         return nil
       end
 
-      local pts = _calc_points_from_stats(stats)
-      pts = math.max(0, math.floor(pts or 0))
+      -- Base points from busting level
+      local base = _calc_points_from_stats(stats)
+      base = math.max(0, math.floor(base or 0))
 
+      -- Per-player x2 chain
       local secret = _safe_secret(pid)
-      local pname  = Net.get_player_name(pid)           -- NEW
       local c = s.contributions[secret] or { points=0, wins=0, boss_dmg=0 }
-      c.points = (c.points or 0) + pts
+
+      local chain = tonumber(c.chain2 or 0) or 0
+      if chain < 0 then chain = 0 end
+      local factor = (chain > 0) and math.floor(math.pow(2, chain)) or 1
+      local award  = base * factor
+
+      local applied_tag = (factor > 1) and (" - x"..factor) or ""
+      local next_chain  = (base >= 10) and (chain + 1) or 0
+      local next_tag    = ""
+      if base >= 10 then
+        next_tag = " x"..math.floor(math.pow(2, next_chain)).."pts next"
+      end
+
+      -- Update contributor (+ pending tallies)
+      local pname = Net.get_player_name(pid)
+      c.points = (c.points or 0) + award
       c.wins   = (c.wins   or 0) + 1
-      c.name   = pname or c.name                        -- NEW
-      s.contributions[secret] = c
+      c.name   = pname or c.name
+      c.chain2 = next_chain
+      c._last_pid = pid
 
-      if s.wave == 1 then
-        c.w1 = (c.w1 or 0) + pts                        -- NEW
-        s.contributions[secret] = c                     -- (re-stash after mutating c)
+      if wave_at_start == 1 then
+        -- Detect first-ever points on Wave 1 (brand new raid start)
+        local first_points = ((tonumber(s.wave1_points or 0) or 0) <= 0) and (award > 0)
 
-        s.wave1_points = (s.wave1_points or 0) + pts
+        c.w1 = (c.w1 or 0) + award
+        c._pend_w1_pts = (c._pend_w1_pts or 0) + award
+        s.contributions[secret] = c
+
+        s.wave1_points = (s.wave1_points or 0) + award
         local was = s.wave
         _maybe_advance_wave(s)
         ezmemory.save_area_memory(mem_area)
+
+        -- Announce brand-new raid started
+        if first_points then
+          local msg = string.format(
+            "RAID STARTED - Wave 1 %d/%d",
+            tonumber(s.wave1_points or 0) or 0,
+            tonumber(s.wave2_points_required or 0) or 0
+          )
+          _announce_all(msg, { loops = 2 })
+        end
+
         if was == 1 and s.wave == 2 then
+          -- Wave 1 cleared → pay pendings
+          if TeamsOK and Teams then
+            for secret2, cc in pairs(s.contributions or {}) do
+              local pend = tonumber(cc._pend_w1_pts or 0) or 0
+              if pend > 0 then
+                if Teams.on_raid_contribution_secret then
+                  pcall(Teams.on_raid_contribution_secret, secret2, raid_id, "w1", pend, cc._last_pid)
+                elseif cc._last_pid and Teams.on_raid_contribution then
+                  pcall(Teams.on_raid_contribution, cc._last_pid, raid_id, "w1", pend)
+                end
+              end
+              cc._pend_w1_pts = 0
+            end
+          end
           if Config.on_wave1_cleared then pcall(Config.on_wave1_cleared, pid, raid_id, s) end
-          await(Async.message_player(pid, ("Wave 1 cleared! Progress: %d/%d"):format(s.wave1_points, s.wave2_points_required)))
+
+          -- ANNOUNCE Wave 1 cleared (Team GP summary + contributions)
+          local gp = _try_team_gp_summary(raid_id, "w1")
+          local contribs = _contrib_list(s, "w1")
+          local msg
+          if gp and gp ~= "" then
+            msg = string.format("WAVE 1 CLEARED - %s - Players: %s", gp, (contribs ~= "" and contribs or "(no data)"))
+          else
+            msg = string.format("WAVE 1 CLEARED - Players: %s", (contribs ~= "" and contribs or "(no data)"))
+          end
+          _announce_all(msg, { loops = 2 })
+
+          await(Async.message_player(pid,
+            ("+%d pt%s - Wave 1 cleared! %d/%d%s")
+            :format(award, applied_tag, s.wave1_points, s.wave2_points_required, next_tag)))
         else
-          await(Async.message_player(pid, ("+%d pt • Wave 1: %d/%d"):format(pts, s.wave1_points, s.wave2_points_required)))
+          await(Async.message_player(pid,
+            ("+%d pt%s - Wave 1: %d/%d%s")
+            :format(award, applied_tag, s.wave1_points, s.wave2_points_required, next_tag)))
         end
 
       else -- wave 2
-        c.w2 = (c.w2 or 0) + pts                        -- NEW
+        c.w2 = (c.w2 or 0) + award
+        c._pend_w2_pts = (c._pend_w2_pts or 0) + award
         s.contributions[secret] = c
 
-        s.wave2_points = (s.wave2_points or 0) + pts
+        s.wave2_points = (s.wave2_points or 0) + award
         local was = s.wave
         _maybe_advance_wave(s)
         ezmemory.save_area_memory(mem_area)
+
         if was == 2 and s.wave == 3 then
+          -- Wave 2 cleared → pay pendings
+          if TeamsOK and Teams then
+            for secret2, cc in pairs(s.contributions or {}) do
+              local pend = tonumber(cc._pend_w2_pts or 0) or 0
+              if pend > 0 then
+                if Teams.on_raid_contribution_secret then
+                  pcall(Teams.on_raid_contribution_secret, secret2, raid_id, "w2", pend, cc._last_pid)
+                elseif cc._last_pid and Teams.on_raid_contribution then
+                  pcall(Teams.on_raid_contribution, cc._last_pid, raid_id, "w2", pend)
+                end
+              end
+              cc._pend_w2_pts = 0
+            end
+          end
           if Config.on_wave2_cleared then pcall(Config.on_wave2_cleared, pid, raid_id, s) end
-          await(Async.message_player(pid, ("Wave 2 cleared! Progress: %d/%d"):format(s.wave2_points, s.wave3_points_required)))
+
+          -- ANNOUNCE Wave 2 cleared (Team GP summary + contributions)
+          local gp = _try_team_gp_summary(raid_id, "w2")
+          local contribs = _contrib_list(s, "w2")
+          local msg
+          if gp and gp ~= "" then
+            msg = string.format("WAVE 2 CLEARED - %s - Players: %s", gp, (contribs ~= "" and contribs or "(no data)"))
+          else
+            msg = string.format("WAVE 2 CLEARED - Players: %s", (contribs ~= "" and contribs or "(no data)"))
+          end
+          _announce_all(msg, { loops = 2 })
+
+          await(Async.message_player(pid,
+            ("+%d pt%s - Wave 2 cleared! %d/%d%s")
+            :format(award, applied_tag, s.wave2_points, s.wave3_points_required, next_tag)))
         else
-          await(Async.message_player(pid, ("+%d pt • Wave 2: %d/%d"):format(pts, s.wave2_points, s.wave3_points_required)))
+          await(Async.message_player(pid,
+            ("+%d pt%s - Wave 2: %d/%d%s")
+            :format(award, applied_tag, s.wave2_points, s.wave3_points_required, next_tag)))
         end
       end
       return nil
@@ -539,36 +910,106 @@ end
 
       if dmg > 0 then
         local secret = _safe_secret(pid)
-        local pname  = Net.get_player_name(pid)         -- NEW
+        local pname  = Net.get_player_name(pid)
         local c = s.contributions[secret] or { points=0, wins=0, boss_dmg=0 }
-        c.boss_dmg = (c.boss_dmg or 0) + dmg            -- NEW
-        c.name     = pname or c.name                    -- NEW
+        c.boss_dmg    = (c.boss_dmg or 0) + dmg
+        c._pend_bdmg  = (c._pend_bdmg or 0) + dmg
+        c.name        = pname or c.name
+        c._last_pid   = pid
         s.contributions[secret] = c
         s.boss_pool_hp = math.max(0, (s.boss_pool_hp or 0) - dmg)
       end
 
       local msg = ("Boss HP: %d/%d"):format(s.boss_pool_hp or 0, s.boss_pool_max or 0)
       if s.boss_pool_hp <= 0 then
-        s.defeated = true
-        s.defeated_at = _now()
+        -- Boss defeated → pay all contributors (offline-safe)
+        if TeamsOK and Teams then
+          for secret2, cc in pairs(s.contributions or {}) do
+            local pend = tonumber(cc._pend_bdmg or 0) or 0
+            if pend > 0 then
+              if Teams.on_raid_contribution_secret then
+                pcall(Teams.on_raid_contribution_secret, secret2, raid_id, "boss", pend, cc._last_pid)
+              elseif cc._last_pid and Teams.on_raid_contribution then
+                pcall(Teams.on_raid_contribution, cc._last_pid, raid_id, "boss", pend)
+              end
+            end
+            cc._pend_bdmg = 0
+          end
+        end
+
+        s.defeated   = true
+        s.defeated_at= _now()
+        if s.style == "Repeat" then
+          local cd = tonumber(s.repeat_cooldown_secs or 1800); if not cd or cd <= 0 then cd = 1800 end
+          s.cooldown_until = _now() + cd
+        end
         ezmemory.save_area_memory(mem_area)
         if Config.on_boss_defeated then pcall(Config.on_boss_defeated, pid, raid_id, s) end
+
+        -- ANNOUNCE top boss damage dealers
+        local contribs = _contrib_list(s, "boss_dmg", 6)
+        local end_msg = "RAID CLEARED - Top Damage: " .. (contribs ~= "" and contribs or "(no data)")
+        _announce_all(end_msg, { loops = 2 })
+
         await(Async.message_player(pid, "Boss defeated!"))
-        _try_reset_if_repeat(s)
         ezmemory.save_area_memory(mem_area)
       else
         ezmemory.save_area_memory(mem_area)
-        await(Async.message_player(pid, (dmg > 0) and (("-"..dmg.." • "..msg)) or msg))
+        await(Async.message_player(pid, (dmg > 0) and (("-"..dmg.." - "..msg)) or msg))
       end
       return nil
     end
   end)
 end
 
+
+
 -- Register dialogue type "raid"
 eznpcs.add_event({
   name   = "raid",
   action = _raid_action,
 })
+
+if not _G.__RAIDS_LOGIN_ANNOUNCE then
+  _G.__RAIDS_LOGIN_ANNOUNCE = true
+  Net:on("player_join", function(ev)
+    local pid = ev.player_id
+
+    -- Where is raid state stored? Prefer configured area; else use player’s area.
+    -- If you already have RAID_MEM_AREA defined earlier, this will use it.
+    local area_for_state = RAID_MEM_AREA or Net.get_player_area(pid)
+    print(("[RAIDS] login check pid=%s area_for_state=%s"):format(pid, tostring(area_for_state)))
+
+    -- Optional test marquee (for visual tuning)
+    if TEST_LOGIN_MARQUEE then
+      local ok, err = pcall(_marquee, pid, TEST_LOGIN_TEXT, TEST_LOGIN_OPTS)
+      if not ok then
+        print(("[RAIDS] login test marquee error pid=%s: %s"):format(pid, tostring(err)))
+      end
+    end
+
+    -- Look for the actually active raid (do NOT create new state)
+    local rid, s = _find_active_or_progress(area_for_state)
+    if not s or not _is_active(s) then
+      print("[RAIDS] login check: no active raid in state (rid="..tostring(rid)..")")
+      return
+    end
+
+    -- Build status line for the current wave
+    local msg
+    if s.wave == 1 then
+      msg = string.format("RAID IN PROGRESS - W1 %d/%d", s.wave1_points or 0, s.wave2_points_required or 0)
+    elseif s.wave == 2 then
+      msg = string.format("RAID IN PROGRESS - W2 %d/%d", s.wave2_points or 0, s.wave3_points_required or 0)
+    else
+      msg = string.format("RAID IN PROGRESS - Boss %d/%d", s.boss_pool_hp or 0, s.boss_pool_max or 0)
+    end
+
+    local ok, err = pcall(_marquee, pid, msg, { loops = 2 })
+    if not ok then
+      print(("[RAIDS] login marquee error pid=%s: %s"):format(pid, tostring(err)))
+    end
+  end)
+end
 
 return Raids

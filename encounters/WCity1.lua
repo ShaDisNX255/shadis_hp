@@ -4,6 +4,72 @@ local sfx = {
     item_get='/server/assets/ezlibs-assets/sfx/item_get.ogg'
 }
 
+-- === Battle Debug Helpers (paste once near the top) ===
+local BATTLE_DEBUG = true          -- flip to false to disable
+local BATTLE_DEBUG_TO_PLAYER = false -- also show a short line to the player
+
+local function _dbg_flatten(value, base, out, seen)
+  out  = out  or {}
+  seen = seen or {}
+  local tv = type(value)
+  if tv ~= "table" then
+    out[#out+1] = string.format("%s = %s (%s)", base, tostring(value), tv)
+    return out
+  end
+  if seen[value] then
+    out[#out+1] = string.format("%s = <cycle> (table)", base)
+    return out
+  end
+  seen[value] = true
+
+  -- array part first
+  local n = #value
+  for i = 1, n do
+    _dbg_flatten(value[i], string.format("%s[%d]", base, i), out, seen)
+  end
+  -- then map part, sorted
+  local keys = {}
+  for k,_ in pairs(value) do
+    if not (type(k)=="number" and k>=1 and k<=n and k==math.floor(k)) then
+      keys[#keys+1] = k
+    end
+  end
+  table.sort(keys, function(a,b) return tostring(a) < tostring(b) end)
+  for _,k in ipairs(keys) do
+    local child = (type(k)=="string" and k:match("^[%a_][%w_]*$")) and (base.."."..k) or (base.."["..tostring(k).."]")
+    _dbg_flatten(value[k], child, out, seen)
+  end
+  return out
+end
+
+local function _debug_encounter_result(player_id, encounter_info, stats)
+  local pname = Net.get_player_name(player_id) or player_id
+  local ename = encounter_info and (encounter_info.name or encounter_info.id) or "<unknown encounter>"
+  print(string.rep("-", 64))
+  print(string.format("[WCity DBG] Player=%s Encounter=%s", tostring(pname), tostring(ename)))
+  print("[WCity DBG] -------- Encounter stats (flattened) --------")
+  local lines = _dbg_flatten(stats or {}, "stats")
+  for _,line in ipairs(lines) do
+    print("[WCity DBG] "..line)
+  end
+  local ran = (stats and (stats.ran or stats.fled or stats.escape)) and true or false
+  local hp  = tonumber(stats and (stats.health or stats.player_hp or stats.hp) or 0) or 0
+  local turns = tonumber(stats and stats.turns or 0) or 0
+  local time  = tonumber(stats and stats.time  or 0) or 0
+  local score = tonumber(stats and stats.score or 0) or 0
+  print(string.format("[WCity DBG] summary ran=%s hp=%s turns=%s time=%s score=%s",
+    tostring(ran), tostring(hp), tostring(turns), tostring(time), tostring(score)))
+  print(string.rep("-", 64))
+
+  if BATTLE_DEBUG_TO_PLAYER then
+    Net.message_player(player_id, string.format(
+      "[DBG] ran=%s hp=%d turns=%d time=%.2f score=%d",
+      tostring(ran), hp, turns, time, score
+    ))
+  end
+end
+-- === /Battle Debug Helpers ===
+
 local JobBBS = (function()
   local ok, M = pcall(require, 'scripts/jobbbs/JobBBS')
   if ok and M then return M end
@@ -20,21 +86,41 @@ local persist_health_and_emotion = function (player_id,encounter_info,stats)
     ezmemory.set_player_health(player_id,stats.health)
 end
 
-local give_result_awards = function (player_id,encounter_info,stats)
-    if JobBBS and JobBBS.on_encounter_result then
-      pcall(JobBBS.on_encounter_result, player_id, stats)
-    end
-    -- stats = { health: number, score: number, time: number, ran: bool, emotion: number, turns: number, npcs: { id: String, health: number }[] }
-    persist_health_and_emotion(player_id,encounter_info,stats)
-    if stats.ran then
-        return -- no rewards for wimps
-    end
-    local reward_monies = (stats.score*50)
-    ezmemory.spend_player_money(player_id,-reward_monies) -- spending money backwards gives money
-    if reward_monies > 0 then
-        Net.message_player(player_id,"Got $"..reward_monies.."!")
-        Net.play_sound_for_player(player_id,sfx.item_get)
-    end
+local give_result_awards = function (player_id, encounter_info, stats)
+  -- Let JobBBS react to the result like before
+  if JobBBS and JobBBS.on_encounter_result then
+    pcall(JobBBS.on_encounter_result, player_id, stats)
+  end
+
+  -- If the player ran, persist health/emotion only (no rewards), same policy as before
+  if stats.ran then
+    persist_health_and_emotion(player_id, encounter_info, stats)
+    return
+  end
+
+  -- 1) Money = busting level * 100
+  local monies = (stats.score or 0) * 100
+
+  -- 2) If post-battle HP < 20, give +50 HP
+  local hp_bonus = ((stats.health or 0) < 21) and 50 or 0
+
+  -- Build the beta-10 reward list
+  local rewards = {}
+  if monies > 0 then
+    table.insert(rewards, { type = 0, value = monies })  -- 0=Money
+  end
+  if hp_bonus > 0 then
+    table.insert(rewards, { type = 2, value = hp_bonus }) -- 2=Health+
+  end
+
+  if #rewards > 0 then
+    Net.send_player_battle_rewards(player_id, rewards)
+  end
+
+  -- Keep ezmemory in sync with the final HP the player ends up with after the HP+ reward
+  -- (so the next encounter/persisted state matches what the client shows)
+  local final_stats = { health = (stats.health or 0) + hp_bonus, emotion = stats.emotion }
+  persist_health_and_emotion(player_id, encounter_info, final_stats)
 end
 
 local Encounter1 = {

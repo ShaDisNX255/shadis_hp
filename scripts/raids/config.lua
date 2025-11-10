@@ -18,6 +18,8 @@ local DEFAULTS = {
     -- substring to identify the boss in stats.enemies[k].id
     -- tip: use a short, plain substring to dodge weird characters, e.g. "GrgBeast" or "GregarBeast"
     boss_id_match = "GrgBeast",
+    repeat_cooldown_secs = 1800,  -- 30 minutes default for Repeat raids
+    raid_memory_area = "WCity1",
   },
 }
 

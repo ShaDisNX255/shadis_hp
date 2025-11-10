@@ -20,37 +20,78 @@ local persist_health_and_emotion = function (player_id,encounter_info,stats)
     ezmemory.set_player_health(player_id,stats.health)
 end
 
-local give_result_awards = function (player_id,encounter_info,stats)
-    if JobBBS and JobBBS.on_encounter_result then
-      pcall(JobBBS.on_encounter_result, player_id, stats)
-    end
-    -- stats = { health: number, score: number, time: number, ran: bool, emotion: number, turns: number, npcs: { id: String, health: number }[] }
-    persist_health_and_emotion(player_id,encounter_info,stats)
-    if stats.ran then
-        return -- no rewards for wimps
-    end
-    local reward_monies = (stats.score*100)
-    ezmemory.spend_player_money(player_id,-reward_monies) -- spending money backwards gives money
-    if reward_monies > 0 then
-        Net.message_player(player_id,"Got $"..reward_monies.."!")
-        Net.play_sound_for_player(player_id,sfx.item_get)
-    end
+local give_result_awards = function (player_id, encounter_info, stats)
+  -- Let JobBBS react to the result like before
+  if JobBBS and JobBBS.on_encounter_result then
+    pcall(JobBBS.on_encounter_result, player_id, stats)
+  end
+
+  -- If the player ran, persist health/emotion only (no rewards), same policy as before
+  if stats.ran then
+    persist_health_and_emotion(player_id, encounter_info, stats)
+    return
+  end
+
+  -- 1) Money = busting level * 100
+  local monies = (stats.score or 0) * 100
+
+  -- 2) If post-battle HP < 20, give +50 HP
+  local hp_bonus = ((stats.health or 0) < 20) and 50 or 0
+
+  -- Build the beta-10 reward list
+  local rewards = {}
+  if monies > 0 then
+    table.insert(rewards, { type = 0, value = monies })  -- 0=Money
+  end
+  if hp_bonus > 0 then
+    table.insert(rewards, { type = 2, value = hp_bonus }) -- 2=Health+
+  end
+
+  if #rewards > 0 then
+    Net.send_player_battle_rewards(player_id, rewards)
+  end
+
+  -- Keep ezmemory in sync with the final HP the player ends up with after the HP+ reward
+  -- (so the next encounter/persisted state matches what the client shows)
+  local final_stats = { health = (stats.health or 0) + hp_bonus, emotion = stats.emotion }
+  persist_health_and_emotion(player_id, encounter_info, final_stats)
 end
 
-local give_result_awards_rare = function (player_id,encounter_info,stats)
-    if JobBBS and JobBBS.on_encounter_result then
-      pcall(JobBBS.on_encounter_result, player_id, stats)
-    end
-    -- stats = { health: number, score: number, time: number, ran: bool, emotion: number, turns: number, npcs: { id: String, health: number }[] }
-    if stats.ran then
-        return -- no rewards for wimps
-    end
-    local reward_monies = (stats.score*2000)
-    ezmemory.spend_player_money(player_id,-reward_monies) -- spending money backwards gives money
-    if reward_monies > 0 then
-        Net.message_player(player_id,"Got $"..reward_monies.."!")
-        Net.play_sound_for_player(player_id,sfx.item_get)
-    end
+local give_result_awards_rare = function (player_id, encounter_info, stats)
+  -- Let JobBBS react to the result like before
+  if JobBBS and JobBBS.on_encounter_result then
+    pcall(JobBBS.on_encounter_result, player_id, stats)
+  end
+
+  -- If the player ran, persist health/emotion only (no rewards), same policy as before
+  if stats.ran then
+    persist_health_and_emotion(player_id, encounter_info, stats)
+    return
+  end
+
+  -- 1) Money = busting level * 300
+  local monies = (stats.score or 0) * 300
+
+  -- 2) If post-battle HP < 20, give +50 HP
+  local hp_bonus = ((stats.health or 0) < 20) and 50 or 0
+
+  -- Build the beta-10 reward list
+  local rewards = {}
+  if monies > 0 then
+    table.insert(rewards, { type = 0, value = monies })  -- 0=Money
+  end
+  if hp_bonus > 0 then
+    table.insert(rewards, { type = 2, value = hp_bonus }) -- 2=Health+
+  end
+
+  if #rewards > 0 then
+    Net.send_player_battle_rewards(player_id, rewards)
+  end
+
+  -- Keep ezmemory in sync with the final HP the player ends up with after the HP+ reward
+  -- (so the next encounter/persisted state matches what the client shows)
+  local final_stats = { health = (stats.health or 0) + hp_bonus, emotion = stats.emotion }
+  persist_health_and_emotion(player_id, encounter_info, final_stats)
 end
 
 local Encounter1 = {
