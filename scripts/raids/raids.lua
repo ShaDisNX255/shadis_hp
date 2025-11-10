@@ -40,6 +40,11 @@ local TEST_LOGIN_TEXT    = "Login test marquee - tweak in raids.lua"
 local TEST_LOGIN_OPTS    = { loops = 2 }  -- you can add width/height/scale/speed/etc here
 -- ===== /Login test marquee =====
 
+-- Force the login marquee to read a specific Raid ID / Area
+-- Set to nil to auto-detect like before.
+local LOGIN_ANNOUNCE_RAID_ID   = "RaidTest2"   -- <== put your exact Raid ID here (or nil)
+local LOGIN_ANNOUNCE_MEM_AREA  = nil           -- optional: e.g. "WCity1"; nil = use RAID_MEM_AREA or player's area
+
 -- Peek current raid store for an area without creating anything
 local function _peek_store(area_id)
   local mem = ezmemory.get_area_memory(area_id)
@@ -975,40 +980,51 @@ if not _G.__RAIDS_LOGIN_ANNOUNCE then
   Net:on("player_join", function(ev)
     local pid = ev.player_id
 
-    -- Where is raid state stored? Prefer configured area; else use player’s area.
-    -- If you already have RAID_MEM_AREA defined earlier, this will use it.
-    local area_for_state = RAID_MEM_AREA or Net.get_player_area(pid)
+    -- Decide which area to read state from
+    local area_for_state = LOGIN_ANNOUNCE_MEM_AREA or RAID_MEM_AREA or Net.get_player_area(pid)
     print(("[RAIDS] login check pid=%s area_for_state=%s"):format(pid, tostring(area_for_state)))
 
-    -- Optional test marquee (for visual tuning)
+    -- If you enabled the local test marquee, show it here (optional)
     if TEST_LOGIN_MARQUEE then
       local ok, err = pcall(_marquee, pid, TEST_LOGIN_TEXT, TEST_LOGIN_OPTS)
-      if not ok then
-        print(("[RAIDS] login test marquee error pid=%s: %s"):format(pid, tostring(err)))
+      if not ok then print(("[RAIDS] login test marquee error pid=%s: %s"):format(pid, tostring(err))) end
+    end
+
+    -- Choose which raid to show
+    local rid, s
+    if LOGIN_ANNOUNCE_RAID_ID and LOGIN_ANNOUNCE_RAID_ID ~= "" then
+      rid = tostring(LOGIN_ANNOUNCE_RAID_ID)
+      s   = _peek_store(area_for_state)[rid]  -- <-- DO NOT create new state
+      if not s then
+        print(("[RAIDS] login check: pinned rid=%s not found in area=%s"):format(rid, tostring(area_for_state)))
+        return
+      end
+      if not _is_active(s) then
+        print(("[RAIDS] login check: pinned rid=%s exists but not active (w1=%s w2=%s wave=%s)")
+              :format(rid, tostring(s.wave1_points), tostring(s.wave2_points), tostring(s.wave)))
+        return
+      end
+    else
+      -- Fallback to auto-detect (find active raid or most-progressed)
+      rid, s = _find_active_or_progress(area_for_state)
+      if not s or not _is_active(s) then
+        print("[RAIDS] login check: no active raid in state (rid="..tostring(rid)..")")
+        return
       end
     end
 
-    -- Look for the actually active raid (do NOT create new state)
-    local rid, s = _find_active_or_progress(area_for_state)
-    if not s or not _is_active(s) then
-      print("[RAIDS] login check: no active raid in state (rid="..tostring(rid)..")")
-      return
-    end
-
-    -- Build status line for the current wave
+    -- Build the status string from the selected state
     local msg
     if s.wave == 1 then
-      msg = string.format("RAID IN PROGRESS - W1 %d/%d", s.wave1_points or 0, s.wave2_points_required or 0)
+      msg = string.format("RAID IN PROGRESS - %s - W1 %d/%d", rid, s.wave1_points or 0, s.wave2_points_required or 0)
     elseif s.wave == 2 then
-      msg = string.format("RAID IN PROGRESS - W2 %d/%d", s.wave2_points or 0, s.wave3_points_required or 0)
+      msg = string.format("RAID IN PROGRESS - %s - W2 %d/%d", rid, s.wave2_points or 0, s.wave3_points_required or 0)
     else
-      msg = string.format("RAID IN PROGRESS - Boss %d/%d", s.boss_pool_hp or 0, s.boss_pool_max or 0)
+      msg = string.format("RAID IN PROGRESS - %s - Boss %d/%d", rid, s.boss_pool_hp or 0, s.boss_pool_max or 0)
     end
 
     local ok, err = pcall(_marquee, pid, msg, { loops = 2 })
-    if not ok then
-      print(("[RAIDS] login marquee error pid=%s: %s"):format(pid, tostring(err)))
-    end
+    if not ok then print(("[RAIDS] login marquee error pid=%s: %s"):format(pid, tostring(err))) end
   end)
 end
 
