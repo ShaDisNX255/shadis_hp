@@ -999,36 +999,11 @@ local function count_placed_in_area_by_player(area_id, once_key, object_id, pid)
   return c
 end
 
--- NEW: count this player's placements of a given object across ALL areas/HPs
-local function count_placed_globally_by_player(object_id, pid)
-  local secret = helpers.get_safe_player_secret(pid)
-  local total = 0
-  for _, aid in ipairs(Net.list_areas() or {}) do
-    for _, oid in ipairs(Net.list_objects(aid) or {}) do
-      local o  = Net.get_object_by_id(aid, oid)
-      local cp = o and o.custom_properties
-      if cp
-        and (cp.placed_by_oncehub == "true")
-        and (cp.oncehub_id or "") == (object_id or "")
-      then
-        -- Count both visitor- and renter-placed objects by this player
-        if (cp.visitor_secret and cp.visitor_secret == secret)
-           or (cp.owner_secret and cp.owner_secret == secret)
-        then
-          total = total + 1
-        end
-      end
-    end
-  end
-  return total
-end
-
--- REPLACE your old per-area variant with this global-aware version
 local function decor_left_to_place(pid, area_id, once_key, object_id)
-  local owned      = decor_count_owned(pid, object_id)               -- total copies owned
-  local placed_all = count_placed_globally_by_player(object_id, pid) -- total placed anywhere
-  local left       = math.max(0, owned - placed_all)
-  return left, owned, placed_all
+  local owned  = decor_count_owned(pid, object_id)                         -- per-player inventory
+  local placed = count_placed_in_area_by_player(area_id, once_key, object_id, pid) -- per-player placements
+  local left   = math.max(0, owned - placed)
+  return left, owned, placed
 end
 
 -- ====================== Placement persistence (area memory) ======================
