@@ -12,3 +12,9 @@ logs.txt
 assets/displayer/*
 assets/net-games/*
 scripts/displayer/*
+run.sh
+players.txt
+server.pid
+watch.sh
+watcher.log
+watcher.pid

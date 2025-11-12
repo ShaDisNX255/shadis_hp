@@ -3508,6 +3508,12 @@ Net:on("player_join", function(event)
   last_viewed_card_by_player[pid] = nil
   summoned_bot_by_player[pid] = nil
   open_list_after_close[pid] = false
+  -- Emit a simple, uncolored, grep-friendly join line for the watcher
+  local function safe(s) return (s and tostring(s):gsub("%s+"," ")) or "?" end
+  local name = safe(Net.get_player_name(pid))
+  local area = safe(Net.get_player_area(pid))
+  io.write(("PLAYER_JOIN: %s | pid=%s | area=%s\n"):format(name, pid, area))
+  io.stdout:flush()  -- ensure it hits logs.txt immediately even if stdout is block-buffered
 end)
 
 Net:on("player_disconnect", function(event)

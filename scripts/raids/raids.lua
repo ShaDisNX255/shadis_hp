@@ -904,12 +904,46 @@ end
 
     else
       -- Boss wave
-      local dmg = _boss_damage_from_enemies_list(stats, s.boss_encounter_hp, s.boss_id_match)
-      if not dmg then
-        if tonumber(stats and stats.health or 0) > 0 and s.boss_encounter_hp and s.boss_encounter_hp > 0 then
-          dmg = s.boss_encounter_hp
+      local ran = (stats and (stats.ran or stats.fled or stats.escape)) or false
+      local enemies = stats and stats.enemies
+      local has_snapshot = (type(enemies) == "table" and next(enemies) ~= nil)
+
+      local dmg = 0
+
+      if has_snapshot then
+        -- Try to compute from enemy list (partial damage if boss present)
+        dmg = _boss_damage_from_enemies_list(stats, s.boss_encounter_hp, s.boss_id_match) or 0
+
+        -- If player ran legitimately and we don't see the boss in the snapshot,
+        -- assume boss was killed and player escaped due to soft-lock adds → full encounter damage.
+        if ran then
+          local boss_present = false
+          local match = tostring(s.boss_id_match or "")
+          for _, e in pairs(enemies) do
+            local id = tostring(e and e.id or "")
+            if match ~= "" and id:find(match, 1, true) then
+              boss_present = true
+              break
+            end
+          end
+          if not boss_present then
+            dmg = tonumber(s.boss_encounter_hp or 0) or 0
+          end
+        end
+
+      else
+        -- No enemy snapshot at all.
+        if ran then
+          -- Dev ESC run: treat as no damage.
+          dmg = 0
         else
-          dmg = _boss_damage_from_stats(stats, s.boss_win_damage)
+          -- Non-run fallbacks (as before).
+          local php = tonumber(stats and (stats.health or stats.player_hp or stats.hp) or 0) or 0
+          if php > 0 and (s.boss_encounter_hp or 0) > 0 then
+            dmg = s.boss_encounter_hp
+          else
+            dmg = _boss_damage_from_stats(stats, s.boss_win_damage)
+          end
         end
       end
 
@@ -927,7 +961,7 @@ end
 
       local msg = ("Boss HP: %d/%d"):format(s.boss_pool_hp or 0, s.boss_pool_max or 0)
       if s.boss_pool_hp <= 0 then
-        -- Boss defeated → pay all contributors (offline-safe)
+        -- Boss defeated → pay all contributors (offline-safe), then start cooldown if Repeat
         if TeamsOK and Teams then
           for secret2, cc in pairs(s.contributions or {}) do
             local pend = tonumber(cc._pend_bdmg or 0) or 0
@@ -950,12 +984,6 @@ end
         end
         ezmemory.save_area_memory(mem_area)
         if Config.on_boss_defeated then pcall(Config.on_boss_defeated, pid, raid_id, s) end
-
-        -- ANNOUNCE top boss damage dealers
-        local contribs = _contrib_list(s, "boss_dmg", 6)
-        local end_msg = "RAID CLEARED - Top Damage: " .. (contribs ~= "" and contribs or "(no data)")
-        _announce_all(end_msg, { loops = 2 })
-
         await(Async.message_player(pid, "Boss defeated!"))
         ezmemory.save_area_memory(mem_area)
       else
