@@ -843,6 +843,7 @@ end
             msg = string.format("WAVE 1 CLEARED - Players: %s", (contribs ~= "" and contribs or "(no data)"))
           end
           _announce_all(msg, { loops = 2 })
+		  print("[RAID DBG] Wave1 cleared")
 
           await(Async.message_player(pid,
             ("+%d pt%s - Wave 1 cleared! %d/%d%s")
@@ -890,6 +891,7 @@ end
             msg = string.format("WAVE 2 CLEARED - Players: %s", (contribs ~= "" and contribs or "(no data)"))
           end
           _announce_all(msg, { loops = 2 })
+		  print("[RAID DBG] Wave2 cleared")
 
           await(Async.message_player(pid,
             ("+%d pt%s - Wave 2 cleared! %d/%d%s")
@@ -984,6 +986,11 @@ end
         end
         ezmemory.save_area_memory(mem_area)
         if Config.on_boss_defeated then pcall(Config.on_boss_defeated, pid, raid_id, s) end
+        -- ANNOUNCE top boss damage dealers
+        local contribs = _contrib_list(s, "boss_dmg", 6)
+        local end_msg = "RAID CLEARED - Top Damage: " .. (contribs ~= "" and contribs or "(no data)")
+        _announce_all(end_msg, { loops = 2 })
+		print("[RAID DBG] Boss defeated")
         await(Async.message_player(pid, "Boss defeated!"))
         ezmemory.save_area_memory(mem_area)
       else

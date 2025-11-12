@@ -543,6 +543,17 @@ local function _ensure_daily_bucket()
   return d, t_mem
 end
 
+-- Last-known display name for a secret (prefers names cached this month)
+local function _last_known_name(secret, t_mem)
+  if t_mem and t_mem.names and t_mem.names[secret] and t_mem.names[secret] ~= "" then
+    return t_mem.names[secret]
+  end
+  local pm = ezmemory.get_player_memory(secret) or {}
+  local n = (pm.teams and pm.teams.last_name) or pm.last_name
+  if n and n ~= "" then return n end
+  return ("secret:"..tostring(secret):sub(1,6))
+end
+
 -- Award GP by secret (works if player is offline). pid_opt only used for an optional toast.
 local function _add_gp_by_secret(secret, amount, why, pid_opt)
   amount = math.floor(tonumber(amount) or 0); if amount <= 0 then return end
@@ -589,43 +600,68 @@ function Teams.on_raid_contribution_secret(secret, raid_id, kind, amount, pid_op
            or (kind == "boss" and RAID_GP.boss_damage_per_gp)
            or 0
   if per <= 0 then return end
+
   local base = math.floor(amount / per)
   if base <= 0 then return end
 
   -- resolve team
   local pm = ezmemory.get_player_memory(secret) or {}
-  pm.teams = pm.teams or {}; pm.teams.current = pm.teams.current or { team=nil, month=_month_key(), gp=0, last_switch_month=nil }
+  pm.teams = pm.teams or {}
+  pm.teams.current = pm.teams.current or { team=nil, month=_month_key(), gp=0, last_switch_month=nil }
   local cur = pm.teams.current
   if not cur.team then return end
   local team = cur.team
 
   -- caps + today's multiplier
-  local d = _ensure_daily_bucket()
+  local d, t_mem = _ensure_daily_bucket()
   local mul  = (d.mul_today and d.mul_today[team]) or 1.0
   local gp   = math.floor(base * mul)
   if gp <= 0 then return end
 
+  -- active set and team cap math
   local actives = d.active_by_team[team] or {}; actives[secret] = true; d.active_by_team[team] = actives
   local active_n = 0; for _ in pairs(actives) do active_n = active_n + 1 end
 
   local team_cap = math.max(RAID_GP.team_daily_cap_min or 0,
-                    math.min(RAID_GP.team_daily_cap_max or 9999,
-                      math.max(active_n,1) * (RAID_GP.team_cap_per_active or 0)))
-  local team_used = tonumber(d.team_used[team] or 0)
-  local team_room = math.max(0, team_cap - team_used)
+                      math.min(RAID_GP.team_daily_cap_max or 9999,
+                        math.max(active_n,1) * (RAID_GP.team_cap_per_active or 0)))
+  local team_used_before = tonumber(d.team_used[team] or 0)
+  local team_room = math.max(0, team_cap - team_used_before)
 
-  local p_used = tonumber(d.player_used[secret] or 0)
+  local p_used_before = tonumber(d.player_used[secret] or 0)
   local p_cap  = RAID_GP.player_daily_cap or 10
-  local p_room = math.max(0, p_cap - p_used)
+  local p_room = math.max(0, p_cap - p_used_before)
 
   local give = math.max(0, math.min(gp, p_room, team_room))
-  if give <= 0 then return end
 
-  d.player_used[secret] = p_used + give
-  d.team_used[team]     = team_used + give
+  -- names and month totals for "before/after"
+  local name = _last_known_name(secret, t_mem)
+  local team_name = _team_name(team)
+  local team_month_before = tonumber((t_mem.month[team] and t_mem.month[team].total) or 0)
+
+  if give <= 0 then
+    local reason = "unknown"
+    if gp <= 0 then reason = "no GP from contribution"
+    elseif p_room <= 0 and team_room <= 0 then reason = "player & team daily caps"
+    elseif p_room <= 0 then reason = "player daily cap"
+    elseif team_room <= 0 then reason = ("team daily cap (%d/%d)"):format(team_used_before, team_cap)
+    end
+    print(("[RAID DBG] %s gained 0 GP %d/%d (%s)"):format(name, p_used_before, p_cap, reason))
+    print(("[RAID DBG] %s: %d -> %d this month"):format(team_name, team_month_before, team_month_before))
+    return
+  end
+
+  -- apply usage, persist the daily bucket
+  d.player_used[secret] = p_used_before + give
+  d.team_used[team]     = team_used_before + give
   _save_area()
 
+  -- award GP (updates monthly totals/roster safely)
   _add_gp_by_secret(secret, give, "raids", pid_opt)
+
+  -- logs
+  print(("[RAID DBG] %s gained %d GP %d/%d"):format(name, give, p_used_before + give, p_cap))
+  print(("[RAID DBG] %s: %d -> %d this month"):format(team_name, team_month_before, team_month_before + give))
 end
 
 -- Convenience wrapper (online toast if present)
