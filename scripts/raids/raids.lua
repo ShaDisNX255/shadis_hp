@@ -7,32 +7,31 @@ local Config       = require('scripts/raids/config')
 local Enc          = require('scripts/raids/encounters')
 
 local TeamsOK, Teams = pcall(require, 'scripts/teams/teams')
--- ===== Force-init Displayer once (boot-safe) =====
-if not _G.__DISPLAYER_READY then
-  -- Try the primary module
-  local ok, D = pcall(require, 'scripts/displayer/displayer')
+-- ===== Displayer bootstrap via Net-Games =====
+local Displayer = _G.Displayer  -- reuse if some other script already set it
+
+if not Displayer then
+  local ok, D = pcall(require, 'scripts/net-games/displayer/displayer')
   if ok and type(D) == 'table' then
-    -- Many builds return an instance that must be initialized
-    if D.init then pcall(D.init, D) end
-    -- Publish to global so every script can find the same instance
-    _G.Displayer = D
+    -- Initialize the Net-Games Displayer once
+    if D.init then
+      local ok_init, err = pcall(D.init, D)
+      if not ok_init then
+        print("[RAIDS] Net-Games Displayer.init failed:", tostring(err))
+      end
+    end
+    Displayer       = D
+    _G.Displayer    = D   -- keep the global name for compatibility
+  else
+    print("[RAIDS] Failed to require scripts/net-games/displayer; raid marquee disabled")
   end
-
-  -- Some builds register subsystems on require; make sure text subsystem is loaded
-  if not (_G.Displayer and _G.Displayer.Text and _G.Displayer.Text.drawMarqueeText) then
-    pcall(require, 'scripts/displayer/text-display')
-  end
-
-  -- Final sanity: if we still only have the table but not the methods, init now
-  if _G.Displayer and _G.Displayer.init
-     and not (_G.Displayer.Text and _G.Displayer.Text.drawMarqueeText) then
-    pcall(_G.Displayer.init, _G.Displayer)
-  end
-
-  _G.__DISPLAYER_READY = (_G.Displayer and _G.Displayer.Text and _G.Displayer.Text.drawMarqueeText) or false
-  print("[RAIDS] Displayer init:", _G.__DISPLAYER_READY and "OK" or "FAILED")
 end
--- ===== /Force-init Displayer =====
+
+_G.__DISPLAYER_READY =
+  (Displayer and Displayer.Text and Displayer.Text.drawMarqueeText) or false
+print("[RAIDS] Displayer (Net-Games) init:",
+      _G.__DISPLAYER_READY and "OK" or "FAILED")
+-- ===== /Displayer bootstrap =====
 
 -- ===== Login test marquee (local toggle) =====
 local TEST_LOGIN_MARQUEE = false   -- set true to show a test marquee on login
@@ -178,14 +177,15 @@ local UI = {
   scale        = 1.2,
   z            = 220,
   speed        = "slow",   -- slow | medium | quick
-  width        = 200,
+  width        = 220,
   height       = 38,
   padding_x    = 6,
   padding_y    = 4,
-  margin_right = -90,          -- distance from the right edge
+  margin_right = -100,          -- distance from the right edge
   y            = 6,          -- top Y of the box
   loops        = 2,          -- exactly two passes, as requested
   font         = "THICK",
+  backdrop_scale = 1.0,
 }
 
 local function _screen_w() return 240 end
@@ -266,6 +266,7 @@ local function _marquee(pid, text, opts)
   local speed       = opts.speed or UI.speed
   local loops       = (opts.loops ~= nil) and opts.loops or UI.loops
   local font        = opts.font or UI.font
+  local backdrop_scale = opts.backdrop_scale or UI.backdrop_scale or 1.0
 
   local line_h   = math.ceil(9 * scale)  -- THICK baseline ~9px
   local x        = _screen_w() - margin_right - width
@@ -282,7 +283,7 @@ local function _marquee(pid, text, opts)
     {
       x=x, y=y, width=width, height=height,
       padding_x=padding_x, padding_y=padding_y,
-      loops=loops,
+      loops=loops, scale=backdrop_scale,
     }
   )
 end

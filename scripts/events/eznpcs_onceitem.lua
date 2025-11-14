@@ -1880,8 +1880,28 @@ local function open_decorate_menu(player_id, dialogue)
         -- Remove your object (no remove-mode)
         local oid = find_my_object()
         if oid then
+          -- Look up the object so we can special-case Card Frame
+          local obj = Net.get_object_by_id(area_id, oid)
+          local cp  = obj and obj.custom_properties or {}
+
+          if (cp.oncehub_id or "") == "card_frame" then
+            -- Refund to the Card Frame owner (the placer)
+            pcall(_refund_card_to_frame_owner, cp)
+
+            -- Despawn bot (prefer stored id, then fallback helper)
+            local direct = cp.cf_bot_id and tostring(cp.cf_bot_id) or nil
+            if direct and direct ~= "" then
+              pcall(Net.remove_bot, direct)
+            end
+            if type(_cf_remove_bot) == "function" then
+              pcall(_cf_remove_bot, area_id, once_key, obj.x, obj.y, obj.z, direct)
+            end
+          end
+
+          -- Remove the invisible anchor and persist placements
           pcall(Net.remove_object, area_id, oid)
           persist_area(area_id, BUCKET_AREA_ID, once_key)
+
           await(Async.message_player(player_id, "Your placed object was removed."))
         else
           await(Async.message_player(player_id, "You haven't placed any object here."))

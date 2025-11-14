@@ -8,6 +8,7 @@ local ezmemory     = require('scripts/ezlibs-scripts/ezmemory')
 local ezencounters = require('scripts/ezlibs-scripts/ezencounters/main')
 local config = require('scripts/fishing-config/main')
 local Constants = config.CONSTANTS
+local NetGames     = require('scripts/net-games/framework')
 
 -- Per-area resolvers (fallback to defaults if not defined)
 local function _C_for(area_id)
@@ -41,6 +42,23 @@ local PLAYER_AREA  = {} -- [pid] = area_id
 
 -- ====================== Config you can edit ======================
 local FISHING      = {
+
+  -- Net-Games HUD fish meter (screen-space)
+  -- Coordinates are in net-games' 240x160 virtual screen:
+  --   X: 0 (left)  →  240 (right)
+  --   Y: 0 (top)   →  160 (bottom)
+  UI_METER = {
+    X = 155,   -- horizontal center by default
+    Y = 30,   -- near bottom of the screen
+    SCALE = 2.0, -- sprite scale (2.0 = default net-games scale)
+  },
+
+  UI_TIMER = {
+    X     = 70,  -- center-ish; tweak as you like
+    Y     = 2,   -- a bit below the fish meter (which is at Y=20)
+    SCALE = 2.0,  -- same scale as fish meter by default
+  },
+  
   -- Hidden layer where your meter prototype objects live
   TEMPLATE_LAYER         = Constants.TEMPLATE_LAYER,
   HOLD_SECONDS           = Constants.HOLD_SECONDS,
@@ -84,36 +102,6 @@ local FISHING      = {
     KEY      = "fish_top10_v4",
     MAX      = 10,
     UNIQUE_PER = "secret",  -- or "name" if you prefer name-based uniqueness
-  },
-
-  -- Your meter catalog (normal 0..10, sweet_spot 0..10) – GIDs kept exactly
-  METERS                 = {
-    normal = {
-      [0]  = 275, -- 0
-      [1]  = 276, -- sweet_spot-1
-      [2]  = 277, -- sweet_spot-2
-      [3]  = 278, -- sweet_spot-3
-      [4]  = 279, -- sweet_spot-4
-      [5]  = 280, -- sweet_spot-5
-      [6]  = 281, -- sweet_spot-6
-      [7]  = 282, -- sweet_spot-7
-      [8]  = 283, -- sweet_spot-8
-      [9]  = 284, -- sweet_spot-9
-      [10] = 285, -- sweet_spot-10
-    },
-    sweet_spot = {
-      [0]  = 0,   -- no sweet_spot-0 asset (intentional)
-      [1]  = 286, -- normal-1
-      [2]  = 288, -- normal-2
-      [3]  = 289, -- normal-3
-      [4]  = 290, -- normal-4
-      [5]  = 291, -- normal-5
-      [6]  = 292, -- normal-6
-      [7]  = 293, -- normal-7
-      [8]  = 294, -- normal-8
-      [9]  = 295, -- normal-9
-      [10] = 287, -- normal-10
-    },
   },
 
   -- Timer meter (0..5 phases), horizontal bar above the player.
@@ -497,60 +485,6 @@ local function _px_to_tiles(area_id, w_px, h_px)
   return wt, ht
 end
 
--- Wrapper that chooses dims: FORCE override (if set) else your current resolver
-local function _resolve_meter_dims(area_id, template_layer_name, base_gid)
-  local forced = FISHING.FORCE_METER_DIMS_PX
-  if forced and forced.w and forced.h then
-    local w, h = _px_to_tiles(area_id, forced.w, forced.h)
-    if FISHING.DEBUG then
-      print(("[fishing] FORCE dims -> tiles: %.3fx%.3f from %dx%d px")
-        :format(w, h, forced.w, forced.h))
-    end
-    return w, h, "forced"
-  end
-  -- Fallback to your current behavior (whatever you reverted to)
-  local w, h, src = resolve_object_dims(area_id, template_layer_name, base_gid)
-  if FISHING.DEBUG then
-    print(("[fishing] RESOLVE dims (%s) -> tiles: %.3fx%.3f (gid=%s)")
-      :format(tostring(src), tonumber(w) or -1, tonumber(h) or -1, tostring(base_gid)))
-  end
-  return w, h, src
-end
-
-local function _enforce_expected_dims(area_id, w, h)
-  local C = _C_for and _C_for(area_id) or nil
-
-  -- pick per-area expectation if present (tiles wins over pixels), else global pixels
-  local area_tiles = C and C.EXPECTED_METER_DIMS_TILES
-  local area_px    = C and (C.EXPECTED_METER_DIMS_PX or C.EXPECTED_METER_SIZE)
-  local base_px    = FISHING and FISHING.EXPECTED_METER_DIMS_PX
-
-  local ew, eh, src
-  if area_tiles and area_tiles.w and area_tiles.h then
-    ew, eh, src = tonumber(area_tiles.w), tonumber(area_tiles.h), "area-tiles"
-  elseif area_px and area_px.w and area_px.h then
-    ew, eh = _px_to_tiles(area_id, tonumber(area_px.w), tonumber(area_px.h)); src = "area-px"
-  elseif base_px and base_px.w and base_px.h then
-    ew, eh = _px_to_tiles(area_id, tonumber(base_px.w), tonumber(base_px.h)); src = "global-px"
-  else
-    -- nothing to enforce
-    return w, h, false
-  end
-
-  -- relative error against expected
-  local dw = math.abs((tonumber(w) or 0) - ew) / (ew == 0 and 1 or ew)
-  local dh = math.abs((tonumber(h) or 0) - eh) / (eh == 0 and 1 or eh)
-
-  if dw > 0.15 or dh > 0.15 then
-    if FISHING.DEBUG then
-      print(("[fishing] size auto-correct (%s): had %.3fx%.3f, expect %.3fx%.3f")
-        :format(src or "?", w, h, ew, eh))
-    end
-    return ew, eh, true
-  end
-  return w, h, false
-end
-
 -- Size resolver for the timer bar; mirrors your fish resolver but uses timer-specific overrides.
 local function _resolve_timer_dims(area_id, layer_name, base_gid)
   -- Force override (pixels -> tiles) if configured
@@ -719,16 +653,29 @@ local function _gid_for_tsx(area_id, tsx_path)
   return 0
 end
 
--- Build gid from your blue/yellow phase files (0..10)
-local function _meter_gid_from_assets(area_id, color, phase)
+-- Resolve PNG path for the HUD meter using constants/area overrides
+local function _meter_png_path(area_id, color, phase)
   phase = tonumber(phase or 0) or 0
-  local C = _C_for(area_id)
-  local fishingDir = C.ASSET_FISHING_DIR
+
+  -- Per-area constants, with global fallback (same as _meter_gid_from_assets)
+  local C = _C_for(area_id) or Constants
+
+  -- These three are what we used before; area overrides win
+  local fishingDir = C.ASSET_FISHING_DIR or Constants.ASSET_FISHING_DIR or "/server/assets/fishing/"
+  local normalDir  = C.ASSET_NORMAL_DIR  or Constants.ASSET_NORMAL_DIR  or "normal/"
+  local sweetDir   = C.ASSET_SWEET_DIR   or Constants.ASSET_SWEET_DIR   or "sweet-spot/"
+
   local dir = (color == "sweet_spot")
-    and (fishingDir .. C.ASSET_SWEET_DIR)
-    or  (fishingDir .. C.ASSET_NORMAL_DIR)
-  local gid = _gid_for_tsx(area_id, dir .. tostring(phase) .. ".tsx")
-  return (gid and gid > 0) and gid or 0
+      and (fishingDir .. sweetDir)
+      or  (fishingDir .. normalDir)
+
+  return dir .. tostring(phase) .. ".png"
+end
+
+-- Resolve PNG path for the HUD timer using per-area constants (like the old TSX logic)
+local function _timer_png_path(phase)
+  phase = tonumber(phase or 0) or 0
+  return "/server/assets/fishing/timer/" .. tostring(phase) .. ".png"
 end
 
 -- Timer (0..5), prefer timer/ then fallback to normal/
@@ -888,16 +835,6 @@ end
 local _PID_AREAS = {} -- pid -> { [area_id]=true, ... }
 
 -- ====================== Meter Preview ======================
-local function _meter_gid(area_id, color, phase)
-  local gid = _meter_gid_from_assets(area_id, color, phase)
-  if gid == 0 then
-    -- Fallback to legacy GID table if the TSX isn’t present in the map
-    local catalog = FISHING.METERS[color] or {}
-    gid = tonumber(catalog[phase or 0] or 0) or 0
-  end
-  return gid
-end
-
 local function _timer_gid(area_id, phase)
   local gid = _timer_gid_from_assets(area_id, phase)
   if gid == 0 then
@@ -907,237 +844,178 @@ local function _timer_gid(area_id, phase)
   return gid
 end
 
+-- ====================== Net-Games Fish Meter (HUD) ======================
+
 local function _spawn_or_update_meter(pid)
   local s = SESS[pid]; if not s or not s.active then return end
 
-  local area_id = s.area_id
+  -- Only show meter during the reeling phase
+  if s.phase ~= "reeling" then
+    -- Centralized cleanup
+    _despawn_meter(pid)
+    return
+  end
+
+  local area_id = s.area_id or Net.get_player_area(pid)
   if not area_id then return end
 
-  local raw_gid = _meter_gid(area_id, s.meter_color, s.meter_phase or 0)
-  if not raw_gid or raw_gid == 0 then return end
+  -- Clamp phase (0..10) to be safe
+  local phase = tonumber(s.meter_phase or 0) or 0
+  phase = _clamp(phase, 0, 10)
 
-  local base_gid = gid_base(raw_gid)
-  local want_fh, want_fv, want_fr = resolve_preview_flip_flags(area_id, FISHING.TEMPLATE_LAYER, base_gid, false, false,
-    false)
-  local w, h = _resolve_meter_dims(area_id, FISHING.TEMPLATE_LAYER, base_gid)
-  w = tonumber(w) or 1
-  h = tonumber(h) or 1
+  -- normal vs sweet-spot
+  local color = (s.meter_color == "sweet_spot") and "sweet_spot" or "normal"
 
-  do
-    local nw, nh, fixed = _enforce_expected_dims(area_id, w, h)
-    if fixed then w, h = nw, nh end
+  -- If nothing changed, don’t redraw
+  if s.meter_ui_phase == phase
+    and s.meter_ui_color == color
+    and s.meter_ui_area  == area_id
+  then
+    return
   end
 
-  local forward = FISHING.METER_FORWARD or FISHING.METER_DISTANCE or 0.2
-  local side_default = math.max(1.4, (w or 1) * 0.65)
-  local side_spec = (FISHING.METER_SIDE ~= nil) and FISHING.METER_SIDE or "right"
-  local x, y, z = get_offset_point(pid, forward, side_spec, side_default)
-  if not x or not y then return end
-  z = tonumber(z) or 0
-  x = tonumber(x) or 0
-  y = tonumber(y) or 0
+  -- Per-area path (handles rink / rink2 icy meters correctly)
+  local texture_path = _meter_png_path(area_id, color, phase)
 
-  -- Apply world-space nudge
-  do
-    local C          = _C_for(area_id)
-    local base       = FISHING.METER_SCREEN_SHIFT or {}
-    local area_shift = C and C.METER_SCREEN_SHIFT or nil
-    local sx = (area_shift and area_shift.x ~= nil) and area_shift.x or base.x or 0
-    local sy = (area_shift and area_shift.y ~= nil) and area_shift.y or base.y or 0
-    local sz = (area_shift and area_shift.z ~= nil) and area_shift.z or base.z or 0
-    x = x + sx
-    y = y + sy  -- increase y to move lower
-    z = z + sz
+  -- IMPORTANT: derive sprite_id from the texture path so each PNG is unique
+  -- This guarantees we never call player_alloc_sprite with the same sprite_id
+  -- but a different texture_path (which is what was freezing you on phase 0).
+  local safe_name = texture_path:gsub("[^%w]", "_")
+  local sprite_id = "fishing_meter_" .. safe_name
+
+  -- HUD position & scale from FISHING.UI_METER
+  local hud   = FISHING.UI_METER or {}
+  local X     = tonumber(hud.X) or 160
+  local Y     = tonumber(hud.Y) or 20
+  local scale = tonumber(hud.SCALE) or 2.0
+
+  if FISHING.DEBUG then
+    print(string.format(
+      "[fishing] METER HUD pid=%s area=%s phase=%d color=%s sprite_id=%s tex=%s",
+      tostring(pid), tostring(area_id), phase, tostring(color), sprite_id, tostring(texture_path)
+    ))
   end
 
-  local data = {
-    type                 = "tile",
-    gid                  = tonumber(base_gid) or 0,
-    flipped_horizontally = not not want_fh,
-    flipped_vertically   = not not want_fv,
-    rotated              = not not want_fr,
-  }
+  -- Remember previous HUD sprite id so we can hide it
+  local prev_id = s.meter_ui_id
 
-  local spec = {
-    name              = "",
-    class             = "FishingMeter",
-    visible           = not FISHING.PRIVATE_METERS,
-    x                 = x,
-    y                 = y,
-    z                 = z,
-    width             = w,
-    height            = h,
-    rotation          = 0,
-    data              = data,
-    custom_properties = {
-      fishing_meter = "true",
-      fishing_pid   = tostring(pid or ""),
-    }
-  }
+  -- Draw this phase’s HUD element
+  NetGames.add_ui_element(
+      sprite_id,
+      pid,
+      texture_path,
+      "",              -- animation_path (none)
+      "",              -- animation_state
+      X, Y, 0,         -- screen-space position + Z
+      scale,           -- ScaleX
+      scale            -- ScaleY
+  )
 
-  local must_recreate = false
-  if not s.meter_oid then
-    must_recreate = true
-  else
-    local cur = Net.get_object_by_id(area_id, s.meter_oid)
-    if not cur then
-      must_recreate = true
-    else
-      -- only recreate if size drifted; DO NOT compare gid
-      local cw = tonumber(cur.width) or 0
-      local ch = tonumber(cur.height) or 0
-      if math.abs(cw - w) > 0.001 or math.abs(ch - h) > 0.001 then
-        if FISHING.DEBUG then
-          print(("[fishing] size mismatch -> recreate (had %.3fx%.3f, want %.3fx%.3f)"):format(cw, ch, w, h))
-        end
-        must_recreate = true
-      end
-    end
+  -- Remove the old phase’s HUD sprite (if any and different)
+  if prev_id and prev_id ~= sprite_id then
+    pcall(NetGames.remove_ui_element, prev_id, pid)
   end
 
-  if must_recreate then
-    if s.meter_oid then pcall(function() Net.remove_object(area_id, s.meter_oid) end) end
-    local ok, res = pcall(Net.create_object, area_id, spec)
-    if not ok then
-      spec.layer = FISHING.TEMPLATE_LAYER
-      ok, res = pcall(Net.create_object, area_id, spec)
-      if not ok then return end
-    end
-    s.meter_oid = res
-    if FISHING.PRIVATE_METERS then
-      _exclude_for_non_owners(pid, area_id, s.meter_oid)
-      async(function()
-        await(Async.sleep(0.05)) -- small delay so all clients know about the object first
-        pcall(Net.set_object_visibility, area_id, s.meter_oid, true)
-        if FISHING.DEBUG then
-          print(("[fishing] reveal meter oid=%s area=%s"):format(tostring(s.meter_oid), tostring(area_id)))
-        end
-      end)
-    end
-    _PID_AREAS[pid] = _PID_AREAS[pid] or {}
-    _PID_AREAS[pid][area_id] = true
-  else
-    Net.move_object(area_id, s.meter_oid, x, y, z)
-    Net.set_object_data(area_id, s.meter_oid, data)
-  end
+  -- Remember what we’re currently showing
+  s.meter_ui_id    = sprite_id
+  s.meter_ui_phase = phase
+  s.meter_ui_color = color
+  s.meter_ui_area  = area_id
 end
 
 local function _despawn_meter(pid)
   local s = SESS[pid]; if not s then return end
-  if s.meter_oid then
-    pcall(function() Net.remove_object(s.area_id, s.meter_oid) end)
-    s.meter_oid = nil
+
+  if s.meter_ui_id then
+    pcall(NetGames.remove_ui_element, s.meter_ui_id, pid)
   end
+
+  s.meter_ui_id    = nil
+  s.meter_ui_phase = nil
+  s.meter_ui_color = nil
+  s.meter_ui_area  = nil
 end
 
 local function _spawn_or_update_timer(pid)
   local s = SESS[pid]; if not s or not s.active then return end
-  local area_id = s.area_id; if not area_id then return end
 
-  -- Resolve current frame gid
-  local raw_gid = _timer_gid(area_id, s.timer_phase or 0)
-  if not raw_gid or raw_gid == 0 then return end
-
-  local base_gid                  = gid_base(raw_gid)
-  local want_fh, want_fv, want_fr =
-      resolve_preview_flip_flags(area_id, FISHING.TEMPLATE_LAYER, base_gid, false, false, false)
-
-  -- Size (timer-specific)
-  local w, h                      = _resolve_timer_dims(area_id, FISHING.TEMPLATE_LAYER, base_gid)
-
-  -- Position (timer-specific)
-  local forward                   = FISHING.TIMER_FORWARD or 0.0
-  local side_spec                 = (FISHING.TIMER_SIDE ~= nil) and FISHING.TIMER_SIDE or 0
-  local side_default              = 0 -- timer stays centered unless you pass a number or "left"/"right"
-  local x, y, z                   = get_offset_point(pid, forward, side_spec, side_default)
-  if not x or not y then return end
-  x = tonumber(x) or 0; y = tonumber(y) or 0; z = tonumber(z) or 0
-
-  -- Apply timer-specific nudge
-  do
-    local shift = FISHING.TIMER_SCREEN_SHIFT or {}
-    x = x + (shift.x or 0)
-    y = y + (shift.y or 0) -- negative draws above player
-    z = z + (shift.z or 0)
+  -- Only show timer during the reeling phase
+  if s.phase ~= "reeling" then
+    -- Let the centralized despawner handle cleanup
+    _despawn_timer(pid)
+    return
   end
 
-  local data = {
-    type                 = "tile",
-    gid                  = tonumber(base_gid) or 0,
-    flipped_horizontally = not not want_fh,
-    flipped_vertically   = not not want_fv,
-    rotated              = not not want_fr,
-  }
+  -- We only need area_id for debug / bookkeeping now
+  local area_id = s.area_id or Net.get_player_area(pid)
+  if not area_id then return end
 
-  local spec = {
-    name              = "",
-    class             = "FishingTimer",
-    visible           = not FISHING.PRIVATE_METERS,
-    x                 = x,
-    y                 = y,
-    z                 = z,
-    width             = w,
-    height            = h,
-    rotation          = 0,
-    data              = data,
-    custom_properties = {
-      fishing_timer = "true",
-      fishing_pid   = tostring(pid or ""),
-    }
-  }
+  -- Clamp timer phase 0..5 to be safe
+  local phase = tonumber(s.timer_phase or 0) or 0
+  phase = _clamp(phase, 0, 5)
 
-  local must_recreate = false
-  if not s.timer_oid then
-    must_recreate = true
-  else
-    local cur = Net.get_object_by_id(area_id, s.timer_oid)
-    if not cur then
-      must_recreate = true
-    else
-      -- only recreate if size drifted; DO NOT compare gid
-      local cw = tonumber(cur.width) or 0
-      local ch = tonumber(cur.height) or 0
-      if math.abs(cw - w) > 0.001 or math.abs(ch - h) > 0.001 then
-        if FISHING.DEBUG then
-          print(("[fishing] timer size mismatch -> recreate (had %.3fx%.3f, want %.3fx%.3f)")
-            :format(cw, ch, w, h))
-        end
-        must_recreate = true
-      end
-    end
+  -- If we’re already showing this phase, do nothing
+  if s.timer_ui_phase == phase then
+    return
   end
 
-  if must_recreate then
-    if s.timer_oid then pcall(function() Net.remove_object(area_id, s.timer_oid) end) end
-    local ok, res = pcall(Net.create_object, area_id, spec)
-    if not ok then
-      spec.layer = FISHING.TEMPLATE_LAYER
-      ok, res = pcall(Net.create_object, area_id, spec)
-      if not ok then return end
-    end
-    s.timer_oid = res
-    if FISHING.PRIVATE_METERS then
-      _exclude_for_non_owners(pid, area_id, s.timer_oid)
-      async(function()
-        await(Async.sleep(0.05))
-        pcall(Net.set_object_visibility, area_id, s.timer_oid, true)
-        if FISHING.DEBUG then
-          print(("[fishing] reveal timer oid=%s area=%s"):format(tostring(s.timer_oid), tostring(area_id)))
-        end
-      end)
-    end
-  else
-    Net.move_object(area_id, s.timer_oid, x, y, z)
-    Net.set_object_data(area_id, s.timer_oid, data)
+  -- One sprite_id per timer phase across all areas
+  local sprite_id    = ("fishing_timer_%d"):format(phase)
+  local texture_path = _timer_png_path(phase)
+
+  -- HUD position / scale (like the meter)
+  local hud   = FISHING.UI_TIMER or {}
+  local X     = tonumber(hud.X) or 160
+  local Y     = tonumber(hud.Y) or 40
+  local scale = tonumber(hud.SCALE) or 2.0
+
+  local prev_id = s.timer_ui_id
+
+  -- Draw / update this phase’s HUD sprite
+  NetGames.add_ui_element(
+      sprite_id,
+      pid,
+      texture_path,
+      "",              -- animation_path
+      "",              -- animation_state
+      X, Y, 0,         -- screen position + Z
+      scale,           -- ScaleX
+      scale            -- ScaleY
+  )
+
+  if FISHING.DEBUG then
+    print(("[fishing] TIMER HUD pid=%s area=%s phase=%d sprite_id=%s tex=%s")
+      :format(tostring(pid), tostring(area_id), phase, sprite_id, texture_path))
   end
+
+  -- Remove previous phase’s HUD sprite (if any)
+  if prev_id and prev_id ~= sprite_id then
+    pcall(NetGames.remove_ui_element, prev_id, pid)
+  end
+
+  -- Remember what we’re showing now
+  s.timer_ui_id    = sprite_id
+  s.timer_ui_phase = phase
+  s.timer_ui_area  = area_id
 end
 
 local function _despawn_timer(pid)
-  local s = SESS[pid]; if not s then return end
-  if s.timer_oid then
-    pcall(function() Net.remove_object(s.area_id, s.timer_oid) end)
-    s.timer_oid = nil
+  local s = SESS[pid]
+  if not s then return end
+
+  -- Remove HUD timer sprite (Net-Games)
+  if s.timer_ui_id then
+    pcall(NetGames.remove_ui_element, s.timer_ui_id, pid)
+    s.timer_ui_id    = nil
+    s.timer_ui_phase = nil
+    s.timer_ui_area  = nil
   end
+
+  -- Legacy world-object timer (in case any still exist)
+  if s.timer_oid and s.area_id then
+    pcall(Net.remove_object, s.area_id, s.timer_oid)
+  end
+  s.timer_oid = nil
 end
 
 -- ====================== Difficulty / weight helpers ======================
@@ -1223,17 +1101,31 @@ end
 
 local function _default_fishing_rewards(player_id, encounter_info, stats)
   -- stats = { health, score, time, ran, emotion, turns, npcs = [...] }
-  if not stats or stats.ran then return end -- no rewards if ran
-  local aid = Net.get_player_area(player_id)
-  local C = _C_for(aid)
+
+  -- No rewards if the player ran away (same behavior as before)
+  if not stats or stats.ran then return end
+
+  -- Keep using the area-defined MONEY_MULTIPLYER
+  local aid  = Net.get_player_area(player_id)
+  local C    = _C_for(aid)
   local mult = tonumber((C and C.MONEY_MULTIPLYER) or Constants.MONEY_MULTIPLYER or 0) or 0
-  local reward_monies = math.floor((stats.score or 0) * mult)
-  if reward_monies > 0 then
-    ezmemory.spend_player_money(player_id, -reward_monies) -- negative spend = give money
-    Net.message_player(player_id, "Got $" .. reward_monies .. "!")
-    if FISHING.SFX and FISHING.SFX.catch then
-      Net.play_sound_for_player(player_id, FISHING.SFX.catch)
-    end
+
+  local monies = math.floor((stats.score or 0) * mult)
+  if monies <= 0 then
+    return
+  end
+
+  -- Build Beta 10-style reward list (money only for fishing viruses)
+  local rewards = {
+    { type = 0, value = monies }  -- 0 = Money (same enum as in WCity1)
+  }
+
+  -- Show the nice reward popup instead of a chat message
+  Net.send_player_battle_rewards(player_id, rewards)
+
+  -- Optional: keep the fishing catch SFX so it still "feels" like fishing
+  if FISHING.SFX and FISHING.SFX.catch then
+    Net.play_sound_for_player(player_id, FISHING.SFX.catch)
   end
 end
 
@@ -1986,6 +1878,8 @@ Net:on("player_area_transfer", function(ev)
 
     _cleanup_fishing_meters(to, pid)
     _hide_existing_meters_for_joiner({ player_id = pid, area_id = to, to_area_id = to })
+    _despawn_meter(pid)
+    _despawn_timer(pid)
   end
 end)
 
@@ -2006,17 +1900,12 @@ Net:on("player_disconnect", function(ev)
   PLAYER_AREA[pid] = nil
   if SESS[pid] and SESS[pid].active then _stop(pid, nil, nil) end
   _cleanup_all_for_pid(pid)
+  _despawn_meter(pid)
+  _despawn_timer(pid)
 end)
 
 -- ====================== Public API (optional) ======================
 local fishing = {}
-
-function fishing.set_meters(tbl)
-  if type(tbl) == "table" then
-    if tbl.normal then FISHING.METERS.normal = tbl.normal end
-    if tbl.sweet_spot then FISHING.METERS.sweet_spot = tbl.sweet_spot end
-  end
-end
 
 function fishing.start_for_player(pid)
   _start_session(pid)
