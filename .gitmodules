@@ -1,3 +1,6 @@
 [submodule "Scriptable-OpenNetBattle-Server"]
 	path = Scriptable-OpenNetBattle-Server
 	url = https://github.com/ArthurCose/Scriptable-OpenNetBattle-Server
+[submodule "extern/net-games"]
+	path = extern/net-games
+	url = https://github.com/indianajson/net-games.git
