@@ -1119,32 +1119,25 @@ end
 
 local function _default_fishing_rewards(player_id, encounter_info, stats)
   -- stats = { health, score, time, ran, emotion, turns, npcs = [...] }
+  if not stats or stats.ran then return end -- no rewards if ran
 
-  -- No rewards if the player ran away (same behavior as before)
-  if not stats or stats.ran then return end
-
-  -- Keep using the area-defined MONEY_MULTIPLYER
   local aid  = Net.get_player_area(player_id)
   local C    = _C_for(aid)
   local mult = tonumber((C and C.MONEY_MULTIPLYER) or Constants.MONEY_MULTIPLYER or 0) or 0
-
   local monies = math.floor((stats.score or 0) * mult)
   if monies <= 0 then
     return
   end
 
-  -- Build Beta 10-style reward list (money only for fishing viruses)
+  -- Beta 10-style overlay
   local rewards = {
-    { type = 0, value = monies }  -- 0 = Money (same enum as in WCity1)
+    { type = 0, value = monies },  -- 0 = money
   }
 
-  -- Show the nice reward popup instead of a chat message
   Net.send_player_battle_rewards(player_id, rewards)
 
-  -- Optional: keep the fishing catch SFX so it still "feels" like fishing
-  if FISHING.SFX and FISHING.SFX.catch then
-    Net.play_sound_for_player(player_id, FISHING.SFX.catch)
-  end
+  -- NOTE: no FISHING.SFX.catch here anymore.
+  -- The battle reward overlay already plays a sound.
 end
 
 if FISHING.RESULTS_CALLBACK == nil then
