@@ -36,8 +36,8 @@ return {
         UNIQUE_PER = "secret",
       },
       VIRUS_CHANCE           = 0.28,
-      ASSET_NORMAL_DIR       = "icy-normal/",
-      ASSET_SWEET_DIR        = "icy-sweet/",
+      ASSET_FISH_PNG         = "/server/assets/fishing/icy-fish.png",
+      ASSET_FISH_ANIM        = "/server/assets/fishing/icy-fish.animation",
       EXPECTED_METER_SIZE    = {w = 24, h = 93},
       METER_SCREEN_SHIFT     = { x = 1.75, y = 0.0, z = 0.0 },
       WINDOW_S              = {
@@ -103,8 +103,8 @@ return {
   rink2 = {
     CONSTANTS = {
       VIRUS_CHANCE           = 0.26,
-      ASSET_NORMAL_DIR       = "icy-normal/",
-      ASSET_SWEET_DIR        = "icy-sweet/",
+      ASSET_FISH_PNG         = "/server/assets/fishing/icy-fish.png",
+      ASSET_FISH_ANIM        = "/server/assets/fishing/icy-fish.animation",
       EXPECTED_METER_SIZE    = {w = 24, h = 93},
       METER_SCREEN_SHIFT     = { x = 1.75, y = 0.0, z = 0.0 },
       WINDOW_S              = {
@@ -177,8 +177,8 @@ return {
         UNIQUE_PER = "secret",
       },
       VIRUS_CHANCE           = 0.24,
-      ASSET_NORMAL_DIR       = "icy-normal/",
-      ASSET_SWEET_DIR        = "icy-sweet/",
+      ASSET_FISH_PNG         = "/server/assets/fishing/icy-fish.png",
+      ASSET_FISH_ANIM        = "/server/assets/fishing/icy-fish.animation",
       EXPECTED_METER_SIZE    = {w = 24, h = 93},
       METER_SCREEN_SHIFT     = { x = 1.75, y = 0.0, z = 0.0 },
       WINDOW_S              = {

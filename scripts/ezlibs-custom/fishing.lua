@@ -618,9 +618,6 @@ end
 --   BITE (flash):       /server/fishing/ex.tsx   (fallback: /server/assets/fishing/ex.tsx)
 
 local fishingDir   = Constants.ASSET_FISHING_DIR
-local normalDir    = fishingDir .. Constants.ASSET_NORMAL_DIR
-local sweetDir     = fishingDir .. Constants.ASSET_SWEET_DIR
-local timerDir     = fishingDir .. Constants.ASSET_TIMER_DIR
 local exPath       = Constants.D_BITE_TSX_CANIDATE
 local exTsx        = Constants.EX_ALERT_TSX
 -- Try a timer/ subdir first; fall back to reusing blue/ if that’s how you stored them.
@@ -653,23 +650,18 @@ local function _gid_for_tsx(area_id, tsx_path)
   return 0
 end
 
--- Resolve PNG path for the HUD meter using constants/area overrides
-local function _meter_png_path(area_id, color, phase)
-  phase = tonumber(phase or 0) or 0
+local function _meter_sheet_paths(area_id)
+  local C = _C_for(area_id)
 
-  -- Per-area constants, with global fallback (same as _meter_gid_from_assets)
-  local C = _C_for(area_id) or Constants
+  local png  = (C and C.ASSET_FISH_PNG)  or (FISHING.ASSET_FISH_PNG)
+  local anim = (C and C.ASSET_FISH_ANIM) or (FISHING.ASSET_FISH_ANIM)
 
-  -- These three are what we used before; area overrides win
-  local fishingDir = C.ASSET_FISHING_DIR or Constants.ASSET_FISHING_DIR or "/server/assets/fishing/"
-  local normalDir  = C.ASSET_NORMAL_DIR  or Constants.ASSET_NORMAL_DIR  or "normal/"
-  local sweetDir   = C.ASSET_SWEET_DIR   or Constants.ASSET_SWEET_DIR   or "sweet-spot/"
+  if not png or png == "" or not anim or anim == "" then
+    print("[fishing] missing fish meter assets for area:", area_id, png or "nil", anim or "nil")
+    return nil, nil
+  end
 
-  local dir = (color == "sweet_spot")
-      and (fishingDir .. sweetDir)
-      or  (fishingDir .. normalDir)
-
-  return dir .. tostring(phase) .. ".png"
+  return png, anim
 end
 
 -- Resolve PNG path for the HUD timer using per-area constants (like the old TSX logic)
@@ -846,81 +838,107 @@ end
 
 -- ====================== Net-Games Fish Meter (HUD) ======================
 
+local METER_SPRITE_ID = "fishing_meter_hud"
+
+-- Give each different meter sheet its own sprite_id so NetGames
+-- doesn't keep reusing the very first one it allocated.
+local function _meter_sprite_id_for_sheet(png_path)
+  local key = tostring(png_path or "default")
+  -- sanitize path into something sprite_id-safe
+  key = key:gsub("[^%w]+", "_")
+  return METER_SPRITE_ID .. "_" .. key
+end
+
 local function _spawn_or_update_meter(pid)
   local s = SESS[pid]; if not s or not s.active then return end
 
-  -- Only show meter during the reeling phase
+  ------------------------------------------------------------------
+  -- 1) Only show meter during the reeling phase
+  ------------------------------------------------------------------
   if s.phase ~= "reeling" then
-    -- Centralized cleanup
-    _despawn_meter(pid)
+    if s.meter_ui_id then
+      pcall(NetGames.remove_ui_element, s.meter_ui_id, pid)
+      s.meter_ui_id    = nil
+      s.meter_ui_state = nil
+      s.meter_ui_sheet = nil
+      s.meter_ui_anim  = nil
+    end
     return
   end
 
+  ------------------------------------------------------------------
+  -- 2) Resolve area + sprite sheet
+  ------------------------------------------------------------------
   local area_id = s.area_id or Net.get_player_area(pid)
   if not area_id then return end
 
-  -- Clamp phase (0..10) to be safe
+  local png_path, anim_path = _meter_sheet_paths(area_id)
+  if not png_path or not anim_path then
+    return -- no assets for this area
+  end
+
+  -- NEW: derive sprite_id from the sheet path so each design is separate
+  local sprite_id = _meter_sprite_id_for_sheet(png_path)
+
+  ------------------------------------------------------------------
+  -- 3) Compute current state name (NORMAL_0..10 or SWEET_0..10)
+  --    (same logic you already had, using s.meter_phase)
+  ------------------------------------------------------------------
   local phase = tonumber(s.meter_phase or 0) or 0
   phase = _clamp(phase, 0, 10)
 
-  -- normal vs sweet-spot
-  local color = (s.meter_color == "sweet_spot") and "sweet_spot" or "normal"
+  local color_tag = (s.meter_color == "sweet_spot") and "SWEET" or "NORMAL"
+  local state     = string.format("%s_%d", color_tag, phase)
 
-  -- If nothing changed, don’t redraw
-  if s.meter_ui_phase == phase
-    and s.meter_ui_color == color
-    and s.meter_ui_area  == area_id
-  then
-    return
-  end
-
-  -- Per-area path (handles rink / rink2 icy meters correctly)
-  local texture_path = _meter_png_path(area_id, color, phase)
-
-  -- IMPORTANT: derive sprite_id from the texture path so each PNG is unique
-  -- This guarantees we never call player_alloc_sprite with the same sprite_id
-  -- but a different texture_path (which is what was freezing you on phase 0).
-  local safe_name = texture_path:gsub("[^%w]", "_")
-  local sprite_id = "fishing_meter_" .. safe_name
-
-  -- HUD position & scale from FISHING.UI_METER
+  ------------------------------------------------------------------
+  -- 4) HUD position / scale (screen-space)
+  ------------------------------------------------------------------
   local hud   = FISHING.UI_METER or {}
   local X     = tonumber(hud.X) or 160
   local Y     = tonumber(hud.Y) or 20
   local scale = tonumber(hud.SCALE) or 2.0
 
-  if FISHING.DEBUG then
-    print(string.format(
-      "[fishing] METER HUD pid=%s area=%s phase=%d color=%s sprite_id=%s tex=%s",
-      tostring(pid), tostring(area_id), phase, tostring(color), sprite_id, tostring(texture_path)
-    ))
-  end
+  ------------------------------------------------------------------
+  -- 5) Allocate sprite with animation when sheet/anim/sprite_id changes
+  --    (first time in, or when moving between fisharea/rink/rink2)
+  ------------------------------------------------------------------
+  local sheet_changed =
+      (s.meter_ui_sheet ~= png_path) or
+      (s.meter_ui_anim  ~= anim_path) or
+      (s.meter_ui_id    ~= sprite_id)
 
-  -- Remember previous HUD sprite id so we can hide it
-  local prev_id = s.meter_ui_id
+  if sheet_changed or not s.meter_ui_id then
+    -- Zap old HUD object if any (cleans up old sheet)
+    if s.meter_ui_id then
+      pcall(NetGames.remove_ui_element, s.meter_ui_id, pid)
+    end
 
-  -- Draw this phase’s HUD element
-  NetGames.add_ui_element(
+    -- This call matches the order_points demo:
+    -- games.add_ui_element("id", pid, png, anim, state, X, Y, Z, sx, sy)
+    NetGames.add_ui_element(
       sprite_id,
       pid,
-      texture_path,
-      "",              -- animation_path (none)
-      "",              -- animation_state
-      X, Y, 0,         -- screen-space position + Z
-      scale,           -- ScaleX
-      scale            -- ScaleY
-  )
+      png_path,
+      anim_path,
+      state,
+      X, Y, 0,
+      scale, scale
+    )
 
-  -- Remove the old phase’s HUD sprite (if any and different)
-  if prev_id and prev_id ~= sprite_id then
-    pcall(NetGames.remove_ui_element, prev_id, pid)
+    s.meter_ui_id    = sprite_id
+    s.meter_ui_sheet = png_path
+    s.meter_ui_anim  = anim_path
+    s.meter_ui_state = state
+    return
   end
 
-  -- Remember what we’re currently showing
-  s.meter_ui_id    = sprite_id
-  s.meter_ui_phase = phase
-  s.meter_ui_color = color
-  s.meter_ui_area  = area_id
+  ------------------------------------------------------------------
+  -- 6) Same sheet/anim: just change animation state if needed
+  ------------------------------------------------------------------
+  if s.meter_ui_state ~= state then
+    NetGames.set_ui_animation(s.meter_ui_id, pid, state)
+    s.meter_ui_state = state
+  end
 end
 
 local function _despawn_meter(pid)

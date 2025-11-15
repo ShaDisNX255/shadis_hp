@@ -36,8 +36,8 @@ local CONSTANTS = {
   },
   -- Asset Paths
   ASSET_FISHING_DIR      = "/server/assets/fishing/",
-  ASSET_NORMAL_DIR       = "normal/",
-  ASSET_SWEET_DIR        = "sweet-spot/",
+  ASSET_FISH_PNG         = "/server/assets/fishing/normal-fish.png",
+  ASSET_FISH_ANIM        = "/server/assets/fishing/normal-fish.animation",
   ASSET_TIMER_DIR        = "timer/",
   EX_ALERT_TSX           = "ex.tsx",
   -- Asset (METER) Properties

@@ -1,0 +1,91 @@
+imagePath="normal-fish.png"
+
+animation state="NORMAL_0"
+frame duration="0.1" x="0" y="0" w="24" h="93" originx="0" originy="0" flipx="0" flipy="0"
+
+animation state="NORMAL_1"
+frame duration="0.1" x="24" y="0" w="24" h="93" originx="0" originy="0" flipx="0" flipy="0"
+
+animation state="NORMAL_2"
+frame duration="0.1" x="48" y="0" w="24" h="93" originx="0" originy="0" flipx="0" flipy="0"
+
+animation state="NORMAL_3"
+frame duration="0.1" x="72" y="0" w="24" h="93" originx="0" originy="0" flipx="0" flipy="0"
+
+animation state="NORMAL_4"
+frame duration="0.1" x="96" y="0" w="24" h="93" originx="0" originy="0" flipx="0" flipy="0"
+
+animation state="NORMAL_5"
+frame duration="0.1" x="120" y="0" w="24" h="93" originx="0" originy="0" flipx="0" flipy="0"
+
+animation state="NORMAL_6"
+frame duration="0.1" x="144" y="0" w="24" h="93" originx="0" originy="0" flipx="0" flipy="0"
+
+animation state="NORMAL_7"
+frame duration="0.1" x="168" y="0" w="24" h="93" originx="0" originy="0" flipx="0" flipy="0"
+
+animation state="NORMAL_8"
+frame duration="0.1" x="192" y="0" w="24" h="93" originx="0" originy="0" flipx="0" flipy="0"
+
+animation state="NORMAL_9"
+frame duration="0.1" x="216" y="0" w="24" h="93" originx="0" originy="0" flipx="0" flipy="0"
+
+animation state="NORMAL_10"
+frame duration="0.1" x="240" y="0" w="24" h="93" originx="0" originy="0" flipx="0" flipy="0"
+
+animation state="SWEET_0"
+frame duration="0.1" x="0" y="93" w="24" h="93" originx="0" originy="0" flipx="0" flipy="0"
+
+animation state="SWEET_1"
+frame duration="0.1" x="24" y="93" w="24" h="93" originx="0" originy="0" flipx="0" flipy="0"
+
+animation state="SWEET_2"
+frame duration="0.1" x="48" y="93" w="24" h="93" originx="0" originy="0" flipx="0" flipy="0"
+
+animation state="SWEET_3"
+frame duration="0.1" x="72" y="93" w="24" h="93" originx="0" originy="0" flipx="0" flipy="0"
+
+animation state="SWEET_4"
+frame duration="0.1" x="96" y="93" w="24" h="93" originx="0" originy="0" flipx="0" flipy="0"
+
+animation state="SWEET_5"
+frame duration="0.1" x="120" y="93" w="24" h="93" originx="0" originy="0" flipx="0" flipy="0"
+
+animation state="SWEET_6"
+frame duration="0.1" x="144" y="93" w="24" h="93" originx="0" originy="0" flipx="0" flipy="0"
+
+animation state="SWEET_7"
+frame duration="0.1" x="168" y="93" w="24" h="93" originx="0" originy="0" flipx="0" flipy="0"
+
+animation state="SWEET_8"
+frame duration="0.1" x="192" y="93" w="24" h="93" originx="0" originy="0" flipx="0" flipy="0"
+
+animation state="SWEET_9"
+frame duration="0.1" x="216" y="93" w="24" h="93" originx="0" originy="0" flipx="0" flipy="0"
+
+animation state="SWEET_10"
+frame duration="0.1" x="240" y="93" w="24" h="93" originx="0" originy="0" flipx="0" flipy="0"
+
+animation state="IDLE_DR"
+
+animation state="IDLE_DL"
+
+animation state="IDLE_UR"
+
+animation state="IDLE_UL"
+
+animation state="WALK_DR"
+
+animation state="WALK_DL"
+
+animation state="WALK_UR"
+
+animation state="WALK_UL"
+
+animation state="RUN_DR"
+
+animation state="RUN_DL"
+
+animation state="RUN_UR"
+
+animation state="RUN_UL"
