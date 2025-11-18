@@ -36,12 +36,15 @@ print("[RAIDS] Displayer (Net-Games) init:",
 -- ===== Login test marquee (local toggle) =====
 local TEST_LOGIN_MARQUEE = false   -- set true to show a test marquee on login
 local TEST_LOGIN_TEXT    = "Login test marquee - tweak in raids.lua"
-local TEST_LOGIN_OPTS    = { loops = 2 }  -- you can add width/height/scale/speed/etc here
+local TEST_LOGIN_OPTS = {
+  loops = 2,
+  id    = "__raid_login_test",  -- unique id so it doesn't overwrite others
+}
 -- ===== /Login test marquee =====
 
 -- Force the login marquee to read a specific Raid ID / Area
 -- Set to nil to auto-detect like before.
-local LOGIN_ANNOUNCE_RAID_ID   = "RaidTest2"   -- <== put your exact Raid ID here (or nil)
+local LOGIN_ANNOUNCE_RAID_ID   = "Mettaur1"   -- <== put your exact Raid ID here (or nil)
 local LOGIN_ANNOUNCE_MEM_AREA  = nil           -- optional: e.g. "WCity1"; nil = use RAID_MEM_AREA or player's area
 
 -- Peek current raid store for an area without creating anything
@@ -53,10 +56,23 @@ end
 -- true if a raid is “active” (has actually started)
 local function _is_active(s)
   if not s then return false end
+
+  -- If the raid has been flagged as defeated, it's no longer active
+  if s.defeated then
+    return false
+  end
+
+  -- If there is a boss pool and it's at 0, also treat as not active
+  local boss_max = tonumber(s.boss_pool_max or 0) or 0
+  local boss_hp  = tonumber(s.boss_pool_hp or boss_max) or 0
+  if boss_max > 0 and boss_hp <= 0 then
+    return false
+  end
+
   -- Active as soon as wave1 has any points, wave advanced, or boss HP moved.
   return (tonumber(s.wave1_points or 0) > 0)
       or (tonumber(s.wave or 1) > 1)
-      or (tonumber(s.boss_pool_hp or s.boss_pool_max or 0) < tonumber(s.boss_pool_max or 0))
+      or (boss_hp < boss_max)
 end
 
 -- Find any active raid in area (prefer truly active; else most progressed)
@@ -82,20 +98,32 @@ end
 
 -- ==== Online tracking (global, area-agnostic) ====
 local ONLINE = {}  -- [pid] = true
+_G.RAIDS_ONLINE = ONLINE  -- expose for other scripts (e.g., LMenu)
 
 -- Keep ONLINE in sync (cover both common event names)
 if not _G.__RAIDS_ONLINE_WIRED then
   _G.__RAIDS_ONLINE_WIRED = true
 
+  local function refresh_lmenu_online()
+    local LM = rawget(_G, "LMenu")
+    if LM and LM.refresh_online_for_all then
+      pcall(LM.refresh_online_for_all)
+    end
+  end
+
   Net:on("player_join", function(ev)
     ONLINE[ev.player_id] = true
+    refresh_lmenu_online()
   end)
 
   Net:on("player_disconnect", function(ev)
     ONLINE[ev.player_id] = nil
+    refresh_lmenu_online()
   end)
+
   Net:on("player_left", function(ev)   -- some builds use a different name
     ONLINE[ev.player_id] = nil
+    refresh_lmenu_online()
   end)
 end
 -- ==== /Online tracking ====
@@ -170,6 +198,20 @@ local function _boss_damage_from_stats(stats, fallback_on_win)
     return math.floor(fallback_on_win)
   end
   return 0
+end
+
+local function _persist_health_and_emotion(pid, encounter_info, stats)
+  if not stats then return end
+
+  if stats.emotion == 1 then
+    Net.set_player_emotion(pid, stats.emotion)
+  else
+    Net.set_player_emotion(pid, 0)
+  end
+
+  if stats.health then
+    ezmemory.set_player_health(pid, stats.health)
+  end
 end
 
 -- Right-side marquee look (tweak as you like)
@@ -255,18 +297,21 @@ local function _marquee(pid, text, opts)
   end
 
   opts = opts or {}
-  local scale       = opts.scale or UI.scale
-  local width       = opts.width or UI.width
-  local height      = opts.height or UI.height
-  local padding_x   = opts.padding_x or UI.padding_x
-  local padding_y   = opts.padding_y or UI.padding_y
-  local margin_right= opts.margin_right or UI.margin_right
-  local y           = opts.y or UI.y
-  local z           = opts.z or UI.z
-  local speed       = opts.speed or UI.speed
-  local loops       = (opts.loops ~= nil) and opts.loops or UI.loops
-  local font        = opts.font or UI.font
+  local scale        = opts.scale or UI.scale
+  local width        = opts.width or UI.width
+  local height       = opts.height or UI.height
+  local padding_x    = opts.padding_x or UI.padding_x
+  local padding_y    = opts.padding_y or UI.padding_y
+  local margin_right = opts.margin_right or UI.margin_right
+  local y            = opts.y or UI.y
+  local z            = opts.z or UI.z
+  local speed        = opts.speed or UI.speed
+  local loops        = (opts.loops ~= nil) and opts.loops or UI.loops
+  local font         = opts.font or UI.font
   local backdrop_scale = opts.backdrop_scale or UI.backdrop_scale or 1.0
+
+  -- NEW: allow each marquee to have its own text id so they don't clobber each other
+  local id = opts.id or "__raid_announce"
 
   local line_h   = math.ceil(9 * scale)  -- THICK baseline ~9px
   local x        = _screen_w() - margin_right - width
@@ -274,16 +319,16 @@ local function _marquee(pid, text, opts)
 
   D.Text.drawMarqueeText(
     pid,
-    "__raid_announce",
+    id,
     tostring(text or ""),
     baseline,
     font, scale,
     z,
     speed,
     {
-      x=x, y=y, width=width, height=height,
-      padding_x=padding_x, padding_y=padding_y,
-      loops=loops, scale=backdrop_scale,
+      x = x, y = y, width = width, height = height,
+      padding_x = padding_x, padding_y = padding_y,
+      loops = loops, scale = backdrop_scale,
     }
   )
 end
@@ -679,6 +724,10 @@ local function _raid_action(npc, pid, dialogue, relay_object)
 
     local spec = _pick_weighted(pack_list) or pack_list[1]
 
+    if spec and not spec.results_callback then
+      spec.results_callback = _persist_health_and_emotion
+    end
+
     -- Begin encounter and await result
     local stats = await(ezencounters.begin_encounter(pid, spec))
 
@@ -1016,14 +1065,57 @@ if not _G.__RAIDS_LOGIN_ANNOUNCE then
   Net:on("player_join", function(ev)
     local pid = ev.player_id
 
+    ------------------------------------------------------------------
+    -- 1) Global login marquee: "<name> logged in!"
+    ------------------------------------------------------------------
+    do
+      local login_name = ("Player %s"):format(pid)
+      if Net.get_player_name then
+        local ok_name, pname = pcall(Net.get_player_name, pid)
+        if ok_name and pname and pname ~= "" then
+          login_name = pname
+        end
+      end
+
+      local login_text = string.format("%s logged in!", login_name)
+
+      -- Small-ish ticker near the bottom-left; tweak numbers to taste.
+      local login_opts = {
+        id           = "__raid_login_announce", -- unique id for login ticker
+        scale        = 0.9,
+        width        = 120,
+        height       = 16,
+        padding_x    = 3,
+        padding_y    = 2,
+        margin_right = 115,   -- with width=150 on 240px screen, this puts x ~ 4px from left
+        y            = 300,  -- near bottom (0 = top, 160 = bottom)
+        z            = 210,  -- slightly under the big raid marquee (z=220)
+        speed        = "slow",
+        loops        = 1,    -- <- exactly one loop
+        font         = "THICK", -- or UI.font / "THICK", whatever you prefer
+      }
+
+      local ok_broadcast, err_broadcast = pcall(_announce_all, login_text, login_opts)
+      if not ok_broadcast then
+        print(("[RAIDS] login broadcast marquee error pid=%s: %s")
+          :format(pid, tostring(err_broadcast)))
+      end
+    end
+
+    ------------------------------------------------------------------
+    -- 2) Existing logic: test marquee + raid status on login
+    ------------------------------------------------------------------
+
     -- Decide which area to read state from
     local area_for_state = LOGIN_ANNOUNCE_MEM_AREA or RAID_MEM_AREA or Net.get_player_area(pid)
     print(("[RAIDS] login check pid=%s area_for_state=%s"):format(pid, tostring(area_for_state)))
 
-    -- If you enabled the local test marquee, show it here (optional)
+    -- Optional test marquee just for this player
     if TEST_LOGIN_MARQUEE then
       local ok, err = pcall(_marquee, pid, TEST_LOGIN_TEXT, TEST_LOGIN_OPTS)
-      if not ok then print(("[RAIDS] login test marquee error pid=%s: %s"):format(pid, tostring(err))) end
+      if not ok then
+        print(("[RAIDS] login test marquee error pid=%s: %s"):format(pid, tostring(err)))
+      end
     end
 
     -- Choose which raid to show
@@ -1032,19 +1124,20 @@ if not _G.__RAIDS_LOGIN_ANNOUNCE then
       rid = tostring(LOGIN_ANNOUNCE_RAID_ID)
       s   = _peek_store(area_for_state)[rid]  -- <-- DO NOT create new state
       if not s then
-        print(("[RAIDS] login check: pinned rid=%s not found in area=%s"):format(rid, tostring(area_for_state)))
+        print(("[RAIDS] login check: pinned rid=%s not found in area=%s")
+          :format(rid, tostring(area_for_state)))
         return
       end
       if not _is_active(s) then
         print(("[RAIDS] login check: pinned rid=%s exists but not active (w1=%s w2=%s wave=%s)")
-              :format(rid, tostring(s.wave1_points), tostring(s.wave2_points), tostring(s.wave)))
+          :format(rid, tostring(s.wave1_points), tostring(s.wave2_points), tostring(s.wave)))
         return
       end
     else
       -- Fallback to auto-detect (find active raid or most-progressed)
       rid, s = _find_active_or_progress(area_for_state)
       if not s or not _is_active(s) then
-        print("[RAIDS] login check: no active raid in state (rid="..tostring(rid)..")")
+        print("[RAIDS] login check: no active raid in state (rid=" .. tostring(rid) .. ")")
         return
       end
     end
@@ -1052,15 +1145,20 @@ if not _G.__RAIDS_LOGIN_ANNOUNCE then
     -- Build the status string from the selected state
     local msg
     if s.wave == 1 then
-      msg = string.format("RAID IN PROGRESS - %s - W1 %d/%d", rid, s.wave1_points or 0, s.wave2_points_required or 0)
+      msg = string.format("RAID IN PROGRESS - %s - W1 %d/%d",
+        rid, s.wave1_points or 0, s.wave2_points_required or 0)
     elseif s.wave == 2 then
-      msg = string.format("RAID IN PROGRESS - %s - W2 %d/%d", rid, s.wave2_points or 0, s.wave3_points_required or 0)
+      msg = string.format("RAID IN PROGRESS - %s - W2 %d/%d",
+        rid, s.wave2_points or 0, s.wave3_points_required or 0)
     else
-      msg = string.format("RAID IN PROGRESS - %s - Boss %d/%d", rid, s.boss_pool_hp or 0, s.boss_pool_max or 0)
+      msg = string.format("RAID IN PROGRESS - %s - Boss %d/%d",
+        rid, s.boss_pool_hp or 0, s.boss_pool_max or 0)
     end
 
     local ok, err = pcall(_marquee, pid, msg, { loops = 2 })
-    if not ok then print(("[RAIDS] login marquee error pid=%s: %s"):format(pid, tostring(err))) end
+    if not ok then
+      print(("[RAIDS] login marquee error pid=%s: %s"):format(pid, tostring(err)))
+    end
   end)
 end
 

@@ -12,6 +12,7 @@
   <property name="Name" value="WCity2"/>
   <property name="OctoPVP" value="true"/>
   <property name="Song" value="/server/assets/wcity_1.ogg"/>
+  <property name="Stasis" value="43,44,0"/>
  </properties>
  <tileset firstgid="1" source="../assets/tiles/central_arrows2.tsx"/>
  <tileset firstgid="5" source="../assets/tiles/Custom_Central_Tiles.tsx"/>

@@ -12,6 +12,7 @@
   <property name="Name" value="WCity1"/>
   <property name="OctoPVP" value="true"/>
   <property name="Song" value="/server/assets/wcity_1.ogg"/>
+  <property name="Stasis" value="36,20,0"/>
  </properties>
  <tileset firstgid="1" source="../assets/tiles/Custom_Central_Tiles.tsx"/>
  <tileset firstgid="9" source="../assets/tiles/hp_warp_blue.tsx"/>
@@ -1184,7 +1185,7 @@
    <properties>
     <property name="Dialogue Type" value="none"/>
     <property name="Event Name" value="raid"/>
-    <property name="Raid ID" value="RaidTest2"/>
+    <property name="Raid ID" value="Mettaur1"/>
    </properties>
    <point/>
   </object>
@@ -1192,7 +1193,7 @@
    <properties>
     <property name="Color" type="color" value="#ffff0000"/>
     <property name="Name" value="RaidBBS"/>
-    <property name="Raid ID" value="RaidTest2"/>
+    <property name="Raid ID" value="Mettaur1"/>
    </properties>
   </object>
  </objectgroup>

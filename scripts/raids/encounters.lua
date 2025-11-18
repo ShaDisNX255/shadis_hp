@@ -304,8 +304,8 @@ local boss = {
 }
 
 -- Register for raid id "default": Wave1 = E1/E2/E3, Wave2 = E4/E5/E6, Boss = boss
-Enc.register("RaidTest2", 1, { E1, E2, E3 })
-Enc.register("RaidTest2", 2, { E4, E5, E6 })
-Enc.register("RaidTest2", 3, { boss })
+Enc.register("Mettaur1", 1, { E1, E2, E3 })
+Enc.register("Mettaur1", 2, { E4, E5, E6 })
+Enc.register("Mettaur1", 3, { boss })
 
 return Enc

@@ -3,6 +3,18 @@ local helpers  = require('scripts/ezlibs-scripts/helpers')
 local ygo_pvp  = require('scripts/ezlibs-custom/ygo_pvp')
 local jobbbs  = require('scripts/jobbbs/JobBBS')
 local fishing  = require('scripts/ezlibs-custom/fishing')
+-- Optional L-Menu (net-games) support
+local LMenu
+do
+  local ok, M = pcall(require, "scripts/ezlibs-custom/LMenu")
+  if ok and M then
+    LMenu = M
+    print("[cards] LMenu module loaded; L button will open LMenu.")
+  else
+    print("[cards] LMenu module not found; L button will use legacy behaviour (if enabled).")
+  end
+end
+
 
 local custom = {}
 -- Read an item’s info/meta when you might have either "area,id" or just a raw id.
@@ -762,15 +774,29 @@ end
 -- compute target “in front” of the player, snapped to 1/16, INCLUDING Z
 local function compute_target_in_front(pid)
   local area_id = Net.get_player_area(pid)
-  local pos     = Net.get_player_position(pid) or {x=0, y=0, z=0}
-  local dir     = as_dir_string(Net.get_player_direction(pid))
-  local px      = pos.x or pos[1] or 0
-  local py      = pos.y or pos[2] or 0
-  local pz      = pos.z or pos[3] or 0
-  local dx, dy  = dir_to_front_offset(dir)
-  local sx      = round16(px + dx)
-  local sy      = round16(py + dy)
-  local sz      = pz  -- keep same floor/z as player
+
+  local pos, dir
+  local double_id = pid .. "-double"
+
+  -- If the net-games freeze double exists, use its position/direction
+  if Net.is_bot and Net.get_bot_position and Net.get_bot_direction
+     and Net.is_bot(double_id) then
+    pos = Net.get_bot_position(double_id) or { x = 0, y = 0, z = 0 }
+    dir = as_dir_string(Net.get_bot_direction(double_id))
+  else
+    -- Fallback: normal player position/direction
+    pos = Net.get_player_position(pid) or { x = 0, y = 0, z = 0 }
+    dir = as_dir_string(Net.get_player_direction(pid))
+  end
+
+  local px = pos.x or pos[1] or 0
+  local py = pos.y or pos[2] or 0
+  local pz = pos.z or pos[3] or 0
+  local dx, dy = dir_to_front_offset(dir)
+  local sx = round16(px + dx)
+  local sy = round16(py + dy)
+  local sz = pz -- keep same floor/z
+
   return area_id, sx, sy, sz
 end
 
@@ -898,6 +924,76 @@ local function spawn_card_npc_for_all(pid, info)
   return bot_id
 end
 
+-- === External API for LMenu / other modules ===
+_G.card_overworld_api = _G.card_overworld_api or {}
+
+do
+  local api = _G.card_overworld_api
+
+  --- Has the player “armed” a card (viewed a card’s description)?
+  function api.is_card_armed(pid)
+    return last_viewed_card_by_player[pid] ~= nil
+  end
+
+  --- Does the player currently have an overworld card summon?
+  function api.has_summon(pid)
+    return summoned_bot_by_player[pid] ~= nil
+  end
+
+  --- Try to summon the currently armed card.
+  --- Returns true on success, false on failure.
+  function api.summon_armed(pid)
+    local info = last_viewed_card_by_player[pid]
+    if not info then
+      Net.message_player(pid, "(View a card first.)")
+      return false
+    end
+
+    -- If something is already summoned, remove it first.
+    if summoned_bot_by_player[pid] then
+      pcall(Net.remove_bot, summoned_bot_by_player[pid])
+      summoned_bot_by_player[pid] = nil
+    end
+
+    -- This is your existing helper that spawns the OW NPC for the card.
+    local bot_id = spawn_card_npc_for_all(pid, info)
+    if bot_id then
+      summoned_bot_by_player[pid] = bot_id
+      return true
+    end
+
+    return false
+  end
+
+  --- Try to dismiss the current summon.
+  function api.unsummon(pid)
+    if summoned_bot_by_player[pid] then
+      pcall(Net.remove_bot, summoned_bot_by_player[pid])
+      summoned_bot_by_player[pid] = nil
+      return true
+    end
+    return false
+  end
+
+  --- Open the Card Collection (same as old L behaviour).
+  function api.open_card_list(pid)
+    -- This is your existing local helper; we just wrap it.
+    return open_card_list(pid)
+  end
+end
+
+-- Wrapper so LMenu can open the card collection
+function custom.open_card_collection_from_lmenu(pid)
+  return open_card_list(pid)
+end
+
+-- If LMenu is available, wire its Cards option to our collection
+if LMenu and LMenu.set_cards_callback then
+  LMenu.set_cards_callback(function(pid)
+    custom.open_card_collection_from_lmenu(pid)
+  end)
+end
+
 -- === Duel↔Overworld helpers (spawn “behind”, reuse your summon table) ===
 
 -- Track table exists earlier; just reuse it here
@@ -985,42 +1081,42 @@ print("[cards] Loaded card collection menu (spawns IN FRONT on same Z; no follow
 --  - If pending, open Card Options.
 --  - Else if a summon exists, open Card Options.
 --  - Else open Card List.
-Net:on("tile_interaction", function(event)
-  if event.button ~= 1 then return end -- Left Shoulder only
-  local pid = event.player_id
-  log("tile_interaction (Left Shoulder) pid", pid, "pending_actions_menu=", pending_actions_menu[pid], "has_summon=", summoned_bot_by_player[pid] ~= nil)
-  -- Detect an active battle UI for this player
-  local battle_up = (_battle_active and _battle_active(pid))
-                 or (custom and custom.is_battle_open_for and custom.is_battle_open_for(pid))
-                 or false
+--Net:on("tile_interaction", function(event)
+--  if event.button ~= 1 then return end -- Left Shoulder only
+--  local pid = event.player_id
+--  log("tile_interaction (Left Shoulder) pid", pid, "pending_actions_menu=", pending_actions_menu[pid], "has_summon=", summoned_bot_by_player[pid] ~= nil)
+--  -- Detect an active battle UI for this player
+--  local battle_up = (_battle_active and _battle_active(pid))
+                 --or (custom and custom.is_battle_open_for and custom.is_battle_open_for(pid))
+                 --or false
 
   -- ✅ If we’re in battle AND the viewer set the "open actions next" latch,
   -- open the battle actions instead of the Card Viewer.
-  if battle_up and pending_actions_menu[pid] then
-    in_actions_menu[pid] = true              -- we’re explicitly going into actions
+--  if battle_up and pending_actions_menu[pid] then
+--    in_actions_menu[pid] = true              -- we’re explicitly going into actions
     -- leave pending_actions_menu[pid] as-is or clear it here; either is fine.
     -- Clearing here is a bit tidier:
-    pending_actions_menu[pid] = false
+--    pending_actions_menu[pid] = false
 
     -- trigger a reopen so build_main_posts can render Summon/Set at top
-    battle_reopen[pid] = true
-    pcall(Net.close_bbs, pid)
-    return
-  end
+--    battle_reopen[pid] = true
+--    pcall(Net.close_bbs, pid)
+--    return
+--  end
 
-  if pending_actions_menu[pid] then
-    pending_actions_menu[pid] = false
-    open_actions_menu(pid, "Card Options")
-    return
-  end
+--  if pending_actions_menu[pid] then
+--    pending_actions_menu[pid] = false
+--    open_actions_menu(pid, "Card Options")
+--    return
+--  end
 
-  if summoned_bot_by_player[pid] then
-    open_actions_menu(pid, "Card Options")
-    return
-  end
+--  if summoned_bot_by_player[pid] then
+--    open_actions_menu(pid, "Card Options")
+--    return
+--  end
 
-  open_card_list(pid)
-end)
+--  open_card_list(pid)
+--end)
 
 -- ==========
 -- Card Trader (BBS) minimal picker (integrated)
@@ -3643,5 +3739,13 @@ function custom.begin_card_battle_await(pid, cfg)
     return result or (_last_duel_result and _last_duel_result[pid]) or nil
   end)
 end
+
+pcall(function()
+  if LMenu and LMenu.set_cards_callback and open_card_list then
+    LMenu.set_cards_callback(function(pid)
+      open_card_list(pid)
+    end)
+  end
+end)
 
 print("[cards] custom plugin ready"); return custom
