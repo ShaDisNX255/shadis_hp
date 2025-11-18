@@ -613,7 +613,7 @@ function LMenu.close(pid)
   log("Closed LMenu for", pid)
 end
 
-local NAV_DEBOUNCE_SEC = 0.10  -- tweak if needed
+local NAV_DEBOUNCE_SEC = 0.02  -- tweak if needed
 
 local function nav_allowed(st, button)
   -- Use os.clock() if available; otherwise no debouncing.
