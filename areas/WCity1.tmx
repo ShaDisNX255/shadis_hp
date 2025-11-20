@@ -6,6 +6,7 @@
   <property name="Background Texture" value="/server/assets/custom/backgrounds/wcity/01-generic1.png"/>
   <property name="Background Vel X" type="float" value="0.45"/>
   <property name="Background Vel Y" type="float" value="0.25"/>
+  <property name="Forced Base HP" type="int" value="100"/>
   <property name="Honor HPMem" type="bool" value="true"/>
   <property name="Mystery Data Maximum" type="int" value="6"/>
   <property name="Mystery Data Minimum" type="int" value="2"/>

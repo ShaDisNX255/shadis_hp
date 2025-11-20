@@ -2299,14 +2299,34 @@ eznpcs.add_event({
               await(say(player_id, dprop(dialogue, "No Money Text", DEFAULTS.NoMoneyText), mug))
               return finish(next_ids[3] or next_ids[2])
             end
+
             await(grant_key_if_missing())
-            local base_ts = manual_purchased_at or now_ts
+
+            -- ✅ FIX: stack new time from the existing expiry when the lease is still active
+            local base_ts
+            if record.expires_at and record.expires_at > now_ts then
+              -- Extend from current expiry (so you never lose already-paid days)
+              base_ts = record.expires_at
+            else
+              -- Fallback (shouldn’t normally hit this in the renewal path)
+              base_ts = manual_purchased_at or now_ts
+            end
+
             local start_ts, end_ts = new_window_from(base_ts)
-            record.owned_at = start_ts; record.expires_at = end_ts; record.owner_name = player_name
+
+            -- Keep the original owned_at if it already exists; only set it on first purchase
+            record.owned_at   = record.owned_at or start_ts
+            record.expires_at = end_ts
+            record.owner_name = player_name
             save_record(record)
-            await(say(player_id, dprop(dialogue, "Renewed Text", DEFAULTS.RenewedText):gsub("{date}", fmt(end_ts)), mug))
+
+            await(say(
+              player_id,
+              dprop(dialogue, "Renewed Text", DEFAULTS.RenewedText):gsub("{date}", fmt(end_ts)),
+              mug
+            ))
             return finish(next_ids[1])
-          else
+          end
             -- Renter declined renewal: offer to clear HP as a safeguard
             local clear_prompt = dprop(dialogue, "Clear HP Prompt", "Would you like to clear your HP?")
             local do_clear = await(Async.question_player(player_id, clear_prompt, mug.texture_path, mug.animation_path))
