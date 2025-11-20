@@ -1,0 +1,36 @@
+animation state="SUMMON_SELECTED"
+frame duration="0.1" x="0" y="0" w="86" h="15" originx="0" originy="0" flipx="0" flipy="0"
+
+animation state="SUMMON_UNSELECTED"
+frame duration="0.1" x="0" y="16" w="86" h="15" originx="0" originy="0" flipx="0" flipy="0"
+
+animation state="UNSUMMON_SELECTED"
+frame duration="0.1" x="0" y="31" w="86" h="15" originx="0" originy="0" flipx="0" flipy="0"
+
+animation state="UNSUMMON_UNSELECTED"
+frame duration="0.1" x="0" y="47" w="86" h="15" originx="0" originy="0" flipx="0" flipy="0"
+
+
+animation state="IDLE_DR"
+
+animation state="IDLE_DL"
+
+animation state="IDLE_UR"
+
+animation state="IDLE_UL"
+
+animation state="WALK_DR"
+
+animation state="WALK_DL"
+
+animation state="WALK_UR"
+
+animation state="WALK_UL"
+
+animation state="RUN_DR"
+
+animation state="RUN_DL"
+
+animation state="RUN_UR"
+
+animation state="RUN_UL"

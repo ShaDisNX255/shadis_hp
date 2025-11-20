@@ -94,6 +94,7 @@ local ONCEHUB_CATALOG = {
   { id = "bug_frag",  name = "Bug Frag",  ts_source = "../assets/objects/frag.tsx", gid = 301, layer = "Object Layer 2" },
   { id = "skull_1",  name = "DOTD Skull Blk",  ts_source = "../assets/objects/skull_1.tsx", gid = 303, layer = "Object Layer 2" },
   { id = "skull_2",  name = "DOTD Skull Wht",  ts_source = "../assets/objects/skull_2.tsx", gid = 304, layer = "Object Layer 2" },
+  { id = "nov_fountain",  name = "Blue Fountain",  ts_source = "../assets/objects/fountain.tsx", gid = 305, layer = "Object Layer 2" },
   { id = "card_frame", name = "Card Frame" },
 }
 
@@ -313,16 +314,16 @@ local function get_record_and_prune(BUCKET_AREA_ID, once_key)
   local mem = ensure_bucket_mem(BUCKET_AREA_ID)
   local rec = mem.onceitems and mem.onceitems[once_key]
   if not rec then
-    -- No lease record; nothing to prune here. (Rehydrate path still treats this as expired.)
+    -- No lease record; nothing to prune here.
     return mem, nil
   end
 
   if (not rec.expires_at) or (rec.expires_at <= os.time()) then
-    -- 1) Clear checkpoint password if present
-    if rec.password then
-      rec.password = nil
-      ezmemory.save_area_memory(BUCKET_AREA_ID)
-    end
+    -- 1) Clear checkpoint password AND public access if present
+    local mutated = false
+    if rec.password then rec.password = nil; mutated = true end
+    if rec.public_access then rec.public_access = nil; mutated = true end
+    if mutated then ezmemory.save_area_memory(BUCKET_AREA_ID) end
 
     -- 2) Resolve the owning area for this once_key (same bucket first)
     local owner_area = mem.oncehub_key_areas and mem.oncehub_key_areas[once_key] or nil
@@ -1879,8 +1880,28 @@ local function open_decorate_menu(player_id, dialogue)
         -- Remove your object (no remove-mode)
         local oid = find_my_object()
         if oid then
+          -- Look up the object so we can special-case Card Frame
+          local obj = Net.get_object_by_id(area_id, oid)
+          local cp  = obj and obj.custom_properties or {}
+
+          if (cp.oncehub_id or "") == "card_frame" then
+            -- Refund to the Card Frame owner (the placer)
+            pcall(_refund_card_to_frame_owner, cp)
+
+            -- Despawn bot (prefer stored id, then fallback helper)
+            local direct = cp.cf_bot_id and tostring(cp.cf_bot_id) or nil
+            if direct and direct ~= "" then
+              pcall(Net.remove_bot, direct)
+            end
+            if type(_cf_remove_bot) == "function" then
+              pcall(_cf_remove_bot, area_id, once_key, obj.x, obj.y, obj.z, direct)
+            end
+          end
+
+          -- Remove the invisible anchor and persist placements
           pcall(Net.remove_object, area_id, oid)
           persist_area(area_id, BUCKET_AREA_ID, once_key)
+
           await(Async.message_player(player_id, "Your placed object was removed."))
         else
           await(Async.message_player(player_id, "You haven't placed any object here."))
@@ -1975,38 +1996,74 @@ end
 
 local function open_pass_menu(player_id, npc, dialogue)
   return async(function ()
-    local opts = {
-      helpers.create_bbs_option("Set visitor password"),
-      helpers.create_bbs_option("Clear visitor password"),
-    }
-    local board = _open_menu_ignoring_custom(player_id, "Visitor Password", MENU_COLOR.BLUE, opts, "oncehub:pass")
-    local sel = await(board.selection_once())
-	_oh_log(player_id, "pass selection: "..tostring(sel))
-	menu_closed_now(player_id, 0.5)
-	fast_close_board(player_id)
-
+    local mug = eznpcs.get_dialogue_mugshot(npc, player_id, dialogue)
     local once_key = normalize_key(dprop(dialogue, "Once Key", ""))
-    if once_key == "" then await(Async.message_player(player_id, "This butler needs an 'Once Key' property.")); return end
+    if once_key == "" then await(say(player_id, "This butler needs an 'Once Key' property.", mug)); return nil end
+
     local BUCKET = resolve_mem_area_id(dialogue, player_id, nil)
     local mem = ezmemory.get_area_memory(BUCKET); mem.onceitems = mem.onceitems or {}
     local rec = mem.onceitems[once_key]
     local now = os.time()
-    if (not rec) or (not rec.expires_at) or (rec.expires_at <= now) or (helpers.get_safe_player_secret(player_id) ~= rec.owner_secret) then
-      await(Async.message_player(player_id, "Only the current renter can change the password.")); return
+    if (not rec) or (not rec.expires_at) or (rec.expires_at <= now)
+       or (helpers.get_safe_player_secret(player_id) ~= rec.owner_secret) then
+      await(say(player_id, "Only the current renter can change visitor access.", mug))
+      return nil
     end
 
-    if sel == "Clear visitor password" then
-      rec.password = nil; ezmemory.save_area_memory(BUCKET); await(Async.message_player(player_id, "Password cleared."))
-    elseif sel == "Set visitor password" then
-      await(Async.message_player(player_id, "Enter a password (1-24 chars):"))
+    -- Dynamic labels
+    local LABEL_SET    = "Set visitor password"
+    local LABEL_CLEAR  = "Clear visitor password"
+    local LABEL_TOGGLE = (rec.public_access == true) and "Require password to enter"
+                                                    or  "Open to everyone"
+
+    -- Build & open board
+    local opts = {
+      helpers.create_bbs_option(LABEL_SET),
+      helpers.create_bbs_option(LABEL_CLEAR),
+      helpers.create_bbs_option(LABEL_TOGGLE),
+    }
+    local board = _open_menu_ignoring_custom(player_id, "Visitor Access", MENU_COLOR.BLUE, opts, "oncehub:pass")
+    local sel = await(board.selection_once())
+    menu_closed_now(player_id, 0.5)
+    fast_close_board(player_id)
+    if not sel then return nil end
+
+    if sel == LABEL_CLEAR then
+      rec.password = nil
+      rec.public_access = false
+      ezmemory.save_area_memory(BUCKET)
+      await(say(player_id, "Password cleared. (Visitors are still blocked unless you open access.)", mug))
+      return nil
+
+    elseif sel == LABEL_SET then
+      await(say(player_id, "Enter a password (1-24 chars):", mug))
       local pw = await(Async.prompt_player(player_id)) or ""
       pw = pw:gsub("^%s+",""):gsub("%s+$","")
       if #pw < 1 or #pw > 24 then
-        await(Async.message_player(player_id, "Password must be 1–24 characters."))
+        await(say(player_id, "Password must be 1–24 characters.", mug))
       else
-        rec.password = pw; ezmemory.save_area_memory(BUCKET); await(Async.message_player(player_id, "Password saved."))
+        rec.password = pw
+        rec.public_access = false  -- setting a pw disables public mode
+        ezmemory.save_area_memory(BUCKET)
+        await(say(player_id, "Password saved.", mug))
       end
+      return nil
+
+    elseif sel == LABEL_TOGGLE then
+      if rec.public_access == true then
+        rec.public_access = false
+        ezmemory.save_area_memory(BUCKET)
+        await(say(player_id, "Visitors must enter a password to enter. (Set one with “Set visitor password”.)", mug))
+      else
+        rec.public_access = true
+        rec.password = nil          -- public mode ignores pw; clear it to avoid confusion
+        ezmemory.save_area_memory(BUCKET)
+        await(say(player_id, "This HP is now open to everyone (no password).", mug))
+      end
+      return nil
     end
+
+    return nil
   end)
 end
 
@@ -2214,8 +2271,16 @@ eznpcs.add_event({
       local safe_secret = helpers.get_safe_player_secret(player_id)
       local player_name = Net.get_player_name(player_id)
 
-      local function save_record(r) mem.onceitems[once_key] = r; ezmemory.save_area_memory(BUCKET_AREA_ID) end
-      local function can_afford(amount) return amount <= 0 or (Net.get_player_money(player_id) >= amount and ezmemory.spend_player_money(player_id, amount)) end
+      local function save_record(r)
+        mem.onceitems[once_key] = r
+        ezmemory.save_area_memory(BUCKET_AREA_ID)
+      end
+
+      local function can_afford(amount)
+        return amount <= 0
+          or (Net.get_player_money(player_id) >= amount
+          and ezmemory.spend_player_money(player_id, amount))
+      end
 
       local function grant_key_if_missing()
         return async(function ()
@@ -2230,41 +2295,86 @@ eznpcs.add_event({
         end)
       end
 
-      local function new_window_from(ts) local s,e = compute_period(ts, lease_months, lease_minutes); return s,e end
+      local function new_window_from(ts)
+        local s, e = compute_period(ts, lease_months, lease_minutes)
+        return s, e
+      end
 
+      ----------------------------------------------------------------
+      -- 1) EXISTING ACTIVE RENTAL?
+      ----------------------------------------------------------------
       if record and record.expires_at and record.expires_at > now_ts then
+        -- HP is currently rented
+
         if record.owner_secret == safe_secret then
+          ----------------------------------------------------------------
+          -- OWNER: OFFER RENEWAL (STACK FROM CURRENT EXPIRY)
+          ----------------------------------------------------------------
           local prompt = dprop(dialogue, "Renew Prompt", DEFAULTS.RenewPrompt)
-          prompt = prompt:gsub("{date}", fmt(record.expires_at)):gsub("{price}", tostring(renewal_price))
+          prompt = prompt
+            :gsub("{date}", fmt(record.expires_at))
+            :gsub("{price}", tostring(renewal_price))
+
           local wants = (renewal_price <= 0) or ask_yes_no(player_id, prompt, mug)
           if wants then
             if not can_afford(renewal_price) then
               await(say(player_id, dprop(dialogue, "No Money Text", DEFAULTS.NoMoneyText), mug))
               return finish(next_ids[3] or next_ids[2])
             end
+
             await(grant_key_if_missing())
-            local base_ts = manual_purchased_at or now_ts
+
+            -- STACK from current expiry so no time is lost
+            local base_ts
+            if record.expires_at and record.expires_at > now_ts then
+              base_ts = record.expires_at
+            else
+              base_ts = manual_purchased_at or now_ts
+            end
+
             local start_ts, end_ts = new_window_from(base_ts)
-            record.owned_at = start_ts; record.expires_at = end_ts; record.owner_name = player_name
+
+            -- Keep behavior close to original: owned_at = start of current lease window
+            record.owned_at     = start_ts
+            record.expires_at   = end_ts
+            record.owner_name   = player_name
+            record.owner_secret = record.owner_secret or safe_secret
+
             save_record(record)
-            await(say(player_id, dprop(dialogue, "Renewed Text", DEFAULTS.RenewedText):gsub("{date}", fmt(end_ts)), mug))
+
+            await(say(
+              player_id,
+              dprop(dialogue, "Renewed Text", DEFAULTS.RenewedText):gsub("{date}", fmt(end_ts)),
+              mug
+            ))
             return finish(next_ids[1])
           else
-            -- Renter declined renewal: offer to clear HP as a safeguard
-            local clear_prompt = dprop(dialogue, "Clear HP Prompt", "Would you like to clear your HP?")
-            local do_clear = await(Async.question_player(player_id, clear_prompt, mug.texture_path, mug.animation_path))
+            ----------------------------------------------------------------
+            -- OWNER DECLINED RENEWAL → OFFER CLEAR HP
+            ----------------------------------------------------------------
+            local clear_prompt =
+              dprop(dialogue, "Clear HP Prompt", "Would you like to clear your HP?")
+            local do_clear = await(Async.question_player(
+              player_id,
+              clear_prompt,
+              mug.texture_path,
+              mug.animation_path
+            ))
 
             if do_clear == 1 then
               -- Prefer explicit HP Area; fall back to player's current area if not set
               local hp_area_id = tostring(dprop(dialogue, "HP Area", ""))
-              if hp_area_id == "" then hp_area_id = Net.get_player_area(player_id) end
+              if hp_area_id == "" then
+                hp_area_id = Net.get_player_area(player_id)
+              end
 
               local removed = 0
               for _, oid in ipairs(Net.list_objects(hp_area_id) or {}) do
                 local o  = Net.get_object_by_id(hp_area_id, oid)
                 local cp = o and o.custom_properties
-                if cp and cp.placed_by_oncehub == "true"
-                   and normalize_key(cp.oncehub_key) == normalize_key(once_key) then
+                if cp
+                  and cp.placed_by_oncehub == "true"
+                  and normalize_key(cp.oncehub_key) == normalize_key(once_key) then
                   pcall(Net.remove_object, hp_area_id, oid)
                   removed = removed + 1
                 end
@@ -2275,37 +2385,55 @@ eznpcs.add_event({
 
               await(Async.message_player(
                 player_id,
-                (removed > 0) and ("HP cleared ("..removed.." objects removed).") or "HP was already clear.",
-                mug.texture_path, mug.animation_path
+                (removed > 0)
+                  and ("HP cleared ("..removed.." objects removed).")
+                  or "HP was already clear.",
+                mug.texture_path,
+                mug.animation_path
               ))
             end
 
             return finish(next_ids[2])
           end
+
         else
+          ----------------------------------------------------------------
+          -- NOT OWNER: BLOCK RENTAL WHILE ACTIVE
+          ----------------------------------------------------------------
           local msg = dprop(dialogue, "Owned Text", DEFAULTS.OwnedText)
-          msg = msg:gsub("{owner}", record.owner_name or "someone")
-                   :gsub("{item}",  item_info.name or "item")
-                   :gsub("{date}",  fmt(record.expires_at))
+          msg = msg
+            :gsub("{owner}", record.owner_name or "someone")
+            :gsub("{item}",  item_info.name or "item")
+            :gsub("{date}",  fmt(record.expires_at))
+
           await(say(player_id, msg, mug))
           return finish(next_ids[2])
         end
-      end
+      end  -- end "existing active rental" block
 
+      ----------------------------------------------------------------
+      -- 2) NO ACTIVE RENTAL → OFFER NEW RENT
+      ----------------------------------------------------------------
       local base_ts = manual_purchased_at or now_ts
       local _, preview_end = new_window_from(base_ts)
 
       local skip_confirm = dprop(dialogue, "Skip Rent Confirm", DEFAULTS.SkipRentConfirm) == "true"
       if not skip_confirm then
         local prompt = dprop(dialogue, "Rent Prompt", DEFAULTS.RentPrompt)
-        prompt = prompt:gsub("{item}",  item_info.name or "item")
-                       :gsub("{price}", tostring(price))
-                       :gsub("{date}",  fmt(preview_end))
+        prompt = prompt
+          :gsub("{item}",  item_info.name or "item")
+          :gsub("{price}", tostring(price))
+          :gsub("{date}",  fmt(preview_end))
+
         local wants = ask_yes_no(player_id, prompt, mug)
         if not wants then
           await(say(player_id, dprop(dialogue, "Declined Text", DEFAULTS.DeclinedText), mug))
           local declined_next = dprop(dialogue, "Declined Next", DEFAULTS.DeclinedNext)
-          if declined_next then return finish(declined_next) else return finish(nil) end
+          if declined_next then
+            return finish(declined_next)
+          else
+            return finish(nil)
+          end
         end
       end
 
@@ -2330,11 +2458,12 @@ eznpcs.add_event({
       save_record(new_rec)
 
       local sold_text = dprop(dialogue, "Sold Text", DEFAULTS.SoldText)
-      sold_text = sold_text:gsub("{owner}", player_name)
-                           :gsub("{item}",  item_info.name or "item")
-                           :gsub("{date}",  fmt(end_ts))
-      await(say(player_id, sold_text, mug))
+      sold_text = sold_text
+        :gsub("{owner}", player_name)
+        :gsub("{item}",  item_info.name or "item")
+        :gsub("{date}",  fmt(end_ts))
 
+      await(say(player_id, sold_text, mug))
       return finish(next_ids[1])
     end)
   end
@@ -2372,6 +2501,7 @@ eznpcs.add_event({
       local action = string.lower(dprop(dialogue, "Pass Action", DEFAULTS.PassAction))
       if action == "clear" then
         rec.password = nil
+        rec.public_access = false
         ezmemory.save_area_memory(BUCKET_AREA_ID)
         await(say(player_id, dprop(dialogue, "Pass Cleared Text", DEFAULTS.PassClearedText), mug))
         return nil
@@ -2554,20 +2684,25 @@ Net:on("object_interaction", function(event)
       if is_owner then
         unlocked = true
       else
-        local pw = rec.password
-        if pw and #pw > 0 then
-          if with_lock then
-            await(Async.message_player(player_id, cprop(cp, "Visitor Password Prompt", DEFAULTS.CP_VisitorPasswordPrompt)))
-            local input = await(Async.prompt_player(player_id))
-            if tostring(input or "") == pw then
-              unlocked = true
-            else
+        if rec.public_access == true then
+          -- Renter has allowed open access; let visitors through with no prompt.
+          unlocked = true
+        else
+          local pw = rec.password
+          if pw and #pw > 0 then
+            if with_lock then
+              await(Async.message_player(player_id, cprop(cp, "Visitor Password Prompt", DEFAULTS.CP_VisitorPasswordPrompt)))
+              local input = await(Async.prompt_player(player_id))
+              if tostring(input or "") == pw then
+                unlocked = true
+              else
+                await(Async.message_player(player_id, cprop(cp, "Wrong Password Message", DEFAULTS.CP_WrongPasswordMessage)))
+              end
+            end
+          else
+            if with_lock then
               await(Async.message_player(player_id, cprop(cp, "Wrong Password Message", DEFAULTS.CP_WrongPasswordMessage)))
             end
-          end
-        else
-          if with_lock then
-            await(Async.message_player(player_id, cprop(cp, "Wrong Password Message", DEFAULTS.CP_WrongPasswordMessage)))
           end
         end
       end

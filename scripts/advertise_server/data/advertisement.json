@@ -1,12 +1,12 @@
 {
     "listservers":{
-        "main":"https://www.keristero.xyz/server_list/"
+        "main":"https://onb.keristero.com/server_list/"
     },
     "advertisements":[
         {
             "unique_server_id":"shadishp",
             "name":"ShaDisHP",
-            "description":"A HomePage to just sit back and relax. Has a functioning Cyber Train. Updated weekly!",
+            "description":"BETA 11 required! A HomePage to just sit back and relax. Slowly working our way to becoming the first ONB MMO! Has a functioning Cyber Train. Updated weekly!",
             "tags":[],
             "address":"70.124.9.221:3000",
             "data":"",

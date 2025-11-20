@@ -36,8 +36,8 @@ local CONSTANTS = {
   },
   -- Asset Paths
   ASSET_FISHING_DIR      = "/server/assets/fishing/",
-  ASSET_NORMAL_DIR       = "normal/",
-  ASSET_SWEET_DIR        = "sweet-spot/",
+  ASSET_FISH_PNG         = "/server/assets/fishing/normal-fish.png",
+  ASSET_FISH_ANIM        = "/server/assets/fishing/normal-fish.animation",
   ASSET_TIMER_DIR        = "timer/",
   EX_ALERT_TSX           = "ex.tsx",
   -- Asset (METER) Properties
@@ -53,7 +53,7 @@ local CONSTANTS = {
   EXPECTED_EX_SIZE       = { w = 22, h = 22 },
   EX_SCREEN_SHIFT        = { x = -1.0, y = -1.0, z = 0.0 },
   -- Catch/Reward Values
-  FISH_REWARD_PER_LB     = 1000,
+  FISH_REWARD_PER_LB     = 700,
   MONEY_MULTIPLYER       = 500,
   -- Odds for each heaviness tier (percent-like weights; they don't need to sum to 100)
   HEAVINESS_CHANCES = {

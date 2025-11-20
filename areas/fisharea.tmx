@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.8" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="50" height="50" tilewidth="64" tileheight="32" infinite="0" nextlayerid="4" nextobjectid="92">
+<map version="1.10" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="50" height="50" tilewidth="64" tileheight="32" infinite="0" nextlayerid="4" nextobjectid="92">
  <properties>
   <property name="Background" value="custom"/>
   <property name="Background Animation" value="/server/assets/custom/backgrounds/fisharea/aquarium.animation"/>
@@ -8,6 +8,7 @@
   <property name="Background Vel Y" type="float" value="0"/>
   <property name="Name" value="Fish Area"/>
   <property name="Song" value="/server/assets/On the River.ogg"/>
+  <property name="Stasis" value="44,26,0"/>
  </properties>
  <tileset firstgid="1" source="../assets/tiles/central_platform.tsx"/>
  <tileset firstgid="241" source="../assets/tiles/EXE6_Shortcuts.tsx"/>
@@ -42,6 +43,7 @@
  <tileset firstgid="304" source="../assets/fishing/timer/5.tsx"/>
  <tileset firstgid="305" source="../assets/fishing/ex.tsx"/>
  <tileset firstgid="306" source="../assets/tiles/enclosed-water-tiles.tsx"/>
+ <tileset firstgid="354" source="../assets/tiles/HoloPanelz.tsx"/>
  <layer id="1" name="Tile Layer 0" width="50" height="50">
   <data encoding="csv">
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -70,7 +72,7 @@
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,315,307,307,321,72,83,93,109,91,61,72,83,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,315,307,307,321,72,83,0,0,0,71,81,82,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,315,307,307,321,72,83,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,314,319,319,317,81,82,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,314,319,319,317,81,82,0,0,0,0,0,0,355,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,

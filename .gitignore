@@ -9,4 +9,12 @@ scripts/bbs/data.json
 scripts/octo-ranking/player_id_ranks.json
 scripts/octo-ranking/player_id_ranks.txt
 logs.txt
-
+assets/displayer/*
+assets/net-games/*
+scripts/displayer/*
+run.sh
+players.txt
+server.pid
+watch.sh
+watcher.log
+watcher.pid

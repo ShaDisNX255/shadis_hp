@@ -36,7 +36,7 @@ local OBJ_SCORES   = "TeamScoresBBS"
 local JOIN_WINDOW_LAST_DAY = 31
 
 -- Test toggles
-local TEST_ALLOW_INFINITE_SWITCH = true  -- if true, switch teams unlimited times in a month
+local TEST_ALLOW_INFINITE_SWITCH = false  -- if true, switch teams unlimited times in a month
 local TEST_ALWAYS_ALLOW_CLAIM     = false -- if true, claim monthly rewards every press (uses current month)
 
 -- BBS header colors
@@ -46,6 +46,26 @@ local TEAM_COLORS = {
 }
 local COLOR_TEAM  = { r=160, g=220, b=255 } -- fallback
 local COLOR_SCORE = { r=255, g=230, b=160 }
+
+-- == GP from Raids ==
+local RAID_GP = {
+  -- conversion: how much progress equals 1 GP
+  w1_points_per_gp    = 50,     -- Wave 1 points → GP
+  w2_points_per_gp    = 30,     -- Wave 2 points → GP
+  boss_damage_per_gp  = 1000,   -- Boss damage → GP
+
+  -- daily caps
+  player_daily_cap    = 10,     -- max GP/player/day from raids
+  team_cap_per_active = 10,     -- team cap/day = active_contributors_today * this
+  team_daily_cap_min  = 10,     -- floor
+  team_daily_cap_max  = 80,     -- ceiling
+
+  -- underdog multiplier (updates daily; disabled in the last 48h)
+  underdog_enabled        = true,
+  underdog_mul            = 1.20,  -- applied to losing team
+  leading_mul             = 1.00,  -- applied to leading team
+  bonus_off_last_hours    = 48,    -- disable multipliers in last 48h of month
+}
 
 -- =========================
 -- ====== UTILITIES  =======
@@ -64,6 +84,13 @@ local function _count_keys(tbl)
   local n = 0
   for _ in pairs(tbl or {}) do n = n + 1 end
   return n
+end
+
+local function _coin_flip(month_key, salt)
+  local s = tostring(month_key or "") .. "|" .. tostring(salt or "")
+  local h = 0
+  for i = 1, #s do h = (h * 131 + s:byte(i)) % 1000000007 end
+  return (h % 2 == 0) and 1 or 2  -- returns 1 or 2
 end
 
 -- Weighted picker for { weight = N, ... } entries
@@ -124,32 +151,77 @@ end
 local function _roll_month_if_needed()
   local mem, t = _amem()
   local now_key = _month_key()
+
+  -- Month rollover: finalize last month into t.prev
   if t.month_key and t.month_key ~= now_key and t.month then
-    local p1 = t.month[1] or { total=0, roster={}, gp_by_secret={} }
-    local p2 = t.month[2] or { total=0, roster={}, gp_by_secret={} }
-    local function top_of(tb)
-      local best_s, best_gp = nil, -1
-      for s,gp in pairs(tb.gp_by_secret or {}) do
-        if gp > best_gp then best_gp, best_s = gp, s end
+    -- Ensure check-in fields exist on old month buckets
+    local p1 = t.month[1] or { total=0, roster={}, gp_by_secret={}, checkins_total=0, checkins_by_secret={} }
+    local p2 = t.month[2] or { total=0, roster={}, gp_by_secret={}, checkins_total=0, checkins_by_secret={} }
+
+    -- Deterministic coin flip based on month key + salt; returns 1 or 2
+    local function coin_flip(month_key, salt)
+      local s = tostring(month_key or "") .. "|" .. tostring(salt or "")
+      local h = 0
+      for i = 1, #s do h = (h * 131 + s:byte(i)) % 1000000007 end
+      return (h % 2 == 0) and 1 or 2
+    end
+
+    -- Per-team MVP selection with tie-break on MOST check-ins, then coin flip
+    local function top_of(tb, mkey, team_tag)
+      local best_s, best_gp, best_chk, best_coin = nil, -1, nil, nil
+      for s, gp in pairs(tb.gp_by_secret or {}) do
+        gp = tonumber(gp or 0)
+        local chk = tonumber((tb.checkins_by_secret and tb.checkins_by_secret[s]) or 0)
+        local cf  = coin_flip(mkey, "mvp|"..tostring(team_tag).."|"..tostring(s))  -- 1 or 2
+        if gp > best_gp
+           or (gp == best_gp and (best_chk == nil or chk > best_chk))   -- most check-ins wins
+           or (gp == best_gp and chk == best_chk and (best_coin == nil or cf < best_coin)) then
+          best_gp, best_s, best_chk, best_coin = gp, s, chk, cf
+        end
       end
+      if not best_s then return nil, 0 end
       return best_s, best_gp
     end
-    local s1,g1 = top_of(p1); local s2,g2 = top_of(p2)
+
+    local mkey = t.month_key
+    local s1, g1 = top_of(p1, mkey, 1)
+    local s2, g2 = top_of(p2, mkey, 2)
+
+    local tot1 = tonumber(p1.total or 0)
+    local tot2 = tonumber(p2.total or 0)
+
+    local win
+    if tot1 ~= tot2 then
+      win = (tot1 > tot2) and 1 or 2
+    else
+      -- Team tie: MOST total check-ins wins; else deterministic coin flip
+      local c1 = tonumber(p1.checkins_total or 0)
+      local c2 = tonumber(p2.checkins_total or 0)
+      if c1 ~= c2 then
+        win = (c1 > c2) and 1 or 2
+      else
+        win = coin_flip(mkey, "team") -- 1 or 2
+      end
+    end
+
     t.prev = {
       month_key = t.month_key,
-      totals    = { [1]=p1.total or 0, [2]=p2.total or 0 },
+      totals    = { [1]=tot1, [2]=tot2 },
       roster    = { [1]=_count_keys(p1.roster), [2]=_count_keys(p2.roster) },
       top       = { [1]={secret=s1, gp=g1 or 0}, [2]={secret=s2, gp=g2 or 0} },
-      winner    = ((p1.total or 0) == (p2.total or 0)) and 0 or (((p1.total or 0) > (p2.total or 0)) and 1 or 2),
+      winner    = win
     }
   end
+
+  -- Start a fresh current month if needed
   if t.month_key ~= now_key or not t.month then
     t.month_key = now_key
     t.month     = {
-      [1] = { total=0, roster={}, gp_by_secret={} },
-      [2] = { total=0, roster={}, gp_by_secret={} },
+      [1] = { total=0, roster={}, gp_by_secret={}, checkins_total=0, checkins_by_secret={} },
+      [2] = { total=0, roster={}, gp_by_secret={}, checkins_total=0, checkins_by_secret={} },
     }
   end
+
   t.names = t.names or {}
   _save_area()
   return mem, t
@@ -164,7 +236,7 @@ local function _pmem(pid)
   if cur.month ~= _month_key() then
     pmem.teams.hist = pmem.teams.hist or {}
     pmem.teams.hist[cur.month] = { team = cur.team, gp = cur.gp or 0 }
-    pmem.teams.current = { team = cur.team, month = _month_key(), gp = 0, last_switch_month = cur.last_switch_month }
+    pmem.teams.current = { team = cur.team, month = _month_key(), gp = 0, checkins = 0, last_switch_month = cur.last_switch_month }
   end
   pmem.teams.claimed = pmem.teams.claimed or {}
   pmem.teams.events_claimed = pmem.teams.events_claimed or {}
@@ -390,6 +462,18 @@ local function _grant_reward(pid, spec)
   end
 end
 
+local function _now() return os.time() end
+local function _today_key() return os.date("%Y-%m-%d", _now()) end
+local function _hours_until_month_end()
+  local now  = os.date("*t", _now())
+  local last = os.date("*t", os.time{year=now.year, month=now.month+1, day=0, hour=23, min=59, sec=59})
+  local sec  = os.difftime(os.time(last), _now())
+  return math.max(0, math.floor(sec/3600))
+end
+local function _is_last_48h_of_month()
+  return _hours_until_month_end() <= (RAID_GP.bonus_off_last_hours or 48)
+end
+
 
 -- =========================
 -- ====== GP EARNING  ======
@@ -420,6 +504,170 @@ local function _add_gp(pid, amount, why)
   _save_area()
 
   if why then Net.message_player(pid, ("+%d GP for %s."):format(amount, why)) end
+end
+
+-- Tracks daily GP cap usage & actives (by secret) + today's team multipliers
+local function _ensure_daily_bucket()
+  local mem, t_mem = _roll_month_if_needed()
+  t_mem.daily = t_mem.daily or {}
+  local key = _today_key()
+  local d = t_mem.daily[key]
+  if d then return d, t_mem end
+
+  d = {
+    active_by_team = { [1] = {}, [2] = {} },  -- set of secrets that contributed today
+    team_used      = { [1] = 0,   [2] = 0   },-- GP used by team today
+    player_used    = {},                      -- [secret] = GP used today
+    mul_today      = { [1] = 1.0, [2] = 1.0 }
+  }
+
+  -- compute underdog multipliers (once per day)
+  if RAID_GP.underdog_enabled and not _is_last_48h_of_month() then
+    t_mem.month[1] = t_mem.month[1] or { total=0, roster={}, gp_by_secret={} }
+    t_mem.month[2] = t_mem.month[2] or { total=0, roster={}, gp_by_secret={} }
+    local t1 = tonumber(t_mem.month[1].total or 0) or 0
+    local t2 = tonumber(t_mem.month[2].total or 0) or 0
+    if t1 > t2 then
+      d.mul_today[1] = RAID_GP.leading_mul or 1.0
+      d.mul_today[2] = RAID_GP.underdog_mul or 1.0
+    elseif t2 > t1 then
+      d.mul_today[2] = RAID_GP.leading_mul or 1.0
+      d.mul_today[1] = RAID_GP.underdog_mul or 1.0
+    else
+      d.mul_today[1], d.mul_today[2] = 1.0, 1.0 -- tie → no boost
+    end
+  end
+
+  t_mem.daily[key] = d
+  _save_area()
+  return d, t_mem
+end
+
+-- Last-known display name for a secret (prefers names cached this month)
+local function _last_known_name(secret, t_mem)
+  if t_mem and t_mem.names and t_mem.names[secret] and t_mem.names[secret] ~= "" then
+    return t_mem.names[secret]
+  end
+  local pm = ezmemory.get_player_memory(secret) or {}
+  local n = (pm.teams and pm.teams.last_name) or pm.last_name
+  if n and n ~= "" then return n end
+  return ("secret:"..tostring(secret):sub(1,6))
+end
+
+-- Award GP by secret (works if player is offline). pid_opt only used for an optional toast.
+local function _add_gp_by_secret(secret, amount, why, pid_opt)
+  amount = math.floor(tonumber(amount) or 0); if amount <= 0 then return end
+
+  local pm = ezmemory.get_player_memory(secret) or {}
+  pm.teams = pm.teams or {}
+  pm.teams.current = pm.teams.current or { team=nil, month=_month_key(), gp=0, last_switch_month=nil }
+  local cur = pm.teams.current
+  if not cur.team then return end
+
+  -- monthly rollover for player
+  if cur.month ~= _month_key() then
+    pm.teams.hist = pm.teams.hist or {}
+    pm.teams.hist[cur.month] = { team = cur.team, gp = cur.gp or 0 }
+    pm.teams.current = { team = cur.team, month = _month_key(), gp = 0, checkins = cur.checkins, last_switch_month = cur.last_switch_month }
+    cur = pm.teams.current
+  end
+
+  local mem, t_mem = _roll_month_if_needed()
+  local slot = t_mem.month[cur.team]
+  cur.gp = (cur.gp or 0) + amount
+  slot.total = (slot.total or 0) + amount
+  slot.gp_by_secret[secret] = (slot.gp_by_secret[secret] or 0) + amount
+  _add_to_roster(t_mem, cur.team, secret)
+
+  if pm.teams and pm.teams.last_name and pm.teams.last_name ~= "" then
+    t_mem.names[secret] = pm.teams.last_name
+  end
+
+  if ezmemory.set_player_memory then ezmemory.set_player_memory(secret, pm) else ezmemory.save_player_memory(secret, pm) end
+  _save_area()
+
+  if pid_opt and why then pcall(Net.message_player, pid_opt, ("+%d GP for %s."):format(amount, why)) end
+end
+
+-- Offline-safe payout used by Raids (called on wave clear / boss death)
+-- kind = "w1" | "w2" | "boss"; amount = points (w1/w2) or damage (boss)
+function Teams.on_raid_contribution_secret(secret, raid_id, kind, amount, pid_opt)
+  amount = tonumber(amount) or 0
+  if amount <= 0 then return end
+
+  local per = (kind == "w1" and RAID_GP.w1_points_per_gp)
+           or (kind == "w2" and RAID_GP.w2_points_per_gp)
+           or (kind == "boss" and RAID_GP.boss_damage_per_gp)
+           or 0
+  if per <= 0 then return end
+
+  local base = math.floor(amount / per)
+  if base <= 0 then return end
+
+  -- resolve team
+  local pm = ezmemory.get_player_memory(secret) or {}
+  pm.teams = pm.teams or {}
+  pm.teams.current = pm.teams.current or { team=nil, month=_month_key(), gp=0, last_switch_month=nil }
+  local cur = pm.teams.current
+  if not cur.team then return end
+  local team = cur.team
+
+  -- caps + today's multiplier
+  local d, t_mem = _ensure_daily_bucket()
+  local mul  = (d.mul_today and d.mul_today[team]) or 1.0
+  local gp   = math.floor(base * mul)
+  if gp <= 0 then return end
+
+  -- active set and team cap math
+  local actives = d.active_by_team[team] or {}; actives[secret] = true; d.active_by_team[team] = actives
+  local active_n = 0; for _ in pairs(actives) do active_n = active_n + 1 end
+
+  local team_cap = math.max(RAID_GP.team_daily_cap_min or 0,
+                      math.min(RAID_GP.team_daily_cap_max or 9999,
+                        math.max(active_n,1) * (RAID_GP.team_cap_per_active or 0)))
+  local team_used_before = tonumber(d.team_used[team] or 0)
+  local team_room = math.max(0, team_cap - team_used_before)
+
+  local p_used_before = tonumber(d.player_used[secret] or 0)
+  local p_cap  = RAID_GP.player_daily_cap or 10
+  local p_room = math.max(0, p_cap - p_used_before)
+
+  local give = math.max(0, math.min(gp, p_room, team_room))
+
+  -- names and month totals for "before/after"
+  local name = _last_known_name(secret, t_mem)
+  local team_name = _team_name(team)
+  local team_month_before = tonumber((t_mem.month[team] and t_mem.month[team].total) or 0)
+
+  if give <= 0 then
+    local reason = "unknown"
+    if gp <= 0 then reason = "no GP from contribution"
+    elseif p_room <= 0 and team_room <= 0 then reason = "player & team daily caps"
+    elseif p_room <= 0 then reason = "player daily cap"
+    elseif team_room <= 0 then reason = ("team daily cap (%d/%d)"):format(team_used_before, team_cap)
+    end
+    print(("[RAID DBG] %s gained 0 GP %d/%d (%s)"):format(name, p_used_before, p_cap, reason))
+    print(("[RAID DBG] %s: %d -> %d this month"):format(team_name, team_month_before, team_month_before))
+    return
+  end
+
+  -- apply usage, persist the daily bucket
+  d.player_used[secret] = p_used_before + give
+  d.team_used[team]     = team_used_before + give
+  _save_area()
+
+  -- award GP (updates monthly totals/roster safely)
+  _add_gp_by_secret(secret, give, "raids", pid_opt)
+
+  -- logs
+  print(("[RAID DBG] %s gained %d GP %d/%d"):format(name, give, p_used_before + give, p_cap))
+  print(("[RAID DBG] %s: %d -> %d this month"):format(team_name, team_month_before, team_month_before + give))
+end
+
+-- Convenience wrapper (online toast if present)
+function Teams.on_raid_contribution(pid, raid_id, kind, amount)
+  local secret = helpers.get_safe_player_secret(pid)
+  Teams.on_raid_contribution_secret(secret, raid_id, kind, amount, pid)
 end
 
 -- =========================
@@ -654,14 +902,37 @@ local function _handle_team_action(pid, post_id)
   -- Daily check-in
   local chk_team = tonumber(post_id:match("^__team:checkin:(%d+)$") or "")
   if chk_team then
-    if cur.team ~= chk_team then Net.message_player(pid, "Join this team first."); return true end
+    if cur.team ~= chk_team then
+      Net.message_player(pid, "Join this team first.")
+      return true
+    end
+
     pmem.teams._last_checkin = pmem.teams._last_checkin or ""
     local today = os.date("%Y-%m-%d", _now())
+
     if pmem.teams._last_checkin == today then
       Net.message_player(pid, "Already checked in today.")
     else
+      -- mark today's check-in
       pmem.teams._last_checkin = today
-      if ezmemory.set_player_memory then ezmemory.set_player_memory(secret, pmem) else ezmemory.save_player_memory(secret, pmem) end
+
+      -- count player check-ins this month (used for MVP tie-breaker)
+      pmem.teams.current.checkins = (pmem.teams.current.checkins or 0) + 1
+      if ezmemory.set_player_memory then
+        ezmemory.set_player_memory(secret, pmem)
+      else
+        ezmemory.save_player_memory(secret, pmem)
+      end
+
+      -- count team check-ins this month (used for team tie-breaker)
+      local _, t_mem_i = _roll_month_if_needed()
+      local slot = t_mem_i.month[cur.team]
+      slot.checkins_total = (slot.checkins_total or 0) + 1
+      slot.checkins_by_secret = slot.checkins_by_secret or {}
+      slot.checkins_by_secret[secret] = (slot.checkins_by_secret[secret] or 0) + 1
+      _save_area()
+
+      -- award GP
       _add_gp(pid, 1, "daily check-in")
     end
     return true
@@ -819,41 +1090,45 @@ end
 -- =========================
 -- ====== HOOK EVENTS  =====
 -- =========================
-Net:on("object_interaction", function(ev)
-  if ev.button ~= 0 then return end -- A/Confirm only
-  local pid = ev.player_id
-  local area_id = Net.get_player_area(pid)
-  local obj = area_id and Net.get_object_by_id(area_id, ev.object_id)
-  if not obj then return end
-  if obj.type == OBJ_TEAM_1 then _open_team_board(pid, 1)
-  elseif obj.type == OBJ_TEAM_2 then _open_team_board(pid, 2)
-  elseif obj.type == OBJ_SCORES then _open_scores_board(pid)
-  end
-end)
+if not _G.__TEAMS_WIRED then
+  _G.__TEAMS_WIRED = true
 
-Net:on("post_selection", function(ev)
-  local pid = ev.player_id
-  local id  = tostring(ev.post_id or "")
-  if id:match("^__team:") then
-    _handle_team_action(pid, id)
-  elseif id:match("^__teamscores:") then
-    _handle_scores_action(pid, id)
-  end
-end)
+  Net:on("object_interaction", function(ev)
+    if ev.button ~= 0 then return end
+    local pid = ev.player_id
+    local area_id = Net.get_player_area(pid)
+    local obj = area_id and Net.get_object_by_id(area_id, ev.object_id)
+    if not obj then return end
+    if obj.type == OBJ_TEAM_1 then _open_team_board(pid, 1)
+    elseif obj.type == OBJ_TEAM_2 then _open_team_board(pid, 2)
+    elseif obj.type == OBJ_SCORES then _open_scores_board(pid)
+    end
+  end)
 
-Net:on("board_close", function(ev)
-  local pid = ev.player_id
-  local pending = _pending_open[pid]
-  if not pending then return end
-  _pending_open[pid] = nil
-  if pending.kind == "members" then
-    _open_members_board(pid, pending.team)
-  elseif pending.kind == "team" then
-    _open_team_board(pid, pending.team)
-  elseif pending.kind == "scores" then
-    _open_scores_board(pid)
-  end
-end)
+  Net:on("post_selection", function(ev)
+    local pid = ev.player_id
+    local id  = tostring(ev.post_id or "")
+    if id:match("^__team:") then
+      _handle_team_action(pid, id)
+    elseif id:match("^__teamscores:") then
+      _handle_scores_action(pid, id)
+    end
+  end)
+
+  Net:on("board_close", function(ev)
+    local pid = ev.player_id
+    local pending = _pending_open[pid]
+    if not pending then return end
+    _pending_open[pid] = nil
+    if pending.kind == "members" then
+      _open_members_board(pid, pending.team)
+    elseif pending.kind == "team" then
+      _open_team_board(pid, pending.team)
+    elseif pending.kind == "scores" then
+      _open_scores_board(pid)
+    end
+  end)
+end
 
 -- Hook into JobBBS: +1 GP on every successful job CLAIM (after JobBBS grants its reward).
 do
