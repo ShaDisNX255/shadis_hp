@@ -2367,7 +2367,6 @@ eznpcs.add_event({
           await(say(player_id, msg, mug))
           return finish(next_ids[2])
         end
-      end
 
       local base_ts = manual_purchased_at or now_ts
       local _, preview_end = new_window_from(base_ts)
