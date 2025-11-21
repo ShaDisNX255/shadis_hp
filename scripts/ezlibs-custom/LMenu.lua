@@ -117,6 +117,18 @@ local cfg = {
   cosmetic_texture    = "/server/assets/cosmetics/snowflake_particle.png",
   cosmetic_animation  = "/server/assets/cosmetics/snowflake_particle.animation",
   cosmetic_anim_state = "SNOWFLAKE_PARTICLE",
+  cosmetic_xforced = 27,
+  cosmetic_yforced = 0,
+
+  --[[
+  --shcok symbol
+  cosmetic_id         = "shock_symbol",
+  cosmetic_texture    = "/server/assets/cosmetics/shock.png",
+  cosmetic_animation  = "/server/assets/cosmetics/shock.animation",
+  cosmetic_anim_state = "cosmetic",
+  cosmetic_xforced = 3,
+  cosmetic_yforced = 0,
+  ]]--
 
   -- Cosmetic preview behavior (screen-space movement)
   cosmetics_preview_step    = 2,    -- how many logical units per D-pad tap
@@ -700,10 +712,10 @@ local function finalize_cosmetics_from_preview(pid)
     texture,
     anim,
     state,
-    x_offset,
+    x_offset+cfg.cosmetic_xforced,
     y_offset,
     true,  -- visible
-    0,     -- player_xoffset
+    cfg.cosmetic_xforced*-1, -- player_xoffset
     0,     -- player_yoffset
     1    -- anim_duration
   )
