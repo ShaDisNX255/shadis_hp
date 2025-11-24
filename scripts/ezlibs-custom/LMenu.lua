@@ -7,6 +7,9 @@
 local LMenu = {}
 _G.LMenu = LMenu  -- expose globally so other scripts can query state if needed
 
+local suppress_next_open = {}
+LMenu._suppress_next_open = suppress_next_open
+
 -- ---------------------------------------------------------------------------
 -- net-games framework
 -- ---------------------------------------------------------------------------
@@ -24,6 +27,15 @@ end
 local FriendsOK, Friends = pcall(require, "scripts/ezlibs-custom/friends")
 if not FriendsOK then
   Friends = nil
+end
+
+-- ---------------------------------------------------------------------------
+-- Cosmetics submenu (new module handles all cosmetic logic)
+-- ---------------------------------------------------------------------------
+
+local CosmeticsOK, Cosmetics = pcall(require, "scripts/ezlibs-custom/cosmetics")
+if not CosmeticsOK then
+  Cosmetics = nil
 end
 
 -- ---------------------------------------------------------------------------
@@ -71,7 +83,7 @@ local cfg = {
   row_x_cards     = nil,
   row_x_summon    = nil,
   row_x_friends   = nil,
-  row_x_cosmetics = 13,
+  row_x_cosmetics = 12,
 
   -- Cards row (always present)
   cards_texture   = "/server/assets/ui/lmenu/lcards.png",
@@ -85,7 +97,6 @@ local cfg = {
   friends_anim    = "/server/assets/ui/lmenu/lfriends.animation",
 
   -- Cosmetics row button (slightly longer tab)
-  -- NOTE: adjust these to your actual asset paths.
   cosmetics_texture = "/server/assets/ui/lmenu/lcosmetics.png",
   cosmetics_anim    = "/server/assets/ui/lmenu/lcosmetics.animation",
 
@@ -110,45 +121,16 @@ local cfg = {
   online_text_y      = 48,    -- logical Y for number
   online_text_z      = 230,   -- text Z-order (should be above tab)
   online_text_scale  = 1.5,   -- GRADIENT_GREEN font scale
-
-  -- Cosmetic definition (actual effect that set_cosmetic will apply)
-  -- IMPORTANT: point these to your snowflake assets + state.
-  cosmetic_id         = "snowflake_particle",
-  cosmetic_texture    = "/server/assets/cosmetics/snowflake_particle.png",
-  cosmetic_animation  = "/server/assets/cosmetics/snowflake_particle.animation",
-  cosmetic_anim_state = "SNOWFLAKE_PARTICLE",
-  cosmetic_xforced = 27,
-  cosmetic_yforced = 0,
-
-  --[[
-  --shcok symbol
-  cosmetic_id         = "shock_symbol",
-  cosmetic_texture    = "/server/assets/cosmetics/shock.png",
-  cosmetic_animation  = "/server/assets/cosmetics/shock.animation",
-  cosmetic_anim_state = "cosmetic",
-  cosmetic_xforced = 3,
-  cosmetic_yforced = 0,
-  ]]--
-
-  -- Cosmetic preview behavior (screen-space movement)
-  cosmetics_preview_step    = 2,    -- how many logical units per D-pad tap
-  cosmetics_preview_start_x = 0,    -- offset from screen center (0 = centered)
-  cosmetics_preview_start_y = -24,  -- e.g., slightly above center
-  cosmetics_preview_z       = 6,
-  cosmetics_preview_scale   = 2.0,
 }
 
 -- Sprite IDs (unique per row)
-local SPRITE_ID_CARDS         = "lmenu_cards"
-local SPRITE_ID_SUMMON        = "lmenu_summon"      -- used for both Summon and Unsummon states
-local SPRITE_ID_FRIENDS       = "lmenu_friends"
-local SPRITE_ID_COSMETICS     = "lmenu_cosmetics"
-local SPRITE_ID_LINE          = "lmenu_line"
-local SPRITE_ID_ONLINE_TAB    = "lmenu_online_tab"
-local ONLINE_TEXT_ID          = "lmenu_online_count"
-
--- Preview sprite for the cosmetic (camera/UI-aligned during preview)
-local COSMETICS_PREVIEW_SPRITE_ID = "lmenu_cosmetic_preview"
+local SPRITE_ID_CARDS      = "lmenu_cards"
+local SPRITE_ID_SUMMON     = "lmenu_summon"      -- used for both Summon and Unsummon states
+local SPRITE_ID_FRIENDS    = "lmenu_friends"
+local SPRITE_ID_COSMETICS  = "lmenu_cosmetics"
+local SPRITE_ID_LINE       = "lmenu_line"
+local SPRITE_ID_ONLINE_TAB = "lmenu_online_tab"
+local ONLINE_TEXT_ID       = "lmenu_online_count"
 
 -- ---------------------------------------------------------------------------
 -- Logging (safe even if helpers module isn't present)
@@ -228,7 +210,7 @@ local function compute_stasis_for_player(pid)
 end
 
 -- ---------------------------------------------------------------------------
--- Per-player menu + cosmetic state
+-- Per-player menu state
 -- ---------------------------------------------------------------------------
 
 -- st_by_pid[pid] = {
@@ -236,13 +218,6 @@ end
 --    rows   = { { id="cards" }, { id="summon" } / { id="unsummon" } , { id="friends" }, { id="cosmetics" } },
 -- }
 local st_by_pid = {}
-
--- Tracks whether the cosmetic is currently equipped for this player
-local cosmetics_equipped = {}  -- [pid] = true/false
-
--- Preview state: active while the snowflake is being positioned
--- cosmetics_preview_by_pid[pid] = { active=true, x=<offset>, y=<offset> }
-local cosmetics_preview_by_pid = {}
 
 -- ---------------------------------------------------------------------------
 -- Online player counter (number only, drawn with GRADIENT_GREEN font)
@@ -337,9 +312,6 @@ end
 local function build_rows_for_player(pid)
   local rows = {}
 
-  -- Always have Cards row
-  rows[#rows+1] = { id = "cards" }
-
   local api = card_api()
   local has_armed  = false
   local has_summon = false
@@ -355,17 +327,20 @@ local function build_rows_for_player(pid)
     end
   end
 
-  -- Slot 2 (when available) = Summon/Unsummon
+  -- FIRST: Summon/Unsummon row (when available)
   if has_summon then
     rows[#rows+1] = { id = "unsummon" }
   elseif has_armed then
     rows[#rows+1] = { id = "summon" }
   end
 
+  -- Then the Cards row (always present)
+  rows[#rows+1] = { id = "cards" }
+
   -- Friends is always available
   rows[#rows+1] = { id = "friends" }
 
-  -- Cosmetics: always show the row (we'll handle missing assets gracefully)
+  -- Cosmetics: always show the row
   rows[#rows+1] = { id = "cosmetics" }
 
   return rows
@@ -580,12 +555,6 @@ local function hide_summon_ui(pid)
   pcall(frame.update_ui_element, SPRITE_ID_SUMMON, pid, { opacity = 0 })
 end
 
-local function clear_cosmetics_preview_ui(pid)
-  if frame.remove_ui_element then
-    pcall(frame.remove_ui_element, COSMETICS_PREVIEW_SPRITE_ID, pid)
-  end
-end
-
 local function clear_all_ui(pid)
   if frame.remove_ui_element then
     pcall(frame.remove_ui_element, SPRITE_ID_CARDS,      pid)
@@ -594,148 +563,11 @@ local function clear_all_ui(pid)
     pcall(frame.remove_ui_element, SPRITE_ID_ONLINE_TAB, pid)
     pcall(frame.remove_ui_element, SPRITE_ID_FRIENDS,    pid)
     pcall(frame.remove_ui_element, SPRITE_ID_COSMETICS,  pid)
-    pcall(frame.remove_ui_element, COSMETICS_PREVIEW_SPRITE_ID, pid)
   end
 
   if Displayer and Displayer.Font and Displayer.Font.eraseTextDisplay then
     pcall(Displayer.Font.eraseTextDisplay, pid, ONLINE_TEXT_ID)
   end
-end
-
--- ---------------------------------------------------------------------------
--- Cosmetic preview helpers
--- ---------------------------------------------------------------------------
-
-local function cosmetics_preview_active(pid)
-  local st = cosmetics_preview_by_pid[pid]
-  return st and st.active
-end
-
-local function draw_cosmetics_preview(pid)
-  local st = cosmetics_preview_by_pid[pid]
-  if not (st and st.active) then
-    return
-  end
-
-  local texture = cfg.cosmetic_texture
-  local anim    = cfg.cosmetic_animation
-  local state   = cfg.cosmetic_anim_state or "SNOWFLAKE_PARTICLE"
-
-  if not texture or texture == "" or not anim or anim == "" then
-    warn("Cosmetic preview requested but cosmetic assets not configured.")
-    return
-  end
-
-  -- Center of screen in logical coords is approximately (120, 80).
-  local base_x = 120
-  local base_y = 80
-
-  local x = base_x + (st.x or 0)
-  local y = base_y + (st.y or 0)
-  local z = cfg.cosmetics_preview_z or cfg.z or 6
-  local s = cfg.cosmetics_preview_scale or 2.0
-
-  frame.add_ui_element(
-    COSMETICS_PREVIEW_SPRITE_ID,
-    pid,
-    texture,
-    anim,
-    state,
-    x,
-    y,
-    z,
-    s,
-    s
-  )
-
-  if frame.update_ui_position then
-    frame.update_ui_position(COSMETICS_PREVIEW_SPRITE_ID, pid, x, y, z)
-  end
-end
-
-local function start_cosmetics_preview(pid)
-  local texture = cfg.cosmetic_texture
-  local anim    = cfg.cosmetic_animation
-
-  if not texture or texture == "" or not anim or anim == "" then
-    warn("Cosmetics button pressed but cosmetic assets not configured; skipping preview.")
-    return
-  end
-
-  cosmetics_preview_by_pid[pid] = {
-    active = true,
-    x = cfg.cosmetics_preview_start_x or 0,
-    y = cfg.cosmetics_preview_start_y or 0,
-  }
-
-  -- IMPORTANT: no Net.message_player here (user requested no messages during preview)
-  draw_cosmetics_preview(pid)
-end
-
-local function stop_cosmetics_preview(pid)
-  cosmetics_preview_by_pid[pid] = nil
-  clear_cosmetics_preview_ui(pid)
-end
-
-local function finalize_cosmetics_from_preview(pid)
-  local st = cosmetics_preview_by_pid[pid]
-  if not (st and st.active) then
-    return
-  end
-
-  -- Take a copy of the offsets before clearing preview
-  local x_offset = st.x or 0
-  local y_offset = st.y or 0
-
-  stop_cosmetics_preview(pid)
-
-  local cosmetic_id = cfg.cosmetic_id or "snowflake_particle"
-  local texture     = cfg.cosmetic_texture
-  local anim        = cfg.cosmetic_animation
-  local state       = cfg.cosmetic_anim_state or "SNOWFLAKE_PARTICLE"
-
-  if not (texture and anim and cosmetic_id) or texture == "" or anim == "" or cosmetic_id == "" then
-    warn("Cosmetic finalize requested but cosmetic not configured.")
-    return
-  end
-
-  if type(frame.set_cosmetic) ~= "function" then
-    warn("frame.set_cosmetic not available; cannot apply cosmetic.")
-    return
-  end
-
-  -- Apply cosmetic via net-games framework; this spawns both the player sprite + public bot
-  local ok, err = pcall(
-    frame.set_cosmetic,
-    cosmetic_id,
-    pid,
-    texture,
-    anim,
-    state,
-    x_offset+cfg.cosmetic_xforced,
-    y_offset,
-    true,  -- visible
-    cfg.cosmetic_xforced*-1, -- player_xoffset
-    0,     -- player_yoffset
-    1    -- anim_duration
-  )
-
-  if not ok then
-    warn("set_cosmetic failed for", pid, ":", tostring(err))
-    Net.message_player(pid, "(Failed to apply cosmetic; see server log.)")
-    return
-  end
-
-  -- We were still in the LMenu freeze/stasis. Confirming with A now unlocks inputs.
-  local ok2, err2 = pcall(frame.unfreeze_player, pid)
-  if not ok2 then
-    warn("unfreeze_player failed after cosmetic apply for", pid, ":", tostring(err2))
-  end
-
-  cosmetics_equipped[pid] = true
-
-  -- This is the ONLY time we message the player for this feature (OK per your request)
-  Net.message_player(pid, "Snowflake cosmetic applied.")
 end
 
 -- ---------------------------------------------------------------------------
@@ -825,7 +657,7 @@ function LMenu.close(pid, opts)
   clear_all_ui(pid)
   st_by_pid[pid] = nil
 
-  -- Allow callers to keep the player frozen (used by Cosmetics preview)
+  -- Allow callers to keep the player frozen (used by Cosmetics submenu)
   local keep_frozen = (type(opts) == "table" and opts.keep_frozen == true)
 
   if not keep_frozen then
@@ -864,41 +696,17 @@ if Net and Net.on then
     local pid = event.player_id
     local btn = event.button
 
-    -- First priority: cosmetic preview, if active.
-    -- While preview is active, LMenu (and other logic in this file) does not react.
-    if cosmetics_preview_active(pid) then
-      local st = cosmetics_preview_by_pid[pid]
-      local step = cfg.cosmetics_preview_step or 2
-
-      if btn == "U" then
-        st.y = (st.y or 0) - step
-        draw_cosmetics_preview(pid)
-      elseif btn == "D" then
-        st.y = (st.y or 0) + step
-        draw_cosmetics_preview(pid)
-      elseif btn == "L" then
-        st.x = (st.x or 0) - step
-        draw_cosmetics_preview(pid)
-      elseif btn == "R" then
-        st.x = (st.x or 0) + step
-        draw_cosmetics_preview(pid)
-      elseif btn == "A" then
-        -- Confirm / anchor cosmetic (this will send a single message to the player)
-        finalize_cosmetics_from_preview(pid)
-      elseif btn == "LS" then
-        -- Cancel preview with no messages
-        stop_cosmetics_preview(pid)
-      end
-
-      -- Do not let preview button presses also drive LMenu open/close
-      return
-    end
-
-    -- From here down, no preview is active.
-
     -- We only care about LS/A/U/D in the LMenu logic
     if btn ~= "LS" and btn ~= "A" and btn ~= "U" and btn ~= "D" then
       return
+    end
+
+    -- NEW: if Cosmetics submenu is open, LMenu should not react at all
+    if Cosmetics and type(Cosmetics.is_open) == "function" then
+      local ok, open = pcall(Cosmetics.is_open, pid)
+      if ok and open then
+        return
+      end
     end
 
     local st = st_by_pid[pid]
@@ -906,6 +714,11 @@ if Net and Net.on then
     -- Menu closed: LS opens it, everything else ignored
     if not st then
       if btn == "LS" then
+        -- If Cosmetics just closed from this same button press, skip opening.
+        if suppress_next_open[pid] then
+          suppress_next_open[pid] = nil
+          return
+        end
         LMenu.open(pid)
       end
       return
@@ -1013,26 +826,26 @@ if Net and Net.on then
       end
 
       if row.id == "cosmetics" then
-        -- Toggle behavior:
-        --   - If cosmetic already equipped, unequip immediately (no preview)
-        --   - If not equipped, close LMenu and enter preview mode
-        local already = cosmetics_equipped[pid] == true
-        local cosmetic_id = cfg.cosmetic_id or "snowflake_particle"
+        -- Close the LMenu but keep the player frozen, then open the Cosmetics submenu.
+        LMenu.close(pid, { keep_frozen = true })
 
-        if already then
-          if type(frame.remove_cosmetic) == "function" then
-            local ok2, err2 = pcall(frame.remove_cosmetic, cosmetic_id, pid)
+        if Cosmetics and type(Cosmetics.open_menu) == "function" then
+          local okc, errc = pcall(Cosmetics.open_menu, pid)
+          if not okc then
+            warn("Cosmetics.open_menu failed for", pid, ":", tostring(errc))
+            -- Fail-safe: unfreeze so the player isn't stuck
+            local ok2, err2 = pcall(frame.unfreeze_player, pid)
             if not ok2 then
-              warn("remove_cosmetic failed:", tostring(err2))
+              warn("unfreeze_player after Cosmetics.open_menu failure:", tostring(err2))
             end
           end
-          cosmetics_equipped[pid] = nil
-          LMenu.close(pid)
-          Net.message_player(pid, "Snowflake cosmetic removed.")
         else
-          -- Close menu and enter preview; no messages (per your request)
-          LMenu.close(pid, { keep_frozen = true })
-          start_cosmetics_preview(pid)
+          Net.message_player(pid, "(Cosmetics menu not available.)")
+          -- Also unfreeze in this case
+          local ok2, err2 = pcall(frame.unfreeze_player, pid)
+          if not ok2 then
+            warn("unfreeze_player after missing Cosmetics module:", tostring(err2))
+          end
         end
 
         return
@@ -1048,17 +861,13 @@ if Net and Net.on then
   -- Safety: auto-close on disconnect / area change
   Net:on("player_disconnect", function(e)
     if e and e.player_id then
-      -- End any preview in progress
-      stop_cosmetics_preview(e.player_id)
-      cosmetics_equipped[e.player_id] = nil
       LMenu.close(e.player_id)
     end
   end)
 
   Net:on("area_transfer", function(e)
     if e and e.player_id then
-      -- Area change: close menu and cancel preview so states don't leak between maps
-      stop_cosmetics_preview(e.player_id)
+      -- Area change: close menu so states don't leak between maps
       LMenu.close(e.player_id)
     end
   end)

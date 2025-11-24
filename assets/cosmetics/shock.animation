@@ -1,4 +1,4 @@
-animation state="cosmetic"
+animation state="SHOCK"
 frame duration=".1" x="0" y="0" w="28" h="28" originx="14" originy="28"
 frame duration=".1" x="0" y="0" w="28" h="28" originx="14" originy="24"
 frame duration=".1" x="0" y="0" w="28" h="28" originx="14" originy="20"
