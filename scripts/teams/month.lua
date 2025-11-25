@@ -90,6 +90,17 @@ Month.EVENTS = {
       },
    }
  },
+  {
+   id   = "CosmeticTest-241125",
+   name = "Testing Cosmetic",
+   start = "2025-11-24",
+   ["end"] = "2025-11-24",
+   rewards = {
+     cosmetics = {
+       { id = "DarkAura", label = "Dark Aura" },
+     },
+   }
+ },
 }
 
 -- ===== Utilities =====
@@ -122,6 +133,21 @@ local function _merge_bucket(base, over)
   end
   if over.pack_name then
     base.pack_name = over.pack_name
+  end
+  -- Merge decor (fixed decor rewards)
+  if over.decor then
+    base.decor = base.decor or {}
+    for _, d in ipairs(over.decor) do
+      table.insert(base.decor, _deepcopy(d))
+    end
+  end
+
+  -- Merge cosmetics (cosmetic rewards)
+  if over.cosmetics then
+    base.cosmetics = base.cosmetics or {}
+    for _, c in ipairs(over.cosmetics) do
+      table.insert(base.cosmetics, _deepcopy(c))
+    end
   end
 
   return base

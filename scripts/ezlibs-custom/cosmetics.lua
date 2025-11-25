@@ -163,6 +163,15 @@ for _, def in ipairs(cosmetics_defs) do
     preview_start_y = def.preview_start_y,
     preview_sprite_id = def.preview_sprite_id,
     loop_duration   = def.loop_duration,
+    -- Small menu preview (always visible while menu is open)
+    menu_preview_texture    = def.menu_preview_texture,
+    menu_preview_animation  = def.menu_preview_animation,
+    menu_preview_anim_state = def.menu_preview_anim_state,
+    menu_preview_sprite_id  = def.menu_preview_sprite_id,
+    menu_preview_offset_x   = def.menu_preview_offset_x,
+    menu_preview_offset_y   = def.menu_preview_offset_y,
+    menu_preview_scale          = def.menu_preview_scale,
+    menu_preview_loop_duration  = def.menu_preview_loop_duration,
   })
 end
 
@@ -184,6 +193,7 @@ local MENU_SPRITE_ID    = "cosmetics_menu_bg"
 local WINDOW_SPRITE_ID  = "cosmetics_menu_window"  -- new: preview window
 local TEXT_BASE_ID      = "cosmetics_menu_option_" -- text_id = TEXT_BASE_ID..index
 local DEFAULT_PREVIEW_SPRITE_ID = "cosmetics_menu_preview_default"
+local DEFAULT_MENU_PREVIEW_SPRITE_ID = "cosmetics_menu_smallpreview_default"
 
 local function preview_sprite_id_for_opt(opt)
   if opt and opt.preview_sprite_id and opt.preview_sprite_id ~= "" then
@@ -196,6 +206,18 @@ local function preview_sprite_id_for_opt(opt)
   end
 
   return DEFAULT_PREVIEW_SPRITE_ID
+end
+
+local function menu_preview_sprite_id_for_opt(opt)
+  if opt and opt.menu_preview_sprite_id and opt.menu_preview_sprite_id ~= "" then
+    return opt.menu_preview_sprite_id
+  end
+
+  if opt and opt.key then
+    return "cosmetics_menu_smallpreview_" .. tostring(opt.key)
+  end
+
+  return DEFAULT_MENU_PREVIEW_SPRITE_ID
 end
 
 -- state_by_pid[pid] = {
@@ -339,6 +361,21 @@ local function clear_preview_ui(pid)
   end
 end
 
+local function clear_menu_preview_ui(pid)
+  if not frame.remove_ui_element then
+    return
+  end
+
+  -- Remove all small menu preview sprites for this player
+  for _, opt in ipairs(OPTIONS) do
+    local sid = menu_preview_sprite_id_for_opt(opt)
+    pcall(frame.remove_ui_element, sid, pid)
+  end
+
+  -- Also clear the default fallback ID just in case
+  pcall(frame.remove_ui_element, DEFAULT_MENU_PREVIEW_SPRITE_ID, pid)
+end
+
 local function draw_list_for_player(pid)
   if not frame.draw_text then
     warn("frame.draw_text not available; cosmetics list text will not be shown.")
@@ -424,6 +461,65 @@ local function draw_list_for_player(pid)
   end
 end
 
+local function draw_menu_preview(pid)
+  if not frame.add_ui_element then
+    return
+  end
+
+  local st = state_by_pid[pid]
+  if not st then
+    return
+  end
+
+  -- Which cosmetic is currently selected in the list?
+  local opt = option_for_player_at(pid, st.cursor or 1)
+
+  -- Clear any previous small preview
+  clear_menu_preview_ui(pid)
+
+  if not opt then
+    return
+  end
+
+  -- Use dedicated preview assets if provided; otherwise fall back to main ones
+  local texture = opt.menu_preview_texture or opt.texture
+  local anim    = opt.menu_preview_animation or opt.animation
+  local state   = opt.menu_preview_anim_state or opt.anim_state or "SNOWFLAKE_PARTICLE"
+
+  if not texture or texture == "" or not anim or anim == "" then
+    return
+  end
+
+  -- Center of screen + per-cosmetic offset from config
+  local base_x = cfg.menu_preview_base_x or 120
+  local base_y = cfg.menu_preview_base_y or 80
+
+  local x = base_x + (opt.menu_preview_offset_x or 0)
+  local y = base_y + (opt.menu_preview_offset_y or 0)
+  local z = cfg.menu_preview_z or (cfg.menu_z or 6)
+  local s = opt.menu_preview_scale or cfg.menu_preview_scale or 1.0
+
+  local sprite_id = menu_preview_sprite_id_for_opt(opt)
+
+  frame.add_ui_element(
+    sprite_id,
+    pid,
+    texture,
+    anim,
+    state,
+    x, y, z,
+    s, s
+  )
+
+  if frame.update_ui_position then
+    frame.update_ui_position(sprite_id, pid, x, y, z)
+  end
+
+  if frame.update_ui_element then
+    pcall(frame.update_ui_element, sprite_id, pid, { opacity = 255 })
+  end
+end
+
 local function draw_menu(pid)
   local st = state_by_pid[pid]
   if not st or st.mode ~= "menu" then
@@ -464,6 +560,7 @@ local function draw_menu(pid)
   end
 
   draw_list_for_player(pid)
+  draw_menu_preview(pid)
 end
 
 local function refresh_menu_cursor(pid)
@@ -485,6 +582,7 @@ local function refresh_menu_cursor(pid)
   end
 
   draw_list_for_player(pid)
+  draw_menu_preview(pid)
 end
 
 local function draw_window(pid)
@@ -665,6 +763,76 @@ local function cancel_preview_and_return_to_menu(pid)
 end
 
 -- ---------------------------------------------------------------------------
+-- Shop preview helpers (temporary cosmetics while answering Yes/No)
+-- ---------------------------------------------------------------------------
+
+local SHOP_PREVIEW_PREFIX = "cosmeticshop_preview_"
+
+local function clear_shop_preview_internal(pid)
+  if type(frame.remove_cosmetic) ~= "function" then
+    return
+  end
+
+  -- Remove any possible shop preview cosmetic IDs for this player
+  for cosmetic_id, _ in pairs(OPTIONS_BY_ID) do
+    local preview_id = SHOP_PREVIEW_PREFIX .. tostring(cosmetic_id)
+    pcall(frame.remove_cosmetic, preview_id, pid)
+  end
+end
+
+local function apply_shop_preview_internal(pid, opt)
+  if type(frame.set_cosmetic) ~= "function" then
+    return false
+  end
+
+  if not opt then
+    return false
+  end
+
+  local texture = opt.texture
+  local anim    = opt.animation
+  local state   = opt.anim_state or "SNOWFLAKE_PARTICLE"
+
+  if not texture or texture == "" or not anim or anim == "" then
+    return false
+  end
+
+  -- Same alignment rules as finalize_cosmetic_from_preview, but with
+  -- "default" offsets (no player-controlled movement).
+  local base_xforced = opt.xforced or 27
+  local base_yforced = opt.yforced or 0
+
+  local x_offset = opt.preview_start_x or cfg.preview_start_x or 0
+  local y_offset = opt.preview_start_y or cfg.preview_start_y or 0
+
+  local duration = opt.loop_duration
+
+  local preview_id = SHOP_PREVIEW_PREFIX .. tostring(opt.cosmetic_id or opt.key or "preview")
+
+  local ok, err = pcall(
+    frame.set_cosmetic,
+    preview_id,
+    pid,
+    texture,
+    anim,
+    state,
+    x_offset + base_xforced,
+    y_offset + base_yforced,
+    true,          -- visible
+    -base_xforced, -- player_xoffset
+    -base_yforced, -- player_yoffset
+    duration       -- anim_duration
+  )
+
+  if not ok then
+    warn("set_cosmetic (shop preview) failed for", pid, ":", tostring(err))
+    return false
+  end
+
+  return true
+end
+
+-- ---------------------------------------------------------------------------
 -- Public helpers for shops / debug
 -- ---------------------------------------------------------------------------
 
@@ -764,6 +932,7 @@ function Cosmetics.close(pid, opts)
   clear_menu_ui(pid)
   clear_preview_ui(pid)
   clear_window_ui(pid)
+  clear_menu_preview_ui(pid)
 
   state_by_pid[pid] = nil
 
@@ -1008,6 +1177,30 @@ if Net and Net.on then
       Cosmetics.close(e.player_id)
     end
   end)
+end
+
+function Cosmetics.preview_for_shop(pid, cosmetic_id)
+  if not cosmetic_id or cosmetic_id == "" then
+    return false, "invalid_id"
+  end
+
+  local opt = OPTIONS_BY_ID[cosmetic_id]
+  if not opt then
+    return false, "unknown_id"
+  end
+
+  -- Only one shop preview at a time per player
+  clear_shop_preview_internal(pid)
+
+  if not apply_shop_preview_internal(pid, opt) then
+    return false, "apply_failed"
+  end
+
+  return true
+end
+
+function Cosmetics.clear_shop_previews(pid)
+  clear_shop_preview_internal(pid)
 end
 
 return Cosmetics

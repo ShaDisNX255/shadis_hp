@@ -919,18 +919,30 @@ eznpcs.add_event{
             mug.texture_path, mug.animation_path
           ))
         else
-          -- Yes/No confirmation (single quantity)
+          -- Yes/No confirmation (single quantity) with live preview
           local question = string.format(
             "Buy %s for %s?",
             chosen.name,
             short_money(chosen.price)
           )
 
-          local do_buy = await(Async.question_player(
+          -- Apply a temporary cosmetic so the player can see it
+          if cosmetics.preview_for_shop then
+            cosmetics.preview_for_shop(player_id, chosen.cosmetic_id)
+          end
+
+          -- Ask the question; 1 = Yes, anything else = No/Cancel
+          local res = await(Async.question_player(
             player_id,
             question,
             mug.texture_path, mug.animation_path
           ))
+          local do_buy = (res == 1)
+
+          -- Always clear the temporary preview after the question
+          if cosmetics.clear_shop_previews then
+            cosmetics.clear_shop_previews(player_id)
+          end
 
           if do_buy then
             local price = chosen.price or 0
@@ -1012,8 +1024,13 @@ eznpcs.add_event{
 
       local confirm = true
       if Async.question_player then
-        confirm = await(Async.question_player(player_id,
-          prompt, mug.texture_path, mug.animation_path))
+        local res = await(Async.question_player(
+          player_id,
+          prompt,
+          mug.texture_path,
+          mug.animation_path
+        ))
+        confirm = (res == 1) -- 1 = Yes, anything else = No/Cancel
       end
 
       if not confirm then
@@ -1028,6 +1045,91 @@ eznpcs.add_event{
       await(Async.message_player(player_id,
         "All cosmetics cleared for this account.\nYou can re-purchase them in the shop.",
         mug.texture_path, mug.animation_path))
+
+      return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+    end)
+  end
+}
+
+eznpcs.add_event{
+  name = "cosmeticgift",
+  action = function(npc, player_id, dialogue, relay_object)
+    return async(function()
+      local mug = eznpcs.get_dialogue_mugshot(npc, player_id, dialogue)
+
+      -- Make sure the cosmetics system is available
+      if not cosmetics or not cosmetics.unlock_for_player then
+        await(Async.message_player(
+          player_id,
+          "Cosmetics system is not available right now.",
+          mug.texture_path, mug.animation_path
+        ))
+        return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+      end
+
+      -- Case-insensitive props
+      local ci = build_ci_props(dialogue)
+
+      -- Read cosmetic id from custom properties:
+      -- Accepts "CosmeticID", "Cosmetic Id", or "Cosmetic"
+      local cosmetic_id = get_ci(ci, "cosmetic id")
+                        or get_ci(ci, "cosmeticid")
+                        or get_ci(ci, "cosmetic")
+
+      if not cosmetic_id or cosmetic_id == "" then
+        await(Async.message_player(
+          player_id,
+          "This NPC isn't configured with a cosmetic reward.",
+          mug.texture_path, mug.animation_path
+        ))
+        return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+      end
+
+      cosmetic_id = tostring(cosmetic_id)
+
+      -- Nice display name (falls back to id if unknown)
+      local name = cosmetics.get_name_for_id
+                and cosmetics.get_name_for_id(cosmetic_id)
+                or cosmetic_id
+
+      -- Optional flavor text before the gift (from a "Prompt" custom property)
+      local prompt = dialogue.custom_properties["Prompt"]
+      if prompt and prompt ~= "" then
+        await(Async.message_player(
+          player_id,
+          prompt,
+          mug.texture_path, mug.animation_path
+        ))
+      end
+
+      -- Already have it? Just say so and bail.
+      if cosmetics.has_cosmetic and cosmetics.has_cosmetic(player_id, cosmetic_id) then
+        await(Async.message_player(
+          player_id,
+          "You already have the " .. name .. " cosmetic.",
+          mug.texture_path, mug.animation_path
+        ))
+        return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+      end
+
+      -- Try to unlock it
+      local ok, reason = cosmetics.unlock_for_player(player_id, cosmetic_id)
+      if ok then
+        if sfx and sfx.item_get then
+          Net.play_sound_for_player(player_id, sfx.item_get)
+        end
+        await(Async.message_player(
+          player_id,
+          "You got the " .. name .. " cosmetic!",
+          mug.texture_path, mug.animation_path
+        ))
+      else
+        await(Async.message_player(
+          player_id,
+          "Couldn't give you that cosmetic (" .. tostring(reason or "error") .. ").",
+          mug.texture_path, mug.animation_path
+        ))
+      end
 
       return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
     end)

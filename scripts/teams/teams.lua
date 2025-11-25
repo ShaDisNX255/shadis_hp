@@ -4,6 +4,7 @@
 local ezmemory = require('scripts/ezlibs-scripts/ezmemory')
 local helpers  = require('scripts/ezlibs-scripts/helpers')
 local Month    = require('scripts/teams/month')  -- << define rewards in this file
+local cosmetics_ok, cosmetics = pcall(require, 'scripts/ezlibs-custom/cosmetics')
 
 -- Try JobBBS from either path; if present we will hook job-claim to +1 GP.
 local JobBBS = (function()
@@ -552,6 +553,41 @@ local function _grant_reward(pid, spec)
         pcall(ezmemory.give_item_with_optional_notify, pid, area_id, nil, item_info, false)
         if Net.play_sound_for_player then
           pcall(Net.play_sound_for_player, pid, "/server/assets/ezlibs-assets/sfx/item_get.ogg")
+        end
+      end
+    end
+  end
+
+  -- COSMETICS (uses cosmetics.unlock_for_player)
+  -- spec.cosmetics can be:
+  --   { "snowflake_particle", "DarkAura" }
+  -- or { { id="snowflake_particle", label="Snowflake" }, ... }
+  if spec.cosmetics and cosmetics_ok and cosmetics and cosmetics.unlock_for_player then
+    for _, entry in ipairs(spec.cosmetics) do
+      local id, label
+
+      if type(entry) == "table" then
+        id    = entry.id or entry.cosmetic_id or entry[1]
+        label = entry.label or entry.name
+      else
+        id = entry
+      end
+
+      if id then
+        id = tostring(id)
+        local ok, reason = cosmetics.unlock_for_player(pid, id)
+        if ok then
+          local pretty = label
+          if (not pretty or pretty == "") and cosmetics.get_name_for_id then
+            pretty = cosmetics.get_name_for_id(id)
+          end
+          pretty = pretty or id
+          Net.message_player(pid, "Got cosmetic: "..pretty..".")
+          if Net.play_sound_for_player then
+            pcall(Net.play_sound_for_player, pid, "/server/assets/ezlibs-assets/sfx/item_get.ogg")
+          end
+        else
+          print("[teams] Failed to grant cosmetic", id, "reason:", tostring(reason or "unknown"))
         end
       end
     end
