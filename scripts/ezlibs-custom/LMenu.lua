@@ -39,6 +39,15 @@ if not CosmeticsOK then
 end
 
 -- ---------------------------------------------------------------------------
+-- Jobs progress viewer (JobBBS integration)
+-- ---------------------------------------------------------------------------
+
+local JobBBSOK, JobBBS = pcall(require, "scripts/jobbbs/JobBBS")
+if not JobBBSOK then
+  JobBBS = nil
+end
+
+-- ---------------------------------------------------------------------------
 -- Displayer (for gradient font text)
 -- ---------------------------------------------------------------------------
 
@@ -84,6 +93,7 @@ local cfg = {
   row_x_summon    = nil,
   row_x_friends   = nil,
   row_x_cosmetics = 12,
+  row_x_jobs      = nil,
 
   -- Cards row (always present)
   cards_texture   = "/server/assets/ui/lmenu/lcards.png",
@@ -99,6 +109,10 @@ local cfg = {
   -- Cosmetics row button (slightly longer tab)
   cosmetics_texture = "/server/assets/ui/lmenu/lcosmetics.png",
   cosmetics_anim    = "/server/assets/ui/lmenu/lcosmetics.animation",
+
+  -- Jobs row button
+  jobs_texture    = "/server/assets/ui/lmenu/ljobs.png",
+  jobs_anim       = "/server/assets/ui/lmenu/ljobs.animation",
 
   -- Decorative line at the bottom
   line_texture    = "/server/assets/ui/lmenu/lline.png",
@@ -128,6 +142,7 @@ local SPRITE_ID_CARDS      = "lmenu_cards"
 local SPRITE_ID_SUMMON     = "lmenu_summon"      -- used for both Summon and Unsummon states
 local SPRITE_ID_FRIENDS    = "lmenu_friends"
 local SPRITE_ID_COSMETICS  = "lmenu_cosmetics"
+local SPRITE_ID_JOBS       = "lmenu_jobs"
 local SPRITE_ID_LINE       = "lmenu_line"
 local SPRITE_ID_ONLINE_TAB = "lmenu_online_tab"
 local ONLINE_TEXT_ID       = "lmenu_online_count"
@@ -337,6 +352,9 @@ local function build_rows_for_player(pid)
   -- Then the Cards row (always present)
   rows[#rows+1] = { id = "cards" }
 
+  -- Jobs: always show the row
+  rows[#rows+1] = { id = "jobs" }
+
   -- Friends is always available
   rows[#rows+1] = { id = "friends" }
 
@@ -445,6 +463,38 @@ local function ensure_friends_ui(pid, y, selected)
   end
   if frame.update_ui_element then
     frame.update_ui_element(SPRITE_ID_FRIENDS, pid, { opacity = 255 })
+  end
+end
+
+local function ensure_jobs_ui(pid, y, selected)
+  if not cfg.jobs_texture or cfg.jobs_texture == "" then
+    return
+  end
+
+  local anim = selected and "JOBS_SELECTED" or "JOBS_UNSELECTED"
+  local x    = cfg.row_x_jobs or cfg.base_x
+
+  frame.add_ui_element(
+    SPRITE_ID_JOBS,
+    pid,
+    cfg.jobs_texture,
+    cfg.jobs_anim,
+    anim,
+    x,
+    y,
+    cfg.z,
+    cfg.scale,
+    cfg.scale
+  )
+
+  if frame.update_ui_position then
+    frame.update_ui_position(SPRITE_ID_JOBS, pid, x, y, cfg.z)
+  end
+  if frame.set_ui_animation then
+    frame.set_ui_animation(SPRITE_ID_JOBS, pid, anim)
+  end
+  if frame.update_ui_element then
+    frame.update_ui_element(SPRITE_ID_JOBS, pid, { opacity = 255 })
   end
 end
 
@@ -563,6 +613,7 @@ local function clear_all_ui(pid)
     pcall(frame.remove_ui_element, SPRITE_ID_ONLINE_TAB, pid)
     pcall(frame.remove_ui_element, SPRITE_ID_FRIENDS,    pid)
     pcall(frame.remove_ui_element, SPRITE_ID_COSMETICS,  pid)
+    pcall(frame.remove_ui_element, SPRITE_ID_JOBS,       pid)
   end
 
   if Displayer and Displayer.Font and Displayer.Font.eraseTextDisplay then
@@ -606,6 +657,8 @@ local function rebuild_and_redraw(pid)
       ensure_friends_ui(pid, y, selected)
     elseif row.id == "cosmetics" then
       ensure_cosmetics_ui(pid, y, selected)
+    elseif row.id == "jobs" then
+      ensure_jobs_ui(pid, y, selected)
     end
   end
 
@@ -770,6 +823,7 @@ if Net and Net.on then
 
       local api = card_api()
 
+      -- Cards: open card collection
       if row.id == "cards" then
         LMenu.close(pid)
         if api and type(api.open_card_list) == "function" then
@@ -783,6 +837,7 @@ if Net and Net.on then
         return
       end
 
+      -- Summon armed card
       if row.id == "summon" then
         if not api or type(api.summon_armed) ~= "function" then
           Net.message_player(pid, "(Summon not available.)")
@@ -797,6 +852,7 @@ if Net and Net.on then
         return
       end
 
+      -- Unsummon
       if row.id == "unsummon" then
         if not api or type(api.unsummon) ~= "function" then
           Net.message_player(pid, "(Unsummon not available.)")
@@ -811,6 +867,7 @@ if Net and Net.on then
         return
       end
 
+      -- Friends board
       if row.id == "friends" then
         LMenu.close(pid)
 
@@ -825,6 +882,23 @@ if Net and Net.on then
         return
       end
 
+      -- NEW: Jobs progress viewer
+      if row.id == "jobs" then
+        -- Close the LMenu and open the Job Progress view-only board.
+        LMenu.close(pid)
+
+        if JobBBS and type(JobBBS.open_progress_board) == "function" then
+          local okj, errj = pcall(JobBBS.open_progress_board, pid)
+          if not okj then
+            warn("JobBBS.open_progress_board failed for", pid, ":", tostring(errj))
+          end
+        else
+          Net.message_player(pid, "(Job progress viewer not available.)")
+        end
+        return
+      end
+
+      -- Cosmetics submenu
       if row.id == "cosmetics" then
         -- Close the LMenu but keep the player frozen, then open the Cosmetics submenu.
         LMenu.close(pid, { keep_frozen = true })
