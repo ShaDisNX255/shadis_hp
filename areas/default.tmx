@@ -903,6 +903,17 @@
     <property name="Price 6" type="int" value="0"/>
     <property name="Price 7" type="int" value="0"/>
     <property name="Price 8" type="int" value="0"/>
+    <property name="Price 9" type="int" value="0"/>
+    <property name="Price 10" type="int" value="0"/>
+    <property name="Price 11" type="int" value="0"/>
+    <property name="Price 12" type="int" value="0"/>
+    <property name="Price 13" type="int" value="0"/>
+    <property name="Price 14" type="int" value="0"/>
+    <property name="Price 15" type="int" value="0"/>
+    <property name="Price 16" type="int" value="0"/>
+    <property name="Price 17" type="int" value="0"/>
+    <property name="Price 18" type="int" value="0"/>
+    <property name="Price 19" type="int" value="0"/>
     <property name="Sell 1" value="snowflake_particle"/>
     <property name="Sell 2" value="confetti"/>
     <property name="Sell 3" value="shock"/>
@@ -911,6 +922,17 @@
     <property name="Sell 6" value="GreenCyberElf"/>
     <property name="Sell 7" value="BlueCyberElf"/>
     <property name="Sell 8" value="Matrix"/>
+    <property name="Sell 9" value="GigFreez"/>
+    <property name="Sell 10" value="MMBadge"/>
+    <property name="Sell 11" value="Sparkle1"/>
+    <property name="Sell 12" value="Ready"/>
+    <property name="Sell 13" value="ChipGreen"/>
+    <property name="Sell 14" value="ChipRed"/>
+    <property name="Sell 15" value="ChipMulti"/>
+    <property name="Sell 16" value="Sims"/>
+    <property name="Sell 17" value="BugFrag"/>
+    <property name="Sell 18" value="ColonelB"/>
+    <property name="Sell 19" value="ProtomanB"/>
    </properties>
    <point/>
   </object>

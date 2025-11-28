@@ -1,0 +1,56 @@
+animation state="READY"
+frame duration="0.05" x="418" y="115" w="0" h="0" originx="0" originy="0"
+frame duration="0.05" x="15" y="14" w="124" h="26" originx="0" originy="25"
+frame duration="0.05" x="141" y="6" w="133" h="34" originx="0" originy="33"
+frame duration="0.05" x="276" y="6" w="130" h="38" originx="0" originy="33"
+frame duration="0.05" x="408" y="6" w="128" h="40" originx="0" originy="33"
+frame duration="0.05" x="538" y="6" w="124" h="40" originx="0" originy="33"
+frame duration="0.05" x="664" y="10" w="128" h="36" originx="0" originy="29"
+frame duration="0.05" x="9" y="69" w="127" h="30" originx="0" originy="25"
+frame duration="0.05" x="138" y="69" w="128" h="28" originx="0" originy="25"
+frame duration="0.05" x="268" y="69" w="124" h="26" originx="0" originy="25"
+frame duration="0.05" x="394" y="69" w="124" h="26" originx="0" originy="25"
+frame duration="0.05" x="520" y="69" w="124" h="26" originx="0" originy="25"
+frame duration="0.05" x="646" y="69" w="124" h="26" originx="0" originy="25"
+frame duration="0.05" x="7" y="110" w="126" h="28" originx="0" originy="25"
+frame duration="0.05" x="135" y="110" w="127" h="29" originx="0" originy="25"
+frame duration="1.0" x="264" y="111" w="128" h="30" originx="0" originy="25"
+frame duration="0.05" x="135" y="110" w="127" h="29" originx="0" originy="25"
+frame duration="0.05" x="7" y="110" w="126" h="28" originx="0" originy="25"
+frame duration="0.05" x="646" y="69" w="124" h="26" originx="0" originy="25"
+frame duration="0.05" x="520" y="69" w="124" h="26" originx="0" originy="25"
+frame duration="0.05" x="394" y="69" w="124" h="26" originx="0" originy="25"
+frame duration="0.05" x="268" y="69" w="124" h="26" originx="0" originy="25"
+frame duration="0.05" x="138" y="69" w="128" h="28" originx="0" originy="25"
+frame duration="0.05" x="9" y="69" w="127" h="30" originx="0" originy="25"
+frame duration="0.05" x="664" y="10" w="128" h="36" originx="0" originy="29"
+frame duration="0.05" x="538" y="6" w="124" h="40" originx="0" originy="33"
+frame duration="0.05" x="408" y="6" w="128" h="40" originx="0" originy="33"
+frame duration="0.05" x="276" y="6" w="130" h="38" originx="0" originy="33"
+frame duration="0.05" x="141" y="6" w="133" h="34" originx="0" originy="33"
+frame duration="0.05" x="15" y="14" w="124" h="26" originx="0" originy="25"
+frame duration="5.0" x="418" y="115" w="0" h="0" originx="0" originy="0"
+
+animation state="IDLE_DR"
+
+animation state="IDLE_DL"
+
+animation state="IDLE_UR"
+
+animation state="IDLE_UL"
+
+animation state="WALK_DR"
+
+animation state="WALK_DL"
+
+animation state="WALK_UR"
+
+animation state="WALK_UL"
+
+animation state="RUN_DR"
+
+animation state="RUN_DL"
+
+animation state="RUN_UR"
+
+animation state="RUN_UL"

@@ -43,6 +43,7 @@ end
 -- Logging
 -- ---------------------------------------------------------------------------
 
+local flavor_textOK, flavor_text = pcall(require, "scripts/ezlibs-custom/flavor_text")
 local helpers_ok, helpers = pcall(require, "scripts/ezlibs-scripts/helpers")
 
 local function log(...)
@@ -163,6 +164,9 @@ for _, def in ipairs(cosmetics_defs) do
     preview_start_y = def.preview_start_y,
     preview_sprite_id = def.preview_sprite_id,
     loop_duration   = def.loop_duration,
+    world_scale     = def.world_scale,
+    bot_scale        = def.bot_scale,
+    preview_scale   = def.preview_scale,
     -- Small menu preview (always visible while menu is open)
     menu_preview_texture    = def.menu_preview_texture,
     menu_preview_animation  = def.menu_preview_animation,
@@ -650,7 +654,7 @@ local function draw_preview(pid)
   local x = base_x + (st.preview_x or 0)
   local y = base_y + (st.preview_y or 0)
   local z = cfg.preview_z     or cfg.menu_z or 6
-  local s = cfg.preview_scale or 2.0
+  local s = opt.preview_scale or cfg.preview_scale or 2.0
 
   local sprite_id = preview_sprite_id_for_opt(opt)
 
@@ -712,6 +716,9 @@ local function finalize_cosmetic_from_preview(pid)
   -- Pick per-cosmetic loop, fall back to config default, then 1.0
   local duration = opt.loop_duration
 
+  local world_scale = opt.world_scale or 2.0  -- Ready will be 1.0, others default 2.0
+  local bot_scale   = opt.bot_scale
+
   local ok, err = pcall(
     frame.set_cosmetic,
     cosmetic_id,
@@ -724,7 +731,9 @@ local function finalize_cosmetic_from_preview(pid)
     true,          -- visible
     -base_xforced, -- player_xoffset (keeps sprite aligned with bot)
     -base_yforced, -- player_yoffset
-    duration              -- anim_duration
+    duration,      -- anim_duration
+    world_scale,    -- NEW: per-cosmetic world scale (optional)
+    bot_scale
   )
 
   if not ok then
@@ -806,6 +815,8 @@ local function apply_shop_preview_internal(pid, opt)
   local y_offset = opt.preview_start_y or cfg.preview_start_y or 0
 
   local duration = opt.loop_duration
+  local world_scale = opt.world_scale or 2.0
+  local bot_scale   = opt.bot_scale or 1.0
 
   local preview_id = SHOP_PREVIEW_PREFIX .. tostring(opt.cosmetic_id or opt.key or "preview")
 
@@ -821,7 +832,9 @@ local function apply_shop_preview_internal(pid, opt)
     true,          -- visible
     -base_xforced, -- player_xoffset
     -base_yforced, -- player_yoffset
-    duration       -- anim_duration
+    duration,      -- anim_duration
+    world_scale,    -- NEW
+    bot_scale
   )
 
   if not ok then

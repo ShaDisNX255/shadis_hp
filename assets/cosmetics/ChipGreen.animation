@@ -1,0 +1,33 @@
+animation state="ChipGreen"
+frame duration="0.15" x="3" y="3" w="14" h="38" originx="0" originy="0"
+frame duration="0.15" x="28" y="3" w="14" h="38" originx="0" originy="0"
+frame duration="0.15" x="53" y="3" w="14" h="38" originx="0" originy="0"
+frame duration="0.15" x="78" y="3" w="14" h="38" originx="0" originy="0"
+frame duration="0.15" x="103" y="3" w="14" h="38" originx="0" originy="0"
+frame duration="0.15" x="128" y="3" w="14" h="38" originx="0" originy="0"
+frame duration="0.15" x="153" y="3" w="14" h="38" originx="0" originy="0"
+frame duration="0.15" x="178" y="3" w="14" h="38" originx="0" originy="0"
+
+animation state="IDLE_DR"
+
+animation state="IDLE_DL"
+
+animation state="IDLE_UR"
+
+animation state="IDLE_UL"
+
+animation state="WALK_DR"
+
+animation state="WALK_DL"
+
+animation state="WALK_UR"
+
+animation state="WALK_UL"
+
+animation state="RUN_DR"
+
+animation state="RUN_DL"
+
+animation state="RUN_UR"
+
+animation state="RUN_UL"
