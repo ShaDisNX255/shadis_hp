@@ -1,0 +1,31 @@
+animation state="BUGFRAGPILE"
+frame duration="0.18" x="4" y="6" w="33" h="30" originx="0" originy="0"
+frame duration="0.18" x="42" y="6" w="33" h="30" originx="0" originy="0"
+frame duration="0.18" x="80" y="6" w="33" h="30" originx="0" originy="0"
+frame duration="0.18" x="118" y="6" w="33" h="30" originx="0" originy="0"
+frame duration="0.18" x="156" y="6" w="33" h="30" originx="0" originy="0"
+
+animation state="IDLE_DR"
+
+animation state="IDLE_DL"
+
+animation state="IDLE_UR"
+
+animation state="IDLE_UL"
+
+animation state="WALK_DR"
+
+animation state="WALK_DL"
+
+animation state="WALK_UR"
+
+animation state="WALK_UL"
+
+animation state="RUN_DR"
+
+animation state="RUN_DL"
+
+animation state="RUN_UR"
+
+animation state="RUN_UL"
+

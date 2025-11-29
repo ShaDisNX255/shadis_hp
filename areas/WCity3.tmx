@@ -287,6 +287,9 @@
   <object id="31" gid="415" x="784" y="432" width="33" height="54"/>
   <object id="32" gid="23" x="1104" y="864" width="64" height="64">
    <properties>
+    <property name="CosmeticExtra" value="Huh... what's this?"/>
+    <property name="CosmeticGotText" value="You got the 'DarkAura' cosmetic!"/>
+    <property name="CosmeticID" value="DarkAura"/>
     <property name="Flavor" value="WCity Cyber Metro under construction"/>
    </properties>
   </object>

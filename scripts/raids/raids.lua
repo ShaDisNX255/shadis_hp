@@ -204,8 +204,6 @@ local function _persist_health_and_emotion(pid, encounter_info, stats)
   if not stats then return end
 
   if stats.emotion == 1 then
-    Net.set_player_emotion(pid, stats.emotion)
-  else
     Net.set_player_emotion(pid, 0)
   end
 

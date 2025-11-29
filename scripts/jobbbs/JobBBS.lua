@@ -918,6 +918,8 @@ local function ensure_jobs_for_today(pid, st, board_id)
         if k:match('^'..board_id..'/') then st.prog.baseline[k] = nil end
       end
     end
+    -- per-day "read" state: wipe on day flip
+    B.opened_desc = {}
     -- mark that flags are clean for this day
     B.flags_stamp = st.day_key
   end
@@ -951,6 +953,7 @@ local function ensure_jobs_for_today(pid, st, board_id)
   B.job_ids = ids
   B.day_key = st.day_key
   -- when we generate a fresh list for the day, flags should be considered clean
+  B.opened_desc = {}
   B.flags_stamp = st.day_key
   return B
 end
@@ -1057,11 +1060,17 @@ local function open_list(pid, board_id, board_title)
     local accepted = (B.accepted[j.id] == true) and not done
 
     local status       = done and TOK.C or (accepted and TOK.P or TOK.A)
-    local is_available = (not done and not accepted) -- [ ] should be bold
+    local is_available = (not done and not accepted)
+
+    -- "Unread" means: available AND description not yet opened today
+    B.opened_desc = B.opened_desc or {}
+    local has_opened          = B.opened_desc[j.id] == true
+    local is_unread_available = is_available and not has_opened
 
     posts[#posts+1] = {
       id     = '__job:view:'..i,
-      read   = not is_available,  -- false => bold/unread for Available
+      -- false => bold/unread → show NEW only for available + never-read
+      read   = not is_unread_available,
       title  = string.format('%s %s', status, trunc(j.title, MAX_TITLE_CH)),
       author = trunc(j.poster, MAX_AUTHOR_CH),
     }
@@ -1081,6 +1090,90 @@ function JobBBS.open(pid, board_name)
   open_list(pid, bname, board_name or DEFAULT_BOARD_TITLE)
 end
 
+-- View-only board that shows progress for currently accepted jobs (all boards)
+local function open_progress_board(pid)
+  -- Ensure state is attached + day reset is applied
+  ensure_daily_reset(pid)
+  local st = attach_state(pid)
+  if not st then return end
+
+  local posts = {}
+  posts[#posts+1] = { id='__job:hintP', read=true, title='[>] = In Process', author='' }
+  posts[#posts+1] = { id='__job:hintC', read=true, title='[X] = Complete',   author='' }
+  posts[#posts+1] = {
+    id     = '__jobprog:blank',
+    read   = true,
+    title  = '',
+    author = ''
+  }
+
+  local by_id = (function() local p,_ = jobs_pool(); return p end)()
+  local any   = false
+
+  -- Same symbols as the main JobBBS list
+  local TOK = { P = '[>]', C = '[X]' }
+
+  -- Iterate all boards and show accepted jobs (that haven’t been claimed yet)
+  for board_id, B in pairs(st.boards or {}) do
+    if B and B.accepted then
+      -- Make sure today’s jobs exist for this board
+      ensure_jobs_for_today(pid, st, board_id)
+
+      local claimed = B.claimed or {}
+
+      for jid, accepted in pairs(B.accepted) do
+        if accepted and not claimed[jid] then
+          local job = by_id[jid]
+          if job and job.check then
+            any = true
+
+            local base_key       = board_id..'/'..jid
+            local done, cur, need = job.check(pid, st, base_key)
+            cur  = cur  or 0
+            need = need or 0
+
+            -- Use [>] for in-process, [X] for complete
+            local status_tok = done and TOK.C or TOK.P
+
+            -- Line 1: Job name with token prefix, like the normal JobBBS
+            posts[#posts+1] = {
+              id     = '__jobprog:title:'..board_id..':'..jid,
+              read   = true, -- view-only board, no bold/unread states
+              title  = string.format('%s %s', status_tok, trunc(job.title, MAX_TITLE_CH)),
+              author = '' -- or job.poster if you want
+            }
+
+            -- Line 2: Pure numeric progress (no "In progress"/"Complete" text)
+            posts[#posts+1] = {
+              id     = '__jobprog:prog:'..board_id..':'..jid,
+              read   = true,
+              title  = string.format('Progress: %d/%d', cur, need),
+              author = ''
+            }
+          end
+        end
+      end
+    end
+  end
+
+  if not any then
+    posts[#posts+1] = {
+      id     = '__jobprog:none',
+      read   = true,
+      title  = 'No accepted jobs today.',
+      author = ''
+    }
+  end
+
+  -- This board is view-only; we use a different id prefix (__jobprog:)
+  -- so JobBBS.handle_post_selection ignores all clicks (unless you add a special handler).
+  Net.open_board(pid, 'Job Progress', COLOR_BOARD, posts)
+end
+
+function JobBBS.open_progress_board(pid)
+  open_progress_board(pid)
+end
+
 function JobBBS.handle_post_selection(event)
   local pid = event.player_id
     local st = attach_state(pid)
@@ -1088,6 +1181,25 @@ function JobBBS.handle_post_selection(event)
     if not st then return end
 
   local post = tostring(event.post_id or '')
+  -- View-only Job Progress board:
+  -- If you click the job title line, show its description in chat.
+  -- (No accept/claim, no extra progress line here.)
+  local prog_board_id, prog_job_id = post:match('^__jobprog:title:([^:]+):(.+)$')
+  if prog_board_id and prog_job_id then
+    local by_id = (function() local p,_ = jobs_pool(); return p end)()
+    local job = by_id[prog_job_id]
+
+    if job and job.desc then
+      local lines = wrap(job.desc, MAX_TITLE_CH)
+      local NL = string.char(10)
+      Net.message_player(pid, table.concat(lines, NL))
+    end
+
+    -- It's a view-only board: don’t start accept/claim flows.
+    return true
+  end
+
+  -- Normal JobBBS boards use "__job:" IDs as before.
   if not post:match('^__job:') then return false end
 
   if post == '__job:close' then
@@ -1104,7 +1216,10 @@ function JobBBS.handle_post_selection(event)
     local jid = B.job_ids[idx]
     local job = jid and by_id[jid]
     if not job then return true end
-
+    -- Mark this job as "description opened" for today (clears NEW next time)
+    B.opened_desc = B.opened_desc or {}
+    B.opened_desc[job.id] = true
+    save_mem(pid, st)
     local lines = wrap(job.desc, MAX_TITLE_CH)
     local NL = string.char(10)
     Net.message_player(pid, table.concat(lines, NL))

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="50" height="50" tilewidth="64" tileheight="32" infinite="0" nextlayerid="14" nextobjectid="341">
+<map version="1.10" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="50" height="50" tilewidth="64" tileheight="32" infinite="0" nextlayerid="14" nextobjectid="347">
  <properties>
   <property name="Background" value="custom"/>
   <property name="Background Animation" value="/server/assets/custom/backgrounds/home/kottouhinyanodennou.animation"/>
@@ -198,12 +198,13 @@
    </properties>
    <point/>
   </object>
-  <object id="181" name="No Idea" type="Dialogue" x="899" y="969">
+  <object id="181" name="Question" type="Dialogue" x="899" y="969">
    <properties>
-    <property name="Dialogue Type" value="first"/>
+    <property name="Dialogue Type" value="question"/>
     <property name="Mugshot" value="player"/>
     <property name="Next 1" type="object" value="183"/>
-    <property name="Text 1" value="I have no idea what he's saying... "/>
+    <property name="Next 2" type="object" value="345"/>
+    <property name="Text 1" value="I have no idea what he's saying, should I just nod?"/>
    </properties>
    <point/>
   </object>
@@ -215,19 +216,20 @@
    </properties>
    <point/>
   </object>
-  <object id="183" name="Nod" type="Dialogue" x="921.5" y="974.5">
+  <object id="183" name="Nod" type="Dialogue" x="914.5" y="961.5">
    <properties>
     <property name="Dialogue Type" value="first"/>
     <property name="Mugshot" value="player"/>
     <property name="Next 1" type="object" value="184"/>
-    <property name="Text 1" value="I'll just nod..."/>
+    <property name="Text 1" value="Alright, I'll just nod"/>
    </properties>
    <point/>
   </object>
-  <object id="184" name="NodsBack" type="Dialogue" x="939" y="971">
+  <object id="184" name="NodsBack" type="Dialogue" x="928.5" y="955.5">
    <properties>
     <property name="Dialogue Type" value="first"/>
     <property name="Mugshot" value="luigi-idle"/>
+    <property name="Next 1" type="object" value="346"/>
     <property name="Text 1" value="*nods back*"/>
    </properties>
    <point/>
@@ -879,6 +881,84 @@
     <property name="Target Object" value="4"/>
    </properties>
   </object>
+  <object id="342" name="Cosmetics Shop" type="NPC" x="822.5" y="691.5">
+   <properties>
+    <property name="Asset Name" value="normal-navi-bn4_red"/>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Direction" value="Down Left"/>
+    <property name="Next 1" type="object" value="343"/>
+    <property name="Text 1" value="Here there, I sell cosmetics!"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="343" name="Cosmetic Shop" type="Dialogue" x="872" y="646">
+   <properties>
+    <property name="Dialogue Type" value="cosmeticshop"/>
+    <property name="Price 1" type="int" value="600000"/>
+    <property name="Price 10" type="int" value="1000000"/>
+    <property name="Price 11" type="int" value="1000000"/>
+    <property name="Price 12" type="int" value="1100000"/>
+    <property name="Price 13" type="int" value="1100000"/>
+    <property name="Price 14" type="int" value="1100000"/>
+    <property name="Price 15" type="int" value="1200000"/>
+    <property name="Price 16" type="int" value="1200000"/>
+    <property name="Price 17" type="int" value="1300000"/>
+    <property name="Price 18" type="int" value="1300000"/>
+    <property name="Price 19" type="int" value="1300000"/>
+    <property name="Price 2" type="int" value="700000"/>
+    <property name="Price 20" type="int" value="1300000"/>
+    <property name="Price 21" type="int" value="1500000"/>
+    <property name="Price 22" type="int" value="1500000"/>
+    <property name="Price 23" type="int" value="1700000"/>
+    <property name="Price 3" type="int" value="700000"/>
+    <property name="Price 4" type="int" value="800000"/>
+    <property name="Price 5" value="800000"/>
+    <property name="Price 6" type="int" value="800000"/>
+    <property name="Price 7" type="int" value="900000"/>
+    <property name="Price 8" type="int" value="900000"/>
+    <property name="Price 9" type="int" value="1000000"/>
+    <property name="Sell 1" value="Sims"/>
+    <property name="Sell 10" value="DarkAura"/>
+    <property name="Sell 11" value="confetti"/>
+    <property name="Sell 12" value="Sparkle1"/>
+    <property name="Sell 13" value="bugfragpile"/>
+    <property name="Sell 14" value="BeanStar"/>
+    <property name="Sell 15" value="dmgaura"/>
+    <property name="Sell 16" value="snowflake_particle"/>
+    <property name="Sell 17" value="Matrix"/>
+    <property name="Sell 18" value="PinkCyberElf"/>
+    <property name="Sell 19" value="GreenCyberElf"/>
+    <property name="Sell 2" value="ColonelB"/>
+    <property name="Sell 20" value="BlueCyberElf"/>
+    <property name="Sell 21" value="bugfragdealer"/>
+    <property name="Sell 22" value="GigFreez"/>
+    <property name="Sell 23" value="Ready"/>
+    <property name="Sell 3" value="ProtomanB"/>
+    <property name="Sell 4" value="BugFrag"/>
+    <property name="Sell 5" value="MMBadge"/>
+    <property name="Sell 6" value="shock"/>
+    <property name="Sell 7" value="ChipGreen"/>
+    <property name="Sell 8" value="ChipRed"/>
+    <property name="Sell 9" value="ChipMulti"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="345" name="No" type="Dialogue" x="928" y="992">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Mugshot" value="none"/>
+    <property name="Text 1" value="You look the other way"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="346" name="Gift" type="Dialogue" x="944.5" y="961.5">
+   <properties>
+    <property name="CosmeticID" value="BeanStar"/>
+    <property name="Dialogue Type" value="cosmeticgift"/>
+    <property name="Mugshot" value="none"/>
+   </properties>
+   <point/>
+  </object>
  </objectgroup>
  <layer id="6" name="Tile Layer 2" width="50" height="50" offsetx="0" offsety="-16">
   <data encoding="csv">
@@ -1092,6 +1172,9 @@
   <object id="113" gid="73" x="896" y="496" width="128" height="128"/>
   <object id="121" gid="77" x="944" y="496" width="128" height="128">
    <properties>
+    <property name="CosmeticExtra" value="You notice something in the corner..."/>
+    <property name="CosmeticGotText" value="You got the 'shock' cosmetic!"/>
+    <property name="CosmeticID" value="shock"/>
     <property name="Flavor" value="You see a trading card vending machine. It seems like all the rare cards are gone..."/>
    </properties>
   </object>

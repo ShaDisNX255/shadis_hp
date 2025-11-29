@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="11" height="18" tilewidth="64" tileheight="32" infinite="0" nextlayerid="4" nextobjectid="51">
+<map version="1.10" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="11" height="18" tilewidth="64" tileheight="32" infinite="0" nextlayerid="4" nextobjectid="52">
  <properties>
   <property name="Background" value="custom"/>
   <property name="Background Animation" value="/server/assets/custom/backgrounds/wcity/01-generic1.animation"/>
@@ -33,6 +33,7 @@
  <tileset firstgid="304" source="../assets/objects/skull_2.tsx"/>
  <tileset firstgid="305" source="../assets/objects/fountain.tsx"/>
  <tileset firstgid="311" source="../assets/tiles/HoloPanelz.tsx"/>
+ <tileset firstgid="321" source="../assets/objects/Zarydoll.tsx"/>
  <layer id="1" name="Tile Layer 0" width="11" height="18">
   <data encoding="csv">
 52,19,29,39,49,9,19,29,39,49,5,
@@ -129,5 +130,6 @@
   <object id="48" gid="303" x="-9" y="421" width="30" height="35"/>
   <object id="49" gid="304" x="3.5" y="400.5" width="30" height="34"/>
   <object id="50" gid="305" x="89.5" y="614.5" width="100" height="100"/>
+  <object id="51" gid="321" x="-32" y="160" width="30" height="28"/>
  </objectgroup>
 </map>

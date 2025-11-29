@@ -2,10 +2,13 @@
 -- L Menu:
 --   LS   = open/close
 --   U/D  = move cursor
---   A    = activate row (Cards / Summon / Unsummon)
+--   A    = activate row (Cards / Summon / Unsummon / Friends / Cosmetics)
 
 local LMenu = {}
 _G.LMenu = LMenu  -- expose globally so other scripts can query state if needed
+
+local suppress_next_open = {}
+LMenu._suppress_next_open = suppress_next_open
 
 -- ---------------------------------------------------------------------------
 -- net-games framework
@@ -24,6 +27,24 @@ end
 local FriendsOK, Friends = pcall(require, "scripts/ezlibs-custom/friends")
 if not FriendsOK then
   Friends = nil
+end
+
+-- ---------------------------------------------------------------------------
+-- Cosmetics submenu (new module handles all cosmetic logic)
+-- ---------------------------------------------------------------------------
+
+local CosmeticsOK, Cosmetics = pcall(require, "scripts/ezlibs-custom/cosmetics")
+if not CosmeticsOK then
+  Cosmetics = nil
+end
+
+-- ---------------------------------------------------------------------------
+-- Jobs progress viewer (JobBBS integration)
+-- ---------------------------------------------------------------------------
+
+local JobBBSOK, JobBBS = pcall(require, "scripts/jobbbs/JobBBS")
+if not JobBBSOK then
+  JobBBS = nil
 end
 
 -- ---------------------------------------------------------------------------
@@ -60,11 +81,19 @@ end
 
 local cfg = {
   -- Logical UI coordinates (0..240 x, 0..160 y); framework doubles them internally.
-  base_x      = 15,   -- move menu left/right
+  base_x      = 15,   -- default X for rows (used if row_x_* is nil)
   base_y      = 30,   -- move menu up/down
   row_spacing = 18,   -- vertical distance between rows
   z           = 6,    -- UI Z-depth
-  scale       = 2,  -- change if tabs feel too big/small
+  scale       = 2,    -- change if tabs feel too big/small
+
+  -- Optional per-row X overrides (use this to visually right-align the longer Cosmetics tab)
+  -- If nil, that row falls back to base_x.
+  row_x_cards     = nil,
+  row_x_summon    = nil,
+  row_x_friends   = nil,
+  row_x_cosmetics = 12,
+  row_x_jobs      = nil,
 
   -- Cards row (always present)
   cards_texture   = "/server/assets/ui/lmenu/lcards.png",
@@ -77,6 +106,15 @@ local cfg = {
   friends_texture = "/server/assets/ui/lmenu/lfriends.png",
   friends_anim    = "/server/assets/ui/lmenu/lfriends.animation",
 
+  -- Cosmetics row button (slightly longer tab)
+  cosmetics_texture = "/server/assets/ui/lmenu/lcosmetics.png",
+  cosmetics_anim    = "/server/assets/ui/lmenu/lcosmetics.animation",
+
+  -- Jobs row button
+  jobs_texture    = "/server/assets/ui/lmenu/ljobs.png",
+  jobs_anim       = "/server/assets/ui/lmenu/ljobs.animation",
+
+  -- Decorative line at the bottom
   line_texture    = "/server/assets/ui/lmenu/lline.png",
   line_x          = 8,     -- around center for 225px wide line at scale 1
   line_y          = 140,   -- near bottom (0..160)
@@ -100,12 +138,14 @@ local cfg = {
 }
 
 -- Sprite IDs (unique per row)
-local SPRITE_ID_CARDS         = "lmenu_cards"
-local SPRITE_ID_SUMMON        = "lmenu_summon"  -- used for both Summon and Unsummon states
-local SPRITE_ID_FRIENDS       = "lmenu_friends"
-local SPRITE_ID_LINE          = "lmenu_line"
-local SPRITE_ID_ONLINE_TAB    = "lmenu_online_tab"
-local ONLINE_TEXT_ID          = "lmenu_online_count"
+local SPRITE_ID_CARDS      = "lmenu_cards"
+local SPRITE_ID_SUMMON     = "lmenu_summon"      -- used for both Summon and Unsummon states
+local SPRITE_ID_FRIENDS    = "lmenu_friends"
+local SPRITE_ID_COSMETICS  = "lmenu_cosmetics"
+local SPRITE_ID_JOBS       = "lmenu_jobs"
+local SPRITE_ID_LINE       = "lmenu_line"
+local SPRITE_ID_ONLINE_TAB = "lmenu_online_tab"
+local ONLINE_TEXT_ID       = "lmenu_online_count"
 
 -- ---------------------------------------------------------------------------
 -- Logging (safe even if helpers module isn't present)
@@ -164,7 +204,7 @@ local function play_sfx(pid, key)
 end
 
 -- ---------------------------------------------------------------------------
--- Stasis: compute a per-player stasis override for freeze_player
+-- Stasis helper (kept in case you want it again later)
 -- ---------------------------------------------------------------------------
 
 local function compute_stasis_for_player(pid)
@@ -174,12 +214,9 @@ local function compute_stasis_for_player(pid)
 
   local pos = Net.get_player_position(pid)
   if not pos then
-    -- Fallback: some safe-ish default; you can tweak this if needed
     return "0,0,0"
   end
 
-  -- Use the *exact* tile the player is currently on.
-  -- freeze_player treats these as tile coords and adds +0.5 internally.
   local x = math.floor(tonumber(pos.x) or 0)
   local y = math.floor(tonumber(pos.y) or 0)
   local z = math.floor(tonumber(pos.z) or 0)
@@ -193,10 +230,9 @@ end
 
 -- st_by_pid[pid] = {
 --    cursor = int,
---    rows   = { { id="cards" }, { id="summon" } / { id="unsummon" } },
+--    rows   = { { id="cards" }, { id="summon" } / { id="unsummon" } , { id="friends" }, { id="cosmetics" } },
 -- }
 local st_by_pid = {}
-
 
 -- ---------------------------------------------------------------------------
 -- Online player counter (number only, drawn with GRADIENT_GREEN font)
@@ -235,7 +271,6 @@ local function update_online_text(pid)
   end
 
   -- Ensure this player has font sprites allocated
-  -- (covers cases where they joined before FontSystem init, or weird race conditions)
   local fs = D._subsystems and D._subsystems.FontSystem
   if fs and fs.player_fonts and not fs.player_fonts[pid] and fs.setupPlayerFonts then
     pcall(fs.setupPlayerFonts, fs, pid)
@@ -292,9 +327,6 @@ end
 local function build_rows_for_player(pid)
   local rows = {}
 
-  -- Always have Cards row
-  rows[#rows+1] = { id = "cards" }
-
   local api = card_api()
   local has_armed  = false
   local has_summon = false
@@ -310,17 +342,24 @@ local function build_rows_for_player(pid)
     end
   end
 
-  -- Slot 2 (when available) = Summon/Unsummon
+  -- FIRST: Summon/Unsummon row (when available)
   if has_summon then
     rows[#rows+1] = { id = "unsummon" }
   elseif has_armed then
     rows[#rows+1] = { id = "summon" }
   end
 
-  -- Friends is always available, and:
-  --   - If Summon/Unsummon exists, Friends becomes slot 3
-  --   - If not, Friends becomes slot 2
+  -- Then the Cards row (always present)
+  rows[#rows+1] = { id = "cards" }
+
+  -- Jobs: always show the row
+  rows[#rows+1] = { id = "jobs" }
+
+  -- Friends is always available
   rows[#rows+1] = { id = "friends" }
+
+  -- Cosmetics: always show the row
+  rows[#rows+1] = { id = "cosmetics" }
 
   return rows
 end
@@ -330,23 +369,23 @@ end
 -- ---------------------------------------------------------------------------
 
 local function ensure_cards_ui(pid, y, selected)
-  -- Allocate if not present; add_ui_element is idempotent thanks to ui_cache
+  local x = cfg.row_x_cards or cfg.base_x
+
   frame.add_ui_element(
     SPRITE_ID_CARDS,
     pid,
     cfg.cards_texture,
     cfg.cards_anim,
     selected and "CARDS_SELECTED" or "CARDS_UNSELECTED",
-    cfg.base_x,
+    x,
     y,
     cfg.z,
     cfg.scale,
     cfg.scale
   )
 
-  -- Move to correct position and update anim
   if frame.update_ui_position then
-    frame.update_ui_position(SPRITE_ID_CARDS, pid, cfg.base_x, y, cfg.z)
+    frame.update_ui_position(SPRITE_ID_CARDS, pid, x, y, cfg.z)
   end
   if frame.set_ui_animation then
     frame.set_ui_animation(
@@ -369,13 +408,15 @@ local function ensure_summon_ui(pid, y, row_id, selected)
     anim = selected and "UNSUMMON_SELECTED" or "UNSUMMON_UNSELECTED"
   end
 
+  local x = cfg.row_x_summon or cfg.base_x
+
   frame.add_ui_element(
     SPRITE_ID_SUMMON,
     pid,
     cfg.summon_texture,
     cfg.summon_anim,
     anim,
-    cfg.base_x,
+    x,
     y,
     cfg.z,
     cfg.scale,
@@ -383,7 +424,7 @@ local function ensure_summon_ui(pid, y, row_id, selected)
   )
 
   if frame.update_ui_position then
-    frame.update_ui_position(SPRITE_ID_SUMMON, pid, cfg.base_x, y, cfg.z)
+    frame.update_ui_position(SPRITE_ID_SUMMON, pid, x, y, cfg.z)
   end
   if frame.set_ui_animation then
     frame.set_ui_animation(SPRITE_ID_SUMMON, pid, anim)
@@ -394,12 +435,12 @@ local function ensure_summon_ui(pid, y, row_id, selected)
 end
 
 local function ensure_friends_ui(pid, y, selected)
-  -- If you temporarily don’t want a sprite, leave friends_texture empty and this will no-op.
   if not cfg.friends_texture or cfg.friends_texture == "" then
     return
   end
 
   local anim = selected and "FRIENDS_SELECTED" or "FRIENDS_UNSELECTED"
+  local x    = cfg.row_x_friends or cfg.base_x
 
   frame.add_ui_element(
     SPRITE_ID_FRIENDS,
@@ -407,7 +448,7 @@ local function ensure_friends_ui(pid, y, selected)
     cfg.friends_texture,
     cfg.friends_anim,
     anim,
-    cfg.base_x,
+    x,
     y,
     cfg.z,
     cfg.scale,
@@ -415,13 +456,78 @@ local function ensure_friends_ui(pid, y, selected)
   )
 
   if frame.update_ui_position then
-    frame.update_ui_position(SPRITE_ID_FRIENDS, pid, cfg.base_x, y, cfg.z)
+    frame.update_ui_position(SPRITE_ID_FRIENDS, pid, x, y, cfg.z)
   end
   if frame.set_ui_animation then
     frame.set_ui_animation(SPRITE_ID_FRIENDS, pid, anim)
   end
   if frame.update_ui_element then
     frame.update_ui_element(SPRITE_ID_FRIENDS, pid, { opacity = 255 })
+  end
+end
+
+local function ensure_jobs_ui(pid, y, selected)
+  if not cfg.jobs_texture or cfg.jobs_texture == "" then
+    return
+  end
+
+  local anim = selected and "JOBS_SELECTED" or "JOBS_UNSELECTED"
+  local x    = cfg.row_x_jobs or cfg.base_x
+
+  frame.add_ui_element(
+    SPRITE_ID_JOBS,
+    pid,
+    cfg.jobs_texture,
+    cfg.jobs_anim,
+    anim,
+    x,
+    y,
+    cfg.z,
+    cfg.scale,
+    cfg.scale
+  )
+
+  if frame.update_ui_position then
+    frame.update_ui_position(SPRITE_ID_JOBS, pid, x, y, cfg.z)
+  end
+  if frame.set_ui_animation then
+    frame.set_ui_animation(SPRITE_ID_JOBS, pid, anim)
+  end
+  if frame.update_ui_element then
+    frame.update_ui_element(SPRITE_ID_JOBS, pid, { opacity = 255 })
+  end
+end
+
+local function ensure_cosmetics_ui(pid, y, selected)
+  if not cfg.cosmetics_texture or cfg.cosmetics_texture == "" then
+    -- Asset not configured; keep row logic but no sprite
+    return
+  end
+
+  local anim = selected and "COSMETICS_SELECTED" or "COSMETICS_UNSELECTED"
+  local x    = cfg.row_x_cosmetics or cfg.base_x
+
+  frame.add_ui_element(
+    SPRITE_ID_COSMETICS,
+    pid,
+    cfg.cosmetics_texture,
+    cfg.cosmetics_anim,
+    anim,
+    x,
+    y,
+    cfg.z,
+    cfg.scale,
+    cfg.scale
+  )
+
+  if frame.update_ui_position then
+    frame.update_ui_position(SPRITE_ID_COSMETICS, pid, x, y, cfg.z)
+  end
+  if frame.set_ui_animation then
+    frame.set_ui_animation(SPRITE_ID_COSMETICS, pid, anim)
+  end
+  if frame.update_ui_element then
+    frame.update_ui_element(SPRITE_ID_COSMETICS, pid, { opacity = 255 })
   end
 end
 
@@ -455,7 +561,6 @@ local function ensure_line_ui(pid)
   end
 
   if frame.update_ui_element then
-    -- Make sure it's visible
     pcall(frame.update_ui_element, SPRITE_ID_LINE, pid, { opacity = 255 })
   end
 end
@@ -497,14 +602,8 @@ local function hide_summon_ui(pid)
   if not frame.update_ui_element then
     return
   end
-
-  -- On first open, the summon sprite may not exist yet.
-  -- Wrapping this in pcall avoids a hard crash when ui_cache[player_id][sprite_id] is nil.
-  local ok, _ = pcall(frame.update_ui_element, SPRITE_ID_SUMMON, pid, { opacity = 0 })
-  -- If it fails, we just silently ignore it; once the sprite exists, this will work.
+  pcall(frame.update_ui_element, SPRITE_ID_SUMMON, pid, { opacity = 0 })
 end
-
-
 
 local function clear_all_ui(pid)
   if frame.remove_ui_element then
@@ -513,6 +612,8 @@ local function clear_all_ui(pid)
     pcall(frame.remove_ui_element, SPRITE_ID_LINE,       pid)
     pcall(frame.remove_ui_element, SPRITE_ID_ONLINE_TAB, pid)
     pcall(frame.remove_ui_element, SPRITE_ID_FRIENDS,    pid)
+    pcall(frame.remove_ui_element, SPRITE_ID_COSMETICS,  pid)
+    pcall(frame.remove_ui_element, SPRITE_ID_JOBS,       pid)
   end
 
   if Displayer and Displayer.Font and Displayer.Font.eraseTextDisplay then
@@ -529,7 +630,7 @@ local function rebuild_and_redraw(pid)
   if not st then return end
 
   st.rows = build_rows_for_player(pid)
-  local rows = st.rows
+  local rows  = st.rows
   local count = #rows
 
   if count == 0 then
@@ -554,6 +655,10 @@ local function rebuild_and_redraw(pid)
       ensure_summon_ui(pid, y, row.id, selected)
     elseif row.id == "friends" then
       ensure_friends_ui(pid, y, selected)
+    elseif row.id == "cosmetics" then
+      ensure_cosmetics_ui(pid, y, selected)
+    elseif row.id == "jobs" then
+      ensure_jobs_ui(pid, y, selected)
     end
   end
 
@@ -598,16 +703,21 @@ function LMenu.open(pid)
   log("Opened LMenu for", pid)
 end
 
-function LMenu.close(pid)
+function LMenu.close(pid, opts)
   local st = st_by_pid[pid]
   if not st then return end
 
   clear_all_ui(pid)
   st_by_pid[pid] = nil
 
-  local ok, err = pcall(frame.unfreeze_player, pid)
-  if not ok then
-    warn("unfreeze_player failed for", pid, "err:", tostring(err))
+  -- Allow callers to keep the player frozen (used by Cosmetics submenu)
+  local keep_frozen = (type(opts) == "table" and opts.keep_frozen == true)
+
+  if not keep_frozen then
+    local ok, err = pcall(frame.unfreeze_player, pid)
+    if not ok then
+      warn("unfreeze_player failed for", pid, "err:", tostring(err))
+    end
   end
 
   log("Closed LMenu for", pid)
@@ -616,14 +726,12 @@ end
 local NAV_DEBOUNCE_SEC = 0.02  -- tweak if needed
 
 local function nav_allowed(st, button)
-  -- Use os.clock() if available; otherwise no debouncing.
   local now = (os and os.clock and os.clock()) or 0
 
   local last_btn  = st.last_nav_button
   local last_time = st.last_nav_time or 0
 
   if last_btn == button and (now - last_time) < NAV_DEBOUNCE_SEC then
-    -- Too soon, treat as "still holding the same button"
     return false
   end
 
@@ -641,9 +749,17 @@ if Net and Net.on then
     local pid = event.player_id
     local btn = event.button
 
-    -- We only care about LS/A/U/D
+    -- We only care about LS/A/U/D in the LMenu logic
     if btn ~= "LS" and btn ~= "A" and btn ~= "U" and btn ~= "D" then
       return
+    end
+
+    -- NEW: if Cosmetics submenu is open, LMenu should not react at all
+    if Cosmetics and type(Cosmetics.is_open) == "function" then
+      local ok, open = pcall(Cosmetics.is_open, pid)
+      if ok and open then
+        return
+      end
     end
 
     local st = st_by_pid[pid]
@@ -651,16 +767,20 @@ if Net and Net.on then
     -- Menu closed: LS opens it, everything else ignored
     if not st then
       if btn == "LS" then
+        -- If Cosmetics just closed from this same button press, skip opening.
+        if suppress_next_open[pid] then
+          suppress_next_open[pid] = nil
+          return
+        end
         LMenu.open(pid)
       end
       return
     end
 
-    -- From here down, menu is open
+    -- Menu is open now
 
     -- LS = close menu
     if btn == "LS" then
-      -- Only play cancel if they never selected anything this session
       if not st.has_selected then
         play_sfx(pid, "cancel")
       end
@@ -670,7 +790,6 @@ if Net and Net.on then
 
     -- U/D = move cursor
     if btn == "U" or btn == "D" then
-      -- Debounce: ignore very rapid repeats of the same button
       if not nav_allowed(st, btn) then
         return
       end
@@ -698,16 +817,14 @@ if Net and Net.on then
       local rows  = st.rows or {}
       local row   = rows[st.cursor or 1]
       if not row then return end
-      -- Mark that something was selected this session (affects cancel SFX logic)
-      st.has_selected = true
 
-      -- Play selection sound for any of the main options
+      st.has_selected = true
       play_sfx(pid, "choose")
 
       local api = card_api()
 
+      -- Cards: open card collection
       if row.id == "cards" then
-        -- Close menu and open Card Collection
         LMenu.close(pid)
         if api and type(api.open_card_list) == "function" then
           local ok2, err2 = pcall(api.open_card_list, pid)
@@ -720,6 +837,7 @@ if Net and Net.on then
         return
       end
 
+      -- Summon armed card
       if row.id == "summon" then
         if not api or type(api.summon_armed) ~= "function" then
           Net.message_player(pid, "(Summon not available.)")
@@ -730,11 +848,11 @@ if Net and Net.on then
           warn("summon_armed error:", tostring(res))
           return
         end
-        -- After summoning, rows change (we now have Unsummon), so rebuild UI
         rebuild_and_redraw(pid)
         return
       end
 
+      -- Unsummon
       if row.id == "unsummon" then
         if not api or type(api.unsummon) ~= "function" then
           Net.message_player(pid, "(Unsummon not available.)")
@@ -745,12 +863,12 @@ if Net and Net.on then
           warn("unsummon error:", tostring(res))
           return
         end
-        -- After unsummoning, rows may change; rebuild UI
         rebuild_and_redraw(pid)
         return
       end
+
+      -- Friends board
       if row.id == "friends" then
-        -- Close menu and open Friends placeholder BBS
         LMenu.close(pid)
 
         if Friends and type(Friends.open_friends_board) == "function" then
@@ -763,11 +881,55 @@ if Net and Net.on then
         end
         return
       end
+
+      -- NEW: Jobs progress viewer
+      if row.id == "jobs" then
+        -- Close the LMenu and open the Job Progress view-only board.
+        LMenu.close(pid)
+
+        if JobBBS and type(JobBBS.open_progress_board) == "function" then
+          local okj, errj = pcall(JobBBS.open_progress_board, pid)
+          if not okj then
+            warn("JobBBS.open_progress_board failed for", pid, ":", tostring(errj))
+          end
+        else
+          Net.message_player(pid, "(Job progress viewer not available.)")
+        end
+        return
+      end
+
+      -- Cosmetics submenu
+      if row.id == "cosmetics" then
+        -- Close the LMenu but keep the player frozen, then open the Cosmetics submenu.
+        LMenu.close(pid, { keep_frozen = true })
+
+        if Cosmetics and type(Cosmetics.open_menu) == "function" then
+          local okc, errc = pcall(Cosmetics.open_menu, pid)
+          if not okc then
+            warn("Cosmetics.open_menu failed for", pid, ":", tostring(errc))
+            -- Fail-safe: unfreeze so the player isn't stuck
+            local ok2, err2 = pcall(frame.unfreeze_player, pid)
+            if not ok2 then
+              warn("unfreeze_player after Cosmetics.open_menu failure:", tostring(err2))
+            end
+          end
+        else
+          Net.message_player(pid, "(Cosmetics menu not available.)")
+          -- Also unfreeze in this case
+          local ok2, err2 = pcall(frame.unfreeze_player, pid)
+          if not ok2 then
+            warn("unfreeze_player after missing Cosmetics module:", tostring(err2))
+          end
+        end
+
+        return
+      end
     end
   end)
 
   Net:on("player_join", function(e)
-    -- Whenever someone joins, refresh the online counter for all players that have LMenu open
+    -- Whenever someone joins, you could refresh the online counter for all open LMenus
+    -- For now we leave it no-op, since the RAIDS_ONLINE table usually drives this.
   end)
 
   -- Safety: auto-close on disconnect / area change
@@ -779,6 +941,7 @@ if Net and Net.on then
 
   Net:on("area_transfer", function(e)
     if e and e.player_id then
+      -- Area change: close menu so states don't leak between maps
       LMenu.close(e.player_id)
     end
   end)
