@@ -44,6 +44,18 @@ local function reset_hp_after_pvp(pid)
     end
 end
 
+local function apply_pvp_hp_after_start(p1, p2)
+    -- Re-assert 1000/1000 shortly after the battle actually starts.
+    Async.sleep(0.25).and_then(function(value)
+        for _, pid in ipairs({p1, p2}) do
+            if pid and Net.is_player(pid) and Net.is_player_battling(pid) then
+                Net.set_player_max_health(pid, PVP_HP)
+                Net.set_player_health(pid, PVP_HP)
+            end
+        end
+    end)
+end
+
 local function load_file(file_path)
 	Async.read_file(file_path..".json").and_then(function(value)
 		if value ~= "" then
@@ -227,15 +239,18 @@ Net:on("actor_interaction", function(event)
 				player_challenges[player_id] = actor_id
 				Net.exclusive_player_emote(actor_id, player_id, 7)
 				Net.exclusive_player_emote(player_id, player_id, 7)
-		    elseif event.post_id == "Challenge2" then
+			elseif event.post_id == "Challenge2" then
     			player_challenges[actor_id] = nil
 
-   				-- give both players temporary PVP HP
-   				set_pvp_hp_for_pair(player_id, actor_id)
+    			-- give both players temporary PVP HP
+    			set_pvp_hp_for_pair(player_id, actor_id)
 
-   				Net.initiate_pvp(player_id,actor_id)
-   				players_in_battle[player_id] = actor_id
-   				players_in_battle[actor_id] = player_id
+    			Net.initiate_pvp(player_id,actor_id)
+    			players_in_battle[player_id] = actor_id
+    			players_in_battle[actor_id] = player_id
+
+    			-- make sure both start at 1000/1000 inside the battle
+    			apply_pvp_hp_after_start(player_id, actor_id)
 			end
 		end)
 	end 
@@ -374,6 +389,7 @@ Net:on("post_selection", function(event)
 					Async.sleep(0.1).and_then(function(value)
 						players_in_battle[player_ids[1]] = player_ids[2]
     					players_in_battle[player_ids[2]] = player_ids[1]
+                        apply_pvp_hp_after_start(player_ids[1], player_ids[2])
 						Async.initiate_pvp(player_ids[1], player_ids[2]).and_then(function(value)
 							
 							if value.ran then
@@ -498,6 +514,7 @@ Net:on("post_selection", function(event)
     					Net.initiate_pvp(player_ids[1],player_ids[2])
     					players_in_battle[player_ids[1]] = player_ids[2]
     					players_in_battle[player_ids[2]] = player_ids[1]
+                        apply_pvp_hp_after_start(player_ids[1], player_ids[2])
 					end)
 				end)
 			end
