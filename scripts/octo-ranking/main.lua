@@ -17,6 +17,8 @@ local player_challenges = {}
 local bbs_type = {}
 local players_in_battle = {}
 local timer = 0
+local BASE_PVE_HP = 100   -- what you want outside PVP
+local PVP_HP      = 1000  -- temporary HP during PVP battles
 local function find_in_table(t, v1)
     for i, v2 in pairs(t) do
         if v1 == v2 then
@@ -24,6 +26,22 @@ local function find_in_table(t, v1)
         end
     end
     return nil
+end
+
+local function set_pvp_hp_for_pair(p1, p2)
+    for _, pid in ipairs({p1, p2}) do
+        if pid and Net.is_player(pid) then
+            Net.set_player_max_health(pid, PVP_HP)
+            Net.set_player_health(pid, PVP_HP)
+        end
+    end
+end
+
+local function reset_hp_after_pvp(pid)
+    if pid and Net.is_player(pid) then
+        Net.set_player_max_health(pid, BASE_PVE_HP)
+        Net.set_player_health(pid, BASE_PVE_HP)
+    end
 end
 
 local function load_file(file_path)
@@ -209,24 +227,41 @@ Net:on("actor_interaction", function(event)
 				player_challenges[player_id] = actor_id
 				Net.exclusive_player_emote(actor_id, player_id, 7)
 				Net.exclusive_player_emote(player_id, player_id, 7)
-			elseif event.post_id == "Challenge2" then
-				player_challenges[actor_id] = nil
-				Net.initiate_pvp(player_id,actor_id)
-				players_in_battle[player_id] = actor_id
-    			players_in_battle[actor_id] = player_id
+		    elseif event.post_id == "Challenge2" then
+    			player_challenges[actor_id] = nil
+
+   				-- give both players temporary PVP HP
+   				set_pvp_hp_for_pair(player_id, actor_id)
+
+   				Net.initiate_pvp(player_id,actor_id)
+   				players_in_battle[player_id] = actor_id
+   				players_in_battle[actor_id] = player_id
 			end
 		end)
 	end 
 end)
 
 Net:on("battle_results", function(event)
-  --Taken from Keristero's pvp_with_stats.lua
-  if players_in_battle[event.player_id] then
-      players_in_battle[event.player_id] = nil
-  end
-  if player_challenges[event.player_id] then
-	player_challenges[event.player_id] = nil
-  end
+    -- Taken from Keristero's pvp_with_stats.lua, expanded to reset HP
+    local pid = event.player_id
+
+    if players_in_battle[pid] then
+        local other = players_in_battle[pid]
+
+        -- clear both sides from the table
+        players_in_battle[pid] = nil
+        if other then
+            players_in_battle[other] = nil
+            reset_hp_after_pvp(other)
+        end
+    end
+
+    -- always reset the player whose results we just got
+    reset_hp_after_pvp(pid)
+
+    if player_challenges[pid] then
+        player_challenges[pid] = nil
+    end
 end)
 
 Net:on("player_disconnect", function(event)
@@ -452,14 +487,17 @@ Net:on("post_selection", function(event)
 					end
 
 					local player_ids = {table.remove(players_in_unranked_matchmaking,1),table.remove(players_in_unranked_matchmaking,1)}
-					for n,player_id in pairs(player_ids) do
-						if Net.is_player_battling(player_id) then return end
+					for _, pid in pairs(player_ids) do
+    					if Net.is_player_battling(pid) then return end
 					end
-					Async.sleep(0.1).and_then(function(value)
-						Net.initiate_pvp(player_ids[1],player_ids[2])
-						players_in_battle[player_ids[1]] = player_ids[2]
-    					players_in_battle[player_ids[2]] = player_ids[1]
 
+					-- give both players temporary PVP HP
+					set_pvp_hp_for_pair(player_ids[1], player_ids[2])
+
+					Async.sleep(0.1).and_then(function(value)
+    					Net.initiate_pvp(player_ids[1],player_ids[2])
+    					players_in_battle[player_ids[1]] = player_ids[2]
+    					players_in_battle[player_ids[2]] = player_ids[1]
 					end)
 				end)
 			end
