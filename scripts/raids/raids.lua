@@ -44,7 +44,7 @@ local TEST_LOGIN_OPTS = {
 
 -- Force the login marquee to read a specific Raid ID / Area
 -- Set to nil to auto-detect like before.
-local LOGIN_ANNOUNCE_RAID_ID   = "Mettaur1"   -- <== put your exact Raid ID here (or nil)
+local LOGIN_ANNOUNCE_RAID_ID   = nil   -- <== put your exact Raid ID here (or nil)
 local LOGIN_ANNOUNCE_MEM_AREA  = nil           -- optional: e.g. "WCity1"; nil = use RAID_MEM_AREA or player's area
 
 -- Peek current raid store for an area without creating anything
@@ -151,15 +151,59 @@ local function _pick_weighted(list)
   return list[#list]
 end
 
+-- Keep track of areas that have raid state so we can scan them on login
+local RAID_MEM_AREAS = {}
+
 local function _safe_area_mem(area_id)
   local mem = ezmemory.get_area_memory(area_id)
   if not mem then mem = {} end
   mem.raids = mem.raids or {}
+
+  -- remember this area so offline payouts can find it later
+  RAID_MEM_AREAS[area_id] = true
+
   return mem, mem.raids
 end
 
 local function _safe_secret(pid)
   return helpers.get_safe_player_secret and helpers.get_safe_player_secret(pid) or tostring(pid)
+end
+
+local function _result_flags(stats)
+  local reason = tonumber(stats and stats.reason or 0) or 0
+  local hp = tonumber(stats and (stats.health or stats.player_hp or stats.hp) or 0) or 0
+
+  local ran, dev_escape, won, lost = false, false, false, false
+
+  if reason == 1 then        -- 1 = battle won
+    won = true
+  elseif reason == 2 then    -- 2 = battle lost
+    lost = true
+  elseif reason == 3 then    -- 3 = ran (L button)
+    ran = true
+  elseif reason == 4 then    -- 4 = ran (ESC / dev escape)
+    ran = true
+    dev_escape = true
+  else
+    -- Backwards compatibility for older ONB builds
+    ran = stats and (stats.ran or stats.fled or stats.escape) or false
+    if not ran then
+      if hp > 0 then
+        won = true
+      elseif hp <= 0 then
+        lost = true
+      end
+    end
+  end
+
+  return {
+    reason     = reason,
+    hp         = hp,
+    ran        = ran,
+    dev_escape = dev_escape,
+    won        = won,
+    lost       = lost,
+  }
 end
 
 local function _calc_points_from_stats(stats)
@@ -193,8 +237,10 @@ local function _boss_damage_from_stats(stats, fallback_on_win)
   local dmg = tonumber(stats.damage_to_enemy or stats.total_damage or stats.damage_dealt)
   if dmg and dmg > 0 then return math.floor(dmg) end
   if tot and rem and (tot >= rem) then return math.floor(tot - rem) end
+
   -- Fallback: if the player won, apply a fixed chunk (configured)
-  if (not stats.ran) and (tonumber(stats.health or 1) > 0) and fallback_on_win then
+  local f = _result_flags(stats)
+  if (not f.ran) and f.hp > 0 and fallback_on_win then
     return math.floor(fallback_on_win)
   end
   return 0
@@ -203,9 +249,7 @@ end
 local function _persist_health_and_emotion(pid, encounter_info, stats)
   if not stats then return end
 
-  if stats.emotion == 1 then
     Net.set_player_emotion(pid, 0)
-  end
 
   if stats.health then
     ezmemory.set_player_health(pid, stats.health)
@@ -388,6 +432,111 @@ local function _try_team_gp_summary(raid_id, wave_label)
 end
 
 -- =========================
+-- ===== Money rewards =====
+-- =========================
+
+-- Record money to pay for each eligible contributor on a given wave.
+local function _queue_money_claims_for_wave(area_id, raid_id, s, wave_key)
+  s.claims       = s.claims       or { wave1 = {}, wave2 = {}, boss = {} }
+  s.claims.wave1 = s.claims.wave1 or {}
+  s.claims.wave2 = s.claims.wave2 or {}
+  s.claims.boss  = s.claims.boss  or {}
+
+  local field
+  if wave_key == "wave1" or wave_key == "w1" then
+    field   = "money_wave1"
+    wave_key = "wave1"
+  elseif wave_key == "wave2" or wave_key == "w2" then
+    field   = "money_wave2"
+    wave_key = "wave2"
+  elseif wave_key == "boss" then
+    field   = "money_boss"
+    wave_key = "boss"
+  else
+    return
+  end
+
+  local per = tonumber(s[field] or 0) or 0
+  if per <= 0 then return end
+
+  for secret, c in pairs(s.contributions or {}) do
+    local eligible = false
+    if wave_key == "wave1" then
+      eligible = (tonumber(c.w1 or 0) or 0) > 0
+    elseif wave_key == "wave2" then
+      eligible = (tonumber(c.w2 or 0) or 0) > 0
+    elseif wave_key == "boss" then
+      eligible = (tonumber(c.boss_dmg or 0) or 0) > 0
+    end
+
+    if eligible and not s.claims[wave_key][secret] then
+      s.claims[wave_key][secret] = per
+      print(("[RAIDS MONEY] Queued %d z for secret=%s (raid=%s, wave=%s)")
+        :format(per, tostring(secret), tostring(raid_id), tostring(wave_key)))
+    end
+  end
+
+  if ezmemory and ezmemory.save_area_memory then
+    ezmemory.save_area_memory(area_id)
+  end
+end
+
+-- Pay and clear all pending money claims for this secret in this raid.
+local function _pay_pending_claims_for_pid(pid, area_id, raid_id, s)
+  if not Net or not Net.is_player or not Net.is_player(pid) then return end
+  if not Net.get_player_money or not Net.set_player_money then return end
+
+  local secret = _safe_secret(pid)
+  local claims = s.claims or {}
+  claims.wave1 = claims.wave1 or {}
+  claims.wave2 = claims.wave2 or {}
+  claims.boss  = claims.boss  or {}
+
+  local a1 = tonumber(claims.wave1[secret] or 0) or 0
+  local a2 = tonumber(claims.wave2[secret] or 0) or 0
+  local a3 = tonumber(claims.boss[secret]  or 0) or 0
+  local total = a1 + a2 + a3
+
+  if total <= 0 then return end
+
+  claims.wave1[secret] = nil
+  claims.wave2[secret] = nil
+  claims.boss[secret]  = nil
+
+  local current = tonumber(Net.get_player_money(pid) or 0) or 0
+  Net.set_player_money(pid, current + total)
+
+  local name = Net.get_player_name and Net.get_player_name(pid) or tostring(pid)
+  print(("[RAIDS MONEY] Paid %d z to %s (raid=%s, area=%s, secret=%s)")
+    :format(total, tostring(name), tostring(raid_id), tostring(area_id), tostring(secret)))
+
+  if ezmemory and ezmemory.save_area_memory then
+    ezmemory.save_area_memory(area_id)
+  end
+end
+
+-- Pay any pending claims for this player across all raid states (login-time).
+local function _pay_all_claims_for_pid(pid)
+  if not Net or not Net.is_player or not Net.is_player(pid) then return end
+  local secret = _safe_secret(pid)
+
+  for area_id, _ in pairs(RAID_MEM_AREAS) do
+    local mem, store = _safe_area_mem(area_id)
+    for raid_id, s in pairs(store or {}) do
+      local claims = s.claims
+      if claims and (
+        (claims.wave1 and claims.wave1[secret]) or
+        (claims.wave2 and claims.wave2[secret]) or
+        (claims.boss  and claims.boss[secret])
+      ) then
+        -- This will print a debug message when it actually pays
+        _pay_pending_claims_for_pid(pid, area_id, raid_id, s)
+      end
+    end
+  end
+end
+
+-- =========================
 -- ===== State =========
 -- =========================
 
@@ -398,11 +547,35 @@ local function _ensure_state(area_id, raid_id, overrides)
     local cfg = Config.get_defaults(raid_id)
     -- Apply overrides (from Dialogue custom properties)
     if overrides then
-      if overrides.style then cfg.style = overrides.style end
-      if overrides.wave2 then cfg.wave2_points_required = tonumber(overrides.wave2) or cfg.wave2_points_required end
-      if overrides.wave3 then cfg.wave3_points_required = tonumber(overrides.wave3) or cfg.wave3_points_required end
-      if overrides.boss_hp then cfg.boss_pool_max = tonumber(overrides.boss_hp) or cfg.boss_pool_max end
-      if overrides.boss_win_damage then cfg.boss_win_damage = tonumber(overrides.boss_win_damage) or cfg.boss_win_damage end
+      if overrides.style then
+        cfg.style = overrides.style
+      end
+      if overrides.wave2 then
+        cfg.wave2_points_required = tonumber(overrides.wave2) or cfg.wave2_points_required
+      end
+      if overrides.wave3 then
+        cfg.wave3_points_required = tonumber(overrides.wave3) or cfg.wave3_points_required
+      end
+      if overrides.boss_hp then
+        cfg.boss_pool_max = tonumber(overrides.boss_hp) or cfg.boss_pool_max
+      end
+      if overrides.boss_win_damage then
+        cfg.boss_win_damage = tonumber(overrides.boss_win_damage) or cfg.boss_win_damage
+      end
+      if overrides.repeat_cooldown_secs then
+        cfg.repeat_cooldown_secs = tonumber(overrides.repeat_cooldown_secs) or cfg.repeat_cooldown_secs
+      end
+
+      -- NEW: per-wave money overrides
+      if overrides.money_wave1 then
+        cfg.money_wave1 = tonumber(overrides.money_wave1) or cfg.money_wave1
+      end
+      if overrides.money_wave2 then
+        cfg.money_wave2 = tonumber(overrides.money_wave2) or cfg.money_wave2
+      end
+      if overrides.money_boss then
+        cfg.money_boss = tonumber(overrides.money_boss) or cfg.money_boss
+      end
     end
     s = {
       raid_id              = raid_id,
@@ -423,6 +596,9 @@ local function _ensure_state(area_id, raid_id, overrides)
       claims               = { wave1 = {}, wave2 = {}, boss = {} }, -- for reward hooks (opt-in)
       repeat_cooldown_secs  = tonumber(cfg.repeat_cooldown_secs or 1800),
       cooldown_until        = nil,
+      money_wave1           = tonumber(cfg.money_wave1 or 0),
+      money_wave2           = tonumber(cfg.money_wave2 or 0),
+      money_boss            = tonumber(cfg.money_boss  or 0),
     }
     -- Apply overrides from Dialogue custom properties (if present)
     if overrides then
@@ -647,6 +823,9 @@ local function _raid_action(npc, pid, dialogue, relay_object)
     local boss_enc_hp = dialogue.custom_properties and tonumber(dialogue.custom_properties["Boss Encounter HP"])
     local boss_match  = dialogue.custom_properties and dialogue.custom_properties["Boss ID Match"]
     local repeat_cd   = dialogue.custom_properties and tonumber(dialogue.custom_properties["Repeat Cooldown Secs"])
+    local money_w1 = dialogue.custom_properties and tonumber(dialogue.custom_properties["Wave1 Money"])
+    local money_w2 = dialogue.custom_properties and tonumber(dialogue.custom_properties["Wave2 Money"])
+    local money_b  = dialogue.custom_properties and tonumber(dialogue.custom_properties["Boss Money"])
 
     raid_id = tostring(raid_id or "default")
     mem_area = tostring(mem_area or Net.get_player_area(pid))
@@ -659,6 +838,9 @@ local function _raid_action(npc, pid, dialogue, relay_object)
       boss_encounter_hp = boss_enc_hp,
       boss_id_match = boss_match,
       repeat_cooldown_secs = repeat_cd,
+      money_wave1          = money_w1,
+      money_wave2          = money_w2,
+      money_boss           = money_b,
     }
     local s, mem, store = _ensure_state(mem_area, raid_id, overrides)
 
@@ -782,21 +964,30 @@ do
   end
 
   -- Helpful summary + what our points parser thinks
-  local ran = stats and (stats.ran or stats.fled or stats.escape)
-  local php = stats and (stats.health or stats.player_hp or stats.hp)
-  local won = (not ran) and (tonumber(php or 0) > 0)
+  local flags   = _result_flags(stats)
+  local ran     = flags.ran
+  local php     = flags.hp
+  local won     = flags.won
   local derived = _calc_points_from_stats and _calc_points_from_stats(stats) or "n/a"
 
-  print(string.format("[RAID DBG] summary won=%s ran=%s player_hp=%s derived_points=%s",
-                      tostring(won), tostring(ran), tostring(php), tostring(derived)))
-  print("[RAID DBG] --------------------------------------------")
+  print(string.format(
+    "[RAID DBG] summary reason=%s won=%s ran=%s dev_escape=%s player_hp=%s derived_points=%s",
+    tostring(flags.reason),
+    tostring(won),
+    tostring(ran),
+    tostring(flags.dev_escape),
+    tostring(php),
+    tostring(derived)
+  ))
 end
 -- ==== /RAID DEBUG ====
 
     -- Handle result per wave (use snapshot)
     if wave_at_start < 3 then
-      local ran      = (stats and stats.ran) or false
-      local defeated = tonumber(stats.health or 0) <= 0
+      local flags = _result_flags(stats)
+      local ran      = flags.ran
+      local defeated = flags.lost
+                        or ((flags.hp or 0) <= 0 and not flags.ran)
 
       if ran then
         local secret = _safe_secret(pid)
@@ -880,6 +1071,9 @@ end
             end
           end
           if Config.on_wave1_cleared then pcall(Config.on_wave1_cleared, pid, raid_id, s) end
+          -- Queue and pay Wave 1 money rewards
+          _queue_money_claims_for_wave(mem_area, raid_id, s, "wave1")
+          _pay_pending_claims_for_pid(pid, mem_area, raid_id, s)
 
           -- ANNOUNCE Wave 1 cleared (Team GP summary + contributions)
           local gp = _try_team_gp_summary(raid_id, "w1")
@@ -928,6 +1122,9 @@ end
             end
           end
           if Config.on_wave2_cleared then pcall(Config.on_wave2_cleared, pid, raid_id, s) end
+          -- Queue and pay Wave 2 money rewards
+          _queue_money_claims_for_wave(mem_area, raid_id, s, "wave2")
+          _pay_pending_claims_for_pid(pid, mem_area, raid_id, s)
 
           -- ANNOUNCE Wave 2 cleared (Team GP summary + contributions)
           local gp = _try_team_gp_summary(raid_id, "w2")
@@ -954,7 +1151,9 @@ end
 
     else
       -- Boss wave
-      local ran = (stats and (stats.ran or stats.fled or stats.escape)) or false
+      local flags   = _result_flags(stats)
+      local ran     = flags.ran
+      local dev_escape = flags.dev_escape
       local enemies = stats and stats.enemies
       local has_snapshot = (type(enemies) == "table" and next(enemies) ~= nil)
 
@@ -964,9 +1163,9 @@ end
         -- Try to compute from enemy list (partial damage if boss present)
         dmg = _boss_damage_from_enemies_list(stats, s.boss_encounter_hp, s.boss_id_match) or 0
 
-        -- If player ran legitimately and we don't see the boss in the snapshot,
+        -- If the player ran and we don't see the boss in the snapshot,
         -- assume boss was killed and player escaped due to soft-lock adds → full encounter damage.
-        if ran then
+        if ran and not dev_escape then
           local boss_present = false
           local match = tostring(s.boss_id_match or "")
           for _, e in pairs(enemies) do
@@ -983,12 +1182,12 @@ end
 
       else
         -- No enemy snapshot at all.
-        if ran then
-          -- Dev ESC run: treat as no damage.
+        if dev_escape then
+          -- ESC / dev-run: treat as no damage, so you can safely abort tests.
           dmg = 0
         else
-          -- Non-run fallbacks (as before).
-          local php = tonumber(stats and (stats.health or stats.player_hp or stats.hp) or 0) or 0
+          -- Non-run and L-button runs fall back to the generic damage logic.
+          local php = flags.hp or tonumber(stats and (stats.health or stats.player_hp or stats.hp) or 0) or 0
           if php > 0 and (s.boss_encounter_hp or 0) > 0 then
             dmg = s.boss_encounter_hp
           else
@@ -1034,6 +1233,9 @@ end
         end
         ezmemory.save_area_memory(mem_area)
         if Config.on_boss_defeated then pcall(Config.on_boss_defeated, pid, raid_id, s) end
+        -- Queue and pay boss money rewards
+        _queue_money_claims_for_wave(mem_area, raid_id, s, "boss")
+        _pay_pending_claims_for_pid(pid, mem_area, raid_id, s)
         -- ANNOUNCE top boss damage dealers
         local contribs = _contrib_list(s, "boss_dmg", 6)
         local end_msg = "RAID CLEARED - Top Damage: " .. (contribs ~= "" and contribs or "(no data)")
@@ -1063,6 +1265,8 @@ if not _G.__RAIDS_LOGIN_ANNOUNCE then
   Net:on("player_join", function(ev)
     local pid = ev.player_id
 
+    -- Pay any pending raid money for this player (offline rewards).
+    _pay_all_claims_for_pid(pid)
     ------------------------------------------------------------------
     -- 1) Global login marquee: "<name> logged in!"
     ------------------------------------------------------------------

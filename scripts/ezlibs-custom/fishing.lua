@@ -21,6 +21,9 @@ end
 local okJobBBS, JobBBS = pcall(require, 'scripts/jobbbs/JobBBS')
 if not okJobBBS then JobBBS = nil end
 
+local okTeams, Teams = pcall(require, 'scripts/teams/teams')
+if not okTeams then Teams = nil end
+
 
 -- Resolve Async if not global
 local function _resolve_async()
@@ -1644,6 +1647,9 @@ local function _begin_reeling(pid)
               area       = cur.area_id,
               rank       = rank
             })
+          end
+          if Teams and Teams.on_fish_catch then
+            pcall(Teams.on_fish_catch, pid)
           end
           _stop(pid, msg, FISHING.SFX.catch)
           return

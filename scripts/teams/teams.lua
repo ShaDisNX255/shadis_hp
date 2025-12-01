@@ -4,6 +4,7 @@
 local ezmemory = require('scripts/ezlibs-scripts/ezmemory')
 local helpers  = require('scripts/ezlibs-scripts/helpers')
 local Month    = require('scripts/teams/month')  -- << define rewards in this file
+local cosmetics_ok, cosmetics = pcall(require, 'scripts/ezlibs-custom/cosmetics')
 
 -- Try JobBBS from either path; if present we will hook job-claim to +1 GP.
 local JobBBS = (function()
@@ -33,7 +34,7 @@ local OBJ_TEAM_2   = "Team2BBS"
 local OBJ_SCORES   = "TeamScoresBBS"
 
 -- Last day (inclusive) of the month players may join a team (set to 31 for testing)
-local JOIN_WINDOW_LAST_DAY = 31
+local JOIN_WINDOW_LAST_DAY = 14
 
 -- Test toggles
 local TEST_ALLOW_INFINITE_SWITCH = false  -- if true, switch teams unlimited times in a month
@@ -67,12 +68,25 @@ local RAID_GP = {
   bonus_off_last_hours    = 48,    -- disable multipliers in last 48h of month
 }
 
+-- GP from Fishing: how many fish catches give 1 GP
+local FISHING_FISHES_PER_GP = 10
+
 -- =========================
 -- ====== UTILITIES  =======
 -- =========================
 local function _now() return os.time() end
 local function _month_key(ts) return os.date("%Y-%m", ts or _now()) end
 local function _day_of_month(ts) return tonumber(os.date("%d", ts or _now())) end
+
+-- Global per-player cap for GP earned from *activities* (jobs, raids, etc.)
+-- Day 1 -> 10 GP, Day 2 -> 20 GP, Day 3 -> 30 GP, ...
+local GLOBAL_ACTIVITY_GP_PER_DAY = 10
+
+local function _activity_cap_for_today()
+  local day = _day_of_month()
+  day = tonumber(day or 1) or 1
+  return day * (GLOBAL_ACTIVITY_GP_PER_DAY or 10)
+end
 
 local function _sum_values(t)
   local s = 0
@@ -104,6 +118,14 @@ local function _pick_weighted(entries)
     if roll <= acc then return e end
   end
   return entries[#entries]
+end
+
+-- Use month.lua config to decide the GP needed to remain on a team for a given month.
+local function _kick_threshold_for_month(month_key)
+  local rewards = (Month and Month.get_rewards_for and Month.get_rewards_for(month_key)) or {}
+  local payout = tonumber(rewards.min_gp_for_payout)
+  local consol = tonumber(rewards.min_gp_for_consolation)
+  return payout or consol or 5
 end
 
 -- =========================
@@ -211,6 +233,58 @@ local function _roll_month_if_needed()
       top       = { [1]={secret=s1, gp=g1 or 0}, [2]={secret=s2, gp=g2 or 0} },
       winner    = win
     }
+
+    ------------------------------------------------------------------------
+    -- Auto-kick members who earned below the month.lua threshold last month
+    ------------------------------------------------------------------------
+    local rewards = (Month and Month.get_rewards_for and Month.get_rewards_for(mkey)) or {}
+    local min_keep = tonumber(rewards.min_gp_for_payout)
+                      or tonumber(rewards.min_gp_for_consolation)
+                      or 5
+    local new_key = now_key
+
+    local function kick_below_min(team_idx, slot)
+      if not slot then return end
+      for secret, _ in pairs(slot.roster or {}) do
+        local gp = tonumber((slot.gp_by_secret and slot.gp_by_secret[secret]) or 0) or 0
+        if gp < min_keep then
+          local pm = ezmemory.get_player_memory(secret) or {}
+          pm.teams = pm.teams or {}
+
+          -- Preserve last-month record for claims.
+          pm.teams.hist = pm.teams.hist or {}
+          if not pm.teams.hist[mkey] then
+            pm.teams.hist[mkey] = { team = team_idx, gp = gp }
+          end
+
+          -- New month: independent, no switch consumed.
+          pm.teams.current = {
+            team              = nil,
+            month             = new_key,
+            gp                = 0,
+            activity_gp       = 0,
+            checkins          = 0,
+            last_switch_month = nil,
+            last_checkin_day  = nil,
+          }
+
+          if ezmemory.set_player_memory then
+            ezmemory.set_player_memory(secret, pm)
+          else
+            ezmemory.save_player_memory(secret, pm)
+          end
+
+          local who = (_last_known_name and _last_known_name(secret, t)) or ("secret:"..tostring(secret):sub(1,6))
+          local team_name = (TEAM_NAMES and TEAM_NAMES[team_idx]) or ("Team "..tostring(team_idx))
+          print(("[TEAMS] Auto-kick %s from %s: %d GP < %d; now independent for %s")
+            :format(who, team_name, gp, min_keep, new_key))
+        end
+      end
+    end
+
+    kick_below_min(1, p1)
+    kick_below_min(2, p2)
+    -- End auto-kick
   end
 
   -- Start a fresh current month if needed
@@ -227,20 +301,46 @@ local function _roll_month_if_needed()
   return mem, t
 end
 
+
 local function _pmem(pid)
   local secret = helpers.get_safe_player_secret(pid)
   local pmem   = ezmemory.get_player_memory(secret) or {}
   pmem.teams   = pmem.teams or {}
-  pmem.teams.current = pmem.teams.current or { team=nil, month=_month_key(), gp=0, last_switch_month=nil }
+
+  pmem.teams.current = pmem.teams.current or {
+    team             = nil,
+    month            = _month_key(),
+    gp               = 0,
+    activity_gp      = 0,   -- NEW: GP from activities (jobs, raids, etc.) this month
+    checkins         = 0,
+    last_switch_month = nil,
+    last_checkin_day = nil,
+  }
+
   local cur = pmem.teams.current
+
+  -- Monthly rollover for the player
   if cur.month ~= _month_key() then
     pmem.teams.hist = pmem.teams.hist or {}
     pmem.teams.hist[cur.month] = { team = cur.team, gp = cur.gp or 0 }
-    pmem.teams.current = { team = cur.team, month = _month_key(), gp = 0, checkins = 0, last_switch_month = cur.last_switch_month }
+
+    pmem.teams.current = {
+      team              = cur.team,
+      month             = _month_key(),
+      gp                = 0,
+      activity_gp       = 0,    -- reset activity GP for new month
+      checkins          = 0,
+      last_switch_month = cur.last_switch_month,
+      last_checkin_day  = nil,
+    }
+    cur = pmem.teams.current
+  else
+    -- Backfill fields for older saves
+    cur.activity_gp      = cur.activity_gp or 0
+    cur.checkins         = cur.checkins or 0
+    cur.last_checkin_day = cur.last_checkin_day -- may be nil; OK
   end
-  pmem.teams.claimed = pmem.teams.claimed or {}
-  pmem.teams.events_claimed = pmem.teams.events_claimed or {}
-  if ezmemory.set_player_memory then ezmemory.set_player_memory(secret, pmem) else ezmemory.save_player_memory(secret, pmem) end
+
   return secret, pmem
 end
 
@@ -460,6 +560,41 @@ local function _grant_reward(pid, spec)
       end
     end
   end
+
+  -- COSMETICS (uses cosmetics.unlock_for_player)
+  -- spec.cosmetics can be:
+  --   { "snowflake_particle", "DarkAura" }
+  -- or { { id="snowflake_particle", label="Snowflake" }, ... }
+  if spec.cosmetics and cosmetics_ok and cosmetics and cosmetics.unlock_for_player then
+    for _, entry in ipairs(spec.cosmetics) do
+      local id, label
+
+      if type(entry) == "table" then
+        id    = entry.id or entry.cosmetic_id or entry[1]
+        label = entry.label or entry.name
+      else
+        id = entry
+      end
+
+      if id then
+        id = tostring(id)
+        local ok, reason = cosmetics.unlock_for_player(pid, id)
+        if ok then
+          local pretty = label
+          if (not pretty or pretty == "") and cosmetics.get_name_for_id then
+            pretty = cosmetics.get_name_for_id(id)
+          end
+          pretty = pretty or id
+          Net.message_player(pid, "Got cosmetic: "..pretty..".")
+          if Net.play_sound_for_player then
+            pcall(Net.play_sound_for_player, pid, "/server/assets/ezlibs-assets/sfx/item_get.ogg")
+          end
+        else
+          print("[teams] Failed to grant cosmetic", id, "reason:", tostring(reason or "unknown"))
+        end
+      end
+    end
+  end
 end
 
 local function _now() return os.time() end
@@ -474,6 +609,17 @@ local function _is_last_48h_of_month()
   return _hours_until_month_end() <= (RAID_GP.bonus_off_last_hours or 48)
 end
 
+-- Last-known display name for a secret (prefers names cached this month)
+local function _last_known_name(secret, t_mem)
+  if t_mem and t_mem.names and t_mem.names[secret] and t_mem.names[secret] ~= "" then
+    return t_mem.names[secret]
+  end
+  local pm = ezmemory.get_player_memory(secret) or {}
+  local n = (pm.teams and pm.teams.last_name) or pm.last_name
+  if n and n ~= "" then return n end
+  return ("secret:"..tostring(secret):sub(1,6))
+end
+
 
 -- =========================
 -- ====== GP EARNING  ======
@@ -482,28 +628,160 @@ local function _add_gp(pid, amount, why)
   local mem, t_mem = _roll_month_if_needed()
   local secret, pmem = _pmem(pid)
   local cur = pmem.teams.current
+
   if not cur.team then
     Net.message_player(pid, "Join a team first to earn GP.")
     return
   end
+
   amount = math.floor(tonumber(amount) or 0)
   if amount <= 0 then return end
 
-  cur.gp = (cur.gp or 0) + amount
+  local is_checkin = (why == "daily check-in")
+
+  -- Global per-player activity cap (does NOT include daily login GP)
+  local cap          = _activity_cap_for_today()
+  cur.activity_gp    = cur.activity_gp or 0
+  local used_before  = cur.activity_gp
+  local give         = amount
+
+  -- Only non-check-in GP is limited by the global cap
+  if not is_checkin then
+    local room = math.max(0, cap - used_before)
+    if room <= 0 then
+      -- Nothing to award; log why
+      local team_slot = t_mem.month[cur.team]
+      if not team_slot then
+        team_slot = { total=0, roster={}, gp_by_secret={}, checkins_total=0, checkins_by_secret={} }
+        t_mem.month[cur.team] = team_slot
+      end
+
+      local team_month_before = tonumber(team_slot.total or 0)
+      local name      = _last_known_name(secret, t_mem)
+      local team_name = _team_name(cur.team)
+
+      print(("[GP DBG] %s gained 0 GP from %s (activity cap %d/%d reached)")
+        :format(name, tostring(why or "unknown"), used_before, cap))
+      print(("[GP DBG] %s: %d -> %d this month")
+        :format(team_name, team_month_before, team_month_before))
+
+      if why then
+        Net.message_player(pid, "You've hit your GP cap for today.")
+      end
+      return
+    end
+
+    give = math.min(amount, room)
+  end
+
+  -- Make sure team slot exists
+  local slot = t_mem.month[cur.team]
+  if not slot then
+    slot = { total=0, roster={}, gp_by_secret={}, checkins_total=0, checkins_by_secret={} }
+    t_mem.month[cur.team] = slot
+  end
+
+  local player_month_before = cur.gp or 0
+  local team_month_before   = tonumber(slot.total or 0)
+
+  -- Update activity usage for non-check-in GP
+  if not is_checkin then
+    cur.activity_gp = (cur.activity_gp or 0) + give
+  end
+
+  -- Apply GP to player + team
+  cur.gp = player_month_before + give
   pmem.teams.hist = pmem.teams.hist or {}
   pmem.teams.hist[cur.month] = { team = cur.team, gp = cur.gp }
 
-  local slot = t_mem.month[cur.team]
-  slot.total = (slot.total or 0) + amount
-  slot.gp_by_secret[secret] = (slot.gp_by_secret[secret] or 0) + amount
+  slot.total = team_month_before + give
+  slot.gp_by_secret[secret] = (slot.gp_by_secret[secret] or 0) + give
   _add_to_roster(t_mem, cur.team, secret)
 
   _remember_name(pid, secret)
 
-  if ezmemory.set_player_memory then ezmemory.set_player_memory(secret, pmem) else ezmemory.save_player_memory(secret, pmem) end
+  if ezmemory.set_player_memory then
+    ezmemory.set_player_memory(secret, pmem)
+  else
+    ezmemory.save_player_memory(secret, pmem)
+  end
   _save_area()
 
-  if why then Net.message_player(pid, ("+%d GP for %s."):format(amount, why)) end
+  -- Toast to player
+  if why then
+    Net.message_player(pid, ("+%d GP for %s."):format(give, why))
+  end
+
+  -- Logs
+  local name      = _last_known_name(secret, t_mem)
+  local team_name = _team_name(cur.team)
+  local act_after = cur.activity_gp or used_before
+
+  if is_checkin then
+    print(("[GP DBG] %s gained %d GP for %s (check-in; activity %d/%d, bypasses cap)")
+      :format(name, give, tostring(why or "daily check-in"), act_after, cap))
+  else
+    print(("[GP DBG] %s gained %d GP for %s (activity %d/%d)")
+      :format(name, give, tostring(why or "unknown"), act_after, cap))
+  end
+
+  print(("[GP DBG] %s: %d -> %d this month")
+    :format(team_name, team_month_before, team_month_before + give))
+end
+
+-- GP from Fishing: +1 GP per N fish caught (subject to activity cap)
+function Teams.on_fish_catch(pid)
+  if not pid then return end
+  local fishes_per_gp = FISHING_FISHES_PER_GP or 10
+  if fishes_per_gp <= 0 then return end
+
+  -- Use the same player memory layout as the rest of the team system
+  local secret, pmem = _pmem(pid)
+  pmem.teams = pmem.teams or {}
+
+  -- Track fishing progress per month so it rolls with the current season
+  pmem.teams.fishing = pmem.teams.fishing or {
+    month  = _month_key(),
+    total  = 0,  -- total fish caught this month
+    gp_paid = 0, -- how many GP we've *attempted* to award from fishing
+  }
+  local fm = pmem.teams.fishing
+
+  -- Month rollover for fishing progress
+  if fm.month ~= _month_key() then
+    fm.month   = _month_key()
+    fm.total   = 0
+    fm.gp_paid = 0
+  end
+
+  -- Count this catch
+  fm.total = (tonumber(fm.total) or 0) + 1
+
+  -- How many GP should we have *offered* by now?
+  local expected_gp = math.floor((fm.total or 0) / fishes_per_gp)
+  local paid        = tonumber(fm.gp_paid or 0) or 0
+  local to_award    = expected_gp - paid
+
+  if to_award < 0 then
+    to_award = 0
+  end
+
+  -- We mark GP as "paid" whether or not the cap blocks it.
+  -- This means extra fish caught while capped do NOT bank GP for later days,
+  -- matching "as long as it's still within the current day cap".
+  fm.gp_paid = expected_gp
+
+  -- Persist fishing progress
+  if ezmemory.set_player_memory then
+    ezmemory.set_player_memory(secret, pmem)
+  else
+    ezmemory.save_player_memory(secret, pmem)
+  end
+
+  -- Actually try to give the GP (global activity cap is enforced inside _add_gp)
+  if to_award > 0 then
+    _add_gp(pid, to_award, "fishing")
+  end
 end
 
 -- Tracks daily GP cap usage & actives (by secret) + today's team multipliers
@@ -543,125 +821,195 @@ local function _ensure_daily_bucket()
   return d, t_mem
 end
 
--- Last-known display name for a secret (prefers names cached this month)
-local function _last_known_name(secret, t_mem)
-  if t_mem and t_mem.names and t_mem.names[secret] and t_mem.names[secret] ~= "" then
-    return t_mem.names[secret]
-  end
-  local pm = ezmemory.get_player_memory(secret) or {}
-  local n = (pm.teams and pm.teams.last_name) or pm.last_name
-  if n and n ~= "" then return n end
-  return ("secret:"..tostring(secret):sub(1,6))
-end
-
 -- Award GP by secret (works if player is offline). pid_opt only used for an optional toast.
 local function _add_gp_by_secret(secret, amount, why, pid_opt)
-  amount = math.floor(tonumber(amount) or 0); if amount <= 0 then return end
+  amount = math.floor(tonumber(amount) or 0)
+  if amount <= 0 then return 0 end
 
   local pm = ezmemory.get_player_memory(secret) or {}
   pm.teams = pm.teams or {}
-  pm.teams.current = pm.teams.current or { team=nil, month=_month_key(), gp=0, last_switch_month=nil }
+
+  pm.teams.current = pm.teams.current or {
+    team              = nil,
+    month             = _month_key(),
+    gp                = 0,
+    activity_gp       = 0,
+    checkins          = 0,
+    last_switch_month = nil,
+    last_checkin_day  = nil,
+  }
+
   local cur = pm.teams.current
-  if not cur.team then return end
+  if not cur.team then return 0 end
 
   -- monthly rollover for player
   if cur.month ~= _month_key() then
     pm.teams.hist = pm.teams.hist or {}
     pm.teams.hist[cur.month] = { team = cur.team, gp = cur.gp or 0 }
-    pm.teams.current = { team = cur.team, month = _month_key(), gp = 0, checkins = cur.checkins, last_switch_month = cur.last_switch_month }
+
+    pm.teams.current = {
+      team              = cur.team,
+      month             = _month_key(),
+      gp                = 0,
+      activity_gp       = 0,
+      checkins          = 0,
+      last_switch_month = cur.last_switch_month,
+      last_checkin_day  = nil,
+    }
     cur = pm.teams.current
+  else
+    cur.activity_gp = cur.activity_gp or 0
+    cur.checkins    = cur.checkins or 0
   end
 
   local mem, t_mem = _roll_month_if_needed()
-  local slot = t_mem.month[cur.team]
-  cur.gp = (cur.gp or 0) + amount
-  slot.total = (slot.total or 0) + amount
-  slot.gp_by_secret[secret] = (slot.gp_by_secret[secret] or 0) + amount
-  _add_to_roster(t_mem, cur.team, secret)
 
-  if pm.teams and pm.teams.last_name and pm.teams.last_name ~= "" then
-    t_mem.names[secret] = pm.teams.last_name
+  local slot = t_mem.month[cur.team]
+  if not slot then
+    slot = { total=0, roster={}, gp_by_secret={}, checkins_total=0, checkins_by_secret={} }
+    t_mem.month[cur.team] = slot
   end
 
-  if ezmemory.set_player_memory then ezmemory.set_player_memory(secret, pm) else ezmemory.save_player_memory(secret, pm) end
+  local is_checkin    = (why == "daily check-in")
+  local cap           = _activity_cap_for_today()
+  local used_before   = cur.activity_gp or 0
+  local give          = amount
+
+  if not is_checkin then
+    local room = math.max(0, cap - used_before)
+    if room <= 0 then
+      local team_month_before = tonumber(slot.total or 0)
+      local name              = _last_known_name(secret, t_mem)
+      local team_name         = _team_name(cur.team)
+
+      print(("[GP DBG] %s gained 0 GP from %s (activity cap %d/%d reached)")
+        :format(name, tostring(why or "unknown"), used_before, cap))
+      print(("[GP DBG] %s: %d -> %d this month")
+        :format(team_name, team_month_before, team_month_before))
+
+      if pid_opt and why then
+        pcall(Net.message_player, pid_opt, "You've hit your GP cap for today.")
+      end
+      return 0
+    end
+
+    give = math.min(amount, room)
+  end
+
+  local player_month_before = cur.gp or 0
+  local team_month_before   = tonumber(slot.total or 0)
+
+  if not is_checkin then
+    cur.activity_gp = (cur.activity_gp or 0) + give
+  end
+
+  cur.gp = player_month_before + give
+  pm.teams.hist = pm.teams.hist or {}
+  pm.teams.hist[cur.month] = { team = cur.team, gp = cur.gp }
+
+  slot.total = team_month_before + give
+  slot.gp_by_secret[secret] = (slot.gp_by_secret[secret] or 0) + give
+  _add_to_roster(t_mem, cur.team, secret)
+
+  if ezmemory.set_player_memory then
+    ezmemory.set_player_memory(secret, pm)
+  else
+    ezmemory.save_player_memory(secret, pm)
+  end
   _save_area()
 
-  if pid_opt and why then pcall(Net.message_player, pid_opt, ("+%d GP for %s."):format(amount, why)) end
+  if pid_opt and why then
+    pcall(Net.message_player, pid_opt, ("+%d GP for %s."):format(give, why))
+  end
+
+  local name      = _last_known_name(secret, t_mem)
+  local team_name = _team_name(cur.team)
+  local act_after = cur.activity_gp or used_before
+
+  if is_checkin then
+    print(("[GP DBG] %s gained %d GP for %s (check-in; activity %d/%d, bypasses cap)")
+      :format(name, give, tostring(why or "daily check-in"), act_after, cap))
+  else
+    print(("[GP DBG] %s gained %d GP for %s (activity %d/%d)")
+      :format(name, give, tostring(why or "unknown"), act_after, cap))
+  end
+  print(("[GP DBG] %s: %d -> %d this month")
+    :format(team_name, team_month_before, team_month_before + give))
+
+  return give
 end
 
 -- Offline-safe payout used by Raids (called on wave clear / boss death)
 -- kind = "w1" | "w2" | "boss"; amount = points (w1/w2) or damage (boss)
 function Teams.on_raid_contribution_secret(secret, raid_id, kind, amount, pid_opt)
-  amount = tonumber(amount) or 0
+  amount = math.floor(tonumber(amount) or 0)
   if amount <= 0 then return end
 
-  local per = (kind == "w1" and RAID_GP.w1_points_per_gp)
-           or (kind == "w2" and RAID_GP.w2_points_per_gp)
-           or (kind == "boss" and RAID_GP.boss_damage_per_gp)
-           or 0
-  if per <= 0 then return end
-
-  local base = math.floor(amount / per)
-  if base <= 0 then return end
-
-  -- resolve team
+  -- Figure out which team this secret currently belongs to
   local pm = ezmemory.get_player_memory(secret) or {}
   pm.teams = pm.teams or {}
-  pm.teams.current = pm.teams.current or { team=nil, month=_month_key(), gp=0, last_switch_month=nil }
   local cur = pm.teams.current
-  if not cur.team then return end
-  local team = cur.team
 
-  -- caps + today's multiplier
-  local d, t_mem = _ensure_daily_bucket()
-  local mul  = (d.mul_today and d.mul_today[team]) or 1.0
-  local gp   = math.floor(base * mul)
-  if gp <= 0 then return end
-
-  -- active set and team cap math
-  local actives = d.active_by_team[team] or {}; actives[secret] = true; d.active_by_team[team] = actives
-  local active_n = 0; for _ in pairs(actives) do active_n = active_n + 1 end
-
-  local team_cap = math.max(RAID_GP.team_daily_cap_min or 0,
-                      math.min(RAID_GP.team_daily_cap_max or 9999,
-                        math.max(active_n,1) * (RAID_GP.team_cap_per_active or 0)))
-  local team_used_before = tonumber(d.team_used[team] or 0)
-  local team_room = math.max(0, team_cap - team_used_before)
-
-  local p_used_before = tonumber(d.player_used[secret] or 0)
-  local p_cap  = RAID_GP.player_daily_cap or 10
-  local p_room = math.max(0, p_cap - p_used_before)
-
-  local give = math.max(0, math.min(gp, p_room, team_room))
-
-  -- names and month totals for "before/after"
-  local name = _last_known_name(secret, t_mem)
-  local team_name = _team_name(team)
-  local team_month_before = tonumber((t_mem.month[team] and t_mem.month[team].total) or 0)
-
-  if give <= 0 then
-    local reason = "unknown"
-    if gp <= 0 then reason = "no GP from contribution"
-    elseif p_room <= 0 and team_room <= 0 then reason = "player & team daily caps"
-    elseif p_room <= 0 then reason = "player daily cap"
-    elseif team_room <= 0 then reason = ("team daily cap (%d/%d)"):format(team_used_before, team_cap)
+  if not cur or not cur.team then
+    if pid_opt then
+      pcall(Net.message_player, pid_opt, "Join a team first to earn GP from raids.")
     end
-    print(("[RAID DBG] %s gained 0 GP %d/%d (%s)"):format(name, p_used_before, p_cap, reason))
-    print(("[RAID DBG] %s: %d -> %d this month"):format(team_name, team_month_before, team_month_before))
     return
   end
 
-  -- apply usage, persist the daily bucket
-  d.player_used[secret] = p_used_before + give
-  d.team_used[team]     = team_used_before + give
-  _save_area()
+  local team = cur.team
 
-  -- award GP (updates monthly totals/roster safely)
-  _add_gp_by_secret(secret, give, "raids", pid_opt)
+  -- Base GP from raid contribution
+  local base_gp = 0
+  if kind == "w1" then
+    base_gp  = amount / (RAID_GP.w1_points_per_gp or 1)
+  elseif kind == "w2" then
+    base_gp  = amount / (RAID_GP.w2_points_per_gp or 1)
+  elseif kind == "boss" then
+    base_gp  = amount / (RAID_GP.boss_damage_per_gp or 1)
+  else
+    base_gp = amount
+  end
 
-  -- logs
-  print(("[RAID DBG] %s gained %d GP %d/%d"):format(name, give, p_used_before + give, p_cap))
-  print(("[RAID DBG] %s: %d -> %d this month"):format(team_name, team_month_before, team_month_before + give))
+  -- Underdog multiplier (kept exactly as before via daily bucket)
+  local d, t_mem = _ensure_daily_bucket()
+  local mul = 1.0
+  if d and d.mul_today and d.mul_today[team] then
+    mul = d.mul_today[team]
+  end
+
+  local raw_gp = base_gp * mul
+  local gp     = math.floor(raw_gp + 0.00001)
+  if gp <= 0 then return end
+
+  -- Snapshot activity usage before awarding (for logging cap info)
+  local before_activity = cur.activity_gp or 0
+  local cap             = _activity_cap_for_today()
+
+  -- Send through the global GP pipeline (cap + GP DBG logging)
+  local awarded = _add_gp_by_secret(secret, gp, "raids", pid_opt) or 0
+
+  -- Raid-specific debug lines (on top of the [GP DBG] lines)
+  local name      = _last_known_name(secret, t_mem)
+  local team_name = _team_name(team)
+
+  if awarded > 0 then
+    local after_activity = math.min(cap, before_activity + awarded)
+    print(("[RAID DBG] %s (%s) %s amount=%d -> base=%.2f mul=%.2f raw=%.2f gp=%d, awarded=%d (activity %d/%d → %d/%d)")
+      :format(name, team_name, tostring(kind or "unknown"), amount,
+              base_gp, mul, raw_gp, gp, awarded,
+              before_activity, cap, after_activity, cap))
+  else
+    print(("[RAID DBG] %s (%s) %s amount=%d -> base=%.2f mul=%.2f raw=%.2f gp=%d, awarded=0 (hit global cap or zero)")
+      :format(name, team_name, tostring(kind or "unknown"), amount,
+              base_gp, mul, raw_gp, gp))
+  end
+end
+
+-- Convenience wrapper (online toast if present)
+function Teams.on_raid_contribution(pid, raid_id, kind, amount)
+  local secret = helpers.get_safe_player_secret(pid)
+  Teams.on_raid_contribution_secret(secret, raid_id, kind, amount, pid)
 end
 
 -- Convenience wrapper (online toast if present)
@@ -709,11 +1057,11 @@ local function _team_posts(pid, team)
 
   local label
   if is_member then
-    label = "You are in this team"
+    label = "Current Team"
   elseif cur.team then
-    label = "Switch to this team"
+    label = "Switch Team"
   else
-    label = "Join this team"
+    label = "Join Team"
   end
 
   local author = ""
@@ -864,24 +1212,61 @@ local function _handle_team_action(pid, post_id)
   local team = tonumber(post_id:match("^__team:join:(%d+)$") or "")
   if team and (team == 1 or team == 2) then
     local day = _day_of_month()
+
     if not cur.team then
       -- Join (days 1..JOIN_WINDOW_LAST_DAY)
       if not (day >= 1 and day <= (JOIN_WINDOW_LAST_DAY or 14)) then
         Net.message_player(pid, "Joining is only allowed on days 1-"..tostring(JOIN_WINDOW_LAST_DAY or 14)..".")
         return true
       end
+
+      -- Balance guard: cannot join into the team that already leads by >= 2 members
+      local slot1 = (t_mem.month and t_mem.month[1]) or { roster = {} }
+      local slot2 = (t_mem.month and t_mem.month[2]) or { roster = {} }
+      local n1    = _count_keys(slot1.roster)
+      local n2    = _count_keys(slot2.roster)
+      local cand_size  = (team == 1) and n1 or n2
+      local other_size = (team == 1) and n2 or n1
+      if cand_size >= (other_size + 2) then
+        Net.message_player(pid,
+          ("That team has %d members vs %d on the other team. " ..
+           "To keep things balanced, you can only join the underdog right now.")
+           :format(cand_size, other_size))
+        return true
+      end
+
       cur.team = team
       cur.month = _month_key(); cur.gp = cur.gp or 0
       _add_to_roster(t_mem, team, secret)
       _remember_name(pid, secret)
       Net.message_player(pid, "Joined ".._team_name(team).."!")
+
     else
       -- Switch (once per month unless testing)
-      if cur.team == team then Net.message_player(pid, "You are already in this team."); return true end
+      if cur.team == team then
+        Net.message_player(pid, "You are already in this team.")
+        return true
+      end
       if (not TEST_ALLOW_INFINITE_SWITCH) and cur.last_switch_month == _month_key() then
         Net.message_player(pid, "You can only switch teams once this month.")
         return true
       end
+
+      -- Balance guard: cannot switch into the team that already leads by >= 2 members
+      local slot1 = (t_mem.month and t_mem.month[1]) or { roster = {} }
+      local slot2 = (t_mem.month and t_mem.month[2]) or { roster = {} }
+      local n1    = _count_keys(slot1.roster)
+      local n2    = _count_keys(slot2.roster)
+      local cand_size  = (team == 1) and n1 or n2
+      local other_size = (team == 1) and n2 or n1
+      if cand_size >= (other_size + 2) then
+        Net.message_player(pid,
+          ("That team has %d members vs %d on the other team. " ..
+           "To keep things balanced, you can only switch to the underdog right now.")
+           :format(cand_size, other_size))
+        return true
+      end
+
       _remove_from_roster(t_mem, cur.team, secret)
       cur.team = team
       if not TEST_ALLOW_INFINITE_SWITCH then
@@ -891,6 +1276,7 @@ local function _handle_team_action(pid, post_id)
       _remember_name(pid, secret)
       Net.message_player(pid, "Switched to ".._team_name(team)..".")
     end
+
     if ezmemory.set_player_memory then ezmemory.set_player_memory(secret, pmem) else ezmemory.save_player_memory(secret, pmem) end
     _save_area()
     _pending_open[pid] = { kind="team", team=team }

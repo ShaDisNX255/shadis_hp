@@ -42,12 +42,12 @@ Async.read_file(SAVE_LOCATION).and_then(function(value)
 end)
 
 function handle_player_connect(player_id)
-  last_read_time[player_id] = os.time()
+  -- Don't touch last_read_time here.
+  -- We only update it when the player actually views/closes a board.
 end
 
 function handle_player_disconnect(player_id)
-  -- free memory
-  last_read_time[player_id] = nil
+  -- Free per-session state; keep read timestamps (they're keyed by secret).
   player_states[player_id] = nil
 end
 
@@ -76,22 +76,40 @@ function handle_object_interaction(player_id, object_id)
     },
   }
 
-  local last_time = last_read_time[player_id]
+  -- Stable per-player key
+  local secret = Net.get_player_secret(player_id)
+  local last_time = last_read_time[secret]
   local board_data = save_data[name]
 
   if board_data then
+    -- If we've never recorded a read time for this player,
+    -- treat all current posts as "already read" and set a baseline
+    if last_time == nil then
+      local newest_time = 0
+
+      for i = 1, #board_data.posts do
+        local t = board_data.posts[i].time
+        if t and t > newest_time then
+          newest_time = t
+        end
+      end
+
+      if newest_time > 0 then
+        last_time = newest_time
+        last_read_time[secret] = newest_time
+      end
+    end
+
     -- show pinned posts at the top
     for i = #board_data.posts, 1, -1 do
       local post = board_data.posts[i]
 
       if post.pin then
-        -- shallow copy to prevent mutation
         post = shallow_copy(post)
-
         post.title = "PIN: " .. string.sub(post.title, 1, TITLE_LIMIT - 5)
 
         -- mark post as read if we've checked the board after this was posted
-        if last_time == nil or post.time < last_time then
+        if last_time ~= nil and post.time <= last_time then
           post.read = true
         end
 
@@ -104,11 +122,10 @@ function handle_object_interaction(player_id, object_id)
       local post = board_data.posts[i]
 
       if not post.pin then
-        -- shallow copy to prevent mutation
         post = shallow_copy(post)
 
         -- mark post as read if we've checked the board after this was posted
-        if last_time == nil or post.time < last_time then
+        if last_time ~= nil and post.time <= last_time then
           post.read = true
         end
 
@@ -174,7 +191,23 @@ function show_post(player_id, post_id)
   end
 
   if post then
+    -- Show the post body
     Net.message_player(player_id, post.body)
+
+    -- Mark this post (and everything older) as "read" for this player
+    local secret = Net.get_player_secret(player_id)
+    local last_time = last_read_time[secret]
+
+    if post.time then
+      if (last_time == nil) or (post.time > last_time) then
+        last_read_time[secret] = post.time
+      end
+    else
+      -- Fallback if somehow time is missing; shouldn't normally happen
+      if last_time == nil then
+        last_read_time[secret] = os.time()
+      end
+    end
   end
 end
 
@@ -303,7 +336,8 @@ function push_post(board_name, area_id, post)
 end
 
 function handle_board_close(player_id)
-  last_read_time[player_id] = os.time()
+  -- Do nothing for read-tracking.
+  -- Posts are only marked as read when actually opened via show_post.
 end
 
 function save()
