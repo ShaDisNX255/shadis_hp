@@ -1197,24 +1197,6 @@
     <property name="Raid ID" value="Mettaur1"/>
    </properties>
   </object>
-  <object id="210" name="???" type="NPC" x="1133.5" y="978.5">
-   <properties>
-    <property name="Asset Name" value="ranked-navi-bn3"/>
-    <property name="Dialogue Type" value="first"/>
-    <property name="Direction" value="Down Right"/>
-    <property name="Next 1" type="object" value="211"/>
-    <property name="Text 1" value="..."/>
-   </properties>
-   <point/>
-  </object>
-  <object id="211" type="Dialogue" x="1099" y="965">
-   <properties>
-    <property name="Dialogue Type" value="none"/>
-    <property name="Event Name" value="raid"/>
-    <property name="Raid ID" value="Swordy1"/>
-   </properties>
-   <point/>
-  </object>
  </objectgroup>
  <layer id="9" name="Tile Layer 4" width="75" height="75" offsetx="0" offsety="-64">
   <data encoding="csv">
