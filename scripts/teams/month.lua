@@ -10,16 +10,16 @@ Month.DEFAULT = {
   min_gp_for_consolation = 5,      -- loser eligibility
 
   team_win = {
-    money = 50000,                -- winners always get this money
+    money = 500000,                -- winners always get this money
     -- (you can add default packs/items here later if you want)
   },
 
   top_player = {
-    money = 100000,                -- top player per team always gets this money
+    money = 300000,                -- top player per team always gets this money
   },
 
   losing_team = {
-    money = 25000,                 -- losers (meeting min GP) always get this money
+    money = 150000,                 -- losers (meeting min GP) always get this money
   },
 }
 
@@ -90,6 +90,20 @@ Month.EVENTS = {
       },
    }
  },
+  {
+   id   = "PrizeTest-291125-2",
+   name = "Prize Test",
+   start = "2025-11-29",
+   ["end"] = "2025-11-29",
+   rewards = {
+     cosmetics = {
+       { id = "Wave1", label = "Wave1" },
+     },
+      items_inline = {
+        { type="item", name="[UR]F.A.DMag", description="FullArt: Dark Magician - A: 2500 / D: 2100", amount=1 }
+      },
+   }
+ },
 }
 
 -- ===== Utilities =====
@@ -122,6 +136,21 @@ local function _merge_bucket(base, over)
   end
   if over.pack_name then
     base.pack_name = over.pack_name
+  end
+  -- Merge decor (fixed decor rewards)
+  if over.decor then
+    base.decor = base.decor or {}
+    for _, d in ipairs(over.decor) do
+      table.insert(base.decor, _deepcopy(d))
+    end
+  end
+
+  -- Merge cosmetics (cosmetic rewards)
+  if over.cosmetics then
+    base.cosmetics = base.cosmetics or {}
+    for _, c in ipairs(over.cosmetics) do
+      table.insert(base.cosmetics, _deepcopy(c))
+    end
   end
 
   return base
