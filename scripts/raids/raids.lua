@@ -44,8 +44,15 @@ local TEST_LOGIN_OPTS = {
 
 -- Force the login marquee to read a specific Raid ID / Area
 -- Set to nil to auto-detect like before.
-local LOGIN_ANNOUNCE_RAID_ID   = nil   -- <== put your exact Raid ID here (or nil)
-local LOGIN_ANNOUNCE_MEM_AREA  = nil           -- optional: e.g. "WCity1"; nil = use RAID_MEM_AREA or player's area
+local LOGIN_ANNOUNCE_RAID_ID   = nil          -- nil = let code auto-pick a raid
+local LOGIN_ANNOUNCE_MEM_AREA  = nil          -- e.g. "WCity1"; nil = default / player's area
+
+-- Limit which raids are allowed to show on the login announcer.
+-- Any raid_id not in this table is ignored by the auto-detect logic.
+local LOGIN_ANNOUNCE_ALLOWED_RAIDS = {
+  Mettaur1 = true,
+  Swordy1  = true,
+}
 
 -- Peek current raid store for an area without creating anything
 local function _peek_store(area_id)
@@ -75,25 +82,35 @@ local function _is_active(s)
       or (boss_hp < boss_max)
 end
 
+-- true if this raid_id is allowed to be shown on the login announcer
+local function _is_allowed_for_login(rid)
+  if not LOGIN_ANNOUNCE_ALLOWED_RAIDS then return true end
+  if not next(LOGIN_ANNOUNCE_ALLOWED_RAIDS) then return true end
+  return LOGIN_ANNOUNCE_ALLOWED_RAIDS[rid] == true
+end
+
 -- Find any active raid in area (prefer truly active; else most progressed)
 local function _find_active_or_progress(area_id)
   local store = _peek_store(area_id)
   local best_id, best_s, best_score = nil, nil, -1
 
   for rid, s in pairs(store) do
-    if _is_active(s) then
-      return rid, s
-    end
-    -- Not active: choose the most progressed as a fallback
-    local wave  = tonumber(s.wave or 1) or 1
-    local wsum  = (tonumber(s.wave1_points or 0) or 0) + (tonumber(s.wave2_points or 0) or 0)
-    local score = (wave * 100000) + wsum
-    if score > best_score then
-      best_id, best_s, best_score = rid, s, score
+    -- skip raids that are not allowed for login announcements
+    if _is_allowed_for_login(rid) then
+      if _is_active(s) then
+        return rid, s
+      end
+      -- Not active: choose the most progressed as a fallback
+      local wave  = tonumber(s.wave or 1) or 1
+      local wsum  = (tonumber(s.wave1_points or 0) or 0) + (tonumber(s.wave2_points or 0) or 0)
+      local score = (wave * 100000) + wsum
+      if score > best_score then
+        best_id, best_s, best_score = rid, s, score
+      end
     end
   end
 
-  return best_id, best_s  -- may be nil/nil if no raids exist yet
+  return best_id, best_s  -- may be nil/nil if no allowed raids exist yet
 end
 
 -- ==== Online tracking (global, area-agnostic) ====
@@ -499,6 +516,7 @@ local function _pay_pending_claims_for_pid(pid, area_id, raid_id, s)
 
   if total <= 0 then return end
 
+  -- clear claims now that we're about to pay them
   claims.wave1[secret] = nil
   claims.wave2[secret] = nil
   claims.boss[secret]  = nil
@@ -509,6 +527,23 @@ local function _pay_pending_claims_for_pid(pid, area_id, raid_id, s)
   local name = Net.get_player_name and Net.get_player_name(pid) or tostring(pid)
   print(("[RAIDS MONEY] Paid %d z to %s (raid=%s, area=%s, secret=%s)")
     :format(total, tostring(name), tostring(raid_id), tostring(area_id), tostring(secret)))
+
+  -- Build a nice player-facing message with per-wave breakdown
+  local parts = {}
+  if a1 > 0 then parts[#parts+1] = ("Wave 1: %d z"):format(a1) end
+  if a2 > 0 then parts[#parts+1] = ("Wave 2: %d z"):format(a2) end
+  if a3 > 0 then parts[#parts+1] = ("Boss: %d z"):format(a3) end
+
+  local msg
+  if #parts > 0 then
+    msg = ("Raid rewards received: +%d z (%s)"):format(total, table.concat(parts, ", "))
+  else
+    msg = ("Raid rewards received: +%d z"):format(total)
+  end
+
+  if Net.message_player then
+    Net.message_player(pid, msg)
+  end
 
   if ezmemory and ezmemory.save_area_memory then
     ezmemory.save_area_memory(area_id)
