@@ -167,6 +167,7 @@ for _, def in ipairs(cosmetics_defs) do
     world_scale     = def.world_scale,
     bot_scale        = def.bot_scale,
     preview_scale   = def.preview_scale,
+    rarity         = def.rarity,
     -- Small menu preview (always visible while menu is open)
     menu_preview_texture    = def.menu_preview_texture,
     menu_preview_animation  = def.menu_preview_animation,
@@ -198,6 +199,9 @@ local WINDOW_SPRITE_ID  = "cosmetics_menu_window"  -- new: preview window
 local TEXT_BASE_ID      = "cosmetics_menu_option_" -- text_id = TEXT_BASE_ID..index
 local DEFAULT_PREVIEW_SPRITE_ID = "cosmetics_menu_preview_default"
 local DEFAULT_MENU_PREVIEW_SPRITE_ID = "cosmetics_menu_smallpreview_default"
+local RARITY_SPRITE_ID  = "cosmetics_menu_rarity"
+local RARITY_BG_SPRITE_ID = "cosmetics_menu_rarity_bg"
+local SORT_HINT_SPRITE_ID = "cosmetics_menu_sort_hint"
 
 local function preview_sprite_id_for_opt(opt)
   if opt and opt.preview_sprite_id and opt.preview_sprite_id ~= "" then
@@ -250,6 +254,75 @@ local function current_equipped_id(pid)
   return nil
 end
 
+local function sort_options_alpha(list)
+  table.sort(list, function(a, b)
+    local an = (a.name or a.key or ""):lower()
+    local bn = (b.name or b.key or ""):lower()
+
+    if an == bn then
+      local aid = a.cosmetic_id or a.key or ""
+      local bid = b.cosmetic_id or b.key or ""
+      return aid < bid
+    end
+
+    return an < bn
+  end)
+end
+
+-- Order of rarity "colors" (GOLD_1..5, GREEN_1..5, etc.)
+local RARITY_COLOR_ORDER = {
+  GOLD  = 1,
+  GREEN = 2,
+  RED   = 3,
+  CYAN  = 4,
+}
+
+local function parse_rarity(r)
+  if type(r) ~= "string" then
+    return math.huge, math.huge
+  end
+
+  -- Expect things like "GOLD_3", "GREEN_5", etc.
+  local color, num = r:match("^([A-Z]+)_?(%d*)$")
+  if not color then
+    return math.huge, math.huge
+  end
+
+  local color_rank = RARITY_COLOR_ORDER[color] or (#RARITY_COLOR_ORDER + 1)
+  local n = tonumber(num) or math.huge
+  return color_rank, n
+end
+
+local function sort_options_rarity(list)
+  table.sort(list, function(a, b)
+    local arank, anum = parse_rarity(a.rarity or "")
+    local brank, bnum = parse_rarity(b.rarity or "")
+
+    -- Unknown / missing rarity gets shoved to the end
+    if arank == brank then
+      if anum == bnum then
+        -- Tie-breaker: alphabetical by name
+        local an = (a.name or a.key or ""):lower()
+        local bn = (b.name or b.key or ""):lower()
+        if an == bn then
+          local aid = a.cosmetic_id or a.key or ""
+          local bid = b.cosmetic_id or b.key or ""
+          return aid < bid
+        end
+        return an < bn
+      end
+      return anum < bnum
+    end
+
+    return arank < brank
+  end)
+end
+
+local function get_sort_mode_for_player(pid)
+  local st = state_by_pid[pid]
+  return (st and st.sort_mode) or "alpha" -- default
+end
+
 -- ---------------------------------------------------------------------------
 -- Owned / unlocked cosmetics per player (persistent via ezmemory)
 -- ---------------------------------------------------------------------------
@@ -264,6 +337,15 @@ local function unlocked_options_for_player(pid)
         opts[#opts+1] = opt
       end
     end
+
+    -- Apply sort for this player
+    local mode = get_sort_mode_for_player(pid)
+    if mode == "rarity" then
+      sort_options_rarity(opts)
+    else
+      sort_options_alpha(opts)
+    end
+
     return opts
   end
 
@@ -275,6 +357,14 @@ local function unlocked_options_for_player(pid)
     if cid and cid ~= "" and bag[cid] then
       opts[#opts+1] = opt
     end
+  end
+
+  -- Apply sort for this player
+  local mode = get_sort_mode_for_player(pid)
+  if mode == "rarity" then
+    sort_options_rarity(opts)
+  else
+    sort_options_alpha(opts)
   end
 
   return opts
@@ -340,11 +430,32 @@ local function clear_text_for_player(pid)
   end
 end
 
+local function clear_rarity_ui(pid)
+  if frame.remove_ui_element then
+    pcall(frame.remove_ui_element, RARITY_SPRITE_ID, pid)
+  end
+end
+
+local function clear_rarity_bg_ui(pid)
+  if frame.remove_ui_element then
+    pcall(frame.remove_ui_element, RARITY_BG_SPRITE_ID, pid)
+  end
+end
+
+local function clear_sort_hint_ui(pid)
+  if frame.remove_ui_element then
+    pcall(frame.remove_ui_element, SORT_HINT_SPRITE_ID, pid)
+  end
+end
+
 local function clear_menu_ui(pid)
   if frame.remove_ui_element then
     pcall(frame.remove_ui_element, MENU_SPRITE_ID, pid)
   end
   clear_text_for_player(pid)
+  clear_rarity_ui(pid)
+  clear_rarity_bg_ui(pid)
+  clear_sort_hint_ui(pid)
 end
 
 local function clear_window_ui(pid)
@@ -378,6 +489,176 @@ local function clear_menu_preview_ui(pid)
 
   -- Also clear the default fallback ID just in case
   pcall(frame.remove_ui_element, DEFAULT_MENU_PREVIEW_SPRITE_ID, pid)
+end
+
+local function get_rarity_star_layout()
+  -- Where the STARS themselves are drawn
+  local x = cfg.rarity_x or (cfg.menu_preview_base_x or 120)
+  local y = cfg.rarity_y or ((cfg.menu_preview_base_y or 80) + 28)
+  local z = cfg.rarity_z or ((cfg.menu_preview_z or (cfg.menu_z or 6)) + 1)
+  local s = cfg.rarity_scale or 1.0
+  return x, y, z, s
+end
+
+local function draw_rarity_stars(pid, opt, z_override)
+  if not frame.add_ui_element then
+    return
+  end
+
+  local texture = cfg.rarity_texture
+  local anim    = cfg.rarity_animation
+  if not texture or texture == "" or not anim or anim == "" then
+    return
+  end
+
+  -- Always clear previous stars for this player first
+  clear_rarity_ui(pid)
+
+  if not opt then
+    return
+  end
+
+  -- opt.rarity is something like "GOLD_3", "GREEN_1", etc.
+  local state = opt.rarity or cfg.rarity_default_state
+  if not state or state == "" then
+    return
+  end
+
+  local x, y, z, s = get_rarity_star_layout()
+  if z_override then
+    z = z_override
+  end
+
+  frame.add_ui_element(
+    RARITY_SPRITE_ID,
+    pid,
+    texture,
+    anim,
+    state,
+    x, y, z,
+    s, s
+  )
+
+  if frame.update_ui_position then
+    frame.update_ui_position(RARITY_SPRITE_ID, pid, x, y, z)
+  end
+end
+
+-- Used while the cosmetics menu is open (no background, just stars)
+local function draw_rarity_for_player(pid)
+  local st = state_by_pid[pid]
+  if not st then
+    return
+  end
+
+  local opt = option_for_player_at(pid, st.cursor or 1)
+  draw_rarity_stars(pid, opt, nil)
+end
+
+local function draw_sort_hint_for_player(pid)
+  if not frame.add_ui_element then
+    return
+  end
+
+  local st = state_by_pid[pid]
+  -- Only show while we're on the cosmetics list
+  if not st or st.mode ~= "menu" then
+    -- If we ever call this while not in menu, make sure it's gone.
+    clear_sort_hint_ui(pid)
+    return
+  end
+
+  local texture = cfg.sort_hint_texture
+  local anim    = cfg.sort_hint_animation
+
+  if not texture or texture == "" or not anim or anim == "" then
+    -- Config not set? Just skip quietly.
+    return
+  end
+
+  -- Determine which state to use based on current sort mode
+  -- (assuming you toggle st.sort_mode = "alpha" / "rarity" on R press)
+  local sort_mode = st.sort_mode or "alpha"
+  local state
+
+  if sort_mode == "rarity" then
+    state = cfg.sort_hint_state_rarity or "star"
+  else
+    state = cfg.sort_hint_state_alpha or "abc"
+  end
+
+  local x = cfg.sort_hint_x      or (cfg.menu_x or 120)
+  local y = cfg.sort_hint_y      or (cfg.menu_y or 80) + 60
+  local z = cfg.sort_hint_z      or ((cfg.menu_z or 6) + 1)
+  local s = cfg.sort_hint_scale  or 1.0
+
+  -- Remove any previous hint sprite for this player
+  clear_sort_hint_ui(pid)
+
+  frame.add_ui_element(
+    SORT_HINT_SPRITE_ID,
+    pid,
+    texture,
+    anim,
+    state,
+    x, y, z,
+    s, s
+  )
+
+  if frame.update_ui_position then
+    frame.update_ui_position(SORT_HINT_SPRITE_ID, pid, x, y, z)
+  end
+
+  if frame.update_ui_element then
+    pcall(frame.update_ui_element, SORT_HINT_SPRITE_ID, pid, { opacity = 255 })
+  end
+end
+
+-- Used for the cosmeticshop preview: background + stars
+local function draw_shop_rarity_for_cosmetic(pid, opt)
+  -- If nothing or missing rarity, just clear and bail
+  if not opt then
+    clear_rarity_ui(pid)
+    clear_rarity_bg_ui(pid)
+    return
+  end
+
+  local star_x, star_y, star_z, _ = get_rarity_star_layout()
+
+  -- First: background behind the stars (raritybg)
+  local bg_tex   = cfg.rarity_bg_texture
+  local bg_anim  = cfg.rarity_bg_animation
+  local bg_state = cfg.rarity_bg_state or "RARITYBG"
+
+  clear_rarity_bg_ui(pid)
+
+  if bg_tex and bg_tex ~= "" and bg_anim and bg_anim ~= "" then
+    local bg_x = cfg.rarity_bg_x or star_x
+    local bg_y = cfg.rarity_bg_y or star_y
+    local bg_z = cfg.rarity_bg_z or (star_z - 1)
+    local bg_s = cfg.rarity_bg_scale or 1.0
+
+    frame.add_ui_element(
+      RARITY_BG_SPRITE_ID,
+      pid,
+      bg_tex,
+      bg_anim,
+      bg_state,
+      bg_x, bg_y, bg_z,
+      bg_s, bg_s
+    )
+
+    if frame.update_ui_position then
+      frame.update_ui_position(RARITY_BG_SPRITE_ID, pid, bg_x, bg_y, bg_z)
+    end
+
+    if frame.update_ui_element then
+      pcall(frame.update_ui_element, RARITY_BG_SPRITE_ID, pid, { opacity = 255 })
+    end
+  end
+
+  -- Then: stars on top (same coordinates as before)
+  draw_rarity_stars(pid, opt, star_z)
 end
 
 local function draw_list_for_player(pid)
@@ -565,6 +846,8 @@ local function draw_menu(pid)
 
   draw_list_for_player(pid)
   draw_menu_preview(pid)
+  draw_rarity_for_player(pid)
+  draw_sort_hint_for_player(pid)
 end
 
 local function refresh_menu_cursor(pid)
@@ -587,6 +870,8 @@ local function refresh_menu_cursor(pid)
 
   draw_list_for_player(pid)
   draw_menu_preview(pid)
+  draw_rarity_for_player(pid)
+  draw_sort_hint_for_player(pid)
 end
 
 local function draw_window(pid)
@@ -927,6 +1212,7 @@ function Cosmetics.open_menu(pid)
     preview_x = cfg.preview_start_x or 0,
     preview_y = cfg.preview_start_y or -24,
     top_index = 1, -- first visible option in the window
+    sort_mode = "alpha", -- "alpha" or "rarity"
   }
 
   draw_menu(pid)
@@ -1039,6 +1325,62 @@ local function handle_menu_button(pid, btn)
     refresh_menu_cursor(pid)
     return true
   end
+
+  -- Right (R) = toggle sort mode (alpha <-> rarity) while viewing the list
+  if btn == "R" then
+    local st = state_by_pid[pid]
+    if not st or st.mode ~= "menu" then
+      return false
+    end
+
+    -- Remember which cosmetic was selected before we change the sort
+    local current_opt = option_for_player_at(pid, st.cursor or 1)
+    local current_id  = current_opt and current_opt.cosmetic_id
+
+    -- Toggle mode
+    local old_mode = st.sort_mode or "alpha"
+    if old_mode == "alpha" then
+      st.sort_mode = "rarity"
+      refresh_menu_cursor(pid)
+    else
+      st.sort_mode = "alpha"
+      refresh_menu_cursor(pid)
+    end
+
+    -- Rebuild list using the new sort mode
+    local unlocked = unlocked_options_for_player(pid)
+    local total    = #unlocked
+
+    -- Try to keep the same cosmetic highlighted after resorting
+    local new_cursor
+    if current_id then
+      for i, opt in ipairs(unlocked) do
+        if opt.cosmetic_id == current_id then
+          new_cursor = i
+          break
+        end
+      end
+    end
+    st.cursor = new_cursor or 1
+
+    -- Keep cursor visible in the current window
+    local top     = st.top_index or 1
+    local max_top = math.max(1, total - VISIBLE_ROWS + 1)
+
+    if st.cursor < top then
+      top = st.cursor
+    elseif st.cursor > (top + VISIBLE_ROWS - 1) then
+      top = st.cursor - VISIBLE_ROWS + 1
+    end
+
+    if top < 1 then top = 1 end
+    if top > max_top then top = max_top end
+    st.top_index = top
+
+    refresh_menu_cursor(pid)
+    return true
+  end
+
 
   -- Confirm selection
   if btn == "A" then
@@ -1193,27 +1535,35 @@ if Net and Net.on then
 end
 
 function Cosmetics.preview_for_shop(pid, cosmetic_id)
-  if not cosmetic_id or cosmetic_id == "" then
-    return false, "invalid_id"
+  -- Clear any previous shop preview cosmetic
+  clear_shop_preview_internal(pid)
+
+  -- Also clear previous rarity UI for safety
+  clear_rarity_ui(pid)
+  clear_rarity_bg_ui(pid)
+
+  if not cosmetic_id then
+    return
   end
 
   local opt = OPTIONS_BY_ID[cosmetic_id]
   if not opt then
-    return false, "unknown_id"
+    return
   end
 
-  -- Only one shop preview at a time per player
-  clear_shop_preview_internal(pid)
+  -- Apply the temporary cosmetic (what you already had)
+  apply_shop_preview_internal(pid, opt)
 
-  if not apply_shop_preview_internal(pid, opt) then
-    return false, "apply_failed"
-  end
-
-  return true
+  -- NEW: draw rarity background + stars for this cosmetic
+  draw_shop_rarity_for_cosmetic(pid, opt)
 end
 
 function Cosmetics.clear_shop_previews(pid)
+  -- Remove temporary cosmetic
   clear_shop_preview_internal(pid)
+  -- Remove rarity UI that was drawn for the preview
+  clear_rarity_ui(pid)
+  clear_rarity_bg_ui(pid)
 end
 
 return Cosmetics

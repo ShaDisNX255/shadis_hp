@@ -881,64 +881,65 @@
     <property name="Target Object" value="4"/>
    </properties>
   </object>
-  <object id="342" name="Cosmetics Shop" type="NPC" x="768" y="688">
+  <object id="342" name="Cosmetics Shop" type="NPC" x="822.5" y="691.5">
    <properties>
     <property name="Asset Name" value="normal-navi-bn4_red"/>
-    <property name="Dialogue Type" value="question"/>
+    <property name="Dialogue Type" value="first"/>
     <property name="Direction" value="Down Left"/>
     <property name="Next 1" type="object" value="343"/>
-    <property name="Next 2" type="object" value="344"/>
-    <property name="Text 1" value="Buy?"/>
+    <property name="Text 1" value="Here there, I sell cosmetics!"/>
    </properties>
    <point/>
   </object>
-  <object id="343" name="Cosmetic Shop" type="Dialogue" x="736" y="640">
+  <object id="343" name="Cosmetic Shop" type="Dialogue" x="872" y="646">
    <properties>
     <property name="Dialogue Type" value="cosmeticshop"/>
-    <property name="Price 1" type="int" value="0"/>
-    <property name="Price 2" type="int" value="0"/>
-    <property name="Price 3" type="int" value="0"/>
-    <property name="Price 4" type="int" value="0"/>
-    <property name="Price 5" value="0"/>
-    <property name="Price 6" type="int" value="0"/>
-    <property name="Price 7" type="int" value="0"/>
-    <property name="Price 8" type="int" value="0"/>
-    <property name="Price 9" type="int" value="0"/>
-    <property name="Price 10" type="int" value="0"/>
-    <property name="Price 11" type="int" value="0"/>
-    <property name="Price 12" type="int" value="0"/>
-    <property name="Price 13" type="int" value="0"/>
-    <property name="Price 14" type="int" value="0"/>
-    <property name="Price 15" type="int" value="0"/>
-    <property name="Price 16" type="int" value="0"/>
-    <property name="Price 17" type="int" value="0"/>
-    <property name="Price 18" type="int" value="0"/>
-    <property name="Price 19" type="int" value="0"/>
-    <property name="Sell 1" value="snowflake_particle"/>
-    <property name="Sell 2" value="confetti"/>
-    <property name="Sell 3" value="shock"/>
-    <property name="Sell 4" value="DarkAura"/>
-    <property name="Sell 5" value="PinkCyberElf"/>
-    <property name="Sell 6" value="GreenCyberElf"/>
-    <property name="Sell 7" value="BlueCyberElf"/>
-    <property name="Sell 8" value="Matrix"/>
-    <property name="Sell 9" value="GigFreez"/>
-    <property name="Sell 10" value="MMBadge"/>
-    <property name="Sell 11" value="Sparkle1"/>
-    <property name="Sell 12" value="Ready"/>
-    <property name="Sell 13" value="ChipGreen"/>
-    <property name="Sell 14" value="ChipRed"/>
-    <property name="Sell 15" value="ChipMulti"/>
-    <property name="Sell 16" value="Sims"/>
-    <property name="Sell 17" value="BugFrag"/>
-    <property name="Sell 18" value="ColonelB"/>
-    <property name="Sell 19" value="ProtomanB"/>
-   </properties>
-   <point/>
-  </object>
-  <object id="344" name="Decor Clear" type="Dialogue" x="704" y="640">
-   <properties>
-    <property name="Dialogue Type" value="decorclear"/>
+    <property name="Price 1" type="int" value="600000"/>
+    <property name="Price 10" type="int" value="1000000"/>
+    <property name="Price 11" type="int" value="1000000"/>
+    <property name="Price 12" type="int" value="1100000"/>
+    <property name="Price 13" type="int" value="1100000"/>
+    <property name="Price 14" type="int" value="1100000"/>
+    <property name="Price 15" type="int" value="1200000"/>
+    <property name="Price 16" type="int" value="1200000"/>
+    <property name="Price 17" type="int" value="1300000"/>
+    <property name="Price 18" type="int" value="1300000"/>
+    <property name="Price 19" type="int" value="1300000"/>
+    <property name="Price 2" type="int" value="700000"/>
+    <property name="Price 20" type="int" value="1300000"/>
+    <property name="Price 21" type="int" value="1500000"/>
+    <property name="Price 22" type="int" value="1500000"/>
+    <property name="Price 23" type="int" value="1700000"/>
+    <property name="Price 3" type="int" value="700000"/>
+    <property name="Price 4" type="int" value="800000"/>
+    <property name="Price 5" value="800000"/>
+    <property name="Price 6" type="int" value="800000"/>
+    <property name="Price 7" type="int" value="900000"/>
+    <property name="Price 8" type="int" value="900000"/>
+    <property name="Price 9" type="int" value="1000000"/>
+    <property name="Sell 1" value="Sims"/>
+    <property name="Sell 10" value="DarkAura"/>
+    <property name="Sell 11" value="confetti"/>
+    <property name="Sell 12" value="Sparkle1"/>
+    <property name="Sell 13" value="bugfragpile"/>
+    <property name="Sell 14" value="BeanStar"/>
+    <property name="Sell 15" value="dmgaura"/>
+    <property name="Sell 16" value="snowflake_particle"/>
+    <property name="Sell 17" value="Matrix"/>
+    <property name="Sell 18" value="PinkCyberElf"/>
+    <property name="Sell 19" value="GreenCyberElf"/>
+    <property name="Sell 2" value="ColonelB"/>
+    <property name="Sell 20" value="BlueCyberElf"/>
+    <property name="Sell 21" value="bugfragdealer"/>
+    <property name="Sell 22" value="GigFreez"/>
+    <property name="Sell 23" value="Ready"/>
+    <property name="Sell 3" value="ProtomanB"/>
+    <property name="Sell 4" value="BugFrag"/>
+    <property name="Sell 5" value="MMBadge"/>
+    <property name="Sell 6" value="shock"/>
+    <property name="Sell 7" value="ChipGreen"/>
+    <property name="Sell 8" value="ChipRed"/>
+    <property name="Sell 9" value="ChipMulti"/>
    </properties>
    <point/>
   </object>
@@ -1171,9 +1172,9 @@
   <object id="113" gid="73" x="896" y="496" width="128" height="128"/>
   <object id="121" gid="77" x="944" y="496" width="128" height="128">
    <properties>
-    <property name="CosmeticExtra" value="You see something in the corner..."/>
-    <property name="CosmeticGotText" value="You got the 'Matrix' cosmetic!"/>
-    <property name="CosmeticID" value="Matrix"/>
+    <property name="CosmeticExtra" value="You notice something in the corner..."/>
+    <property name="CosmeticGotText" value="You got the 'shock' cosmetic!"/>
+    <property name="CosmeticID" value="shock"/>
     <property name="Flavor" value="You see a trading card vending machine. It seems like all the rare cards are gone..."/>
    </properties>
   </object>

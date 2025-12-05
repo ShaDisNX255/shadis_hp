@@ -6,20 +6,48 @@ local Config = {}
 
 -- Defaults by raid id (you can duplicate the "default" block to create presets)
 local DEFAULTS = {
-  default = {
-    style                 = "Repeat",  -- "Repeat" or "Once"
-    wave2_points_required = 500,        -- points to clear wave 1
-    wave3_points_required = 350,        -- points to clear wave 2
-    boss_pool_max         = 10000,     -- shared boss HP pool
-    boss_win_damage       = 500,       -- applied when the player wins and stats don't expose damage
-    -- how much HP the boss has **in a single encounter**
-    boss_encounter_hp = 1800,
+  -- Mettaur raid
+  Mettaur1 = {
+    style                 = "Repeat",
+    wave2_points_required = 500,
+    wave3_points_required = 350,
+    boss_pool_max         = 10000,
+    boss_win_damage       = 500,
+    boss_encounter_hp     = 1800,
+    boss_id_match         = "GrgBeast",  -- matches GregarBeast boss
+    repeat_cooldown_secs  = 7200,
+    raid_memory_area      = "WCity1",
+    money_wave1           = 50000,
+    money_wave2           = 75000,
+    money_boss            = 90000,
+  },
 
-    -- substring to identify the boss in stats.enemies[k].id
-    -- tip: use a short, plain substring to dodge weird characters, e.g. "GrgBeast" or "GregarBeast"
-    boss_id_match = "GrgBeast",
-    repeat_cooldown_secs = 7200,  -- 30 minutes default for Repeat raids
-    raid_memory_area = "WCity1",
+  Swordy1 = {
+    style                 = "Repeat",  -- or "Once"
+    wave2_points_required = 300,       -- W1 -> W2 threshold
+    wave3_points_required = 150,       -- W2 -> Boss threshold
+    boss_pool_max         = 15000,     -- shared HP pool for this boss
+    boss_win_damage       = 700,       -- fallback per win
+    boss_encounter_hp     = 600,      -- HP in a single encounter
+    boss_id_match         = "Quickman",
+    repeat_cooldown_secs  = 14400,
+    raid_memory_area      = "WCity2",
+    money_wave1           = 70000,
+    money_wave2           = 80000,
+    money_boss            = 100000,
+  },
+
+  -- Fallback if some raid_id has no preset
+  default = {
+    style                 = "Repeat",
+    wave2_points_required = 500,
+    wave3_points_required = 350,
+    boss_pool_max         = 10000,
+    boss_win_damage       = 500,
+    boss_encounter_hp     = 1800,
+    boss_id_match         = "GrgBeast",
+    repeat_cooldown_secs  = 7200,
+    raid_memory_area      = "WCity1",
   },
 }
 

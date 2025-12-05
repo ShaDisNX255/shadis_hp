@@ -303,9 +303,275 @@ local boss = {
     },
 }
 
+local S1 = {
+    name="S1",
+    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    weight=10,
+    enemies={
+        {name="Swordy",rank=1},
+        {name="Swordy",rank=3},
+    },
+    obstacles={
+    },
+    positions={
+        {0,0,0,1,1,0},
+        {0,0,0,1,1,2},
+        {0,0,0,1,1,0},
+    },
+    obstacle_positions={
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+    },
+    player_positions={
+        {0,0,0,0,0,0},
+        {0,1,0,0,0,0},
+        {0,0,0,0,0,0},
+    },
+    tiles={
+        {1,1,1,1,1,1},
+        {1,1,1,1,1,1},
+        {1,1,1,1,1,1},
+    },
+    teams={
+        {2,2,2,1,1,1},
+        {2,2,2,1,1,1},
+        {2,2,2,1,1,1},
+    },
+}
+
+local S2 = {
+    name="S2",
+    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    weight=10,
+    enemies={
+        {name="Swordy",rank=2},
+    },
+    obstacles={
+    },
+    positions={
+        {0,0,0,0,1,0},
+        {0,0,0,0,1,0},
+        {0,0,0,0,1,0},
+    },
+    obstacle_positions={
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+    },
+    player_positions={
+        {0,0,0,0,0,0},
+        {0,1,0,0,0,0},
+        {0,0,0,0,0,0},
+    },
+    tiles={
+        {13,1,1,1,1,1},
+        {13,1,1,1,1,1},
+        {13,1,1,1,1,1},
+    },
+    teams={
+        {2,2,2,1,1,1},
+        {2,2,2,1,1,1},
+        {2,2,2,1,1,1},
+    },
+}
+
+local S3 = {
+    name="S3",
+    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    weight=10,
+    enemies={
+        {name="Swordy",rank=2},
+        {name="Swordy",rank=3},
+        {name="Swordy",rank=4},
+    },
+    obstacles={
+    },
+    positions={
+        {0,0,0,1,0,0},
+        {0,0,0,0,2,0},
+        {0,0,0,0,0,3},
+    },
+    obstacle_positions={
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+    },
+    player_positions={
+        {0,0,0,0,0,0},
+        {0,1,0,0,0,0},
+        {0,0,0,0,0,0},
+    },
+    tiles={
+        {9,9,9,1,1,1},
+        {9,9,9,1,1,1},
+        {9,9,9,1,1,1},
+    },
+    teams={
+        {2,2,2,1,1,1},
+        {2,2,2,1,1,1},
+        {2,2,2,1,1,1},
+    },
+}
+
+local S4 = {
+    name="S4",
+    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    weight=10,
+    enemies={
+        {name="Dominerd",rank=1},
+        {name="Swordy",rank=3},
+        {name="Swordy",rank=4},
+    },
+    obstacles={
+    },
+    positions={
+        {0,0,0,0,2,0},
+        {0,0,0,1,0,0},
+        {0,0,0,0,3,0},
+    },
+    obstacle_positions={
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+    },
+    player_positions={
+        {0,0,0,0,0,0},
+        {0,1,0,0,0,0},
+        {0,0,0,0,0,0},
+    },
+    tiles={
+        {8,1,1,1,1,1},
+        {1,1,1,1,1,1},
+        {8,1,1,1,1,1},
+    },
+    teams={
+        {2,2,2,1,1,1},
+        {2,2,2,1,1,1},
+        {2,2,2,1,1,1},
+    },
+}
+
+local S5 = {
+    name="S5",
+    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    weight=10,
+    enemies={
+        {name="Doomer",rank=1},
+        {name="Swordy",rank=4},
+        {name="Swordy",rank=1},
+    },
+    obstacles={
+    },
+    positions={
+        {0,0,0,0,2,0},
+        {0,0,0,1,0,0},
+        {0,0,0,0,3,0},
+    },
+    obstacle_positions={
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+    },
+    player_positions={
+        {0,0,0,0,0,0},
+        {0,1,0,0,0,0},
+        {0,0,0,0,0,0},
+    },
+    tiles={
+        {13,1,1,1,1,1},
+        {13,1,1,1,1,1},
+        {13,1,1,1,1,1},
+    },
+    teams={
+        {2,2,2,1,1,1},
+        {2,2,2,1,1,1},
+        {2,2,2,1,1,1},
+    },
+}
+
+local S6 = {
+    name="S6",
+    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    weight=10,
+    enemies={
+        {name="Bladia5",rank=1},
+        {name="Swordy",rank=2},
+        {name="Swordy",rank=3},
+    },
+    obstacles={
+    },
+    positions={
+        {0,0,0,0,2,0},
+        {0,0,0,0,0,1},
+        {0,0,0,0,3,0},
+    },
+    obstacle_positions={
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+    },
+    player_positions={
+        {0,0,0,0,0,0},
+        {0,1,0,0,0,0},
+        {0,0,0,0,0,0},
+    },
+    tiles={
+        {1,1,1,1,1,1},
+        {1,1,1,1,1,1},
+        {1,1,1,1,1,1},
+    },
+    teams={
+        {2,2,2,1,1,1},
+        {2,2,2,1,1,1},
+        {2,2,2,1,1,1},
+    },
+}
+
+local boss2 = {
+    name="boss2",
+    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    weight=10,
+    enemies={
+        {name="QuickMan",rank=1},
+        {name="Swordy",rank=4},
+        {name="Swordy",rank=8},
+    },
+    obstacles={
+    },
+    positions={
+        {0,0,0,0,0,2},
+        {0,0,0,0,1,0},
+        {0,0,0,0,0,3},
+    },
+    obstacle_positions={
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+    },
+    player_positions={
+        {0,0,0,0,0,0},
+        {0,1,0,0,0,0},
+        {0,0,0,0,0,0},
+    },
+    tiles={
+        {1,1,1,1,1,1},
+        {1,1,1,1,1,1},
+        {1,1,1,1,1,1},
+    },
+    teams={
+        {2,2,2,1,1,1},
+        {2,2,2,1,1,1},
+        {2,2,2,1,1,1},
+    },
+}
+
 -- Register for raid id "default": Wave1 = E1/E2/E3, Wave2 = E4/E5/E6, Boss = boss
 Enc.register("Mettaur1", 1, { E1, E2, E3 })
 Enc.register("Mettaur1", 2, { E4, E5, E6 })
 Enc.register("Mettaur1", 3, { boss })
+Enc.register("Swordy1", 1, { S1, S2, S3 })
+Enc.register("Swordy1", 2, { S4, S5, S6 })
+Enc.register("Swordy1", 3, { boss2 })
 
 return Enc

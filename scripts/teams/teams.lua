@@ -68,6 +68,9 @@ local RAID_GP = {
   bonus_off_last_hours    = 48,    -- disable multipliers in last 48h of month
 }
 
+-- GP from Fishing: how many fish catches give 1 GP
+local FISHING_FISHES_PER_GP = 10
+
 -- =========================
 -- ====== UTILITIES  =======
 -- =========================
@@ -724,6 +727,61 @@ local function _add_gp(pid, amount, why)
 
   print(("[GP DBG] %s: %d -> %d this month")
     :format(team_name, team_month_before, team_month_before + give))
+end
+
+-- GP from Fishing: +1 GP per N fish caught (subject to activity cap)
+function Teams.on_fish_catch(pid)
+  if not pid then return end
+  local fishes_per_gp = FISHING_FISHES_PER_GP or 10
+  if fishes_per_gp <= 0 then return end
+
+  -- Use the same player memory layout as the rest of the team system
+  local secret, pmem = _pmem(pid)
+  pmem.teams = pmem.teams or {}
+
+  -- Track fishing progress per month so it rolls with the current season
+  pmem.teams.fishing = pmem.teams.fishing or {
+    month  = _month_key(),
+    total  = 0,  -- total fish caught this month
+    gp_paid = 0, -- how many GP we've *attempted* to award from fishing
+  }
+  local fm = pmem.teams.fishing
+
+  -- Month rollover for fishing progress
+  if fm.month ~= _month_key() then
+    fm.month   = _month_key()
+    fm.total   = 0
+    fm.gp_paid = 0
+  end
+
+  -- Count this catch
+  fm.total = (tonumber(fm.total) or 0) + 1
+
+  -- How many GP should we have *offered* by now?
+  local expected_gp = math.floor((fm.total or 0) / fishes_per_gp)
+  local paid        = tonumber(fm.gp_paid or 0) or 0
+  local to_award    = expected_gp - paid
+
+  if to_award < 0 then
+    to_award = 0
+  end
+
+  -- We mark GP as "paid" whether or not the cap blocks it.
+  -- This means extra fish caught while capped do NOT bank GP for later days,
+  -- matching "as long as it's still within the current day cap".
+  fm.gp_paid = expected_gp
+
+  -- Persist fishing progress
+  if ezmemory.set_player_memory then
+    ezmemory.set_player_memory(secret, pmem)
+  else
+    ezmemory.save_player_memory(secret, pmem)
+  end
+
+  -- Actually try to give the GP (global activity cap is enforced inside _add_gp)
+  if to_award > 0 then
+    _add_gp(pid, to_award, "fishing")
+  end
 end
 
 -- Tracks daily GP cap usage & actives (by secret) + today's team multipliers

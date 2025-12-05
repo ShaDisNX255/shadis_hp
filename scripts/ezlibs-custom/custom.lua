@@ -583,6 +583,7 @@ local SUMMON_NAME_OVERRIDE = {
     ["DMGirl"] = "Dark Magician Girl",
     ["F.A.DMGirl"] = "Dark Magician Girl",
     ["DMag"] = "Dark Magician",
+    ["F.A.DMag"] = "Dark Magician",
     ["F.Imp"] = "Feral Imp",
     ["Gaia"] = "Gaia The Fierce Knight",
     ["H.M.Gnt"] = "Hitotsu-Me Giant",

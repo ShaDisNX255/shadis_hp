@@ -1,0 +1,83 @@
+animation state="GOLD_1"
+frame duration="0.1" x="1" y="17" w="45" h="6" originx="0" originy="0" flipx="0" flipy="0"
+
+animation state="GOLD_2"
+frame duration="0.1" x="1" y="33" w="45" h="6" originx="0" originy="0" flipx="0" flipy="0"
+
+animation state="GOLD_3"
+frame duration="0.1" x="1" y="49" w="45" h="6" originx="0" originy="0" flipx="0" flipy="0"
+
+animation state="GOLD_4"
+frame duration="0.1" x="1" y="65" w="45" h="6" originx="0" originy="0" flipx="0" flipy="0"
+
+animation state="GOLD_5"
+frame duration="0.1" x="1" y="81" w="45" h="6" originx="0" originy="0" flipx="0" flipy="0"
+
+animation state="GREEN_1"
+frame duration="0.1" x="1" y="116" w="45" h="6" originx="0" originy="0" flipx="0" flipy="0"
+
+animation state="GREEN_2"
+frame duration="0.1" x="1" y="132" w="45" h="6" originx="0" originy="0" flipx="0" flipy="0"
+
+animation state="GREEN_3"
+frame duration="0.1" x="1" y="148" w="45" h="6" originx="0" originy="0" flipx="0" flipy="0"
+
+animation state="GREEN_4"
+frame duration="0.1" x="1" y="164" w="45" h="6" originx="0" originy="0" flipx="0" flipy="0"
+
+animation state="GREEN_5"
+frame duration="0.1" x="1" y="180" w="45" h="6" originx="0" originy="0" flipx="0" flipy="0"
+
+animation state="RED_1"
+frame duration="0.1" x="1" y="218" w="45" h="6" originx="0" originy="0" flipx="0" flipy="0"
+
+animation state="RED_2"
+frame duration="0.1" x="1" y="234" w="45" h="6" originx="0" originy="0" flipx="0" flipy="0"
+
+animation state="RED_3"
+frame duration="0.1" x="1" y="250" w="45" h="6" originx="0" originy="0" flipx="0" flipy="0"
+
+animation state="RED_4"
+frame duration="0.1" x="1" y="266" w="45" h="6" originx="0" originy="0" flipx="0" flipy="0"
+
+animation state="RED_5"
+frame duration="0.1" x="1" y="282" w="45" h="6" originx="0" originy="0" flipx="0" flipy="0"
+
+animation state="CYAN_1"
+frame duration="0.1" x="1" y="316" w="45" h="6" originx="0" originy="0" flipx="0" flipy="0"
+
+animation state="CYAN_2"
+frame duration="0.1" x="1" y="332" w="45" h="6" originx="0" originy="0" flipx="0" flipy="0"
+
+animation state="CYAN_3"
+frame duration="0.1" x="1" y="348" w="45" h="6" originx="0" originy="0" flipx="0" flipy="0"
+
+animation state="CYAN_4"
+frame duration="0.1" x="1" y="364" w="45" h="6" originx="0" originy="0" flipx="0" flipy="0"
+
+animation state="CYAN_5"
+frame duration="0.1" x="1" y="380" w="45" h="6" originx="0" originy="0" flipx="0" flipy="0"
+
+animation state="IDLE_DR"
+
+animation state="IDLE_DL"
+
+animation state="IDLE_UR"
+
+animation state="IDLE_UL"
+
+animation state="WALK_DR"
+
+animation state="WALK_DL"
+
+animation state="WALK_UR"
+
+animation state="WALK_UL"
+
+animation state="RUN_DR"
+
+animation state="RUN_DL"
+
+animation state="RUN_UR"
+
+animation state="RUN_UL"

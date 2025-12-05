@@ -10,16 +10,16 @@ Month.DEFAULT = {
   min_gp_for_consolation = 5,      -- loser eligibility
 
   team_win = {
-    money = 50000,                -- winners always get this money
+    money = 500000,                -- winners always get this money
     -- (you can add default packs/items here later if you want)
   },
 
   top_player = {
-    money = 100000,                -- top player per team always gets this money
+    money = 300000,                -- top player per team always gets this money
   },
 
   losing_team = {
-    money = 25000,                 -- losers (meeting min GP) always get this money
+    money = 150000,                 -- losers (meeting min GP) always get this money
   },
 }
 
@@ -91,14 +91,17 @@ Month.EVENTS = {
    }
  },
   {
-   id   = "CosmeticTest-241125",
-   name = "Testing Cosmetic",
-   start = "2025-11-24",
-   ["end"] = "2025-11-24",
+   id   = "PrizeTest-291125-2",
+   name = "Prize Test",
+   start = "2025-11-29",
+   ["end"] = "2025-11-29",
    rewards = {
      cosmetics = {
-       { id = "DarkAura", label = "Dark Aura" },
+       { id = "Wave1", label = "Wave1" },
      },
+      items_inline = {
+        { type="item", name="[UR]F.A.DMag", description="FullArt: Dark Magician - A: 2500 / D: 2100", amount=1 }
+      },
    }
  },
 }

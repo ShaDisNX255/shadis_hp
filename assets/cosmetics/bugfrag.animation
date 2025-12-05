@@ -2,25 +2,37 @@ animation state="BugFrag"
 frame duration="0.15" x="0" y="0" w="20" h="23" originx="0" originy="0"
 
 animation state="IDLE_DR"
+frame duration="0.15" x="0" y="0" w="20" h="23" originx="0" originy="0"
 
 animation state="IDLE_DL"
+frame duration="0.15" x="0" y="0" w="20" h="23" originx="0" originy="0"
 
 animation state="IDLE_UR"
+frame duration="0.15" x="0" y="0" w="20" h="23" originx="0" originy="0"
 
 animation state="IDLE_UL"
+frame duration="0.15" x="0" y="0" w="20" h="23" originx="0" originy="0"
 
 animation state="WALK_DR"
+frame duration="0.15" x="0" y="0" w="20" h="23" originx="0" originy="0"
 
 animation state="WALK_DL"
+frame duration="0.15" x="0" y="0" w="20" h="23" originx="0" originy="0"
 
 animation state="WALK_UR"
+frame duration="0.15" x="0" y="0" w="20" h="23" originx="0" originy="0"
 
 animation state="WALK_UL"
+frame duration="0.15" x="0" y="0" w="20" h="23" originx="0" originy="0"
 
 animation state="RUN_DR"
+frame duration="0.15" x="0" y="0" w="20" h="23" originx="0" originy="0"
 
 animation state="RUN_DL"
+frame duration="0.15" x="0" y="0" w="20" h="23" originx="0" originy="0"
 
 animation state="RUN_UR"
+frame duration="0.15" x="0" y="0" w="20" h="23" originx="0" originy="0"
 
 animation state="RUN_UL"
+frame duration="0.15" x="0" y="0" w="20" h="23" originx="0" originy="0"
