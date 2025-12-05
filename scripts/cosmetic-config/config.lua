@@ -664,9 +664,9 @@ local cosmetics = {
     menu_preview_scale      = 1.5,
   },
   {
-    id              = "dmgaura",               -- internal cosmetic id
-    key             = "dmgaura",                        -- menu key
-    name            = "Damage_Aura",                        -- text shown in list
+    id              = "dmgaura",
+    key             = "dmgaura",
+    name            = "Damage_Aura",
     texture         = "/server/assets/cosmetics/dmgaura.png",
     animation       = "/server/assets/cosmetics/dmgaura.animation",
     anim_state      = "dmgaura",
@@ -674,11 +674,9 @@ local cosmetics = {
     rarity          = "GREEN_4",
     loop_duration = 1.0,
 
-    -- Alignment knobs (bot <-> sprite)
     xforced         = 50,
     yforced         = 0,
 
-    -- Preview starting offsets (inside the preview window)
     preview_start_x = -25,
     preview_start_y = -40,
 
@@ -690,6 +688,82 @@ local cosmetics = {
     menu_preview_offset_y   = 5,
     menu_preview_scale          = 1.25,
     menu_preview_loop_duration  = 1.0,
+  },
+  {
+    id              = "Wave1",
+    key             = "Wave1",
+    name            = "Wave1",
+    texture         = "/server/assets/cosmetics/Wave1.png",
+    animation       = "/server/assets/cosmetics/Wave1.animation",
+    anim_state      = "WAVE1",
+    preview_sprite_id = "preview_Wave1",
+    rarity          = "RED_5",
+    loop_duration = 0.7,
+
+    xforced         = 0,
+    yforced         = 0,
+
+    preview_start_x = 0,
+    preview_start_y = 0,
+
+    menu_preview_texture    = "/server/assets/cosmetics/Wave1_preview.png",
+    menu_preview_animation  = "/server/assets/cosmetics/Wave1_preview.animation",
+    menu_preview_anim_state = "Wave1_preview",
+    menu_preview_sprite_id  = "menu_preview_Wave1",
+    menu_preview_offset_x   = 13,
+    menu_preview_offset_y   = 25,
+    menu_preview_scale          = 1.25,
+    menu_preview_loop_duration  = 1.0,
+  },
+  {
+    id              = "Beastout",
+    key             = "Beastout",
+    name            = "Beastout",
+    texture         = "/server/assets/cosmetics/Beastout.png",
+    animation       = "/server/assets/cosmetics/Beastout.animation",
+    anim_state      = "BEASTOUT",
+    preview_sprite_id = "preview_Beastout",
+    rarity          = "GREEN_4",
+    loop_duration = 0.36,
+
+    xforced         = 70,
+    yforced         = 0,
+
+    preview_start_x = -36,
+    preview_start_y = -50,
+
+    menu_preview_texture    = "/server/assets/cosmetics/Beastout_preview.png",
+    menu_preview_animation  = "/server/assets/cosmetics/Beastout_preview.animation",
+    menu_preview_anim_state = "BEASTOUT_preview",
+    menu_preview_sprite_id  = "menu_preview_Beastout",
+    menu_preview_offset_x   = -3,
+    menu_preview_offset_y   = -3,
+    menu_preview_scale          = 1.0,
+  },
+  {
+    id              = "ShadowAura",
+    key             = "ShadowAura",
+    name            = "ShadowAura",
+    texture         = "/server/assets/cosmetics/ShadowAura.png",
+    animation       = "/server/assets/cosmetics/ShadowAura.animation",
+    anim_state      = "SHADOWAURA",
+    preview_sprite_id = "preview_ShadowAura",
+    rarity          = "GOLD_5",
+    loop_duration = 1.3,
+
+    xforced         = 64,
+    yforced         = 0,
+
+    preview_start_x = -32,
+    preview_start_y = -46,
+
+    menu_preview_texture    = "/server/assets/cosmetics/ShadowAura_preview.png",
+    menu_preview_animation  = "/server/assets/cosmetics/ShadowAura_preview.animation",
+    menu_preview_anim_state = "SHADOWAURA_preview",
+    menu_preview_sprite_id  = "menu_preview_ShadowAura",
+    menu_preview_offset_x   = -3,
+    menu_preview_offset_y   = 7,
+    menu_preview_scale          = 1.0,
   },
 }
 

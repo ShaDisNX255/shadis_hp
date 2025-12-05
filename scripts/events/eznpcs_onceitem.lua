@@ -96,6 +96,9 @@ local ONCEHUB_CATALOG = {
   { id = "skull_1",  name = "DOTD Skull Blk",  ts_source = "../assets/objects/skull_1.tsx", gid = 303, layer = "Object Layer 2" },
   { id = "skull_2",  name = "DOTD Skull Wht",  ts_source = "../assets/objects/skull_2.tsx", gid = 304, layer = "Object Layer 2" },
   { id = "nov_fountain",  name = "Blue Fountain",  ts_source = "../assets/objects/fountain.tsx", gid = 305, layer = "Object Layer 2" },
+  { id = "home_shortcut",  name = "Home Shortcut",  ts_source = "../assets/objects/EXE6_Shortcuts.tsx", gid = 326, layer = "Object Layer 2" },
+  { id = "fish_shortcut",  name = "Fish Area Shortcut",  ts_source = "../assets/objects/EXE6_Shortcuts.tsx", gid = 322, layer = "Object Layer 2" },
+  { id = "teams_shortcut",  name = "TeamsHQ Shortcut",  ts_source = "../assets/objects/EXE6_Shortcuts.tsx", gid = 330, layer = "Object Layer 2" },
   { id = "card_frame", name = "Card Frame" },
 }
 
@@ -472,14 +475,20 @@ end
 local function find_prototype_for_gid(area_id, target_gid)
   target_gid = tonumber(target_gid or 0)
   if not target_gid or target_gid <= 0 then return nil end
+
   local ids = Net.list_objects(area_id) or {}
   for _, oid in ipairs(ids) do
     local o = Net.get_object_by_id(area_id, oid)
     local gid = o and o.data and tonumber(o.data.gid)
     if gid and gid == target_gid and o.width and o.height then
-      return o -- first exact match wins
+      local cp = o.custom_properties or {}
+      -- Ignore OnceHub-placed decor / previews – we only want real map prototypes
+      if not cp.placed_by_oncehub and not cp.oncehub_preview then
+        return o -- first exact non-OnceHub match wins
+      end
     end
   end
+
   return nil
 end
 
@@ -1014,14 +1023,30 @@ local PLACEMENTS_MEM_KEY = "oncehub_placements_v1"
 -- Collect all placed objects for this renter in this area
 local function snapshot_oncehub_placements(area_id, once_key)
   local out = {}
-  for _, oid in ipairs(Net.list_objects(area_id)) do
-    local o = Net.get_object_by_id(area_id, oid)
+  for _, oid in ipairs(Net.list_objects(area_id) or {}) do
+    local o  = Net.get_object_by_id(area_id, oid)
     local cp = o and o.custom_properties
     if cp and cp.placed_by_oncehub == "true" and (cp.oncehub_key or "") == (once_key or "") then
+      -- Clone all custom properties so we keep warp settings etc.
+      local new_cp = {}
+      for k, v in pairs(cp) do
+        new_cp[k] = v
+      end
+
+      -- Normalize OnceHub core fields
+      new_cp.placed_by_oncehub = "true"
+      new_cp.oncehub_gid       = new_cp.oncehub_gid  or ""
+      new_cp.oncehub_name      = new_cp.oncehub_name or "Object"
+      new_cp.oncehub_id        = new_cp.oncehub_id   or "object"
+      new_cp.oncehub_key       = new_cp.oncehub_key  or (once_key or "")
+
       table.insert(out, {
+        -- Preserve type/class so warps and other special objects keep behavior
+        type     = o.type,
+        class    = o.class,
         visible  = (o.visible ~= false),   -- keep actual visibility
-        x = o.x, y = o.y, z = o.z,
-        width = o.width, height = o.height,
+        x        = o.x, y = o.y, z = o.z,
+        width    = o.width, height = o.height,
         rotation = o.rotation or 0,
         data = o.data and {
           type = o.data.type or "tile",
@@ -1030,21 +1055,7 @@ local function snapshot_oncehub_placements(area_id, once_key)
           flipped_vertically   = o.data.flipped_vertically   or false,
           rotated              = o.data.rotated              or false,
         } or nil,
-        custom_properties = {
-          placed_by_oncehub = "true",
-          oncehub_gid  = (cp.oncehub_gid  or ""),
-          oncehub_name = (cp.oncehub_name or "Object"),
-          oncehub_id   = (cp.oncehub_id   or "object"),
-          oncehub_key  = (cp.oncehub_key  or (once_key or "")),
-          visitor_secret = cp.visitor_secret,
-          owner_secret   = cp.owner_secret,
-          cf_title       = cp.cf_title,     -- already present
-          cf_png         = cp.cf_png,       -- NEW: persist exact OW png
-          cf_anim        = cp.cf_anim,      -- NEW: persist exact OW anim
-          cf_bot_id      = cp.cf_bot_id,
-          cf_item_id     = cp.cf_item_id,       -- NEW
-          cf_owner_secret= cp.cf_owner_secret,
-        }
+        custom_properties = new_cp,
       })
     end
   end
@@ -1111,10 +1122,29 @@ local function rehydrate_placements(area_id, bucket_area_id, once_key)
       end
 
       -- 2) Recreate the invisible anchor and WRITE back cf_bot_id + owner/item ids
+      local new_cp = {}
+      for k, v in pairs(cp) do
+        new_cp[k] = v
+      end
+      new_cp.placed_by_oncehub = "true"
+      new_cp.oncehub_gid       = new_cp.oncehub_gid  or ""
+      new_cp.oncehub_name      = new_cp.oncehub_name or "Card Frame"
+      new_cp.oncehub_id        = "card_frame"
+      new_cp.oncehub_key       = new_cp.oncehub_key  or (once_key or "")
+
+      -- Ensure Card Frame specifics are up to date
+      new_cp.cf_title        = cp.cf_title
+      new_cp.cf_png          = cp.cf_png
+      new_cp.cf_anim         = cp.cf_anim
+      new_cp.cf_bot_id       = bid and tostring(bid) or (cp.cf_bot_id or nil)
+      new_cp.cf_item_id      = cp.cf_item_id
+      new_cp.cf_owner_secret = cp.cf_owner_secret
+
       Net.create_object(area_id, {
+        type     = obj.type,  -- usually nil, but keep it consistent
         visible  = obj.visible ~= false,
-        x = obj.x, y = obj.y, z = obj.z,
-        width = obj.width, height = obj.height,
+        x        = obj.x, y = obj.y, z = obj.z,
+        width    = obj.width, height = obj.height,
         rotation = obj.rotation or 0,
         data = obj.data and {
           type = obj.data.type or "tile",
@@ -1123,31 +1153,49 @@ local function rehydrate_placements(area_id, bucket_area_id, once_key)
           flipped_vertically   = obj.data.flipped_vertically   or false,
           rotated              = obj.data.rotated              or false,
         } or nil,
-        custom_properties = {
-          placed_by_oncehub = "true",
-          oncehub_gid  = (cp.oncehub_gid  or ""),
-          oncehub_name = (cp.oncehub_name or "Card Frame"),
-          oncehub_id   = "card_frame",
-          oncehub_key  = (cp.oncehub_key  or (once_key or "")),
-          visitor_secret = cp.visitor_secret,
-          owner_secret   = cp.owner_secret,
-
-          -- Persist Card Frame specifics
-          cf_title        = cp.cf_title,
-          cf_png          = cp.cf_png,
-          cf_anim         = cp.cf_anim,
-          cf_bot_id       = bid and tostring(bid) or (cp.cf_bot_id or nil),
-          cf_item_id      = cp.cf_item_id,        -- keep same item id for refund
-          cf_owner_secret = cp.cf_owner_secret,   -- who to refund to
-        }
+        custom_properties = new_cp,
       })
 
     else
       -- Generic object/anchor path
+      -- Recreate generic decor/anchors, preserving type/class and all properties
+      local new_cp = {}
+      for k, v in pairs(cp) do
+        new_cp[k] = v
+      end
+
+      -- Normalize OnceHub core fields in case older saves were missing them
+      new_cp.placed_by_oncehub = "true"
+      new_cp.oncehub_gid       = new_cp.oncehub_gid  or ""
+      new_cp.oncehub_name      = new_cp.oncehub_name or "Object"
+      new_cp.oncehub_id        = new_cp.oncehub_id   or "object"
+      new_cp.oncehub_key       = new_cp.oncehub_key  or (once_key or "")
+
+      -- For older snapshots that didn't include warp fields, we can still
+      -- inherit them again from the map prototype based on gid.
+      local gid = obj.data and tonumber(obj.data.gid or 0) or nil
+      if gid and gid > 0 then
+        local proto = find_prototype_for_gid(area_id, gid)
+        if proto then
+          local tcp = proto.custom_properties or {}
+          for k, v in pairs(tcp) do
+            if new_cp[k] == nil then
+              new_cp[k] = v
+            end
+          end
+          -- If class/type was missing from the snapshot, restore it
+          obj.type  = obj.type  or proto.type
+          obj.class = obj.class or proto.class
+        end
+      end
+
       Net.create_object(area_id, {
+        -- Keep any saved type/class, but default decor if missing
+        type     = obj.type,
+        class    = obj.class or "Decor",
         visible  = obj.visible ~= false,
-        x = obj.x, y = obj.y, z = obj.z,
-        width = obj.width, height = obj.height,
+        x        = obj.x, y = obj.y, z = obj.z,
+        width    = obj.width, height = obj.height,
         rotation = obj.rotation or 0,
         data = obj.data and {
           type = obj.data.type or "tile",
@@ -1156,22 +1204,7 @@ local function rehydrate_placements(area_id, bucket_area_id, once_key)
           flipped_vertically   = obj.data.flipped_vertically   or false,
           rotated              = obj.data.rotated              or false,
         } or nil,
-        custom_properties = {
-          placed_by_oncehub = "true",
-          oncehub_gid  = (cp.oncehub_gid  or ""),
-          oncehub_name = (cp.oncehub_name or "Object"),
-          oncehub_id   = (cp.oncehub_id   or "object"),
-          oncehub_key  = (cp.oncehub_key  or (once_key or "")),
-          visitor_secret = cp.visitor_secret,
-          owner_secret   = cp.owner_secret,
-          -- pass-through any card-frame fields if present
-          cf_title        = cp.cf_title,
-          cf_png          = cp.cf_png,
-          cf_anim         = cp.cf_anim,
-          cf_bot_id       = cp.cf_bot_id,
-          cf_item_id      = cp.cf_item_id,
-          cf_owner_secret = cp.cf_owner_secret,
-        }
+        custom_properties = new_cp,
       })
     end
   end
@@ -1576,6 +1609,36 @@ local function place_current(player_id)
   end
 
   -- === Default behavior for normal decor (unchanged) ===
+  -- Core oncehub metadata
+  local permanent_cp = {
+    placed_by_oncehub = "true",
+    oncehub_gid       = tostring(s.object_gid or ""),
+    oncehub_name      = tostring(s.object_name or "Object"),
+    oncehub_id        = tostring(s.object_id   or "object"),
+    oncehub_key       = tostring(s.once_key    or ""),
+    visitor_secret    = s.is_visitor and s.visitor_secret or nil,
+    owner_secret      = (not s.is_visitor) and (s.owner_secret or nil) or nil,
+  }
+
+  -- 2) Look for a prototype object on this map that uses this gid
+  --    (for home_shortcut, this is your Custom Warp on "Object Layer 2" in HP01)
+  local proto = find_prototype_for_gid(s.area_id, s.object_gid)
+  local permanent_type = nil
+
+  if proto then
+    -- Copy the object's type/class, e.g. "Custom Warp", "Interact Warp", etc.
+    permanent_type = proto.type or proto.class
+
+    -- Merge its custom properties (Target Area, Target Object, Warp In, etc.)
+    local src_cp = proto.custom_properties or {}
+    for k, v in pairs(src_cp) do
+      if permanent_cp[k] == nil then
+        permanent_cp[k] = v
+      end
+    end
+  end
+
+  -- 3) Build the object we’ll actually place
   local permanent = {
     name = "",
     class = "Decor",
@@ -1584,16 +1647,17 @@ local function place_current(player_id)
     width = preview.width, height = preview.height,
     rotation = 0,
     data = preview.data,  -- ✅ must be a table
-    custom_properties = {
-      placed_by_oncehub = "true",
-      oncehub_gid       = tostring(s.object_gid or ""),
-      oncehub_name      = tostring(s.object_name or "Object"),
-      oncehub_id        = tostring(s.object_id   or "object"),
-      oncehub_key       = tostring(s.once_key    or ""),
-      visitor_secret    = s.is_visitor and s.visitor_secret or nil,
-      owner_secret      = (not s.is_visitor) and (s.owner_secret or nil) or nil,
-    }
+    custom_properties = permanent_cp,
   }
+
+  -- If the prototype had a special class (like "Custom Warp"), apply it
+  if permanent_type and permanent_type ~= "" then
+    -- This is what ONB uses for warp classes
+    permanent.class = permanent_type
+    -- And keep type in sync for compatibility
+    permanent.type  = permanent_type
+  end
+
   Net.create_object(s.area_id, permanent)
   persist_area(s.area_id, s.bucket_area_id, s.once_key)
   stop_session(player_id, "Placed "..(s.object_name or "object")..".")
