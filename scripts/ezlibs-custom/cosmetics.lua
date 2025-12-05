@@ -1220,8 +1220,8 @@ function Cosmetics.open_menu(pid)
 end
 
 -- If you ever want to close this from elsewhere:
---   Cosmetics.close(pid)           -> closes & unfreezes player
---   Cosmetics.close(pid, { keep_frozen = true }) -> closes but keeps freeze
+--   Cosmetics.close(pid)           -> closes & unlocks input
+--   Cosmetics.close(pid, { keep_frozen = true }) -> closes but keeps input locked
 function Cosmetics.close(pid, opts)
   local st = state_by_pid[pid]
   if not st then
@@ -1236,10 +1236,10 @@ function Cosmetics.close(pid, opts)
   state_by_pid[pid] = nil
 
   local keep_frozen = (type(opts) == "table" and opts.keep_frozen == true)
-  if not keep_frozen and frame.unfreeze_player then
-    local ok, err = pcall(frame.unfreeze_player, pid)
+  if not keep_frozen and Net and Net.unlock_player_input then
+    local ok, err = pcall(Net.unlock_player_input, pid)
     if not ok then
-      warn("unfreeze_player failed in Cosmetics.close for", pid, ":", tostring(err))
+      warn("unlock_player_input failed in Cosmetics.close for", pid, ":", tostring(err))
     end
   end
 
@@ -1250,19 +1250,40 @@ end
 -- Button handling
 -- ---------------------------------------------------------------------------
 
-local NAV_DEBOUNCE_SEC = 0.02
+-- List navigation (Up/Down) timing:
+-- - First repeat after holding for 1.0s
+-- - Then repeat every 0.15s
+local NAV_FIRST_REPEAT_DELAY_SEC = 0.5
+local NAV_REPEAT_DELAY_SEC       = 0.15
+
+-- Preview movement timing (Up/Down/Left/Right) while holding:
+-- - First repeat after holding for 1.0s
+-- - Then repeat faster (0.05s) for quicker positioning
+local PREVIEW_HOLD_DELAY_SEC   = 0.5
+local PREVIEW_REPEAT_DELAY_SEC = 0.05
 
 local function nav_allowed(st, button)
   local now = (os and os.clock and os.clock()) or 0
   local last_btn  = st.last_nav_button
   local last_time = st.last_nav_time or 0
 
-  if last_btn == button and (now - last_time) < NAV_DEBOUNCE_SEC then
+  -- New button (or first time): move immediately and start timers
+  if last_btn ~= button then
+    st.last_nav_button       = button
+    st.last_nav_time         = now
+    st.nav_first_repeat_done = false
+    return true
+  end
+
+  local first_done = (st.nav_first_repeat_done == true)
+  local delay      = first_done and NAV_REPEAT_DELAY_SEC or NAV_FIRST_REPEAT_DELAY_SEC
+
+  if (now - last_time) < delay then
     return false
   end
 
-  st.last_nav_button = button
-  st.last_nav_time   = now
+  st.last_nav_time         = now
+  st.nav_first_repeat_done = true
   return true
 end
 
@@ -1461,14 +1482,49 @@ local function handle_menu_button(pid, btn)
   return false
 end
 
-local function handle_preview_button(pid, btn)
+local function handle_preview_button(pid, btn, kind)
   local st = state_by_pid[pid]
   if not st or st.mode ~= "preview" then
     return false
   end
 
   local step = cfg.preview_step or 2
+  local now  = (os and os.clock and os.clock()) or 0
+  kind = kind or "press"  -- "press" or "hold"
 
+  -- For movement buttons, apply hold-delay + fast repeat
+  if (btn == "U" or btn == "D" or btn == "L" or btn == "R") and kind == "hold" then
+    -- Initialize tracking for this direction if needed
+    if st.preview_hold_dir ~= btn then
+      st.preview_hold_dir        = btn
+      st.preview_hold_started_at = now
+      st.preview_last_move_at    = now
+      -- Don't move yet; wait for the initial hold delay
+      return true
+    end
+
+    local start     = st.preview_hold_started_at or now
+    local last_move = st.preview_last_move_at or start
+
+    -- Wait until we've held long enough before starting to scroll
+    if (now - start) < PREVIEW_HOLD_DELAY_SEC then
+      return true
+    end
+
+    -- After that, move at PREVIEW_REPEAT_DELAY_SEC
+    if (now - last_move) < PREVIEW_REPEAT_DELAY_SEC then
+      return true
+    end
+
+    st.preview_last_move_at = now
+  else
+    -- For presses (and non-movement buttons) reset hold tracking
+    st.preview_hold_dir        = btn
+    st.preview_hold_started_at = now
+    st.preview_last_move_at    = now
+  end
+
+  -- Actual movement / actions
   if btn == "U" then
     st.preview_y = (st.preview_y or 0) - step
     draw_preview(pid)
@@ -1499,23 +1555,81 @@ local function handle_preview_button(pid, btn)
 end
 
 if Net and Net.on then
-  Net:on("button_press", function(event)
+  Net:on("virtual_input", function(event)
     local pid = event.player_id
-    local btn = event.button
-
-    local st = state_by_pid[pid]
+    local st  = state_by_pid[pid]
     if not st then
       return -- Cosmetics submenu not active for this player
     end
 
-    -- While Cosmetics is active, we fully consume inputs we care about.
-    if st.mode == "preview" then
-      if handle_preview_button(pid, btn) then
-        return
+    local evs = event.events
+    if not evs then
+      return
+    end
+
+    for _, button in next, evs do
+      local name  = button.name
+      local state = button.state
+
+      -- Map engine names to our old logical btn codes:
+      --   LS = "Shoulder L"
+      --   U  = "Move Up"
+      --   D  = "Move Down"
+      --   L  = "Move Left"
+      --   R  = "Move Right"
+      --   A  = "Confirm"
+      --
+      -- NOTE: "Shoot", "Pause", "Shoulder R" are handled globally in LMenu.lua.
+
+      local btn = nil
+      local is_press       = (state == 1)
+      local is_hold_or_scr = (state == 2 or state == 4)
+
+      -- Single press mapping (both menu + preview)
+      if is_press then
+        if name == "Shoulder L" then
+          btn = "LS"
+        elseif name == "Confirm" or name == "Interact" then
+          btn = "A"
+        elseif name == "Move Up" then
+          btn = "U"
+        elseif name == "Move Down" then
+          btn = "D"
+        elseif name == "Move Left" then
+          btn = "L"
+        elseif name == "Move Right" then
+          btn = "R"
+        end
       end
-    elseif st.mode == "menu" then
-      if handle_menu_button(pid, btn) then
-        return
+
+      -- Held / scroll mapping:
+      -- - Up/Down repeat in BOTH menu + preview
+      -- - Left/Right repeat ONLY in preview (for moving the cosmetic)
+      if is_hold_or_scr then
+        if name == "Move Up" then
+          btn = "U"
+        elseif name == "Move Down" then
+          btn = "D"
+        elseif st.mode == "preview" then
+          if name == "Move Left" then
+            btn = "L"
+          elseif name == "Move Right" then
+            btn = "R"
+          end
+        end
+      end
+
+      if btn then
+        if st.mode == "preview" then
+          local kind = is_press and "press" or "hold"
+          if handle_preview_button(pid, btn, kind) then
+            return
+          end
+        elseif st.mode == "menu" then
+          if handle_menu_button(pid, btn) then
+            return
+          end
+        end
       end
     end
   end)
