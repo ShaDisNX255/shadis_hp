@@ -735,8 +735,8 @@ local DEBUG_INPUT = false  -- set to true if you want to log virtual_input event
 
 -- Hold-repeat settings for LMenu Up/Down navigation.
 -- These ONLY apply to held buttons, not single presses.
-local HOLD_FIRST_DELAY_SEC  = 0.5   -- wait this long before first repeat
-local HOLD_REPEAT_DELAY_SEC = 0.15  -- then repeat at this interval
+local HOLD_FIRST_DELAY_SEC  = 0.15   -- wait this long before first repeat
+local HOLD_REPEAT_DELAY_SEC = 0.02  -- then repeat at this interval
 
 local function hold_nav_allowed(st, dir)
   local now = (os and os.clock and os.clock()) or 0

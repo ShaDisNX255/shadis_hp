@@ -1251,40 +1251,61 @@ end
 -- ---------------------------------------------------------------------------
 
 -- List navigation (Up/Down) timing:
--- - First repeat after holding for 1.0s
+-- - First repeat after holding for 0.5s
 -- - Then repeat every 0.15s
-local NAV_FIRST_REPEAT_DELAY_SEC = 0.5
-local NAV_REPEAT_DELAY_SEC       = 0.15
+local NAV_FIRST_REPEAT_DELAY_SEC = 0.15
+local NAV_REPEAT_DELAY_SEC       = 0.02
 
 -- Preview movement timing (Up/Down/Left/Right) while holding:
--- - First repeat after holding for 1.0s
--- - Then repeat faster (0.05s) for quicker positioning
-local PREVIEW_HOLD_DELAY_SEC   = 0.5
-local PREVIEW_REPEAT_DELAY_SEC = 0.05
+-- - First repeat after holding for 0.5s
+-- - Then repeat every 0.15s (you can make this faster/slower if you want)
+local PREVIEW_HOLD_DELAY_SEC   = 0.15
+local PREVIEW_REPEAT_DELAY_SEC = 0.02
 
-local function nav_allowed(st, button)
+-- Hold-repeat control for the cosmetics LIST (Up/Down).
+-- IMPORTANT: this ONLY affects held inputs; taps are always instant.
+local function hold_nav_allowed(st, dir)
   local now = (os and os.clock and os.clock()) or 0
-  local last_btn  = st.last_nav_button
-  local last_time = st.last_nav_time or 0
 
-  -- New button (or first time): move immediately and start timers
-  if last_btn ~= button then
-    st.last_nav_button       = button
-    st.last_nav_time         = now
-    st.nav_first_repeat_done = false
-    return true
-  end
-
-  local first_done = (st.nav_first_repeat_done == true)
-  local delay      = first_done and NAV_REPEAT_DELAY_SEC or NAV_FIRST_REPEAT_DELAY_SEC
-
-  if (now - last_time) < delay then
+  -- New hold direction or fresh hold: initialize & don't move yet
+  if st.list_hold_dir ~= dir then
+    st.list_hold_dir           = dir
+    st.list_hold_start_time    = now
+    st.list_hold_last_time     = now
+    st.list_hold_first_fired   = false
     return false
   end
 
-  st.last_nav_time         = now
-  st.nav_first_repeat_done = true
+  local start = st.list_hold_start_time or now
+  local last  = st.list_hold_last_time or start
+
+  -- First repeat: wait NAV_FIRST_REPEAT_DELAY_SEC
+  if not st.list_hold_first_fired then
+    if (now - start) < NAV_FIRST_REPEAT_DELAY_SEC then
+      return false
+    end
+    st.list_hold_first_fired = true
+    st.list_hold_last_time   = now
+    return true
+  end
+
+  -- Subsequent repeats: wait NAV_REPEAT_DELAY_SEC between moves
+  if (now - last) < NAV_REPEAT_DELAY_SEC then
+    return false
+  end
+
+  st.list_hold_last_time = now
   return true
+end
+
+local function reset_hold_nav(st, dir)
+  if not st then return end
+  if dir == nil or st.list_hold_dir == dir then
+    st.list_hold_dir          = nil
+    st.list_hold_start_time   = nil
+    st.list_hold_last_time    = nil
+    st.list_hold_first_fired  = nil
+  end
 end
 
 local function close_from_button(pid)
@@ -1313,9 +1334,9 @@ local function handle_menu_button(pid, btn)
       return true
     end
 
-    if not nav_allowed(st, btn) then
-      return true
-    end
+    -- NOTE: no timing here; taps and allowed repeats come straight through.
+    -- Taps are called directly; held events are gated by hold_nav_allowed
+    -- in the Net:on("virtual_input") handler.
 
     -- Move cursor within 1..total (no wrap-around)
     if btn == "U" then
@@ -1401,7 +1422,6 @@ local function handle_menu_button(pid, btn)
     refresh_menu_cursor(pid)
     return true
   end
-
 
   -- Confirm selection
   if btn == "A" then
@@ -1492,7 +1512,7 @@ local function handle_preview_button(pid, btn, kind)
   local now  = (os and os.clock and os.clock()) or 0
   kind = kind or "press"  -- "press" or "hold"
 
-  -- For movement buttons, apply hold-delay + fast repeat
+  -- For movement buttons, apply hold-delay + repeat
   if (btn == "U" or btn == "D" or btn == "L" or btn == "R") and kind == "hold" then
     -- Initialize tracking for this direction if needed
     if st.preview_hold_dir ~= btn then
@@ -1621,13 +1641,29 @@ if Net and Net.on then
 
       if btn then
         if st.mode == "preview" then
+          -- Preview gets press vs hold distinction for movement
           local kind = is_press and "press" or "hold"
           if handle_preview_button(pid, btn, kind) then
             return
           end
+
         elseif st.mode == "menu" then
-          if handle_menu_button(pid, btn) then
-            return
+          -- Cosmetics LIST:
+          -- - Taps on U/D move instantly, no delay.
+          -- - Holds on U/D go through hold_nav_allowed (0.5s delay, 0.15s repeat).
+          if is_press then
+            if btn == "U" or btn == "D" then
+              reset_hold_nav(st, btn)      -- new tap: clear any previous hold state
+            end
+            if handle_menu_button(pid, btn) then
+              return
+            end
+          elseif is_hold_or_scr and (btn == "U" or btn == "D") then
+            if hold_nav_allowed(st, btn) then
+              if handle_menu_button(pid, btn) then
+                return
+              end
+            end
           end
         end
       end
