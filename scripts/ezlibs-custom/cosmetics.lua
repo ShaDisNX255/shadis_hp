@@ -1609,7 +1609,7 @@ if Net and Net.on then
       if is_press then
         if name == "Shoulder L" then
           btn = "LS"
-        elseif name == "Confirm" or name == "Interact" then
+        elseif name == "Confirm" then
           btn = "A"
         elseif name == "Move Up" then
           btn = "U"

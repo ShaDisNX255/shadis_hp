@@ -1103,7 +1103,7 @@ if Net and Net.on then
 
           if name == "Shoulder L" or name == "LS" then           -- open/close LMenu
             btn = "LS"
-          elseif name == "Confirm" or name == "Interact" then
+          elseif name == "Confirm" then
             btn = "A"
           elseif name == "Move Up" then
             -- New tap: clear any hold state so a fresh hold
