@@ -1052,7 +1052,7 @@ if Net and Net.on then
       --    - If Cosmetics open -> back to LMenu (keep locked)
       --    - Else if LMenu open -> close LMenu
       ----------------------------------------------------------------
-      if state == 1 and name == "Shoot" then
+      if state == 1 and name == "Cancel" then
         if cosmetics_open then
           if Cosmetics and type(Cosmetics.close) == "function" then
             -- close submenu but keep player input locked
