@@ -689,10 +689,14 @@ function LMenu.open(pid)
     has_selected    = false,
   }
 
-  -- Freeze player using map-defined Stasis only
-  local ok, err = pcall(frame.freeze_player, pid)
-  if not ok then
-    warn("freeze_player failed for", pid, "err:", tostring(err))
+  -- Lock player input so we start receiving Net:on("virtual_input") events (net-games v2.1)
+  if Net and Net.lock_player_input then
+    local ok, err = pcall(Net.lock_player_input, pid)
+    if not ok then
+      warn("lock_player_input failed for", pid, "err:", tostring(err))
+    end
+  else
+    warn("Net.lock_player_input not available; LMenu cannot lock player input.")
   end
 
   rebuild_and_redraw(pid)
@@ -710,226 +714,435 @@ function LMenu.close(pid, opts)
   clear_all_ui(pid)
   st_by_pid[pid] = nil
 
-  -- Allow callers to keep the player frozen (used by Cosmetics submenu)
+  -- Allow callers to keep the player locked (used by Cosmetics submenu)
   local keep_frozen = (type(opts) == "table" and opts.keep_frozen == true)
 
   if not keep_frozen then
-    local ok, err = pcall(frame.unfreeze_player, pid)
-    if not ok then
-      warn("unfreeze_player failed for", pid, "err:", tostring(err))
+    if Net and Net.unlock_player_input then
+      local ok, err = pcall(Net.unlock_player_input, pid)
+      if not ok then
+        warn("unlock_player_input failed for", pid, "err:", tostring(err))
+      end
+    else
+      warn("Net.unlock_player_input not available; player may remain locked.")
     end
   end
 
   log("Closed LMenu for", pid)
 end
 
-local NAV_DEBOUNCE_SEC = 0.02  -- tweak if needed
+local DEBUG_INPUT = false  -- set to true if you want to log virtual_input events
 
-local function nav_allowed(st, button)
+-- Hold-repeat settings for LMenu Up/Down navigation.
+-- These ONLY apply to held buttons, not single presses.
+local HOLD_FIRST_DELAY_SEC  = 0.15   -- wait this long before first repeat
+local HOLD_REPEAT_DELAY_SEC = 0.02  -- then repeat at this interval
+
+local function hold_nav_allowed(st, dir)
   local now = (os and os.clock and os.clock()) or 0
 
-  local last_btn  = st.last_nav_button
-  local last_time = st.last_nav_time or 0
-
-  if last_btn == button and (now - last_time) < NAV_DEBOUNCE_SEC then
+  -- New hold direction or fresh hold: initialize & don't move yet
+  if st.hold_nav_dir ~= dir then
+    st.hold_nav_dir          = dir
+    st.hold_nav_start_time   = now
+    st.hold_nav_last_time    = now
+    st.hold_nav_first_fired  = false
     return false
   end
 
-  st.last_nav_button = button
-  st.last_nav_time   = now
+  local start = st.hold_nav_start_time or now
+  local last  = st.hold_nav_last_time or start
+
+  -- First repeat: wait HOLD_FIRST_DELAY_SEC
+  if not st.hold_nav_first_fired then
+    if (now - start) < HOLD_FIRST_DELAY_SEC then
+      return false
+    end
+    st.hold_nav_first_fired = true
+    st.hold_nav_last_time   = now
+    return true
+  end
+
+  -- Subsequent repeats: wait HOLD_REPEAT_DELAY_SEC between moves
+  if (now - last) < HOLD_REPEAT_DELAY_SEC then
+    return false
+  end
+
+  st.hold_nav_last_time = now
   return true
 end
 
+local function reset_hold_nav(st, dir)
+  if not st then return end
+  if dir == nil or st.hold_nav_dir == dir then
+    st.hold_nav_dir         = nil
+    st.hold_nav_start_time  = nil
+    st.hold_nav_last_time   = nil
+    st.hold_nav_first_fired = nil
+  end
+end
+
+
+local function handle_lmenu_button(pid, btn)
+  -- No extra guards here; caller is responsible for passing LS/A/U/D
+
+  local st = st_by_pid[pid]
+
+  -- Menu closed: LS opens it
+  if not st then
+    if btn == "LS" then
+      -- If Cosmetics just closed from this same button press, skip opening.
+      if suppress_next_open[pid] then
+        suppress_next_open[pid] = nil
+        return
+      end
+      LMenu.open(pid)
+    end
+    return
+  end
+
+  -- Menu is open
+
+  -- LS = close menu
+  if btn == "LS" then
+    if not st.has_selected then
+      play_sfx(pid, "cancel")
+    end
+    LMenu.close(pid)
+    return
+  end
+
+  -- U/D = move cursor
+  if btn == "U" or btn == "D" then
+    local rows  = st.rows or {}
+    local count = #rows
+    if count <= 1 then
+      return
+    end
+
+    if btn == "U" then
+      st.cursor = st.cursor - 1
+      if st.cursor < 1 then st.cursor = count end
+    else
+      st.cursor = st.cursor + 1
+      if st.cursor > count then st.cursor = 1 end
+    end
+
+    rebuild_and_redraw(pid)
+    play_sfx(pid, "select")
+    return
+  end
+
+  -- A = activate current row
+  if btn == "A" then
+    local rows  = st.rows or {}
+    local row   = rows[st.cursor or 1]
+    if not row then return end
+
+    st.has_selected = true
+    play_sfx(pid, "choose")
+
+    local api = card_api()
+
+    -- Cards: open card collection
+    if row.id == "cards" then
+      LMenu.close(pid)
+      if api and type(api.open_card_list) == "function" then
+        local ok2, err2 = pcall(api.open_card_list, pid)
+        if not ok2 then
+          warn("open_card_list failed:", tostring(err2))
+        end
+      else
+        Net.message_player(pid, "(Card Collection not available.)")
+      end
+      return
+    end
+
+    -- Summon armed card
+    if row.id == "summon" then
+      if not api or type(api.summon_armed) ~= "function" then
+        Net.message_player(pid, "(Summon not available.)")
+        return
+      end
+      local ok2, res = pcall(api.summon_armed, pid)
+      if not ok2 then
+        warn("summon_armed error:", tostring(res))
+        return
+      end
+      rebuild_and_redraw(pid)
+      return
+    end
+
+    -- Unsummon
+    if row.id == "unsummon" then
+      if not api or type(api.unsummon) ~= "function" then
+        Net.message_player(pid, "(Unsummon not available.)")
+        return
+      end
+      local ok2, res = pcall(api.unsummon, pid)
+      if not ok2 then
+        warn("unsummon error:", tostring(res))
+        return
+      end
+      rebuild_and_redraw(pid)
+      return
+    end
+
+    -- Friends board
+    if row.id == "friends" then
+      LMenu.close(pid)
+
+      if Friends and type(Friends.open_friends_board) == "function" then
+        local okf, errf = pcall(Friends.open_friends_board, pid)
+        if not okf then
+          warn("Friends.open_friends_board failed:", tostring(errf))
+        end
+      else
+        Net.message_player(pid, "(Friends menu not available.)")
+      end
+      return
+    end
+
+    -- Jobs progress viewer
+    if row.id == "jobs" then
+      LMenu.close(pid)
+
+      if JobBBS and type(JobBBS.open_progress_board) == "function" then
+        local okj, errj = pcall(JobBBS.open_progress_board, pid)
+        if not okj then
+          warn("JobBBS.open_progress_board failed for", pid, ":", tostring(errj))
+        end
+      else
+        Net.message_player(pid, "(Job progress viewer not available.)")
+      end
+      return
+    end
+
+    -- Cosmetics submenu
+    if row.id == "cosmetics" then
+      -- Close the LMenu but keep the player locked, then open the Cosmetics submenu.
+      LMenu.close(pid, { keep_frozen = true })
+
+      if Cosmetics and type(Cosmetics.open_menu) == "function" then
+        local okc, errc = pcall(Cosmetics.open_menu, pid)
+        if not okc then
+          warn("Cosmetics.open_menu failed for", pid, ":", tostring(errc))
+          -- Fail-safe: unlock so the player isn't stuck
+          if Net and Net.unlock_player_input then
+            local ok2, err2 = pcall(Net.unlock_player_input, pid)
+            if not ok2 then
+              warn("unlock_player_input after Cosmetics.open_menu failure:", tostring(err2))
+            end
+          end
+        end
+      else
+        Net.message_player(pid, "(Cosmetics menu not available.)")
+        -- Also unlock in this case
+        if Net and Net.unlock_player_input then
+          local ok2, err2 = pcall(Net.unlock_player_input, pid)
+          if not ok2 then
+            warn("unlock_player_input after missing Cosmetics module:", tostring(err2))
+          end
+        end
+      end
+
+      return
+    end
+  end
+end
+
 -- ---------------------------------------------------------------------------
--- Button handling
+-- Button handling: opener via Net:on("button_press"),
+-- navigation via Net:on("virtual_input")
 -- ---------------------------------------------------------------------------
 
 if Net and Net.on then
+  -- Use the legacy button_press event ONLY as a way to open the menu
+  -- while the player is not yet locked. As soon as the menu opens,
+  -- LMenu.open() calls Net.lock_player_input and we switch to virtual_input.
   Net:on("button_press", function(event)
     local pid = event.player_id
     local btn = event.button
-
-    -- We only care about LS/A/U/D in the LMenu logic
-    if btn ~= "LS" and btn ~= "A" and btn ~= "U" and btn ~= "D" then
+    if not pid or not btn then
       return
     end
 
-    -- NEW: if Cosmetics submenu is open, LMenu should not react at all
+    -- If either LMenu or Cosmetics are already open for this player,
+    -- ignore button_press. Input while "frozen" is handled by virtual_input.
+    local lmenu_open = (st_by_pid[pid] ~= nil)
+
+    local cosmetics_open = false
     if Cosmetics and type(Cosmetics.is_open) == "function" then
       local ok, open = pcall(Cosmetics.is_open, pid)
-      if ok and open then
-        return
-      end
+      cosmetics_open = ok and open
     end
 
-    local st = st_by_pid[pid]
-
-    -- Menu closed: LS opens it, everything else ignored
-    if not st then
-      if btn == "LS" then
-        -- If Cosmetics just closed from this same button press, skip opening.
-        if suppress_next_open[pid] then
-          suppress_next_open[pid] = nil
-          return
-        end
-        LMenu.open(pid)
-      end
+    if lmenu_open or cosmetics_open then
       return
     end
 
-    -- Menu is open now
-
-    -- LS = close menu
+    -- Old engine names here ("LS", "A", "U", "D", etc.).
+    -- We only care about LS to open the menu.
     if btn == "LS" then
-      if not st.has_selected then
-        play_sfx(pid, "cancel")
-      end
-      LMenu.close(pid)
-      return
+      handle_lmenu_button(pid, "LS")
+    end
+  end)
+
+  Net:on("virtual_input", function(event)
+    local pid  = event.player_id
+    local evs  = event.events
+
+    if DEBUG_INPUT then
+      -- Log that we at least received the event, even if events is nil/empty
+      log("virtual_input event for pid=", pid, "has_events=", evs and "yes" or "no")
     end
 
-    -- U/D = move cursor
-    if btn == "U" or btn == "D" then
-      if not nav_allowed(st, btn) then
-        return
-      end
-      local rows  = st.rows or {}
-      local count = #rows
-      if count <= 1 then
-        return
-      end
+    if not evs then return end
 
-      if btn == "U" then
-        st.cursor = st.cursor - 1
-        if st.cursor < 1 then st.cursor = count end
-      else
-        st.cursor = st.cursor + 1
-        if st.cursor > count then st.cursor = 1 end
+    -- Cache whether menus are open for this player
+    local function is_cosmetics_open()
+      if not (Cosmetics and type(Cosmetics.is_open) == "function") then
+        return false
       end
-
-      rebuild_and_redraw(pid)
-      play_sfx(pid, "select")
-      return
+      local ok, open = pcall(Cosmetics.is_open, pid)
+      return ok and open
     end
 
-    -- A = activate current row
-    if btn == "A" then
-      local rows  = st.rows or {}
-      local row   = rows[st.cursor or 1]
-      if not row then return end
+    local cosmetics_open = is_cosmetics_open()
+    local lmenu_open     = (st_by_pid[pid] ~= nil)
 
-      st.has_selected = true
-      play_sfx(pid, "choose")
+    for _, button in next, evs do
+      local name  = button.name
+      local state = button.state
 
-      local api = card_api()
-
-      -- Cards: open card collection
-      if row.id == "cards" then
-        LMenu.close(pid)
-        if api and type(api.open_card_list) == "function" then
-          local ok2, err2 = pcall(api.open_card_list, pid)
-          if not ok2 then
-            warn("open_card_list failed:", tostring(err2))
-          end
-        else
-          Net.message_player(pid, "(Card Collection not available.)")
-        end
-        return
+      if DEBUG_INPUT then
+        log("virtual_input pid=", pid, "name=", name, "state=", state)
       end
 
-      -- Summon armed card
-      if row.id == "summon" then
-        if not api or type(api.summon_armed) ~= "function" then
-          Net.message_player(pid, "(Summon not available.)")
-          return
-        end
-        local ok2, res = pcall(api.summon_armed, pid)
-        if not ok2 then
-          warn("summon_armed error:", tostring(res))
-          return
-        end
-        rebuild_and_redraw(pid)
-        return
-      end
+      ----------------------------------------------------------------
+      -- 1) Global hard-close: Pause / Shoulder R
+      ----------------------------------------------------------------
+      if state == 1 and (name == "Pause" or name == "Shoulder R") then
+        local did_any = false
 
-      -- Unsummon
-      if row.id == "unsummon" then
-        if not api or type(api.unsummon) ~= "function" then
-          Net.message_player(pid, "(Unsummon not available.)")
-          return
-        end
-        local ok2, res = pcall(api.unsummon, pid)
-        if not ok2 then
-          warn("unsummon error:", tostring(res))
-          return
-        end
-        rebuild_and_redraw(pid)
-        return
-      end
-
-      -- Friends board
-      if row.id == "friends" then
-        LMenu.close(pid)
-
-        if Friends and type(Friends.open_friends_board) == "function" then
-          local okf, errf = pcall(Friends.open_friends_board, pid)
-          if not okf then
-            warn("friends.open_friends_board failed:", tostring(errf))
-          end
-        else
-          Net.message_player(pid, "(Friends menu not available.)")
-        end
-        return
-      end
-
-      -- NEW: Jobs progress viewer
-      if row.id == "jobs" then
-        -- Close the LMenu and open the Job Progress view-only board.
-        LMenu.close(pid)
-
-        if JobBBS and type(JobBBS.open_progress_board) == "function" then
-          local okj, errj = pcall(JobBBS.open_progress_board, pid)
-          if not okj then
-            warn("JobBBS.open_progress_board failed for", pid, ":", tostring(errj))
-          end
-        else
-          Net.message_player(pid, "(Job progress viewer not available.)")
-        end
-        return
-      end
-
-      -- Cosmetics submenu
-      if row.id == "cosmetics" then
-        -- Close the LMenu but keep the player frozen, then open the Cosmetics submenu.
-        LMenu.close(pid, { keep_frozen = true })
-
-        if Cosmetics and type(Cosmetics.open_menu) == "function" then
-          local okc, errc = pcall(Cosmetics.open_menu, pid)
+        -- Close Cosmetics if open
+        if cosmetics_open and Cosmetics and type(Cosmetics.close) == "function" then
+          local okc, errc = pcall(Cosmetics.close, pid)
           if not okc then
-            warn("Cosmetics.open_menu failed for", pid, ":", tostring(errc))
-            -- Fail-safe: unfreeze so the player isn't stuck
-            local ok2, err2 = pcall(frame.unfreeze_player, pid)
-            if not ok2 then
-              warn("unfreeze_player after Cosmetics.open_menu failure:", tostring(err2))
+            warn("Cosmetics.close via Pause/Shoulder R failed for", pid, ":", tostring(errc))
+          end
+          cosmetics_open = false
+          did_any = true
+        end
+
+        -- Close LMenu if open
+        if st_by_pid[pid] then
+          LMenu.close(pid)
+          lmenu_open = false
+          did_any = true
+        end
+
+        if did_any then
+          return
+        end
+      end
+
+      ----------------------------------------------------------------
+      -- 2) Global back: Shoot
+      --    - If Cosmetics open -> back to LMenu (keep locked)
+      --    - Else if LMenu open -> close LMenu
+      ----------------------------------------------------------------
+      if state == 1 and name == "Cancel" then
+        if cosmetics_open then
+          if Cosmetics and type(Cosmetics.close) == "function" then
+            -- close submenu but keep player input locked
+            local okc, errc = pcall(Cosmetics.close, pid, { keep_frozen = true })
+            if not okc then
+              warn("Cosmetics.close (keep_frozen) via Shoot failed for", pid, ":", tostring(errc))
             end
           end
-        else
-          Net.message_player(pid, "(Cosmetics menu not available.)")
-          -- Also unfreeze in this case
-          local ok2, err2 = pcall(frame.unfreeze_player, pid)
-          if not ok2 then
-            warn("unfreeze_player after missing Cosmetics module:", tostring(err2))
+
+          cosmetics_open = false
+
+          -- Immediately go back to LMenu (still locked)
+          if not st_by_pid[pid] then
+            LMenu.open(pid)
+            lmenu_open = true
+          end
+          return
+        elseif lmenu_open then
+          -- LMenu is open: Shoot acts as back/close
+          LMenu.close(pid)
+          lmenu_open = false
+          return
+        end
+        -- If nothing is open, ignore Shoot
+      end
+
+      ----------------------------------------------------------------
+      -- 3) Regular LMenu navigation (only when Cosmetics is NOT open)
+      --    - Taps on U/D move immediately
+      --    - Holds on U/D wait 1s, then repeat every 0.15s
+      ----------------------------------------------------------------
+      if not cosmetics_open then
+        -- Map engine button names to old LMenu logical buttons:
+        --   LS = "Shoulder L"
+        --   U  = "Move Up"
+        --   D  = "Move Down"
+        --   A  = "Confirm"
+
+        local st_for_nav = st_by_pid[pid]
+        local is_press       = (state == 1)
+        local is_hold_or_scr = (state == 2 or state == 4)
+
+        ----------------------------------------------------------------
+        -- Single presses: always instantaneous, no delay at all
+        ----------------------------------------------------------------
+        if is_press then
+          local btn = nil
+
+          if name == "Shoulder L" or name == "LS" then           -- open/close LMenu
+            btn = "LS"
+          elseif name == "Confirm" then
+            btn = "A"
+          elseif name == "Move Up" then
+            -- New tap: clear any hold state so a fresh hold
+            -- will get its own 1s delay.
+            if st_for_nav then reset_hold_nav(st_for_nav, "U") end
+            btn = "U"
+          elseif name == "Move Down" then
+            if st_for_nav then reset_hold_nav(st_for_nav, "D") end
+            btn = "D"
+          end
+
+          if btn then
+            handle_lmenu_button(pid, btn)
+            lmenu_open = (st_by_pid[pid] ~= nil)
           end
         end
 
-        return
+        ----------------------------------------------------------------
+        -- Held / scroll: only used for Up/Down repeats with delay
+        ----------------------------------------------------------------
+        if is_hold_or_scr and st_for_nav then
+          local dir = nil
+          if name == "Move Up" then
+            dir = "U"
+          elseif name == "Move Down" then
+            dir = "D"
+          end
+
+          if dir and hold_nav_allowed(st_for_nav, dir) then
+            handle_lmenu_button(pid, dir)
+            lmenu_open = (st_by_pid[pid] ~= nil)
+          end
+        end
       end
     end
   end)
 
   Net:on("player_join", function(e)
-    -- Whenever someone joins, you could refresh the online counter for all open LMenus
-    -- For now we leave it no-op, since the RAIDS_ONLINE table usually drives this.
+    -- Optional: could refresh online count here
   end)
 
   -- Safety: auto-close on disconnect / area change
