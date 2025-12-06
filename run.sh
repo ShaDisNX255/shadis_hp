@@ -7,7 +7,7 @@ DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 cd "$DIR"
 
 SERVER="${SERVER:-$DIR/net_battle_server}"
-PORT="${PORT:-3000}"
+PORT="${PORT:-5000}"
 
 LOG="$DIR/logs.txt"
 PIDFILE="$DIR/server.pid"
