@@ -7,6 +7,7 @@
   <property name="Background Vel X" type="float" value="-0.0295"/>
   <property name="Background Vel Y" type="float" value="0"/>
   <property name="Name" value="Dungeon1"/>
+  <property name="Song" value="/server/assets/dungeon1.ogg"/>
  </properties>
  <tileset firstgid="1" source="../assets/objects/NoiseWaveEntrance.tsx"/>
  <tileset firstgid="5" source="../assets/tiles/bn3_undernet_tiles.tsx"/>
