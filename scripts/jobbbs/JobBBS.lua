@@ -1466,6 +1466,44 @@ if _G.Net and Net.on then
   end)
 end
 
+-- Normalize encounter results (mirrors raids.lua)
+local function _result_flags(stats)
+  local reason = tonumber(stats and stats.reason or 0) or 0
+  local hp = tonumber(stats and (stats.health or stats.player_hp or stats.hp) or 0) or 0
+
+  local ran, dev_escape, won, lost = false, false, false, false
+
+  if reason == 1 then        -- 1 = battle won
+    won = true
+  elseif reason == 2 then    -- 2 = battle lost
+    lost = true
+  elseif reason == 3 then    -- 3 = ran (L button)
+    ran = true
+  elseif reason == 4 then    -- 4 = ran (ESC / dev escape)
+    ran = true
+    dev_escape = true
+  else
+    -- Backwards compatibility for older ONB builds
+    ran = stats and (stats.ran or stats.fled or stats.escape) or false
+    if not ran then
+      if hp > 0 then
+        won = true
+      elseif hp <= 0 then
+        lost = true
+      end
+    end
+  end
+
+  return {
+    reason     = reason,
+    hp         = hp,
+    ran        = ran,
+    dev_escape = dev_escape,
+    won        = won,
+    lost       = lost,
+  }
+end
+
 -- ===== External hooks from other systems =====
 function JobBBS.on_encounter_result(pid, stats)
   ensure_daily_reset(pid)
@@ -1476,19 +1514,39 @@ function JobBBS.on_encounter_result(pid, stats)
 
   st.prog.virus = st.prog.virus or { clears=0, runs=0, bust8=0, fast=0, turn1=0 }
 
-  if stats and stats.ran then
-    st.prog.virus.runs = (st.prog.virus.runs or 0) + 1
-    save_mem(pid, st)
+  -- Use unified flags (reason-based; same semantics as raids.lua)
+  local flags = _result_flags(stats)
+
+  -- Any kind of run?
+  if flags.ran then
+    -- Only count L-button runs (reason == 3) toward virus_run jobs.
+    -- ESC/dev runs (reason == 4) do NOT advance the JobBBS run quests.
+    if flags.reason == 3 then
+      st.prog.virus.runs = (st.prog.virus.runs or 0) + 1
+      save_mem(pid, st)
+    end
     return
   end
 
+  -- Anything that isn't a run is treated as a "clear" like before
   st.prog.virus.clears = (st.prog.virus.clears or 0) + 1
+
+  -- Old bust/time/turn logic kept intact
   local score = tonumber(stats and stats.score) or 0
-  if score >= 8 then st.prog.virus.bust8 = (st.prog.virus.bust8 or 0) + 1 end
+  if score >= 8 then
+    st.prog.virus.bust8 = (st.prog.virus.bust8 or 0) + 1
+  end
+
   local elapsed = tonumber(stats and stats.time)
-  if elapsed and elapsed <= 10 then st.prog.virus.fast = (st.prog.virus.fast or 0) + 1 end
+  if elapsed and elapsed <= 10 then
+    st.prog.virus.fast = (st.prog.virus.fast or 0) + 1
+  end
+
   local turns = tonumber(stats and stats.turns)
-  if turns and turns <= 1 then st.prog.virus.turn1 = (st.prog.virus.turn1 or 0) + 1 end
+  if turns and turns <= 1 then
+    st.prog.virus.turn1 = (st.prog.virus.turn1 or 0) + 1
+  end
+
   save_mem(pid, st)
 end
 
