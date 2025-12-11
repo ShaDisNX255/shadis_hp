@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="50" height="50" tilewidth="64" tileheight="32" infinite="0" nextlayerid="14" nextobjectid="350">
+<map version="1.10" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="50" height="50" tilewidth="64" tileheight="32" infinite="0" nextlayerid="14" nextobjectid="352">
  <properties>
   <property name="Background" value="custom"/>
   <property name="Background Animation" value="/server/assets/custom/backgrounds/home/kottouhinyanodennou.animation"/>
@@ -65,7 +65,7 @@
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483671,2147483671,2147483671,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147484232,347,347,347,10,11,10,11,10,11,10,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,10,11,10,11,10,11,10,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,11,8,9,8,9,8,11,0,0,8,9,8,9,8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,8,7,0,0,10,9,6,7,6,9,10,0,0,9,9,9,9,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8,7,8,13,13,11,8,7,5,7,8,11,9,9,8,9,9,9,8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -182,7 +182,7 @@
     <property name="Target Object" value="1"/>
    </properties>
   </object>
-  <object id="179" name="Luigi.EXE" type="NPC" x="817" y="893">
+  <object id="179" name="Luigi.EXE" type="NPC" x="816" y="896">
    <properties>
     <property name="Asset Name" value="luigi"/>
     <property name="Dialogue Type" value="first"/>
@@ -962,16 +962,12 @@
    </properties>
    <point/>
   </object>
-  <object id="347" gid="593" x="557" y="719" width="56" height="88"/>
-  <object id="349" name="To Dungeon1" type="Radius Warp" x="568" y="688">
+  <object id="351" name="WCity3" type="Custom Warp" gid="319" x="672" y="672" width="64" height="40">
    <properties>
-    <property name="Activation Radius" type="float" value="0.6"/>
-    <property name="Arrival Animation" value="arrow_up_left_in"/>
-    <property name="Leave Animation" value="arrow_up_left_out"/>
-    <property name="Target Area" value="Dungeon1"/>
-    <property name="Target Object" value="129"/>
+    <property name="Direction" value="Down Left"/>
+    <property name="Target Area" value="WCity3"/>
+    <property name="Target Object" value="79"/>
    </properties>
-   <point/>
   </object>
  </objectgroup>
  <layer id="6" name="Tile Layer 2" width="50" height="50" offsetx="0" offsety="-16">
