@@ -583,7 +583,7 @@ function ezmemory.set_player_max_health(player_id, new_max_health, should_heal_b
     Net.set_player_max_health(player_id,new_max_health)
     Net.set_player_health(player_id,new_health)
     player_memory.health = new_health
-    player_memory.max_health = max_health
+    player_memory.max_health = new_max_health
     ezmemory.save_player_memory(safe_secret)
 
     update_player_health(player_id)
@@ -592,7 +592,7 @@ end
 ezmemory.set_player_health = function(player_id, new_health)
     local safe_secret = helpers.get_safe_player_secret(player_id)
     local player_memory = ezmemory.get_player_memory(safe_secret)
-    local max_health = player_memory.max_health or Net.get_player_max_health(player_id)
+    local max_health = Net.get_player_max_health(player_id) or player_memory.max_health
 
     -- dont set health to anything above the players max health
     printd('setting player health to ',new_health)
