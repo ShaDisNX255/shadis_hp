@@ -82,52 +82,45 @@ local function item_check(player_id,prompt_message,required_item,amount,consume_
     end)
 end
 
-local function unlock_checkpoint_for_player(player_id,area_id,object_id,unlocking_asset_name,unlocking_sound_path,unlocking_animation_time,once)
-    return async(function ()
-        Net.lock_player_input(player_id)
-        local object = Net.get_object_by_id(area_id,object_id)
-        Net.play_sound_for_player(player_id,unlocking_sound_path)
-        if once then
-            ezmemory.hide_object_from_player(player_id, area_id, object_id)
-        else
-            ezmemory.hide_object_from_player_till_disconnect(player_id, area_id, object_id)
-        end
-        if unlocking_animation_time > 0 then
-            --[[
-            local tileset = Net.get_tileset_for_tile(area_id, object.data.gid)
-            local first_gid = tileset.first_gid
-            object.data.gid = first_gid+tonumber(unlocking_frame_index)
-            local new_object_props = {
-                x=object.x,
-                y=object.y,
-                z=object.z,
-                width=object.width,
-                height=object.height,
-                rotation=object.data.rotation,
-                data=object.data
-            }
-            ]]
-            local new_bot_props = {
-                x=object.x,
-                y=object.y,
-                z=object.z,
-                texture_path='/server/assets/ezlibs-assets/ezcheckpoints/'..unlocking_asset_name..'.png',
-                animation_path='/server/assets/ezlibs-assets/ezcheckpoints/'..unlocking_asset_name..'.animation',
-                animation='UNLOCKING',
-                warp_in=false,
-                area_id=area_id
-            }
-            Net.provide_asset(area_id, new_bot_props.texture_path)
-            
-            --local new_object_id = Net.create_object(area_id,new_object_props)
-            local bot_id = Net.create_bot(new_bot_props)
-            --Net.set_object_data(area_id, object_id, object.data)
-            await(Async.sleep(unlocking_animation_time))
-            --Net.remove_object(area_id,new_object_id)
-            Net.remove_bot(bot_id, false)
-        end
-        Net.unlock_player_input(player_id)
-    end)
+local function unlock_checkpoint_for_player(player_id, area_id, object_id, unlocking_asset_name, unlocking_sound_path, unlocking_animation_time, once)
+  return async(function ()
+    Net.lock_player_input(player_id)
+
+    local object = Net.get_object_by_id(area_id, object_id)
+    if not object then
+      Net.unlock_player_input(player_id)
+      return false
+    end
+
+    Net.play_sound_for_player(player_id, unlocking_sound_path)
+
+    if once then
+      ezmemory.hide_object_from_player(player_id, area_id, object_id)
+    else
+      ezmemory.hide_object_from_player_till_disconnect(player_id, area_id, object_id)
+    end
+
+    if unlocking_animation_time > 0 then
+      local new_bot_props = {
+        x = object.x,
+        y = object.y,
+        z = object.z,
+        texture_path = "/server/assets/ezlibs-assets/ezcheckpoints/" .. unlocking_asset_name .. ".png",
+        animation_path = "/server/assets/ezlibs-assets/ezcheckpoints/" .. unlocking_asset_name .. ".animation",
+        animation = "UNLOCKING",
+        warp_in = false,
+        area_id = area_id
+      }
+      Net.provide_asset(area_id, new_bot_props.texture_path)
+
+      local bot_id = Net.create_bot(new_bot_props)
+      await(Async.sleep(unlocking_animation_time))
+      Net.remove_bot(bot_id, false)
+    end
+
+    Net.unlock_player_input(player_id)
+    return true
+  end)
 end
 
 Net:on("object_interaction", function(event)

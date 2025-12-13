@@ -85,7 +85,7 @@
 </data>
  </layer>
  <objectgroup id="3" name="Object Layer 0">
-  <object id="3" name="Gate1" type="Checkpoint" gid="2147483899" x="1222" y="918" width="34" height="52">
+  <object id="3" name="Gate1" type="Checkpoint" gid="2147483899" x="1220" y="918" width="34" height="52">
    <properties>
     <property name="Boss IDs" value="MiniBoss1"/>
     <property name="Boss Memory Area" value="Dungeon1"/>
