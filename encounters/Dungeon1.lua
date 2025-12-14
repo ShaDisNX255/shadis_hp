@@ -783,7 +783,7 @@ local MainBoss = {
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     weight=0,
     enemies={
-        {name="ShadeMan",rank=4},
+        {name="ShadeMan",rank=3},
         {name="Metrid",rank=2},
         {name="MegaBunny",rank=1},
     },
