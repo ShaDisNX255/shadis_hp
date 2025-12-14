@@ -784,17 +784,15 @@ local MainBoss = {
     weight=0,
     enemies={
         {name="ShadeMan",rank=4},
-        {name="Yort",rank=3},
         {name="Metrid",rank=2},
         {name="MegaBunny",rank=1},
-        {name="Gloomer",rank=1},
     },
     obstacles={
     },
     positions={
-        {0,0,0,2,0,3},
+        {0,0,0,2,0,0},
         {0,0,0,0,1,0},
-        {0,0,0,4,0,5},
+        {0,0,0,0,0,3},
     },
     obstacle_positions={
         {0,0,0,0,0,0},
