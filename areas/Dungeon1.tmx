@@ -294,11 +294,11 @@
   </object>
   <object id="139" name="MainBoss Battle" type="Dialogue" x="49.5" y="896.5">
    <properties>
-    <property name="Boss Encounter HP" type="int" value="1500"/>
+    <property name="Boss Encounter HP" type="int" value="1200"/>
     <property name="Boss ID" value="MainBoss"/>
     <property name="Boss ID Match" value="ShadeMan"/>
     <property name="Boss Memory Area" value="Dungeon1"/>
-    <property name="Boss Pool Max HP" type="int" value="15000"/>
+    <property name="Boss Pool Max HP" type="int" value="12000"/>
     <property name="Dialogue Type" value="none"/>
     <property name="Encounter Name" value="MainBoss"/>
     <property name="Event Name" value="DungeonBoss"/>

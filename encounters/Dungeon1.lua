@@ -142,6 +142,23 @@ local persist_health_and_emotion = function (player_id,encounter_info,stats)
     ezmemory.set_player_health(player_id,stats.health)
 end
 
+-- Dungeon "lives" revives can adjust the player's HP outside the battle stats.
+-- When persisting HP after rewards, never LOWER the player's current HP.
+local function _final_persist_hp(player_id, intended_hp)
+  intended_hp = tonumber(intended_hp or 0) or 0
+  local cur = tonumber(Net.get_player_health(player_id) or intended_hp) or intended_hp
+  if cur > intended_hp then
+    return cur
+  end
+  return intended_hp
+end
+
+local function _in_dungeon(player_id)
+  if not (dungeon and dungeon.is_dungeon_area) then return false end
+  local area_id = Net.get_player_area(player_id)
+  return dungeon.is_dungeon_area(area_id)
+end
+
 local give_result_awards = function (player_id, encounter_info, stats)
   -- Normalize result so we respect stats.reason (3 = legit run, 4 = dev ESC)
   local flags = _result_flags(stats)
@@ -186,8 +203,13 @@ local give_result_awards = function (player_id, encounter_info, stats)
     end
   end
 
+  -- If we lost in a dungeon, don't also grant HP+ here (the "life" revive handles healing).
+  if _in_dungeon(player_id) and flags.lost then
+    hp_bonus = 0
+  end
+
   if hp_bonus > 0 then
-    table.insert(rewards, { type = 2, value = hp_bonus })  -- 0=Money
+    table.insert(rewards, { type = 2, value = hp_bonus })
   end
 
   if #rewards > 0 then
@@ -196,7 +218,8 @@ local give_result_awards = function (player_id, encounter_info, stats)
 
   -- Keep ezmemory in sync with the final HP the player ends up with after the HP+ reward
   -- (so the next encounter/persisted state matches what the client shows)
-  local final_stats = { health = (stats.health or 0) + hp_bonus, emotion = stats.emotion }
+  local final_hp = _final_persist_hp(player_id, (stats.health or 0) + hp_bonus)
+  local final_stats = { health = final_hp, emotion = stats.emotion }
   persist_health_and_emotion(player_id, encounter_info, final_stats)
 end
 
@@ -222,6 +245,11 @@ local mini_boss_rewards = function (player_id, encounter_info, stats)
   -- 2) If post-battle HP < 101, give +300 HP
   local hp_bonus = ((stats.health or 0) < 101) and 300 or 0
 
+  -- If we lost in a dungeon, don't also grant HP+ here (the "life" revive handles healing).
+  if _in_dungeon(player_id) and flags.lost then
+    hp_bonus = 0
+  end
+
   -- 3) 5% chance to drop 1 BugFrag
   local bugfrag_amount = (math.random(100) <= 5) and 1 or 0
 
@@ -242,7 +270,8 @@ local mini_boss_rewards = function (player_id, encounter_info, stats)
 
   -- Keep ezmemory in sync with the final HP the player ends up with after the HP+ reward
   -- (so the next encounter/persisted state matches what the client shows)
-  local final_stats = { health = (stats.health or 0) + hp_bonus, emotion = stats.emotion }
+  local final_hp = _final_persist_hp(player_id, (stats.health or 0) + hp_bonus)
+  local final_stats = { health = final_hp, emotion = stats.emotion }
   persist_health_and_emotion(player_id, encounter_info, final_stats)
 end
 

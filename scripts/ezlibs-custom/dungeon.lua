@@ -25,6 +25,144 @@ local DAMAGE_MSG = "Damage critical, logging out before deletion"
 -- pid -> { stage="show"|"kick", from_area=string, exit={...} }
 local _PENDING_KICK = {}
 
+----------------------------------------------------------------
+-- Dungeon "Life" system (optional gameplay mechanic)
+--
+-- On entering a dungeon area (Dungeon=true), player gets extra "lives"
+-- equal to the number of OTHER players currently in the same area.
+-- Each life prevents ONE dungeon kick-out (HP<=0), heals you back up to
+-- the map's "Forced Base HP" (or max HP fallback), and shows a message.
+--
+-- Optional map custom properties:
+--   DungeonLivesCap (int)         -> cap extra lives (0/blank = uncapped)
+--   DungeonLivesShowOnEnter (bool)-> "true" to show a message on entry
+----------------------------------------------------------------
+local _DUNGEON_LIVES = {}        -- [pid] = { lives=int, dungeon_root=string }
+local _WAS_IN_DUNGEON = {}       -- [pid] = bool
+
+local function _get_forced_base_hp(area_id)
+  local v = Net.get_area_custom_property(area_id, "Forced Base HP")
+  if v == nil then
+    v = Net.get_area_custom_property(area_id, "ForcedBaseHP")
+  end
+  local n = tonumber(v or "")
+  if n and n > 0 then
+    return math.floor(n)
+  end
+  return nil
+end
+
+local function _grant_lives_on_enter(player_id, area_id)
+  if not player_id or not area_id then return end
+  if not is_dungeon_area(area_id) then return end
+
+  local ids = Net.list_players(area_id) or {}
+  local others = 0
+  for _, pid in ipairs(ids) do
+    if pid ~= player_id then
+      others = others + 1
+    end
+  end
+
+  local cap = tonumber(Net.get_area_custom_property(area_id, "DungeonLivesCap") or 0) or 0
+  if cap > 0 then
+    others = math.min(others, cap)
+  end
+
+  _DUNGEON_LIVES[player_id] = {
+    lives = others,
+    dungeon_root = area_id,
+  }
+
+  if others > 0 and Net.get_area_custom_property(area_id, "DungeonLivesShowOnEnter") == "true" then
+    Net.message_player(player_id, ("You feel the power of allies nearby. Extra lives: %d"):format(others))
+  end
+end
+
+local function _clear_lives(player_id)
+  _DUNGEON_LIVES[player_id] = nil
+  _WAS_IN_DUNGEON[player_id] = nil
+end
+
+-- Returns true if it consumed a life and healed the player (preventing kick)
+local function _try_consume_life(player_id, area_id)
+  local st = _DUNGEON_LIVES[player_id]
+  if not st then return false end
+
+  local lives = tonumber(st.lives or 0) or 0
+  if lives <= 0 then return false end
+
+  -- consume
+  st.lives = lives - 1
+
+  local heal_to = _get_forced_base_hp(area_id) or tonumber(Net.get_player_max_health(player_id) or 1) or 1
+  heal_to = math.max(1, math.floor(heal_to))
+  -- If Forced Base HP is higher than the player's current max HP,
+  -- raise max HP so the revive can actually reach the forced base.
+  local max_hp = tonumber(Net.get_player_max_health(player_id) or heal_to) or heal_to
+  if heal_to > max_hp then
+    if Net.set_player_max_health then
+      Net.set_player_max_health(player_id, heal_to)
+      max_hp = heal_to
+    else
+      -- fallback: clamp if this server build doesn't expose set_player_max_health
+      heal_to = max_hp
+    end
+  end
+
+  -- Persist via ezmemory when available (consistent with DungeonHeal)
+  if ezmemory and ezmemory.set_player_health then
+    ezmemory.set_player_health(player_id, heal_to)
+  else
+    Net.set_player_health(player_id, heal_to)
+  end
+
+  Net.message_player(
+    player_id,
+    ("The power of other players in the area have healed you. Lives left: %d"):format(st.lives)
+  )
+  return true
+end
+
+-- Track dungeon entry/exit to grant lives once per dungeon "run"
+local function _refresh_player_dungeon_state(player_id)
+  if not player_id then return end
+  local area_id = Net.get_player_area(player_id)
+  if not area_id then return end
+
+  local now = is_dungeon_area(area_id)
+  local was = _WAS_IN_DUNGEON[player_id] or false
+
+  if now and not was then
+    _WAS_IN_DUNGEON[player_id] = true
+    _grant_lives_on_enter(player_id, area_id)
+  elseif (not now) and was then
+    _clear_lives(player_id)
+  else
+    _WAS_IN_DUNGEON[player_id] = now
+  end
+end
+
+Net:on("player_join", function(event)
+  local pid = event and event.player_id
+  if not pid then return end
+  _WAS_IN_DUNGEON[pid] = false
+  _refresh_player_dungeon_state(pid)
+end)
+
+Net:on("player_area_transfer", function(event)
+  local pid = event and event.player_id
+  if not pid then return end
+  _refresh_player_dungeon_state(pid)
+end)
+
+Net:on("player_disconnect", function(event)
+  local pid = event and event.player_id
+  if not pid then return end
+  _PENDING_KICK[pid] = nil
+  _clear_lives(pid)
+end)
+
 local function _parse_textbox_response_args(a, b)
   if type(a) == "table" then
     local pid = a.player_id or a[1]
@@ -81,6 +219,12 @@ local function kick_player_out_of_dungeon(player_id, defer_damage_msg)
     return
   end
 
+  -- Life system: prevent the dungeon kick if the player has an extra life
+  if _try_consume_life(player_id, area_id) then
+    _PENDING_KICK[player_id] = nil
+    return true
+  end
+
   local exit = _resolve_exit_from_area(area_id)
   if not exit then
     return
@@ -97,10 +241,11 @@ local function kick_player_out_of_dungeon(player_id, defer_damage_msg)
     exit = exit,
   }
 
-  -- If not deferring, show DAMAGE_MSG right now.
   if not defer_damage_msg then
     Net.message_player(player_id, DAMAGE_MSG)
   end
+
+  return false
 end
 
 -- expose for other scripts (if you call it externally)
@@ -702,7 +847,11 @@ local DUNGEON_BOSS_DIALOGUE_EVENT = {
         if kick then
           -- If we just showed progress, defer so the next close shows Damage critical,
           -- and the following close performs the warp (same pattern as your run-penalty fix)
-          kick(player_id, not hide_progress)
+          local revived = kick(player_id, false) -- always show DAMAGE_MSG immediately when we’re actually kicking
+
+          if not revived then
+            return nil -- IMPORTANT: end the dialogue chain so you can't start another fight
+          end
         end
         return props["Battle Lost"] or props["Next 1"]
       end
@@ -823,13 +972,6 @@ Net:on("battle_results", function(ev)
     out.defeated_now = defeated_now
     out.applied = applied
     out.dmg = dmg
-  end
-
-  if (not flags.ran) and (tonumber(flags.hp or 0) <= 0) then
-    local kick = (dungeon and dungeon.kick_player_out_of_dungeon) or kick_player_out_of_dungeon
-    if kick then
-      kick(pid, true) -- <-- THIS is the “2 textbox closes” behavior you want for boss losses
-    end
   end
 
   dungeon._boss_fight_outcome[pid] = out
