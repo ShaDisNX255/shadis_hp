@@ -2,6 +2,7 @@ local whitelist_areas = {
   ["WCity1"] = true,
   ["WCity2"] = true,
   ["WCity3"] = true,
+  ["Dungeon1"] = true,
 }
 
 ---

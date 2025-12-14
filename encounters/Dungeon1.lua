@@ -164,18 +164,30 @@ local give_result_awards = function (player_id, encounter_info, stats)
   end
 
   -- 1) Money = busting level * 100
-  local monies = (stats.score or 0) * 100
+  local monies = (stats.score or 0) * 400
 
-  -- 2) If post-battle HP < 20, give +50 HP
-  local hp_bonus = ((stats.health or 0) < 100) and 150 or 0
+  -- 2) HP bonus:
+  --    If HP < 101: always +150
+  --    Else if HP < 401: 1/3 chance of +150
+  local hp = (stats.health or 0)
+  local hp_bonus = 0
 
   -- Build the beta-10 reward list
   local rewards = {}
   if monies > 0 then
     table.insert(rewards, { type = 0, value = monies })  -- 0=Money
   end
+  if hp < 101 then
+    hp_bonus = 150
+  elseif hp < 401 then
+    -- 1/3 chance
+    if math.random(3) == 1 then
+      hp_bonus = 150
+    end
+  end
+
   if hp_bonus > 0 then
-    table.insert(rewards, { type = 2, value = hp_bonus }) -- 2=Health+
+    table.insert(rewards, { type = 2, value = hp_bonus })  -- 0=Money
   end
 
   if #rewards > 0 then
@@ -744,8 +756,87 @@ local MiniBoss2 = {
     results_callback = mini_boss_rewards
 }
 
+local MiniBoss3 = {
+    name="MiniBoss3",
+    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    weight=0,
+    enemies={
+        {name="ElementMan",rank=4},
+        {name="JokerEye",rank=1},
+        {name="Sniper",rank=1},
+    },
+    obstacles={
+    },
+    positions={
+        {0,0,0,0,0,0},
+        {0,0,0,0,1,3},
+        {0,0,0,2,0,0},
+    },
+    obstacle_positions={
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+    },
+    player_positions={
+        {0,0,0,0,0,0},
+        {0,1,0,0,0,0},
+        {0,0,0,0,0,0},
+    },
+    tiles={
+        {13,1,1,1,1,1},
+        {1,1,1,1,1,1},
+        {1,1,13,1,1,1},
+    },
+    teams={
+        {2,2,2,1,1,1},
+        {2,2,2,1,1,1},
+        {2,2,2,1,1,1},
+    },
+    results_callback = mini_boss_rewards
+}
+
+local MainBoss = {
+    name="MainBoss",
+    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    weight=0,
+    enemies={
+        {name="ShadeMan",rank=4},
+        {name="Yort",rank=3},
+        {name="Metrid",rank=2},
+        {name="TuffBunny",rank=1},
+        {name="Gloomer",rank=1},
+    },
+    obstacles={
+    },
+    positions={
+        {0,0,0,2,0,3},
+        {0,0,0,0,1,0},
+        {0,0,0,4,0,5},
+    },
+    obstacle_positions={
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+    },
+    player_positions={
+        {0,0,0,0,0,0},
+        {0,1,0,0,0,0},
+        {0,0,0,0,0,0},
+    },
+    tiles={
+        {1,1,1,1,1,1},
+        {1,1,1,1,1,1},
+        {1,1,1,1,1,1},
+    },
+    teams={
+        {2,2,2,1,1,1},
+        {2,2,2,1,1,1},
+        {2,2,2,1,1,1},
+    },
+}
+
 return {
     minimum_steps_before_encounter=40,
     encounter_chance_per_step=0.10,
-    encounters={Dungeon1,Dungeon2,Dungeon3,Dungeon4,Dungeon5,Dungeon6,Dungeon7,Dungeon8,Dungeon9,Dungeon10,MiniBoss1,MiniBoss2}
+    encounters={Dungeon1,Dungeon2,Dungeon3,Dungeon4,Dungeon5,Dungeon6,Dungeon7,Dungeon8,Dungeon9,Dungeon10,MiniBoss1,MiniBoss2,MiniBoss3,MainBoss}
 }

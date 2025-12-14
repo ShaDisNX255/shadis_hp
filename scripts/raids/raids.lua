@@ -7,6 +7,7 @@ local Config       = require('scripts/raids/config')
 local Enc          = require('scripts/raids/encounters')
 
 local TeamsOK, Teams = pcall(require, 'scripts/teams/teams')
+local JobBBSOK, JobBBS = pcall(require, 'scripts/jobbbs/JobBBS')
 -- ===== Displayer bootstrap via Net-Games =====
 local Displayer = _G.Displayer  -- reuse if some other script already set it
 
@@ -1067,6 +1068,15 @@ end
       c.chain2 = next_chain
       c._last_pid = pid
 
+      if award > 0 and JobBBSOK and JobBBS and JobBBS.on_raid_progress then
+        pcall(JobBBS.on_raid_progress, pid, {
+          raid_id = raid_id,
+          wave    = wave_at_start,
+          points  = award,
+          boss    = false,
+        })
+      end
+
       if wave_at_start == 1 then
         -- Detect first-ever points on Wave 1 (brand new raid start)
         local first_points = ((tonumber(s.wave1_points or 0) or 0) <= 0) and (award > 0)
@@ -1241,10 +1251,27 @@ end
         c._last_pid   = pid
         s.contributions[secret] = c
         s.boss_pool_hp = math.max(0, (s.boss_pool_hp or 0) - dmg)
+
+        if JobBBSOK and JobBBS and JobBBS.on_raid_progress then
+          pcall(JobBBS.on_raid_progress, pid, {
+            raid_id     = raid_id,
+            wave        = 3,
+            boss        = true,
+            boss_damage = dmg,
+          })
+        end
       end
 
       local msg = ("Boss HP: %d/%d"):format(s.boss_pool_hp or 0, s.boss_pool_max or 0)
       if s.boss_pool_hp <= 0 then
+        if JobBBSOK and JobBBS and JobBBS.on_raid_progress then
+          pcall(JobBBS.on_raid_progress, pid, {
+            raid_id = raid_id,
+            wave    = 3,
+            boss    = true,
+            killed  = true,   -- no extra damage; we already sent dmg above
+          })
+        end
         -- Boss defeated → pay all contributors (offline-safe), then start cooldown if Repeat
         if TeamsOK and Teams then
           for secret2, cc in pairs(s.contributions or {}) do

@@ -31,6 +31,240 @@ local JobBBS = (function()
   return ok and M or nil
 end)()
 
+----------------------------------------------------------------
+-- Dialogue-driven secret paths (persistent)
+-- Used by the "SecretPath" dialogue event
+----------------------------------------------------------------
+
+local SECRET_PATHS_MEM_KEY = "__secret_paths_dialogue"
+local rehydrated_secret_areas = {}
+
+local function get_secret_paths_bucket(area_id)
+    if not ezmemory or not ezmemory.get_area_memory then
+        return nil, nil
+    end
+    local mem = ezmemory.get_area_memory(area_id) or ezmemory.get_area_memory(area_id)
+    if not mem then return nil, nil end
+
+    mem[SECRET_PATHS_MEM_KEY] = mem[SECRET_PATHS_MEM_KEY] or {}
+    return mem[SECRET_PATHS_MEM_KEY], mem
+end
+
+local function rehydrate_secret_paths_for_area(area_id)
+    if not area_id or rehydrated_secret_areas[area_id] then
+        return
+    end
+    print("[SecretPath] rehydrate attempt for area:", area_id)
+
+    local bucket = get_secret_paths_bucket(area_id)
+    if not bucket then
+      print("[SecretPath] no bucket for area:", area_id)
+	  return
+    end
+
+    local total = 0
+
+    for path_id, rec in pairs(bucket) do
+        print("[SecretPath] found record:", path_id, "revealed=", rec and rec.revealed)
+        if rec and rec.revealed and rec.segments then
+            local layer = rec.layer or 0
+            for _, seg in ipairs(rec.segments) do
+                local gid = seg.gid
+                if gid and gid ~= 0 then
+                    for tx = seg.x_start, seg.x_end do
+                        for ty = seg.y_start, seg.y_end do
+                            Net.set_tile(
+                                area_id,
+                                tx,
+                                ty,
+                                layer,
+                                gid,
+                                seg.fh,
+                                seg.fv,
+                                seg.rot
+                            )
+                            total = total + 1
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    if total > 0 then
+        print(string.format(
+            "[SecretPath] Rehydrated %d tiles in area '%s'",
+            total, tostring(area_id)
+        ))
+    end
+
+    rehydrated_secret_areas[area_id] = true
+end
+
+local function reveal_dialogue_path(area_id, player_id, dialogue)
+    local props = dialogue.custom_properties or {}
+
+    -- Identify this path (so multiple NPCs/quests don't fight)
+    local raw_id = props["Path ID"] or props["Path Id"] or props["path id"]
+    local path_id = tostring(raw_id or (dialogue.name or dialogue.id or "default_path"))
+
+    local bucket = get_secret_paths_bucket(area_id)
+    if not bucket then
+        Net.message_player(player_id, "Debug: Area memory not available for secret path.")
+        return
+    end
+
+    -- Already revealed in a previous run? Just show repeat message.
+    local rec = bucket[path_id]
+    if rec and rec.revealed then
+        local repeat_msg = props["Repeat Message"]
+        if repeat_msg and repeat_msg ~= "" then
+            Net.message_player(player_id, repeat_msg)
+        end
+        return
+    end
+
+    local layer = tonumber(props["Path Layer"] or 0)
+
+    local segments = {}
+    local segments_mem = {}
+    local had_error = false
+
+    local function add_segment(label, path_prefix, sample_prefix)
+        if had_error then return end
+
+        -- Example: path_prefix="Path"  -> "Path X1", "Path Y1", ...
+        --          path_prefix="Path 2" -> "Path 2 X1", etc.
+        local x1_key = path_prefix .. " X1"
+        local y1_key = path_prefix .. " Y1"
+        local x2_key = path_prefix .. " X2"
+        local y2_key = path_prefix .. " Y2"
+
+        local sx_key = sample_prefix .. " X"
+        local sy_key = sample_prefix .. " Y"
+
+        local x1_prop = props[x1_key]
+        local y1_prop = props[y1_key]
+
+        -- If X1/Y1 not defined, this segment doesn't exist; that's fine.
+        if x1_prop == nil or y1_prop == nil then
+            return
+        end
+
+        local x1 = tonumber(x1_prop) or 0
+        local y1 = tonumber(y1_prop) or 0
+        local x2 = tonumber(props[x2_key] or x1)
+        local y2 = tonumber(props[y2_key] or y1)
+
+        local sx_prop = props[sx_key]
+        local sy_prop = props[sy_key]
+
+        if sx_prop == nil or sy_prop == nil then
+            Net.message_player(player_id, "Debug: Missing floor sample for " .. label .. ".")
+            had_error = true
+            return
+        end
+
+        local sx = tonumber(sx_prop) or 0
+        local sy = tonumber(sy_prop) or 0
+
+        local floor_tile = Net.get_tile(area_id, sx, sy, layer)
+        if not floor_tile then
+            Net.message_player(player_id, "Debug: Sample tile is nil for " .. label .. ".")
+            had_error = true
+            return
+        end
+        if floor_tile.gid == 0 then
+            Net.message_player(player_id, "Debug: Sample tile is empty for " .. label .. ".")
+            had_error = true
+            return
+        end
+
+        local x_start = math.min(x1, x2)
+        local x_end   = math.max(x1, x2)
+        local y_start = math.min(y1, y2)
+        local y_end   = math.max(y1, y2)
+
+        -- Runtime segment (uses full tile table)
+        table.insert(segments, {
+            x_start = x_start,
+            x_end   = x_end,
+            y_start = y_start,
+            y_end   = y_end,
+            tile    = floor_tile,
+        })
+
+        -- Persistent segment (only primitives so ezmemory can serialize)
+        table.insert(segments_mem, {
+            x_start = x_start,
+            x_end   = x_end,
+            y_start = y_start,
+            y_end   = y_end,
+            gid     = floor_tile.gid,
+            fh      = floor_tile.flipped_horizontally,
+            fv      = floor_tile.flipped_vertically,
+            rot     = floor_tile.rotated,
+        })
+    end
+
+    -- Segment 1 uses the same property names as secret_path_switch:
+    -- Path X1/Y1/X2/Y2 + Floor Sample X/Y
+    add_segment("segment 1", "Path", "Floor Sample")
+
+    -- Extra segments: Path 2 X1/Y1/X2/Y2 + Floor Sample 2 X/Y, Path 3..., etc.
+    for i = 2, 8 do
+        add_segment("segment " .. i, "Path " .. i, "Floor Sample " .. i)
+    end
+
+    if had_error then
+        return
+    end
+
+    if #segments == 0 then
+        Net.message_player(player_id, "Debug: No path segments defined on this dialogue.")
+        return
+    end
+
+    -- Paint all segments now
+    for _, seg in ipairs(segments) do
+        local t = seg.tile
+        for tx = seg.x_start, seg.x_end do
+            for ty = seg.y_start, seg.y_end do
+                Net.set_tile(
+                    area_id,
+                    tx,
+                    ty,
+                    layer,
+                    t.gid,
+                    t.flipped_horizontally,
+                    t.flipped_vertically,
+                    t.rotated
+                )
+            end
+        end
+    end
+
+    -- Persist config to area memory so we can repaint after reboot
+    bucket[path_id] = {
+        revealed = true,
+        layer    = layer,
+        segments = segments_mem,
+    }
+    ezmemory.save_area_memory(area_id)
+
+    -- Optional sound (everyone in area)
+    local sound_path = props["Sound Path"]
+    if sound_path and sound_path ~= "" then
+        Net.play_sound(area_id, sound_path)
+    end
+
+    -- Optional post message (only to triggering player)
+    local post_msg = props["Post Message"]
+    if post_msg and post_msg ~= "" then
+        Net.message_player(player_id, post_msg)
+    end
+end
+
 local event1 = {
     name = "Italian Gibberish",
     action = function(npc, player_id, dialogue, relay_object)
@@ -1135,3 +1369,40 @@ eznpcs.add_event{
     end)
   end
 }
+
+eznpcs.add_event{
+  name = "SecretPath",
+  action = function(npc, player_id, dialogue, relay_object)
+    return async(function()
+      local area_id = Net.get_player_area(player_id)
+      if not area_id then
+        return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+      end
+
+      reveal_dialogue_path(area_id, player_id, dialogue)
+
+      -- Continue to whatever the dialogue's "Next 1" is, like other events.
+      if dialogue.custom_properties then
+        return dialogue.custom_properties["Next 1"]
+      end
+      return nil
+    end)
+  end
+}
+
+-- Repaint any already-revealed paths when players appear in an area
+Net:on("player_join", function(ev)
+    if not ev or not ev.player_id then return end
+    local area_id = Net.get_player_area(ev.player_id)
+    if area_id then
+        rehydrate_secret_paths_for_area(area_id)
+    end
+end)
+
+Net:on("player_area_transfer", function(ev)
+    if not ev or not ev.player_id then return end
+    local area_id = Net.get_player_area(ev.player_id)
+    if area_id then
+        rehydrate_secret_paths_for_area(area_id)
+    end
+end)

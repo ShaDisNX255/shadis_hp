@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="57" height="57" tilewidth="64" tileheight="32" infinite="0" nextlayerid="7" nextobjectid="136">
+<map version="1.10" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="57" height="57" tilewidth="64" tileheight="32" infinite="0" nextlayerid="7" nextobjectid="139">
  <properties>
   <property name="Background" value="custom"/>
   <property name="Background Animation" value="/server/assets/custom/backgrounds/dungeon1/09-graveyard.animation"/>
@@ -32,7 +32,7 @@
 0,0,0,0,0,0,0,0,0,2147483654,8,0,0,0,0,2147483654,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,16,2147483659,10,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,2147483654,6,6,0,0,2147483656,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,11,2147483661,10,0,2147483684,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,2147483654,8,8,18,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,10,2147483659,10,11,10,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483654,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,36,0,2147483661,2147483659,37,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,2147483673,0,0,0,0,0,2147483654,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,36,0,2147483661,2147483659,37,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,30,23,2147483697,0,0,0,0,2147483656,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483656,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,30,23,24,2147483672,2147483697,0,0,0,2147483654,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483654,21,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,26,23,23,23,23,23,6,6,8,18,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,5,0,0,0,2147483654,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -97,9 +97,9 @@
   </object>
   <object id="4" type="Checkpoint" gid="256" x="650.5" y="855.5" width="63" height="92">
    <properties>
-    <property name="Boss IDs" value="MiniBoss2"/>
+    <property name="Boss IDs" value="MiniBoss2,MiniBoss3"/>
     <property name="Boss Memory Area" value="Dungeon1"/>
-    <property name="Boss Not Defeated Message" value="You can still feel the Navi protecting this gate"/>
+    <property name="Boss Not Defeated Message" value="You can still feel the power of the Navis protecting this gate"/>
     <property name="Description" value="This door seems to be protected by a mysterious force"/>
     <property name="Key Name" value="Boss Gate"/>
     <property name="Unlocked Message" value="The door opens..."/>
@@ -131,7 +131,7 @@
   <object id="101" name="Prisoner(DailyQuest )" x="1713" y="1493">
    <point/>
   </object>
-  <object id="102" name="Boss Virus 1" type="NPC" x="1169" y="149">
+  <object id="102" name="Boss Virus 1" type="NPC" x="1166" y="144">
    <properties>
     <property name="Asset Name" value="heel-navi-exe4_purple"/>
     <property name="Dialogue Type" value="first"/>
@@ -150,10 +150,13 @@
   <object id="106" name="Hell Navi(Flavour text npc)" x="881" y="1549">
    <point/>
   </object>
-  <object id="107" name="Dungeon Boss (Navi)" x="73" y="877">
-   <point/>
-  </object>
-  <object id="108" name="Virus Boss 3 " x="233" y="333">
+  <object id="107" name="Dungeon Boss (Navi)" type="NPC" x="73" y="877">
+   <properties>
+    <property name="Asset Name" value="shademan-exe5"/>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Direction" value="Down Right"/>
+    <property name="Text 1" value="Generic dungeon boss stuff"/>
+   </properties>
    <point/>
   </object>
   <object id="109" name="Hell Navi (Flavour text npc )" x="1297" y="973">
@@ -176,10 +179,10 @@
   <object id="116" gid="276" x="1781" y="1523" width="20" height="43"/>
   <object id="117" gid="276" x="1269" y="1427" width="20" height="43"/>
   <object id="118" gid="276" x="949" y="1523" width="20" height="43"/>
-  <object id="119" gid="276" x="309" y="275" width="20" height="43"/>
-  <object id="120" gid="2147483956" x="389" y="1315" width="13" height="32"/>
+  <object id="119" gid="276" x="275" y="403" width="20" height="43"/>
+  <object id="120" gid="2147483956" x="387" y="1377" width="13" height="32"/>
   <object id="121" gid="308" x="1189" y="131" width="13" height="32"/>
-  <object id="122" gid="2147483956" x="189" y="323" width="13" height="32"/>
+  <object id="122" gid="2147483956" x="258" y="256" width="13" height="32"/>
   <object id="123" gid="276" x="789" y="499" width="20" height="43"/>
   <object id="124" gid="276" x="469" y="51" width="20" height="43"/>
   <object id="125" gid="292" x="1557" y="595" width="20" height="43"/>
@@ -224,11 +227,11 @@
    </properties>
    <point/>
   </object>
-  <object id="133" name="Boss Virus 2" type="NPC" x="439" y="1311">
+  <object id="133" name="Boss Virus 2" type="NPC" x="401" y="1329">
    <properties>
     <property name="Asset Name" value="noir"/>
     <property name="Dialogue Type" value="first"/>
-    <property name="Direction" value="Down Left"/>
+    <property name="Direction" value="Down Right"/>
     <property name="Next 1" type="object" value="134"/>
     <property name="Text 1" value="..."/>
    </properties>
@@ -245,13 +248,45 @@
   </object>
   <object id="135" name="MiniBoss2 Battle" type="Dialogue" x="332" y="1338">
    <properties>
-    <property name="Boss Encounter HP" type="int" value="1400"/>
+    <property name="Boss Encounter HP" type="int" value="1500"/>
     <property name="Boss ID" value="MiniBoss2"/>
     <property name="Boss ID Match" value="Noir"/>
     <property name="Boss Memory Area" value="Dungeon1"/>
-    <property name="Boss Pool Max HP" type="int" value="4200"/>
+    <property name="Boss Pool Max HP" type="int" value="3000"/>
     <property name="Dialogue Type" value="none"/>
     <property name="Encounter Name" value="MiniBoss2"/>
+    <property name="Event Name" value="DungeonBoss"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="136" name="Boss Virus 3" type="NPC" x="305" y="239">
+   <properties>
+    <property name="Asset Name" value="elementman"/>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Direction" value="Down Right"/>
+    <property name="Next 1" type="object" value="137"/>
+    <property name="Text 1" value="..."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="137" name="Next 1" type="Dialogue" x="254" y="188">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Mugshot" value="Blank"/>
+    <property name="Next 1" type="object" value="138"/>
+    <property name="Text 1" value="This navi seems out of it... (flavor text)"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="138" name="MiniBoss3 Battle" type="Dialogue" x="198.5" y="155.5">
+   <properties>
+    <property name="Boss Encounter HP" type="int" value="1700"/>
+    <property name="Boss ID" value="MiniBoss3"/>
+    <property name="Boss ID Match" value="ElemntMn"/>
+    <property name="Boss Memory Area" value="Dungeon1"/>
+    <property name="Boss Pool Max HP" type="int" value="3400"/>
+    <property name="Dialogue Type" value="none"/>
+    <property name="Encounter Name" value="MiniBoss3"/>
     <property name="Event Name" value="DungeonBoss"/>
    </properties>
    <point/>

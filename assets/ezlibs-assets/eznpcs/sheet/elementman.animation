@@ -1,0 +1,23 @@
+animation state="IDLE_U"
+frame duration="0.1" x="0" y="0" w="44" h="49" originx="23" originy="47" flipx="1"
+
+animation state="IDLE_UL"
+frame duration="0.1" x="0" y="0" w="44" h="49" originx="23" originy="47" flipx="1"
+
+animation state="IDLE_R"
+frame duration="0.1" x="0" y="0" w="44" h="49" originx="23" originy="47" flipx="1"
+
+animation state="IDLE_DR"
+frame duration="0.1" x="0" y="0" w="44" h="49" originx="23" originy="47" flipx="1"
+
+animation state="IDLE_D"
+frame duration="0.1" x="0" y="0" w="44" h="49" originx="23" originy="47" flipx="1"
+
+animation state="IDLE_DL"
+frame duration="0.1" x="0" y="0" w="44" h="49" originx="23" originy="47" flipx="1"
+
+animation state="IDLE_L"
+frame duration="0.1" x="0" y="0" w="44" h="49" originx="23" originy="47" flipx="1"
+
+animation state="IDLE_UL"
+frame duration="0.1" x="0" y="0" w="44" h="49" originx="23" originy="47" flipx="1"
