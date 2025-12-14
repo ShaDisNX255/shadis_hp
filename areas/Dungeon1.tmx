@@ -323,7 +323,7 @@
    </properties>
    <point/>
   </object>
-  <object id="142" gid="319" x="253" y="893" width="64" height="40">
+  <object id="142" gid="5" x="236" y="876" width="64" height="68">
    <properties>
     <property name="Direction" value="Up Right"/>
     <property name="Target Area" value="default"/>
