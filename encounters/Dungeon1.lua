@@ -200,52 +200,6 @@ local give_result_awards = function (player_id, encounter_info, stats)
   persist_health_and_emotion(player_id, encounter_info, final_stats)
 end
 
-local give_result_awards_rare = function (player_id, encounter_info, stats)
-  -- Normalize result so we respect stats.reason (3 = legit run, 4 = dev ESC)
-  local flags = _result_flags(stats)
-
-  -- DEBUG (put this right at the top)
-  if BATTLE_DEBUG then
-    _debug_encounter_result(player_id, encounter_info, stats)
-  end
-
-  -- If the player ran (either type), persist health/emotion only (no rewards)
-  if flags.dev_escape then
-    persist_health_and_emotion(player_id, encounter_info, stats)
-    dungeon.apply_run_penalty(player_id, encounter_info, stats)
-    return
-  end
-
-  -- If this was a straight-up loss (HP hit 0), kick the player out of the dungeon.
-  if dungeon and dungeon.kick_player_if_dead and flags.lost then
-    dungeon.kick_player_if_dead(player_id, stats)
-  end
-
-  -- 1) Money = busting level * 300
-  local monies = (stats.score or 0) * 300
-
-  -- 2) If post-battle HP < 100, give +150 HP
-  local hp_bonus = ((stats.health or 0) < 100) and 150 or 0
-
-  -- Build the beta-10 reward list
-  local rewards = {}
-  if monies > 0 then
-    table.insert(rewards, { type = 0, value = monies })  -- 0=Money
-  end
-  if hp_bonus > 0 then
-    table.insert(rewards, { type = 2, value = hp_bonus }) -- 2=Health+
-  end
-
-  if #rewards > 0 then
-    Net.send_player_battle_rewards(player_id, rewards)
-  end
-
-  -- Keep ezmemory in sync with the final HP the player ends up with after the HP+ reward
-  -- (so the next encounter/persisted state matches what the client shows)
-  local final_stats = { health = (stats.health or 0) + hp_bonus, emotion = stats.emotion }
-  persist_health_and_emotion(player_id, encounter_info, final_stats)
-end
-
 local mini_boss_rewards = function (player_id, encounter_info, stats)
   -- Normalize result so we respect stats.reason (3 = legit run, 4 = dev ESC)
   local flags = _result_flags(stats)
@@ -724,7 +678,7 @@ local MiniBoss2 = {
     enemies={
         {name="Noir",rank=1},
         {name="Metrid",rank=2},
-        {name="TuffBunny",rank=1},
+        {name="MegaBunny",rank=1},
     },
     obstacles={
     },
@@ -803,7 +757,7 @@ local MainBoss = {
         {name="ShadeMan",rank=4},
         {name="Yort",rank=3},
         {name="Metrid",rank=2},
-        {name="TuffBunny",rank=1},
+        {name="MegaBunny",rank=1},
         {name="Gloomer",rank=1},
     },
     obstacles={
@@ -833,6 +787,7 @@ local MainBoss = {
         {2,2,2,1,1,1},
         {2,2,2,1,1,1},
     },
+    results_callback = mini_boss_rewards
 }
 
 return {

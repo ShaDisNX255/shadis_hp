@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="57" height="57" tilewidth="64" tileheight="32" infinite="0" nextlayerid="7" nextobjectid="139">
+<map version="1.10" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="57" height="57" tilewidth="64" tileheight="32" infinite="0" nextlayerid="7" nextobjectid="140">
  <properties>
   <property name="Background" value="custom"/>
   <property name="Background Animation" value="/server/assets/custom/backgrounds/dungeon1/09-graveyard.animation"/>
@@ -155,6 +155,7 @@
     <property name="Asset Name" value="shademan-exe5"/>
     <property name="Dialogue Type" value="first"/>
     <property name="Direction" value="Down Right"/>
+    <property name="Next 1" type="object" value="139"/>
     <property name="Text 1" value="Generic dungeon boss stuff"/>
    </properties>
    <point/>
@@ -287,6 +288,19 @@
     <property name="Boss Pool Max HP" type="int" value="3400"/>
     <property name="Dialogue Type" value="none"/>
     <property name="Encounter Name" value="MiniBoss3"/>
+    <property name="Event Name" value="DungeonBoss"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="139" name="MainBoss Battle" type="Dialogue" x="49.5" y="896.5">
+   <properties>
+    <property name="Boss Encounter HP" type="int" value="1500"/>
+    <property name="Boss ID" value="MainBoss"/>
+    <property name="Boss ID Match" value="ShadeMan"/>
+    <property name="Boss Memory Area" value="Dungeon1"/>
+    <property name="Boss Pool Max HP" type="int" value="15000"/>
+    <property name="Dialogue Type" value="none"/>
+    <property name="Encounter Name" value="MainBoss"/>
     <property name="Event Name" value="DungeonBoss"/>
    </properties>
    <point/>
