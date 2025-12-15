@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Minimal self-detaching server runner (no watcher)
+# Minimal self-detaching server runner (correct PID handling + group kill)
 
-set -u
+set -euo pipefail
 
 DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 cd "$DIR"
@@ -12,52 +12,82 @@ PORT="${PORT:-3000}"
 LOG="$DIR/logs.txt"
 PIDFILE="$DIR/server.pid"
 
-have_pid() { [ -n "${1:-}" ] && kill -0 "$1" 2>/dev/null; }
-
-# Optional line buffering (harmless if stdbuf missing)
-stdbuf_wrap() {
-  if command -v stdbuf >/dev/null 2>&1; then
-    echo "stdbuf -oL -eL $*"
-  else
-    echo "$*"
-  fi
-}
+have_pid() { local p="${1:-}"; [[ -n "$p" ]] && kill -0 "$p" 2>/dev/null; }
 
 start_server() {
-  if [ -f "$PIDFILE" ] && have_pid "$(cat "$PIDFILE" 2>/dev/null)"; then
+  if [[ -f "$PIDFILE" ]] && have_pid "$(cat "$PIDFILE" 2>/dev/null || true)"; then
     echo "Server already running (pid $(cat "$PIDFILE"))."
     return 0
   fi
 
-  # Overwrite logs each start (like 'tee' without -a). Remove this line to append instead.
+  # Overwrite logs each start (remove this line if you prefer to append)
   : > "$LOG"
 
-  CMD=$(stdbuf_wrap "\"$SERVER\" -p \"$PORT\"")
-  # Detach fully, write all output to logs.txt
-  nohup bash -lc "$CMD >> \"$LOG\" 2>&1" >/dev/null 2>&1 &
+  # Build the command: use stdbuf if present to keep line-flushed logs
+  if command -v stdbuf >/dev/null 2>&1; then
+    CMD=(stdbuf -oL -eL "$SERVER" -p "$PORT")
+  else
+    CMD=("$SERVER" -p "$PORT")
+  fi
+
+  # Detach fully, record the *server's* PID.
+  # If 'setsid' exists, put it in its own session so we can kill the whole group later.
+  if command -v setsid >/dev/null 2>&1; then
+    nohup setsid "${CMD[@]}" >>"$LOG" 2>&1 &
+  else
+    nohup "${CMD[@]}" >>"$LOG" 2>&1 &
+  fi
   echo $! > "$PIDFILE"
   echo "Server started (pid $(cat "$PIDFILE"))."
   echo "Logs → $LOG"
 }
 
 stop_server() {
-  if [ -f "$PIDFILE" ]; then
-    PID="$(cat "$PIDFILE" 2>/dev/null || true)"
-    if have_pid "$PID"; then
-      kill "$PID" 2>/dev/null || true
-      for _ in 1 2 3; do have_pid "$PID" || break; sleep 0.3; done
-      have_pid "$PID" && kill -9 "$PID" 2>/dev/null || true
-    fi
-    rm -f "$PIDFILE"
-    echo "Server stopped."
-  else
+  if [[ ! -f "$PIDFILE" ]]; then
     echo "No PID file; server may not be running."
+    return 0
   fi
+
+  local pid
+  pid="$(cat "$PIDFILE" 2>/dev/null || true)"
+  if ! have_pid "$pid"; then
+    echo "PID $pid not running; cleaning up pidfile."
+    rm -f "$PIDFILE"
+    return 0
+  fi
+
+  # Try to terminate the entire process group first (covers any children),
+  # then the main pid as a fallback. Negative PID = process group.
+  kill -TERM -"${pid}" 2>/dev/null || true
+  kill -TERM  "${pid}" 2>/dev/null || true
+
+  for _ in {1..10}; do
+    have_pid "$pid" || break
+    sleep 0.3
+  done
+
+  if have_pid "$pid"; then
+    echo "Force killing server (pid $pid)..."
+    kill -KILL -"${pid}" 2>/dev/null || true
+    kill -KILL  "${pid}" 2>/dev/null || true
+    for _ in {1..10}; do
+      have_pid "$pid" || break
+      sleep 0.2
+    done
+  fi
+
+  rm -f "$PIDFILE"
+  echo "Server stopped."
 }
 
 status_server() {
-  if [ -f "$PIDFILE" ] && have_pid "$(cat "$PIDFILE" 2>/dev/null)"; then
-    echo "Server: running (pid $(cat "$PIDFILE"))"
+  if [[ -f "$PIDFILE" ]]; then
+    local pid; pid="$(cat "$PIDFILE" 2>/dev/null || true)"
+    if have_pid "$pid"; then
+      echo "Server: running (pid $pid)"
+    else
+      echo "Server: stopped (stale pidfile: $pid)"
+    fi
   else
     echo "Server: stopped"
   fi
