@@ -971,16 +971,10 @@
   </object>
   <object id="352" name="Ball" type="SoccerBall" x="755" y="755">
    <properties>
+    <property name="Asset Name" value="soccer_ball"/>
     <property name="Direction" value="Down"/>
    </properties>
    <point/>
-  </object>
-  <object id="353" type="Custom Warp" gid="303" x="672.5" y="769.5" width="64" height="40">
-   <properties>
-    <property name="Direction" value="Down Right"/>
-    <property name="Target Area" value="Dungeon1"/>
-    <property name="Target Object" value="142"/>
-   </properties>
   </object>
  </objectgroup>
  <layer id="6" name="Tile Layer 2" width="50" height="50" offsetx="0" offsety="-16">
