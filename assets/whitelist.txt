@@ -104,11 +104,10 @@ f15ac4cd199c10be25fb48ef7ad316f2 Areagrab.Unified.Library.162
 f5b200a5a6defc1d69451ead69a88477 com.OFC.block.EXE6-013-UnderShirt
 
 ...........................class PlayerPackageManager............................
-2c161602ba727287b7bf060d3276c30f com.beaned.navi.megamanbn6_100
-8e5972064e1ed287a9f2fce17115e25c com.scilabs.cossack.player.fortepvp_100
-43367546fb1e07516cf96e358bd303d5 com.beaned.navi.megamanbn6_100
-716419d6a153541595f54bcc2f1aa5d6 com.scilabs.cossack.player.fortepvp_100
-69bbd8ba6628318c1b9424be2c00eb1e com.shadis.navi.adventure.Luigi
+926948c190aed4bd4b8320d981dec325 com.Loui.player.Elecman.basic
+3482863148ae4ffbc4dfe800d5e703f6 com.beaned.navi.megamanbn6.basic
+95f9abcdec7e81504d6ff841d1654932 com.scilabs.cossack.player.fortepvp.basic
+f0d97c53ef8daeeb1f6c3c26bd843715 com.shadis.navi.adventure.Luigi.basic
 6c78689ae81f84cb00c399e730849cb2 com.discord.imagiknight#0510.player.OreoEXEB
 b6de28d83fe9a2d5e7ad0965bc532644 61.Mannerek.Unified.Library
 9675acc834e29dff5c1eeaacf67a303b com.silva.navi.zarymura.adventure

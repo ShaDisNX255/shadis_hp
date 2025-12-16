@@ -71,6 +71,7 @@ local function _grant_lives_on_enter(player_id, area_id)
 
   _DUNGEON_LIVES[player_id] = {
     lives = others,
+    max_lives = others,
     dungeon_root = area_id,
   }
 
@@ -325,62 +326,118 @@ eznpcs.add_event{
   action = function(npc, player_id, dialogue, relay_object)
     return async(function()
       local area_id = Net.get_player_area(player_id)
+
+      local next_1 = nil
+      if dialogue and dialogue.custom_properties then
+        next_1 = dialogue.custom_properties["Next 1"]
+      end
+
       if not is_dungeon_area(area_id) then
-        if dialogue and dialogue.custom_properties then
-          return dialogue.custom_properties["Next 1"]
-        end
-        return nil
+        return next_1
       end
 
       local mug   = eznpcs.get_dialogue_mugshot(npc, player_id, dialogue)
       local props = (dialogue and dialogue.custom_properties) or {}
 
+      local function _msg(text)
+        if Async and Async.message_player then
+          await(Async.message_player(
+            player_id,
+            text,
+            mug and mug.texture_path,
+            mug and mug.animation_path
+          ))
+        else
+          Net.message_player(player_id, text)
+        end
+      end
+
+      -- --------------------------
+      -- HP HEAL (same behavior)
+      -- --------------------------
       local heal_cap = tonumber(
         props["Heal Amount"]
         or props["Heal"]
         or props["HP"]
       ) or 500
 
-      local cur_hp = Net.get_player_health(player_id)
-      local max_hp = Net.get_player_max_health(player_id)
-      local target = math.min(heal_cap, max_hp)
+      local cur_hp = tonumber(Net.get_player_health(player_id) or 0) or 0
+      local max_hp = tonumber(Net.get_player_max_health(player_id) or 0) or 0
+      local target_hp = math.min(heal_cap, max_hp)
 
-      if cur_hp >= target then
-        if Async and Async.message_player then
-          await(Async.message_player(
-            player_id,
-            string.format("You're already at %d HP.", cur_hp),
-            mug and mug.texture_path,
-            mug and mug.animation_path
-          ))
-        else
-          Net.message_player(player_id, string.format("You're already at %d HP.", cur_hp))
+      local hp_changed = false
+      local new_hp = cur_hp
+
+      if cur_hp < target_hp then
+        ezmemory.set_player_health(player_id, target_hp)
+        new_hp = tonumber(Net.get_player_health(player_id) or target_hp) or target_hp
+        hp_changed = true
+      end
+
+      -- --------------------------
+      -- LIVES REFILL (even if HP is max)
+      -- Refill to "current party size" lives:
+      --   lives = #other players in this dungeon area (capped by DungeonLivesCap)
+      -- --------------------------
+      local lives_changed = false
+      local new_lives = nil
+
+      do
+        local ids = Net.list_players(area_id) or {}
+        local others = 0
+        for _, pid in ipairs(ids) do
+          if pid ~= player_id then
+            others = others + 1
+          end
         end
-      else
-        ezmemory.set_player_health(player_id, target)
-        local new_hp = Net.get_player_health(player_id)
 
+        local cap = tonumber(Net.get_area_custom_property(area_id, "DungeonLivesCap") or 0) or 0
+        if cap > 0 then
+          others = math.min(others, cap)
+        end
+
+        local st = _DUNGEON_LIVES[player_id]
+        if st and type(st) == "table" then
+          local cur_lives = tonumber(st.lives or 0) or 0
+          new_lives = math.max(cur_lives, others) -- never reduce lives via healer
+          if new_lives ~= cur_lives then
+            st.lives = new_lives
+            lives_changed = true
+          end
+        else
+          -- If life state is missing but they're in a dungeon, recreate it
+          -- (only if they'd actually have >0 lives right now)
+          if others > 0 then
+            _DUNGEON_LIVES[player_id] = { lives = others, dungeon_root = area_id }
+            new_lives = others
+            lives_changed = true
+          end
+        end
+      end
+
+      -- Play SFX if anything was actually restored
+      if hp_changed or lives_changed then
         Net.play_sound_for_player(
           player_id,
           "/server/assets/ezlibs-assets/sfx/recover.ogg"
         )
-
-        if Async and Async.message_player then
-          await(Async.message_player(
-            player_id,
-            string.format("Recovered your HP to %d!", new_hp),
-            mug and mug.texture_path,
-            mug and mug.animation_path
-          ))
-        else
-          Net.message_player(player_id, string.format("Recovered your HP to %d!", new_hp))
-        end
       end
 
-      if dialogue and dialogue.custom_properties then
-        return dialogue.custom_properties["Next 1"]
+      -- One textbox message (covers all cases)
+      local lines = {}
+
+      if hp_changed then
+        table.insert(lines, string.format("Recovered your HP to %d!", new_hp))
+      else
+        table.insert(lines, string.format("You're already at %d HP.", cur_hp))
       end
-      return nil
+
+      if lives_changed and new_lives ~= nil then
+        table.insert(lines, string.format("Your extra lives were restored. Lives left: %d", new_lives))
+      end
+
+      _msg(table.concat(lines, "\n"))
+      return next_1
     end)
   end
 }

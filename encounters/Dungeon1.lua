@@ -218,7 +218,13 @@ local give_result_awards = function (player_id, encounter_info, stats)
 
   -- Keep ezmemory in sync with the final HP the player ends up with after the HP+ reward
   -- (so the next encounter/persisted state matches what the client shows)
-  local final_hp = _final_persist_hp(player_id, (stats.health or 0) + hp_bonus)
+  local final_hp = (stats.health or 0) + hp_bonus
+
+  -- Only protect against "life revive" overwriting HP on a LOSS in a dungeon.
+  if _in_dungeon(player_id) and flags.lost then
+    final_hp = _final_persist_hp(player_id, final_hp)
+  end
+
   local final_stats = { health = final_hp, emotion = stats.emotion }
   persist_health_and_emotion(player_id, encounter_info, final_stats)
 end
@@ -268,9 +274,12 @@ local mini_boss_rewards = function (player_id, encounter_info, stats)
     Net.send_player_battle_rewards(player_id, rewards)
   end
 
-  -- Keep ezmemory in sync with the final HP the player ends up with after the HP+ reward
-  -- (so the next encounter/persisted state matches what the client shows)
-  local final_hp = _final_persist_hp(player_id, (stats.health or 0) + hp_bonus)
+  local final_hp = (stats.health or 0) + hp_bonus
+
+  if _in_dungeon(player_id) and flags.lost then
+    final_hp = _final_persist_hp(player_id, final_hp)
+  end
+
   local final_stats = { health = final_hp, emotion = stats.emotion }
   persist_health_and_emotion(player_id, encounter_info, final_stats)
 end
@@ -783,16 +792,16 @@ local MainBoss = {
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     weight=0,
     enemies={
-        {name="ShadeMan",rank=3},
-        {name="Metrid",rank=2},
         {name="MegaBunny",rank=1},
+        {name="ShadeMan",rank=1},
+        {name="Metrid",rank=2},
     },
     obstacles={
     },
     positions={
-        {0,0,0,2,0,0},
-        {0,0,0,0,1,0},
-        {0,0,0,0,0,3},
+        {0,0,0,3,0,0},
+        {0,0,0,0,2,0},
+        {0,0,0,1,0,0},
     },
     obstacle_positions={
         {0,0,0,0,0,0},
