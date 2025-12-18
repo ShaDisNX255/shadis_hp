@@ -427,9 +427,9 @@ eznpcs.add_event{
       local lines = {}
 
       if hp_changed then
-        table.insert(lines, string.format("Recovered your HP to %d!", new_hp))
+        table.insert(lines, string.format("See? Didn't even explode this time. Proud of us~<3! Recovered your HP to %d!", new_hp))
       else
-        table.insert(lines, string.format("You're already at %d HP.", cur_hp))
+        table.insert(lines, string.format("Oi, you're already perfect! What am I, a glorified cheerleader? You're already at %d HP.", cur_hp))
       end
 
       if lives_changed and new_lives ~= nil then

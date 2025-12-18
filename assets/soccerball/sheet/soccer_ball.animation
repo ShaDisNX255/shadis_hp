@@ -1,0 +1,47 @@
+animation state="IDLE_U"
+frame duration="0.1" x="0" y="0" w="29" h="29" originx="14" originy="14"
+
+animation state="IDLE_UR"
+frame duration="0.1" x="0" y="0" w="29" h="29" originx="14" originy="14"
+
+animation state="IDLE_R"
+frame duration="0.1" x="0" y="0" w="29" h="29" originx="14" originy="14"
+
+animation state="IDLE_DR"
+frame duration="0.1" x="0" y="0" w="29" h="29" originx="14" originy="14"
+
+animation state="IDLE_D"
+frame duration="0.1" x="0" y="0" w="29" h="29" originx="14" originy="14"
+
+animation state="IDLE_DL"
+frame duration="0.1" x="0" y="0" w="29" h="29" originx="14" originy="14"
+
+animation state="IDLE_L"
+frame duration="0.1" x="0" y="0" w="29" h="29" originx="14" originy="14"
+
+animation state="IDLE_UL"
+frame duration="0.1" x="0" y="0" w="29" h="29" originx="14" originy="14"
+
+animation state="WALK_U"
+frame duration="0.1" x="0" y="0" w="29" h="29" originx="14" originy="14"
+
+animation state="WALK_UR"
+frame duration="0.1" x="0" y="0" w="29" h="29" originx="14" originy="14"
+
+animation state="WALK_R"
+frame duration="0.1" x="0" y="0" w="29" h="29" originx="14" originy="14"
+
+animation state="WALK_DR"
+frame duration="0.1" x="0" y="0" w="29" h="29" originx="14" originy="14"
+
+animation state="WALK_D"
+frame duration="0.1" x="0" y="0" w="29" h="29" originx="14" originy="14"
+
+animation state="WALK_DL"
+frame duration="0.1" x="0" y="0" w="29" h="29" originx="14" originy="14"
+
+animation state="WALK_L"
+frame duration="0.1" x="0" y="0" w="29" h="29" originx="14" originy="14"
+
+animation state="WALK_UL"
+frame duration="0.1" x="0" y="0" w="29" h="29" originx="14" originy="14"
