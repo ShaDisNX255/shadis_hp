@@ -476,14 +476,29 @@ function ezmemory.get_player_fragments(player_id)
     if not (Net.get_player_fragments and Net.set_player_fragments) then
         return nil
     end
+
     local safe_secret = helpers.get_safe_player_secret(player_id)
-    local player_memory = ezmemory.get_player_memory(safe_secret)
-    if player_memory.fragments == nil then
-        player_memory.fragments = Net.get_player_fragments(player_id) or 0
+    local pm = ezmemory.get_player_memory(safe_secret)
+
+    local net_frags = tonumber(Net.get_player_fragments(player_id) or 0) or 0
+    local mem_frags = tonumber(pm.fragments or net_frags) or net_frags
+
+    -- Merge upward so we never "lose" frags that were granted outside ezmemory.
+    local merged = math.max(net_frags, mem_frags)
+
+    if pm.fragments ~= merged then
+        pm.fragments = merged
         ezmemory.save_player_memory(safe_secret)
     end
-    return player_memory.fragments
+
+    -- If net is behind memory (rare, but possible), keep client/server in sync too.
+    if net_frags ~= merged then
+        Net.set_player_fragments(player_id, merged)
+    end
+
+    return merged
 end
+
 
 function ezmemory.set_player_fragments(player_id, fragments)
     if not (Net.get_player_fragments and Net.set_player_fragments) then
