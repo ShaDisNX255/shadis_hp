@@ -190,7 +190,7 @@
     <property name="Asset Name" value="shademan-exe5"/>
     <property name="Dialogue Type" value="first"/>
     <property name="Direction" value="Down Right"/>
-    <property name="Next 1" type="object" value="154"/>
+    <property name="Next 1" type="object" value="156"/>
     <property name="Text 1" value="Heh... so... you... you've made it... this far... Funny... I... I know what I am... I... am not... but... I... I'LL... DELETE... YOU!"/>
    </properties>
    <point/>
@@ -336,11 +336,11 @@
    <properties>
     <property name="Already Defeated Message" value="-It will not engage again."/>
     <property name="Boss Defeated Message" value="...N-no... this... can't be... I... I... am... not... I... I... CAN'T... EXIST... Heh... heh... hahaha... Fragments... breaking... ...chaos... remains..."/>
-    <property name="Boss Encounter HP" type="int" value="1000"/>
+    <property name="Boss Encounter HP" type="int" value="600"/>
     <property name="Boss ID" value="MainBoss"/>
     <property name="Boss ID Match" value="ShadeMan"/>
     <property name="Boss Memory Area" value="Dungeon1"/>
-    <property name="Boss Pool Max HP" type="int" value="10000"/>
+    <property name="Boss Pool Max HP" type="int" value="1200"/>
     <property name="Dialogue Type" value="none"/>
     <property name="Encounter Name" value="MainBoss"/>
     <property name="Event Name" value="MainBoss"/>
@@ -428,23 +428,7 @@
    </properties>
    <point/>
   </object>
-  <object id="154" name="Next 1" type="Dialogue" x="73" y="907">
-   <properties>
-    <property name="Dialogue Type" value="first"/>
-    <property name="Next 1" type="object" value="155"/>
-    <property name="Text 1" value="You... think... you... can stop me? Hahaha... HAH...HA! I'm... not bound... by... the rules... of this world... I'm... CHAOS... INCARNATE!"/>
-   </properties>
-   <point/>
-  </object>
-  <object id="155" name="Next 1" type="Dialogue" x="67.5" y="926.5">
-   <properties>
-    <property name="Dialogue Type" value="first"/>
-    <property name="Next 1" type="object" value="156"/>
-    <property name="Text 1" value="Come... come on... let's see... if... if you... can survive... the darkness..."/>
-   </properties>
-   <point/>
-  </object>
-  <object id="156" name="Question" type="Dialogue" x="61" y="943">
+  <object id="156" name="Question" type="Dialogue" x="63" y="915">
    <properties>
     <property name="Dialogue Type" value="question"/>
     <property name="Mugshot" value="Blank"/>
