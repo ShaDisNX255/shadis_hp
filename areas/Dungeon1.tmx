@@ -336,11 +336,11 @@
    <properties>
     <property name="Already Defeated Message" value="-It will not engage again."/>
     <property name="Boss Defeated Message" value="...N-no... this... can't be... I... I... am... not... I... I... CAN'T... EXIST... Heh... heh... hahaha... Fragments... breaking... ...chaos... remains..."/>
-    <property name="Boss Encounter HP" type="int" value="6000"/>
+    <property name="Boss Encounter HP" type="int" value="1000"/>
     <property name="Boss ID" value="MainBoss"/>
     <property name="Boss ID Match" value="ShadeMan"/>
     <property name="Boss Memory Area" value="Dungeon1"/>
-    <property name="Boss Pool Max HP" type="int" value="60000"/>
+    <property name="Boss Pool Max HP" type="int" value="10000"/>
     <property name="Dialogue Type" value="none"/>
     <property name="Encounter Name" value="MainBoss"/>
     <property name="Event Name" value="MainBoss"/>

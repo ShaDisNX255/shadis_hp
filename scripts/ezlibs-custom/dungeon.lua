@@ -1362,7 +1362,7 @@ local MAIN_BOSS_DIALOGUE_EVENT = {
       -- Stash ctx so battle_results can apply pool damage
       local boss_encounter_hp = props["Boss Encounter HP"] or props["Enemy HP"] or props["Encounter HP"] or nil
       local boss_id_match     = props["Boss ID Match"] or props["Boss Name Match"] or props["Boss Match"] or nil
-      local win_damage        = props["Win Damage"] or nil
+      local win_damage        = props["Boss Encounter HP"] or nil
 
       dungeon._boss_fight_ctx[player_id] = {
         kind = "MainBoss",
