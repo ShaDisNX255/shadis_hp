@@ -3,6 +3,9 @@ local helpers  = require('scripts/ezlibs-scripts/helpers')
 local ygo_pvp  = require('scripts/ezlibs-custom/ygo_pvp')
 local jobbbs  = require('scripts/jobbbs/JobBBS')
 local fishing  = require('scripts/ezlibs-custom/fishing')
+local secret  = require('scripts/ezlibs-custom/secret_path_switch')
+local dungeon  = require('scripts/ezlibs-custom/dungeon')
+local soccerball  = require('scripts/ezlibs-custom/soccerball')
 -- Optional L-Menu (net-games) support
 local LMenu
 do
@@ -3598,7 +3601,6 @@ end)
 -- Clean up on join/leave
 Net:on("player_join", function(event)
   local pid = event.player_id
-  log("player_join pid", pid)
   player_using_card_bbs[pid] = false
   in_actions_menu[pid] = false
   pending_actions_menu[pid] = false

@@ -91,17 +91,14 @@ Month.EVENTS = {
    }
  },
   {
-   id   = "PrizeTest-291125-2",
+   id   = "PrizeTest-021225-2",
    name = "Prize Test",
-   start = "2025-11-29",
-   ["end"] = "2025-11-29",
+   start = "2025-12-03",
+   ["end"] = "2025-12-03",
    rewards = {
      cosmetics = {
-       { id = "Wave1", label = "Wave1" },
+       { id = "ShadowAura", label = "ShadowAura" },
      },
-      items_inline = {
-        { type="item", name="[UR]F.A.DMag", description="FullArt: Dark Magician - A: 2500 / D: 2100", amount=1 }
-      },
    }
  },
 }

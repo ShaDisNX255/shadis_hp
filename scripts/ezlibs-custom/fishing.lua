@@ -1810,7 +1810,7 @@ Net:on("object_interaction", function(ev)
     local have_bug  = _count_item(pid, bug_name)
 
     -- 1) Show counts as a standalone message (waits for close)
-    local prompt = string.format("You have %d bait and %d bugfrags.", have_bait, have_bug)
+    local prompt = string.format("You have %d bait and %d BugBait.", have_bait, have_bug)
     await(Async.message_player(pid, prompt))
 
     -- 2) Then ask how to proceed with a quiz
@@ -1818,7 +1818,7 @@ Net:on("object_interaction", function(ev)
     local ans = await(Async.quiz_player(pid,
       "No item",  -- 0
       "Use bait",            -- 1
-      "Use bugfrag"          -- 2
+      "Use BugBait"          -- 2
     ))
 
     if ans == 1 then
@@ -1831,9 +1831,9 @@ Net:on("object_interaction", function(ev)
     elseif ans == 2 then
       -- Use bugfrag
       if have_bug <= 0 then
-        _queue_start_after_message(pid, "No bugfrags left, fishing without bugfrags...", { used_bait=false, used_bugfrag=false })
+        _queue_start_after_message(pid, "No BugBait left, fishing without BugBait...", { used_bait=false, used_bugfrag=false })
       else
-        _queue_start_after_message(pid, "Using bugfrag...", { used_bait=false, used_bugfrag=true })
+        _queue_start_after_message(pid, "Using BugBait...", { used_bait=false, used_bugfrag=true })
       end
     else
       -- Fish without items

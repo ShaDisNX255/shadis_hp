@@ -22,10 +22,17 @@ local Teams = {}
 -- IMPORTANT: must be a real area id that always exists (e.g., the map where these boards live)
 local TEAM_DATA_AREA_ID = "teamshq"
 
--- Team names (reusable for other servers; nothing hard-coded)
-local TEAM_NAMES = {
+-- Team names (default + optional per-month overrides)
+local TEAM_NAMES_DEFAULT = {
   [1] = "Team Protoman",
   [2] = "Team Colonel",
+}
+
+-- Set names per month here:
+-- key format must match _month_key() => "YYYY-MM"
+local TEAM_NAMES_BY_MONTH = {
+  ["2025-12"] = { [1] = "Team Protoman", [2] = "Team Colonel" },
+  ["2026-01"] = { [1] = "Team Megaman",  [2] = "Team Bass"    },
 }
 
 -- Object types for map objects (press A to open)
@@ -170,9 +177,28 @@ local function _save_area()
   end
 end
 
+local function _copy_team_names(src)
+  return {
+    [1] = tostring(src and src[1] or ""),
+    [2] = tostring(src and src[2] or ""),
+  }
+end
+
+local function _names_for_month(month_key)
+  local override = TEAM_NAMES_BY_MONTH and TEAM_NAMES_BY_MONTH[month_key]
+  if override then return _copy_team_names(override) end
+  return _copy_team_names(TEAM_NAMES_DEFAULT)
+end
+
 local function _roll_month_if_needed()
   local mem, t = _amem()
   local now_key = _month_key()
+
+  -- Lock team names per month so "Last Month" keeps the old names
+  t.names_by_month = t.names_by_month or {}
+  if t.month_key and not t.names_by_month[t.month_key] then
+    t.names_by_month[t.month_key] = _names_for_month(t.month_key)
+  end
 
   -- Month rollover: finalize last month into t.prev
   if t.month_key and t.month_key ~= now_key and t.month then
@@ -206,6 +232,7 @@ local function _roll_month_if_needed()
     end
 
     local mkey = t.month_key
+    local prev_names = t.names_by_month[mkey] or _names_for_month(mkey)
     local s1, g1 = top_of(p1, mkey, 1)
     local s2, g2 = top_of(p2, mkey, 2)
 
@@ -231,7 +258,8 @@ local function _roll_month_if_needed()
       totals    = { [1]=tot1, [2]=tot2 },
       roster    = { [1]=_count_keys(p1.roster), [2]=_count_keys(p2.roster) },
       top       = { [1]={secret=s1, gp=g1 or 0}, [2]={secret=s2, gp=g2 or 0} },
-      winner    = win
+      winner    = win,
+      names     = prev_names
     }
 
     ------------------------------------------------------------------------
@@ -275,7 +303,7 @@ local function _roll_month_if_needed()
           end
 
           local who = (_last_known_name and _last_known_name(secret, t)) or ("secret:"..tostring(secret):sub(1,6))
-          local team_name = (TEAM_NAMES and TEAM_NAMES[team_idx]) or ("Team "..tostring(team_idx))
+          local team_name = (prev_names and prev_names[team_idx]) or ("Team "..tostring(team_idx))
           print(("[TEAMS] Auto-kick %s from %s: %d GP < %d; now independent for %s")
             :format(who, team_name, gp, min_keep, new_key))
         end
@@ -296,6 +324,11 @@ local function _roll_month_if_needed()
     }
   end
 
+  -- Ensure this month's names are locked too
+  if not t.names_by_month[now_key] then
+    t.names_by_month[now_key] = _names_for_month(now_key)
+  end
+
   t.names = t.names or {}
   _save_area()
   return mem, t
@@ -306,6 +339,11 @@ local function _pmem(pid)
   local secret = helpers.get_safe_player_secret(pid)
   local pmem   = ezmemory.get_player_memory(secret) or {}
   pmem.teams   = pmem.teams or {}
+
+  -- Backfill/ensure optional tables exist (older/new saves)
+  pmem.teams.hist          = pmem.teams.hist or {}
+  pmem.teams.claimed       = pmem.teams.claimed or {}
+  pmem.teams.events_claimed = pmem.teams.events_claimed or {}
 
   pmem.teams.current = pmem.teams.current or {
     team             = nil,
@@ -347,7 +385,12 @@ end
 -- =========================
 -- ====== NAMES/ROSTER =====
 -- =========================
-local function _team_name(i) return TEAM_NAMES[i] or ("Team "..tostring(i)) end
+local function _team_name(i, t_mem, month_key)
+  if not t_mem then _, t_mem = _roll_month_if_needed() end
+  local key = month_key or (t_mem and t_mem.month_key) or _month_key()
+  local names = (t_mem.names_by_month and t_mem.names_by_month[key]) or TEAM_NAMES_DEFAULT
+  return names[i] or ("Team "..tostring(i))
+end
 
 local function _get_display_name(pid)
   local ok, name = pcall(Net.get_player_name, pid)
@@ -1186,10 +1229,11 @@ local function _open_scores_board(pid)
     local pt2 = tonumber(pt[2] or 0)
     local pr1 = tonumber(pr[1] or 0)
     local pr2 = tonumber(pr[2] or 0)
-    posts[#posts+1] = { id="__teamscores:pt1_name",   read=true, title=_team_name(1), author="" }
+    local prev_key = t_mem.prev.month_key
+    posts[#posts+1] = { id="__teamscores:pt1_name",   read=true, title=_team_name(1, t_mem, prev_key), author="" }
     posts[#posts+1] = { id="__teamscores:pt1_total",  read=true, title=("- Total GP: "..tostring(pt1)), author="" }
     posts[#posts+1] = { id="__teamscores:pt1_roster", read=true, title=("- Members: "..tostring(pr1)), author="" }
-    posts[#posts+1] = { id="__teamscores:pt2_name",   read=true, title=_team_name(2), author="" }
+    posts[#posts+1] = { id="__teamscores:pt2_name",   read=true, title=_team_name(2, t_mem, prev_key), author="" }
     posts[#posts+1] = { id="__teamscores:pt2_total",  read=true, title=("- Total GP: "..tostring(pt2)), author="" }
     posts[#posts+1] = { id="__teamscores:pt2_roster", read=true, title=("- Members: "..tostring(pr2)), author="" }
   end
@@ -1409,14 +1453,15 @@ local function _handle_team_action(pid, post_id)
     local min_win = tonumber(rset.min_gp_for_payout or 0)
     local min_con = tonumber(rset.min_gp_for_consolation or 0)
 
-    pm2.teams.claimed[month_key] = pm2.teams.claimed[month_key] or { team=false, top=false, losing=false }
-    local flags = pm2.teams.claimed[month_key]
-
     local hist = pm2.teams.hist and pm2.teams.hist[month_key]
     if not hist or not hist.team then
       Net.message_player(pid, "You were not on a team last month.")
       return true
     end
+
+    pm2.teams.claimed = pm2.teams.claimed or {}
+    pm2.teams.claimed[month_key] = pm2.teams.claimed[month_key] or { team=false, top=false, losing=false }
+    local flags = pm2.teams.claimed[month_key]
 
     local my_team = hist.team
     local my_gp   = tonumber(hist.gp or 0)
@@ -1529,5 +1574,11 @@ end
 
 -- Optional debug helper
 function Teams.debug_add_gp(pid, n) _add_gp(pid, n or 1, "debug") end
+
+-- Public helper for other systems (pets, etc.) to award GP using the SAME capped rules.
+-- This calls the internal _add_gp() logic so all caps and month tracking remain centralized.
+function Teams.award_activity_gp(pid, amount, why)
+  _add_gp(pid, amount or 1, why or "pet expedition")
+end
 
 return Teams

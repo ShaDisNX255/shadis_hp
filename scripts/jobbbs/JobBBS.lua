@@ -121,7 +121,8 @@ local function job_category(job_id)
   if job_id:match('^virus')   then return 'virus'   end
   if job_id:match('^duel')    then return 'duel'    end
   if job_id:match('^pack')    then return 'pack'    end
-  if job_id:match('^fish')   then return 'fish'   end
+  if job_id:match('^raid')    then return 'raid'    end
+  if job_id:match('^fish')    then return 'fish'    end
   return nil
 end
 
@@ -377,6 +378,14 @@ local REWARDS = {
   fish_virus_lake3  = { money = 45000 },
   fish_virus_lake6  = { money = 70000 },
   fish_virus_lake9  = { money = 80000 },
+  -- Raids
+  raid_wave2     = { money = 30000 },
+  raid_wave4     = { money = 50000 },
+  raid_pts30     = { money = 45000 },
+  raid_pts60     = { money = 65000 },
+  raid_bdmg500   = { money = 50000 },
+  raid_bdmg1500  = { money = 80000 },
+  raid_kill      = { money = 100000 },
 }
 
 local function give_money(pid, amount)
@@ -771,6 +780,84 @@ local function jobs_pool()
       local cur  = (st.prog.fish.catches or 0) - (base.catches or 0); return cur>=12, cur, 12
     end)
 
+  -- Raid (uses st.prog.raid from raids.lua callbacks)
+  J('raid_wave2', 'Raid Help', 'Mr. Prog', 'LVL1: Participate in 2 raid battles.',
+    function(pid, st, base_key)
+      st.prog.raid = st.prog.raid or {}
+      local base = st.prog.baseline
+                  and st.prog.baseline[base_key]
+                  and st.prog.baseline[base_key].raid or nil
+      local cur = st.prog.raid.battles or 0
+      local n = math.max(0, cur - ((base and base.battles) or 0))
+      return n>=2, n, 2
+    end)
+
+  J('raid_wave4', 'Raid Help', 'Mr. Prog', 'LVL2: Participate in 4 raid battles.',
+    function(pid, st, base_key)
+      st.prog.raid = st.prog.raid or {}
+      local base = st.prog.baseline
+                  and st.prog.baseline[base_key]
+                  and st.prog.baseline[base_key].raid or nil
+      local cur = st.prog.raid.battles or 0
+      local n = math.max(0, cur - ((base and base.battles) or 0))
+      return n>=4, n, 4
+    end)
+
+  J('raid_pts30', 'Raid Pts', 'ShaDisNX', 'LVL1: Earn 30 raid points from any raid.',
+    function(pid, st, base_key)
+      st.prog.raid = st.prog.raid or {}
+      local base = st.prog.baseline
+                  and st.prog.baseline[base_key]
+                  and st.prog.baseline[base_key].raid or nil
+      local cur = st.prog.raid.points or 0
+      local n = math.max(0, cur - ((base and base.points) or 0))
+      return n>=30, n, 30
+    end)
+
+  J('raid_pts60', 'Raid Pts', 'ShaDisNX', 'LVL2: Earn 60 raid points from any raid.',
+    function(pid, st, base_key)
+      st.prog.raid = st.prog.raid or {}
+      local base = st.prog.baseline
+                  and st.prog.baseline[base_key]
+                  and st.prog.baseline[base_key].raid or nil
+      local cur = st.prog.raid.points or 0
+      local n = math.max(0, cur - ((base and base.points) or 0))
+      return n>=60, n, 60
+    end)
+
+  J('raid_bdmg500', 'Boss Dmg', 'ShaDisNX', 'LVL1: Deal 500 damage to a raid boss.',
+    function(pid, st, base_key)
+      st.prog.raid = st.prog.raid or {}
+      local base = st.prog.baseline
+                  and st.prog.baseline[base_key]
+                  and st.prog.baseline[base_key].raid or nil
+      local cur = st.prog.raid.boss_dmg or 0
+      local n = math.max(0, cur - ((base and base.boss_dmg) or 0))
+      return n>=500, n, 500
+    end)
+
+  J('raid_bdmg1500', 'Boss Dmg', 'ShaDisNX', 'LVL2: Deal 1500 damage to raid bosses.',
+    function(pid, st, base_key)
+      st.prog.raid = st.prog.raid or {}
+      local base = st.prog.baseline
+                  and st.prog.baseline[base_key]
+                  and st.prog.baseline[base_key].raid or nil
+      local cur = st.prog.raid.boss_dmg or 0
+      local n = math.max(0, cur - ((base and base.boss_dmg) or 0))
+      return n>=1500, n, 1500
+    end)
+
+  J('raid_kill', 'Boss Kill', 'ShaDisNX', 'LVL MAX: Land the finishing blow on a raid boss.',
+    function(pid, st, base_key)
+      st.prog.raid = st.prog.raid or {}
+      local base = st.prog.baseline
+                  and st.prog.baseline[base_key]
+                  and st.prog.baseline[base_key].raid or nil
+      local cur = st.prog.raid.boss_kills or 0
+      local n = math.max(0, cur - ((base and base.boss_kills) or 0))
+      return n>=1, n, 1
+    end)
+
   -- Big Fish (HowlerMan) - N: 10,15,20 (single catch)
   local function _big_single_check(pid, st, base_key, need_lb)
     st.prog.fish = st.prog.fish or {}
@@ -880,6 +967,12 @@ end
       'fish_streak3','fish_streak4','fish_streak5','fish_streak6',
       'fish_virus_lake3','fish_virus_lake6','fish_virus_lake9'
     },
+    raid    = {
+      'raid_wave2','raid_wave4',
+      'raid_pts30','raid_pts60',
+      'raid_bdmg500','raid_bdmg1500',
+      'raid_kill'
+    },
   }
   return P, CATS
 end
@@ -943,7 +1036,7 @@ local function ensure_jobs_for_today(pid, st, board_id)
 
   -- (Re)pick today's jobs deterministically
   local pool, cats = jobs_pool()
-  local order = { 'visit','npc','inspect','virus','duel','pack','fish' }
+  local order = { 'visit','npc','inspect','virus','duel','pack','fish', 'raid' }
   local ids = {}
   for _, cat in ipairs(order) do
     local list = cats[cat]
@@ -1338,6 +1431,12 @@ function JobBBS.handle_textbox_response(pid, response)
             virus_wins  = (st.prog.fish and st.prog.fish.virus_wins)  or 0,
             last_w      = (st.prog.fish and st.prog.fish.last_w)      or 0,
           },
+          raid = {
+            battles    = (st.prog.raid and st.prog.raid.battles)    or 0,
+            points     = (st.prog.raid and st.prog.raid.points)     or 0,
+            boss_dmg   = (st.prog.raid and st.prog.raid.boss_dmg)   or 0,
+            boss_kills = (st.prog.raid and st.prog.raid.boss_kills) or 0,
+          },
         }
         local cat = job_category(job.id)
         if cat then activate_category(st, cat) end
@@ -1618,6 +1717,36 @@ function JobBBS.on_fish_virus_result(pid, info)
     st.prog.fish.virus_wins = (st.prog.fish.virus_wins or 0) + 1
     save_mem(pid, st)
   end
+end
+
+function JobBBS.on_raid_progress(pid, info)
+  ensure_daily_reset(pid)
+  local st = attach_state(pid); if not st then return end
+  st.prog = st.prog or {}
+  st.prog.active = st.prog.active or {}
+  if not st.prog.active.raid then return end
+
+  st.prog.raid = st.prog.raid or { battles=0, points=0, boss_dmg=0, boss_kills=0 }
+
+  local pts        = tonumber(info and info.points) or 0
+  local boss_dmg   = tonumber(info and (info.boss_damage or info.boss_dmg)) or 0
+  local killed     = info and info.killed
+
+  -- Any non-zero award counts as “participated in 1 raid battle”
+  if pts > 0 then
+    st.prog.raid.points   = (st.prog.raid.points   or 0) + pts
+    st.prog.raid.battles  = (st.prog.raid.battles  or 0) + 1
+  end
+
+  if boss_dmg > 0 then
+    st.prog.raid.boss_dmg = (st.prog.raid.boss_dmg or 0) + boss_dmg
+  end
+
+  if killed then
+    st.prog.raid.boss_kills = (st.prog.raid.boss_kills or 0) + 1
+  end
+
+  save_mem(pid, st)
 end
 
 return JobBBS

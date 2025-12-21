@@ -616,7 +616,7 @@
     <property name="Dialogue Type" value="first"/>
     <property name="Direction" value="Up Left"/>
     <property name="Next 1" type="object" value="162"/>
-    <property name="Text 1" value="Hey kid... want some bugfrags?"/>
+    <property name="Text 1" value="Hey kid... want some BugBait?"/>
    </properties>
    <point/>
   </object>
@@ -634,10 +634,10 @@
    </properties>
    <point/>
   </object>
-  <object id="161" name="bugfrag" type="Item" x="645" y="1459.5">
+  <object id="161" name="bugbait" type="Item" x="645" y="1459.5">
    <properties>
-    <property name="Description" value="Bugfrag to fish"/>
-    <property name="Name" value="bugfrag"/>
+    <property name="Description" value="Bugbait to fish"/>
+    <property name="Name" value="BugBait"/>
     <property name="Price" value="10000"/>
     <property name="Type" value="item"/>
    </properties>
@@ -649,7 +649,7 @@
     <property name="Next 1" type="object" value="159"/>
     <property name="Next 2" type="object" value="160"/>
     <property name="Next 3" type="object" value="163"/>
-    <property name="Text 1" value="Buy bugfrags"/>
+    <property name="Text 1" value="Buy BugBait"/>
     <property name="Text 2" value="Explain"/>
     <property name="Text 3" value="Cancel"/>
    </properties>

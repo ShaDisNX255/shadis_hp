@@ -135,7 +135,37 @@ local cfg = {
   online_text_y      = 48,    -- logical Y for number
   online_text_z      = 230,   -- text Z-order (should be above tab)
   online_text_scale  = 1.5,   -- GRADIENT_GREEN font scale
+
+  -- Camera fade (dims the world while LMenu is open)
+  fade_enabled = true,
+  fade_color   = { r = 0, g = 0, b = 0 }, -- black
+  fade_alpha   = 120,   -- 0..255 (how dark it gets while menu is open)
+  fade_in_sec  = 0.08,  -- tweak 0.05..0.15
+  fade_out_sec = 0.08,
 }
+
+local function lmenu_fade(pid, alpha, duration)
+  if not (cfg.fade_enabled and Net and Net.fade_player_camera) then
+    return
+  end
+
+  local base = cfg.fade_color or { r = 0, g = 0, b = 0 }
+  local a = tonumber(alpha) or 0
+  if a < 0 then a = 0 end
+  if a > 255 then a = 255 end
+
+  local color = {
+    r = tonumber(base.r) or 0,
+    g = tonumber(base.g) or 0,
+    b = tonumber(base.b) or 0,
+    a = a,
+  }
+
+  local ok, err = pcall(Net.fade_player_camera, pid, color, tonumber(duration) or 0)
+  if not ok then
+    warn("fade_player_camera failed for", pid, ":", tostring(err))
+  end
+end
 
 -- Sprite IDs (unique per row)
 local SPRITE_ID_CARDS      = "lmenu_cards"
@@ -181,25 +211,40 @@ end
 -- Sound effects
 -- ---------------------------------------------------------------------------
 
-local sfx = {
-  choose = "/server/assets/sfx/card_choose.ogg",
-  select = "/server/assets/sfx/card_select.ogg",
-  cancel = "/server/assets/sfx/card_cancel.ogg",
-}
+-- ---------------------------------------------------------------------------
+-- Sound effects (global)
+-- ---------------------------------------------------------------------------
 
+local UI_SFX = rawget(_G, "UI_SFX")
+if type(UI_SFX) ~= "table" then
+  UI_SFX = {}
+  _G.UI_SFX = UI_SFX
+end
+
+UI_SFX.paths = UI_SFX.paths or {}
+UI_SFX.paths.choose      = UI_SFX.paths.choose      or "/server/assets/sfx/card_choose.ogg"
+UI_SFX.paths.select      = UI_SFX.paths.select      or "/server/assets/sfx/card_select.ogg"
+UI_SFX.paths.cancel      = UI_SFX.paths.cancel      or "/server/assets/sfx/card_cancel.ogg"
+UI_SFX.paths.screen_open = UI_SFX.paths.screen_open or "/server/assets/sfx/card_screen_open.ogg"
+
+if type(UI_SFX.play) ~= "function" then
+  function UI_SFX.play(pid, key)
+    if not (Net and Net.play_sound_for_player) then return end
+    local path = UI_SFX.paths and UI_SFX.paths[key]
+    if not path then return end
+
+    local ok, err = pcall(Net.play_sound_for_player, pid, path)
+    if not ok then
+      warn("play_sound_for_player failed for", pid, ":", tostring(err))
+    end
+  end
+end
+
+-- keep old local helper so the rest of LMenu.lua doesn't need refactors
 local function play_sfx(pid, key)
-  if not (Net and Net.play_sound_for_player) then
-    return
-  end
-
-  local path = sfx[key]
-  if not path then
-    return
-  end
-
-  local ok, err = pcall(Net.play_sound_for_player, pid, path)
-  if not ok then
-    warn("play_sound_for_player failed for", pid, ":", tostring(err))
+  local UI = rawget(_G, "UI_SFX")
+  if UI and type(UI.play) == "function" then
+    pcall(UI.play, pid, key)
   end
 end
 
@@ -233,6 +278,8 @@ end
 --    rows   = { { id="cards" }, { id="summon" } / { id="unsummon" } , { id="friends" }, { id="cosmetics" } },
 -- }
 local st_by_pid = {}
+
+local opened_once = {}
 
 -- ---------------------------------------------------------------------------
 -- Online player counter (number only, drawn with GRADIENT_GREEN font)
@@ -698,7 +745,12 @@ function LMenu.open(pid)
   else
     warn("Net.lock_player_input not available; LMenu cannot lock player input.")
   end
-
+  if not opened_once[pid] then
+    play_sfx(pid, "screen_open")
+    opened_once[pid] = true
+  end
+  -- Fade in (dim background) while menu opens
+  lmenu_fade(pid, cfg.fade_alpha or 0, cfg.fade_in_sec or 0)
   rebuild_and_redraw(pid)
   ensure_line_ui(pid)
   ensure_online_tab_ui(pid)
@@ -726,8 +778,11 @@ function LMenu.close(pid, opts)
     else
       warn("Net.unlock_player_input not available; player may remain locked.")
     end
+    -- ONLY reset the "screen_open" gate on a full close
+    opened_once[pid] = nil
   end
-
+  -- Fade out (restore camera) when menu closes
+  lmenu_fade(pid, 0, cfg.fade_out_sec or 0)
   log("Closed LMenu for", pid)
 end
 
@@ -1043,6 +1098,7 @@ if Net and Net.on then
         end
 
         if did_any then
+		  play_sfx(pid, "cancel")
           return
         end
       end
@@ -1054,11 +1110,32 @@ if Net and Net.on then
       ----------------------------------------------------------------
       if state == 1 and name == "Cancel" then
         if cosmetics_open then
+          -- Prefer the cosmetics module's own Cancel handler (preview vs list).
+          if Cosmetics and type(Cosmetics.handle_cancel) == "function" then
+            local okc, handled, why = pcall(Cosmetics.handle_cancel, pid)
+            if okc and handled then
+              if why == "to_menu" then
+			    play_sfx(pid, "cancel")
+                -- Stayed inside cosmetics list; don't open LMenu.
+                return
+              end
+
+              -- Closed cosmetics -> go back to LMenu (still locked)
+              cosmetics_open = false
+              if not st_by_pid[pid] then
+                play_sfx(pid, "cancel")
+                LMenu.open(pid)
+                lmenu_open = true
+              end
+              return
+            end
+          end
+
+          -- Fallback for older cosmetics.lua: close submenu but keep player input locked
           if Cosmetics and type(Cosmetics.close) == "function" then
-            -- close submenu but keep player input locked
             local okc, errc = pcall(Cosmetics.close, pid, { keep_frozen = true })
             if not okc then
-              warn("Cosmetics.close (keep_frozen) via Shoot failed for", pid, ":", tostring(errc))
+              warn("Cosmetics.close (keep_frozen) via Cancel failed for", pid, ":", tostring(errc))
             end
           end
 
@@ -1071,12 +1148,13 @@ if Net and Net.on then
           end
           return
         elseif lmenu_open then
-          -- LMenu is open: Shoot acts as back/close
+		  play_sfx(pid, "cancel")
+          -- LMenu is open: Cancel acts as back/close
           LMenu.close(pid)
           lmenu_open = false
           return
         end
-        -- If nothing is open, ignore Shoot
+        -- If nothing is open, ignore Cancel
       end
 
       ----------------------------------------------------------------
@@ -1148,6 +1226,7 @@ if Net and Net.on then
   -- Safety: auto-close on disconnect / area change
   Net:on("player_disconnect", function(e)
     if e and e.player_id then
+      opened_once[e.player_id] = nil
       LMenu.close(e.player_id)
     end
   end)

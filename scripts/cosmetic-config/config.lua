@@ -101,7 +101,7 @@ local cosmetics = {
     anim_state      = "SNOWFLAKE_PARTICLE",
     preview_sprite_id = "preview_snowflake",
     rarity          = "GOLD_5",
-    loop_duration = 1.0,
+    loop_duration = 1.12,
 
     -- Alignment knobs (bot <-> sprite)
     xforced         = 50,
@@ -129,7 +129,7 @@ local cosmetics = {
     anim_state        = "CONFETTI",
     preview_sprite_id = "preview_confetti",
     rarity          = "GOLD_4",
-    loop_duration     = 0.5,
+    loop_duration     = 0.468,
 
     xforced           = 0,
     yforced           = 0,
@@ -170,7 +170,7 @@ local cosmetics = {
     menu_preview_offset_x   = 13,
     menu_preview_offset_y   = 25,
     menu_preview_scale          = 1.25,
-    menu_preview_loop_duration  = 0.4,
+    menu_preview_loop_duration  = 0.468,
   },
   {
     id              = "DarkAura",
@@ -207,7 +207,7 @@ local cosmetics = {
     anim_state      = "MATRIX_CODE",
     preview_sprite_id = "preview_matrix",
     rarity          = "GOLD_5",
-    loop_duration = 1.0,
+    loop_duration = 0.88,
 
     xforced         = 50,
     yforced         = 0,
@@ -232,7 +232,7 @@ local cosmetics = {
     anim_state      = "BEANSTAR",
     preview_sprite_id = "preview_beanstar",
     rarity          = "GREEN_4",
-    loop_duration = 3.0,
+    loop_duration = 3.2,
 
     xforced         = 18,
     yforced         = 0,
@@ -257,7 +257,7 @@ local cosmetics = {
     anim_state      = "CYBERELF_PINK",
     preview_sprite_id = "preview_pinkcyberelf",
     rarity          = "GOLD_5",
-    loop_duration = 2.2,
+    loop_duration = 2.24,
 
     xforced         = 60,
     yforced         = 0,
@@ -282,7 +282,7 @@ local cosmetics = {
     anim_state      = "CYBERELF_GREEN",
     preview_sprite_id = "preview_greencyberelf",
     rarity          = "GOLD_5",
-    loop_duration = 2.2,
+    loop_duration = 2.24,
 
     xforced         = 60,
     yforced         = 0,
@@ -307,7 +307,7 @@ local cosmetics = {
     anim_state      = "CYBERELF_BLUE",
     preview_sprite_id = "preview_bluecyberelf",
     rarity          = "GOLD_5",
-    loop_duration = 2.2,
+    loop_duration = 2.24,
 
     xforced         = 60,
     yforced         = 0,

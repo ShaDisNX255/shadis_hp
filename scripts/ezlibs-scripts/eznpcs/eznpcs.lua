@@ -347,7 +347,14 @@ function eznpcs.add_npcs_to_area(area_id)
     for i, object_id in next, objects do
         local object = ezcache.get_object_by_id_cached(area_id, object_id)
         if object.type == "NPC" then
-            create_bot_from_object(area_id, object_id)
+            -- If this NPC is flagged as a Quest NPC, don't auto-spawn it.
+            -- Quest scripts will call eznpcs.create_npc_from_object(...) when appropriate.
+            if object.custom_properties
+               and object.custom_properties["Quest NPC"] == "true" then
+                printd("Skipping quest NPC placeholder id "..object_id.." in "..area_id)
+            else
+                create_bot_from_object(area_id, object_id)
+            end
         end
     end
 end

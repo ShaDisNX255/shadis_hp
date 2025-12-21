@@ -1,0 +1,512 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="57" height="57" tilewidth="64" tileheight="32" infinite="0" nextlayerid="7" nextobjectid="167">
+ <properties>
+  <property name="Amount 1" type="int" value="1"/>
+  <property name="Amount 2" type="int" value="1"/>
+  <property name="Amount 3" type="int" value="150000"/>
+  <property name="Amount 4" type="int" value="100000"/>
+  <property name="Background" value="custom"/>
+  <property name="Background Animation" value="/server/assets/custom/backgrounds/dungeon1/09-graveyard.animation"/>
+  <property name="Background Texture" value="/server/assets/custom/backgrounds/dungeon1/09-graveyard.png"/>
+  <property name="Background Vel X" type="float" value="-0.0295"/>
+  <property name="Background Vel Y" type="float" value="0"/>
+  <property name="Chance 1" type="int" value="5"/>
+  <property name="Chance 2" type="int" value="10"/>
+  <property name="Chance 3" type="int" value="25"/>
+  <property name="Chance 4" type="int" value="60"/>
+  <property name="Dungeon" type="bool" value="true"/>
+  <property name="DungeonKickArea" value="WCity2"/>
+  <property name="DungeonKickObject" value="202"/>
+  <property name="Forced Base HP" type="int" value="500"/>
+  <property name="Name" value="Lost Lab"/>
+  <property name="PunishHP" type="int" value="150"/>
+  <property name="Reward 1" value="pet_meddy"/>
+  <property name="Reward 2" value="ShadowAura"/>
+  <property name="Reward 3" value="moneyz"/>
+  <property name="Reward 4" value="moneyz"/>
+  <property name="Song" value="/server/assets/dungeon1.ogg"/>
+  <property name="Type 1" value="decor"/>
+  <property name="Type 2" value="cosmetic"/>
+  <property name="Type 3" value="moneyz"/>
+  <property name="Type 4" value="moneyz"/>
+ </properties>
+ <tileset firstgid="1" source="../assets/objects/NoiseWaveEntrance.tsx"/>
+ <tileset firstgid="5" source="../assets/tiles/bn3_undernet_tiles.tsx"/>
+ <tileset firstgid="239" source="../assets/tiles/bn3_arrows_undernet.tsx"/>
+ <tileset firstgid="251" source="../assets/objects/gate.tsx"/>
+ <tileset firstgid="256" source="../assets/objects/nebula door.tsx"/>
+ <tileset firstgid="268" source="../assets/objects/MysteryData.tsx"/>
+ <tileset firstgid="308" source="../assets/objects/Darkchip13x32.tsx"/>
+ <tileset firstgid="312" source="../assets/tiles/CrackedFloorForKeristero.tsx"/>
+ <tileset firstgid="313" source="../assets/objects/Junkpiles.tsx"/>
+ <tileset firstgid="315" source="../assets/tiles/EXE6_Shortcuts.tsx"/>
+ <tileset firstgid="363" source="../assets/ezlibs-assets/ezcheckpoints/bn5cubegreen_tile.tsx"/>
+ <tileset firstgid="367" source="../assets/ezlibs-assets/ezmystery/BlueMysteryData.tsx"/>
+ <layer id="1" name="Tile Layer 0" width="57" height="57">
+  <data encoding="csv">
+0,0,0,0,0,0,0,0,23,24,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,24,23,0,0,0,0,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,23,23,0,0,0,0,2147483654,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,2147483654,0,0,0,0,2147483656,2147483654,8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,2147483654,8,0,0,0,0,2147483654,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,16,2147483659,10,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,2147483654,6,6,0,0,2147483656,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,11,2147483661,10,0,2147483684,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,2147483654,8,8,18,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,10,2147483659,10,11,10,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,2147483673,0,0,0,0,0,2147483654,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,36,0,2147483661,2147483659,37,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,30,23,2147483697,0,0,0,0,2147483656,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483656,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,30,23,24,2147483672,2147483697,0,0,0,2147483654,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483654,21,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,26,23,23,23,23,23,6,6,8,18,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,5,0,0,0,2147483654,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,49,23,23,23,50,0,0,0,0,2147483654,0,0,0,0,0,0,0,0,0,0,0,0,0,5,20,9,22,0,0,2147483656,6,0,0,0,0,0,0,0,5,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,49,23,50,0,0,0,0,0,2147483656,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483654,0,0,0,0,0,2147483654,6,0,0,0,0,0,0,2147483656,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483654,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483657,0,0,0,0,0,0,2147483656,0,0,0,0,0,0,2147483654,6,6,6,22,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483654,6,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483654,0,0,0,0,0,0,2147483654,6,6,0,0,0,0,2147483656,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483654,2147483654,0,0,0,0,0,0,23,0,0,0,0,0,0,2147483657,6,0,0,0,0,0,2147483654,5,18,6,6,0,0,2147483656,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483654,18,6,6,0,0,0,23,2147483672,23,0,0,0,0,0,2147483670,2147483654,0,0,0,0,0,2147483654,2147483655,2147483656,0,2147483656,6,6,18,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483654,18,0,2147483654,6,6,6,25,23,23,0,0,0,0,0,0,2147483654,9,0,0,0,0,2147483655,2147483655,2147483654,0,0,0,0,2147483656,6,6,8,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483654,0,0,0,0,0,0,2147483672,24,23,0,0,0,0,0,0,0,2147483654,6,0,0,0,0,2147483669,2147483654,0,0,0,0,2147483670,0,0,2147483656,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483656,0,0,0,0,0,0,23,23,24,0,0,0,0,0,0,0,0,2147483654,9,6,0,0,0,2147483657,22,0,0,0,0,0,0,2147483669,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483654,0,0,0,0,0,0,0,2147483654,0,0,0,0,0,0,0,0,0,0,0,2147483654,9,6,0,2147483654,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,5,6,6,8,18,0,0,0,0,0,0,0,2147483656,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483654,6,2147483654,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,2147483654,18,0,0,0,0,0,0,0,0,0,0,2147483654,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483657,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,17,2147483661,2147483661,2147483661,2147483661,2147483661,2147483684,0,0,0,0,0,0,0,0,0,0,0,0,0,0,30,24,23,2147483697,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483654,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+17,23,23,23,0,23,23,23,2147483684,0,0,0,0,0,0,0,0,0,0,0,0,30,23,23,23,23,2147483697,0,0,0,0,0,0,0,0,0,0,0,0,10,2147483659,10,10,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,2147483662,0,0,0,0,0,23,0,0,0,0,0,0,0,0,0,0,0,0,30,23,23,23,23,24,23,2147483697,0,0,0,0,0,0,0,0,0,0,10,2147483660,10,2147483659,2147483660,11,0,0,0,0,0,0,0,0,0,0,0,0,0,
+13,23,23,23,0,23,23,23,2147483662,0,0,0,0,0,0,0,0,0,0,0,23,23,2147483672,23,23,23,23,2147483672,2147483697,0,0,0,0,0,0,0,0,0,2147483659,2147483659,2147483660,0,10,2147483663,10,0,0,0,0,0,0,0,0,0,0,0,0,
+13,23,23,23,23,23,23,23,23,32,32,32,32,32,32,32,32,32,32,32,23,2147483672,23,23,24,23,23,23,23,0,0,0,0,0,0,0,0,0,10,0,11,0,2147483659,0,10,11,0,0,0,0,0,0,0,0,0,0,0,
+13,23,23,23,0,23,23,23,2147483662,0,0,0,0,0,0,0,0,0,0,0,23,23,23,23,23,23,23,23,23,6,6,8,6,6,6,8,6,6,10,10,10,12,10,12,11,10,6,6,8,6,241,0,0,0,0,0,0,
+0,2147483662,0,0,0,0,0,23,0,0,0,0,0,0,0,0,0,0,0,0,49,23,24,23,23,2147483672,23,24,50,0,0,0,0,0,0,0,0,0,2147483660,2147483659,0,11,0,11,0,10,0,0,0,0,0,0,0,0,0,0,0,
+36,23,23,23,0,23,23,23,37,0,0,0,0,0,0,0,0,0,0,0,0,49,23,2147483672,23,23,23,2147483698,0,0,0,0,0,0,0,0,0,0,11,0,10,10,0,10,2147483659,0,0,0,0,0,0,0,0,0,0,0,0,
+0,36,14,14,14,14,14,37,0,0,0,0,0,0,0,0,0,0,0,0,0,0,49,23,23,23,2147483698,0,0,0,0,0,0,0,0,0,0,0,2147483660,10,2147483659,11,2147483659,15,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,23,23,23,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483659,10,10,2147483660,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,23,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483654,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,30,23,23,23,2147483697,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483654,6,21,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,6,6,23,23,2147483672,23,23,24,24,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483656,6,6,8,6,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,49,23,23,2147483672,2147483698,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483656,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483654,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,18,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483672,23,0,0,0,0,2147483657,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483656,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,30,23,23,0,5,6,6,25,2147483672,23,0,0,0,2147483654,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,18,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,23,23,23,2147483696,0,0,23,23,24,0,23,23,2147483673,23,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,18,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,26,23,23,23,0,0,0,0,2147483654,0,0,0,23,2147483672,23,24,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483654,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,23,23,23,2147483698,0,0,0,2147483654,0,0,2147483672,23,23,23,0,0,0,0,0,0,0,0,0,0,5,8,8,22,0,0,0,2147483654,5,22,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,49,23,0,0,0,0,0,0,2147483657,0,0,0,0,2147483654,0,0,0,0,0,0,0,0,0,0,0,2147483656,0,0,0,0,0,0,2147483656,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483654,6,0,0,5,18,0,0,0,0,0,0,0,0,0,0,0,2147483654,11,10,0,2147483659,10,0,2147483654,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483654,6,0,2147483657,0,0,0,0,0,0,0,0,0,0,0,0,2147483654,12,15,2147483659,2147483661,11,6,6,8,6,8,0,0,0,0,2147483659,10,10,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483654,18,9,18,6,6,25,24,23,0,0,0,0,0,0,0,0,10,2147483659,0,10,0,0,0,0,0,2147483654,0,0,0,0,0,2147483659,2147483661,11,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,24,23,23,0,0,0,0,0,0,0,0,11,10,2147483659,11,0,0,0,0,0,2147483654,6,8,6,8,12,10,2147483659,10,22,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,23,23,2147483672,0,0,0,0,0,0,0,0,0,11,10,15,0,0,0,0,0,0,0,0,0,0,2147483661,11,10,2147483659,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483656,0,0,0,0,0,0,0,0,0,0,0,0,0,11,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483654,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483654,21,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483656,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483654,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,18,8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483654,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483669,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+</data>
+ </layer>
+ <objectgroup id="3" name="Object Layer 0">
+  <object id="3" name="Gate1" type="Checkpoint" gid="2147483899" x="1218" y="921" width="34" height="52">
+   <properties>
+    <property name="Boss IDs" value="MiniBoss1"/>
+    <property name="Boss Memory Area" value="Dungeon1"/>
+    <property name="Boss Not Defeated Message" value="You can still feel the Navi protecting this gate"/>
+    <property name="Description" value="This door seems to be protected by a mysterious force"/>
+    <property name="Key Name" value="Boss Gate"/>
+    <property name="Unlocked Message" value="The door opens..."/>
+   </properties>
+  </object>
+  <object id="4" type="Checkpoint" gid="256" x="650.5" y="855.5" width="63" height="92">
+   <properties>
+    <property name="Boss IDs" value="MiniBoss2,MiniBoss3"/>
+    <property name="Boss Memory Area" value="Dungeon1"/>
+    <property name="Boss Not Defeated Message" value="You can still feel the power of the Navis protecting this gate"/>
+    <property name="Description" value="This door seems to be protected by a mysterious force"/>
+    <property name="Key Name" value="Boss Gate"/>
+    <property name="Unlocked Message" value="The door opens..."/>
+   </properties>
+  </object>
+  <object id="6" gid="1" x="1648" y="942" width="56" height="88"/>
+  <object id="27" gid="1" x="16" y="910" width="56" height="88"/>
+  <object id="89" gid="312" x="685.5" y="788.5" width="320" height="192"/>
+  <object id="90" gid="2147483961" x="1006.5" y="339.5" width="64" height="64"/>
+  <object id="91" gid="2147483961" x="1229.5" y="208.5" width="64" height="64"/>
+  <object id="92" gid="314" x="1233.5" y="526.5" width="64" height="64"/>
+  <object id="93" gid="313" x="1265.5" y="814.5" width="64" height="64"/>
+  <object id="94" gid="2147483961" x="1425.5" y="846.5" width="64" height="64"/>
+  <object id="95" gid="2147483961" x="1233.5" y="1006.5" width="64" height="64"/>
+  <object id="96" gid="313" x="1209" y="1459" width="64" height="64"/>
+  <object id="97" gid="2147483961" x="1329" y="1547" width="64" height="64"/>
+  <object id="98" gid="313" x="1689" y="1555" width="64" height="64"/>
+  <object id="99" gid="2147483961" x="1745" y="1459" width="64" height="64"/>
+  <object id="100" name="Medditaur(Heal npc )" type="NPC" x="865" y="961">
+   <properties>
+    <property name="Asset Name" value="Medittaur"/>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Direction" value="Up Right"/>
+    <property name="Next 1" type="object" value="130"/>
+    <property name="Text 1" value="You're half-charged and fully clueless. Perfect! Let's fix that~&lt;3!"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="101" name="Prisoner(DailyQuest )" x="1713" y="1493">
+   <point/>
+  </object>
+  <object id="102" name="Boss Virus 1" type="NPC" x="1166" y="144">
+   <properties>
+    <property name="Asset Name" value="heel-navi-exe4_purple"/>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Direction" value="Down Left"/>
+    <property name="Mugshot" value="Blank"/>
+    <property name="Next 1" type="object" value="146"/>
+    <property name="Text 1" value="A shade of a Heel Navi stands before you"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="103" name="Working Mettaur" type="NPC" x="1253.5" y="526.5">
+   <properties>
+    <property name="Asset Name" value="MetSwing"/>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Direction" value="Up Left"/>
+    <property name="Mugshot" value="Blank"/>
+    <property name="Next 1" type="object" value="145"/>
+    <property name="Text 1" value="This Mettaur is carefully extracting data from the floor."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="104" name="Prisoner2 (DailyQuest )" x="273" y="13">
+   <point/>
+  </object>
+  <object id="106" name="HeelNavi" type="NPC" x="881" y="1549">
+   <properties>
+    <property name="Asset Name" value="heel-navi-exe4_black"/>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Direction" value="Down Right"/>
+    <property name="Next 1" type="object" value="147"/>
+    <property name="Text 1" value="What the hell is this place...? No-no, someone's watching me... I know it."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="107" name="Dungeon Boss (Navi)" type="NPC" x="73" y="877">
+   <properties>
+    <property name="Asset Name" value="shademan-exe5"/>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Direction" value="Down Right"/>
+    <property name="Next 1" type="object" value="156"/>
+    <property name="Text 1" value="Heh... so... you... you've made it... this far... Funny... I... I know what I am... I... am not... but... I... I'LL... DELETE... YOU!"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="109" name="HeelNavi" type="NPC" x="1297" y="973">
+   <properties>
+    <property name="Asset Name" value="heel-navi-exe4_black"/>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Direction" value="Down Right"/>
+    <property name="Next 1" type="object" value="144"/>
+    <property name="Text 1" value="Yo! Jackpot, right? This whole area just appeared! Gotta be some primo stuff in here, hehehe!"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="110" name="Friendly Mettaur" type="NPC" x="785" y="941">
+   <properties>
+    <property name="Asset Name" value="mettaur-bn45"/>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Direction" value="Up Right"/>
+    <property name="Text 1" value="Beep-beep... Hello there, traveler. We're just doing our work here... please pass carefully. Beep!"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="111" name="Friendly Mettaur" type="NPC" x="817" y="845">
+   <properties>
+    <property name="Asset Name" value="mettaur-bn45"/>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Direction" value="Up Left"/>
+    <property name="Text 1" value="Boop-boop... Watch your step! We're busy mining data, so don't get in the way. Beep-beep!"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="112" name="HeelNavi" type="NPC" x="337" y="397">
+   <properties>
+    <property name="Asset Name" value="heel-navi-exe4_black"/>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Direction" value="Up Right"/>
+    <property name="Mugshot" value="Blank"/>
+    <property name="Next 1" type="object" value="150"/>
+    <property name="Text 1" value="The Navi trembles, its form flickering in and out of place..."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="113" name="Working Mettaur" type="NPC" x="1232" y="1456">
+   <properties>
+    <property name="Asset Name" value="MetSwing"/>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Direction" value="Up Left"/>
+    <property name="Mugshot" value="Blank"/>
+    <property name="Next 1" type="object" value="143"/>
+    <property name="Text 1" value="This Mettaur seems to be mining something..."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="120" gid="2147483956" x="379.5" y="1306.5" width="13" height="32"/>
+  <object id="121" gid="308" x="1143.5" y="122.5" width="13" height="32"/>
+  <object id="122" gid="2147483956" x="283.5" y="218.5" width="13" height="32"/>
+  <object id="127" gid="292" x="405" y="723" width="20" height="43"/>
+  <object id="129" name="To WCity2" type="Radius Warp" x="1605.5" y="914.5">
+   <properties>
+    <property name="Activation Radius" type="float" value="0.6"/>
+    <property name="Arrival Animation" value="arrow_down_right_in"/>
+    <property name="Leave Animation" value="arrow_down_right_out"/>
+    <property name="Target Area" value="WCity2"/>
+    <property name="Target Object" value="202"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="130" name="Heal" type="Dialogue" x="916" y="1016">
+   <properties>
+    <property name="Dialogue Type" value="DungeonHeal"/>
+    <property name="Heal Amount" type="int" value="500"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="132" name="Mini Boss Battle" type="Dialogue" x="972" y="108">
+   <properties>
+    <property name="Already Defeated Message" value="-It will not engage."/>
+    <property name="Boss Defeated Message" value="The Navi flickers... fragments of its form glitch in and out. It does not acknowledge your presence... Yet it remains, a ghost of data with no will of its own."/>
+    <property name="Boss Encounter HP" type="int" value="1400"/>
+    <property name="Boss ID" value="MiniBoss1"/>
+    <property name="Boss ID Match" value="HeelNavi"/>
+    <property name="Boss Memory Area" value="Dungeon1"/>
+    <property name="Boss Pool Max HP" type="int" value="4200"/>
+    <property name="Dialogue Type" value="none"/>
+    <property name="Encounter Name" value="MiniBoss1"/>
+    <property name="Event Name" value="DungeonBoss"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="133" name="Boss Virus 2" type="NPC" x="401" y="1329">
+   <properties>
+    <property name="Asset Name" value="noir"/>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Direction" value="Down Right"/>
+    <property name="Mugshot" value="Blank"/>
+    <property name="Next 1" type="object" value="149"/>
+    <property name="Text 1" value="A shade of Noir.EXE stands before you"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="135" name="MiniBoss2 Battle" type="Dialogue" x="332" y="1338">
+   <properties>
+    <property name="Already Defeated Message" value="-It will not fight again."/>
+    <property name="Boss Defeated Message" value="The Navi shudders, pieces of its code unraveling. It freezes mid-step... silent, empty, a ghost of what it was. Though defeated, something about it still remains."/>
+    <property name="Boss Encounter HP" type="int" value="1500"/>
+    <property name="Boss ID" value="MiniBoss2"/>
+    <property name="Boss ID Match" value="Noir"/>
+    <property name="Boss Memory Area" value="Dungeon1"/>
+    <property name="Boss Pool Max HP" type="int" value="3000"/>
+    <property name="Dialogue Type" value="none"/>
+    <property name="Encounter Name" value="MiniBoss2"/>
+    <property name="Event Name" value="DungeonBoss"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="136" name="Boss Virus 3" type="NPC" x="305" y="239">
+   <properties>
+    <property name="Asset Name" value="elementman"/>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Direction" value="Down Right"/>
+    <property name="Mugshot" value="Blank"/>
+    <property name="Next 1" type="object" value="153"/>
+    <property name="Text 1" value="A shade of ElementMan stands before you"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="138" name="MiniBoss3 Battle" type="Dialogue" x="198.5" y="155.5">
+   <properties>
+    <property name="Already Defeated Message" value="The energy fades, leaving only fragments of its code behind. -It will not engage again."/>
+    <property name="Boss Defeated Message" value="The elemental Navi shudders, sparks flickering erratically across its body. It staggers back, its form glitching in and out of place."/>
+    <property name="Boss Encounter HP" type="int" value="1700"/>
+    <property name="Boss ID" value="MiniBoss3"/>
+    <property name="Boss ID Match" value="ElemntMn"/>
+    <property name="Boss Memory Area" value="Dungeon1"/>
+    <property name="Boss Pool Max HP" type="int" value="3400"/>
+    <property name="Dialogue Type" value="none"/>
+    <property name="Encounter Name" value="MiniBoss3"/>
+    <property name="Event Name" value="DungeonBoss"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="139" name="MainBoss Battle" type="Dialogue" x="38.5" y="949.5">
+   <properties>
+    <property name="Already Defeated Message" value="-It will not engage again."/>
+    <property name="Boss Defeated Message" value="...N-no... this... can't be... I... I... am... not... I... I... CAN'T... EXIST... Heh... heh... hahaha... Fragments... breaking... ...chaos... remains..."/>
+    <property name="Boss Encounter HP" type="int" value="600"/>
+    <property name="Boss ID" value="MainBoss"/>
+    <property name="Boss ID Match" value="ShadeMan"/>
+    <property name="Boss Memory Area" value="Dungeon1"/>
+    <property name="Boss Pool Max HP" type="int" value="6000"/>
+    <property name="Dialogue Type" value="none"/>
+    <property name="Encounter Name" value="MainBoss"/>
+    <property name="Event Name" value="MainBoss"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="143" name="Next 1" type="Dialogue" x="1180" y="1496">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Mugshot" value="Blank"/>
+    <property name="Text 1" value="It notices you, but pays you no mind. There is no point in engaging."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="144" name="Next 1" type="Dialogue" x="1263" y="977">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Text 1" value="...Uh, huh? Door's locked? Aw man! C'mon, just open already!"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="145" name="Next 1" type="Dialogue" x="1183.5" y="466.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Mugshot" value="Blank"/>
+    <property name="Text 1" value="It glances your way briefly, then resumes its work. Interfering with it doesn't seem worthwhile."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="146" name="Question" type="Dialogue" x="1043" y="95">
+   <properties>
+    <property name="Dialogue Type" value="question"/>
+    <property name="Mugshot" value="Blank"/>
+    <property name="Next 1" type="object" value="132"/>
+    <property name="Text 1" value="Engage?"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="147" name="Next 1" type="Dialogue" x="856" y="1592">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="148"/>
+    <property name="Text 1" value="The viruses won't stop, and my backup recovery protocol isn't responding. If I get deleted here... that's it. No restore. No coming back."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="148" name="Next 1" type="Dialogue" x="814.5" y="1605.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Text 1" value="...Tch. I can't stay here. I've gotta get out-now."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="149" name="Question" type="Dialogue" x="355.5" y="1314.5">
+   <properties>
+    <property name="Dialogue Type" value="question"/>
+    <property name="Mugshot" value="Blank"/>
+    <property name="Next 1" type="object" value="135"/>
+    <property name="Text 1" value="Engage?"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="150" name="Next 1" type="Dialogue" x="369" y="453">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Mugshot" value="Blank"/>
+    <property name="Next 1" type="object" value="151"/>
+    <property name="Text 1" value="It swats at you, but its movements are jerky, unnatural."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="151" name="Next 1" type="Dialogue" x="402" y="472">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Text 1" value="The atmosphere here... it's too much. Something about this place is warping it."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="153" name="Question" type="Dialogue" x="252" y="188">
+   <properties>
+    <property name="Dialogue Type" value="question"/>
+    <property name="Mugshot" value="Blank"/>
+    <property name="Next 1" type="object" value="138"/>
+    <property name="Text 1" value="Engage?"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="156" name="Question" type="Dialogue" x="63" y="915">
+   <properties>
+    <property name="Dialogue Type" value="question"/>
+    <property name="Mugshot" value="Blank"/>
+    <property name="Next 1" type="object" value="139"/>
+    <property name="Text 1" value="Engage?"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="159" name="Zarymura" type="NPC" x="1361.5" y="784.5">
+   <properties>
+    <property name="Asset Name" value="zarymura"/>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Direction" value="Down Left"/>
+    <property name="Next 1" type="object" value="160"/>
+    <property name="Text 1" value="Hey kid...Got some bugfrags?"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="160" name="Quiz" type="Dialogue" x="1375" y="749">
+   <properties>
+    <property name="Dialogue Type" value="quiz"/>
+    <property name="Next 1" type="object" value="164"/>
+    <property name="Next 2" type="object" value="161"/>
+    <property name="Text 1" value="Shop"/>
+    <property name="Text 2" value="Explain"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="161" name="Explain" type="Dialogue" x="1417.5" y="754.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="163"/>
+    <property name="Text 1" value="This area's different... something about it just ain't right. If you lose your HP inside, you'll get kicked out... and the viruses? Extra nasty. I can feel some strong energies in here too."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="163" name="Explain 2" type="Dialogue" x="1446" y="766">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Text 1" value="I recommend tackling this area with a friend or two. Oh! And if you happen to drop any delicious BugFrags, I'll be more than happy to trade them for some nice stuff. Lil' ol' Zary's got wares if you've got the frags~ Nyahaha!"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="164" name="Bug Frag Shop" type="Dialogue" x="1394" y="730">
+   <properties>
+    <property name="Already Owned Msg" value="Kid you already have this one, but I can take your bugfrags if you want ~"/>
+    <property name="Amount 1" type="int" value="1"/>
+    <property name="Amount 2" type="int" value="1"/>
+    <property name="Dialogue Type" value="fragshop"/>
+    <property name="Not Enough Msg" value="Sorry kid looks like you a lil short on bugfrags"/>
+    <property name="Price 1" type="int" value="8"/>
+    <property name="Price 2" type="int" value="10"/>
+    <property name="Sell 1" value="ShadowAura"/>
+    <property name="Sell 2" value="pet_meddy"/>
+    <property name="Type 1" value="cosmetic"/>
+    <property name="Type 2" value="decor"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="165" name="Cube Underground Key" type="Checkpoint" gid="363" x="672" y="1136" width="53.25" height="56">
+   <properties>
+    <property name="Description" value="This security cube seems to be sealed by a powerful dark force. There are a few words written on the surface: &quot;Only those worthy of S can walk through&quot;"/>
+    <property name="Dialogue Type" value=""/>
+    <property name="Key Name" value="UndrGrndKey"/>
+    <property name="Once" type="bool" value="true"/>
+    <property name="Required Keys" type="int" value="1"/>
+    <property name="Skip Prompt" type="bool" value="true"/>
+    <property name="Unlocked Message" value="You show your card, &quot;Curse of Dragon&quot;. The security cube opens."/>
+   </properties>
+  </object>
+  <object id="166" type="Mystery Data" gid="367" x="624" y="1136" width="14" height="43">
+   <properties>
+    <property name="Name" value="HPMem"/>
+    <property name="Next 1" type="object" value="0"/>
+    <property name="Once" type="bool" value="true"/>
+    <property name="Type" value="item"/>
+   </properties>
+  </object>
+ </objectgroup>
+</map>

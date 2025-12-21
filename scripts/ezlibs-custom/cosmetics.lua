@@ -81,6 +81,13 @@ end
 
 local COSMETIC_MEM_KEY = "cosmetics_unlocked_v1"
 
+local function play_ui_sfx(pid, key)
+  local UI = rawget(_G, "UI_SFX")
+  if UI and type(UI.play) == "function" then
+    pcall(UI.play, pid, key)
+  end
+end
+
 local function cosmetic_pmem_get(pid)
   if not (ezmemory_ok and ezmemory and ezmemory.get_player_memory) then
     return nil, nil
@@ -1198,6 +1205,24 @@ function Cosmetics.is_in_preview(pid)
   return st and st.mode == "preview"
 end
 
+function Cosmetics.handle_cancel(pid)
+  local st = state_by_pid[pid]
+  if not st then
+    return false, "not_open"
+  end
+
+  -- In preview: Cancel should just cancel preview and return to the cosmetics list.
+  if st.mode == "preview" then
+    cancel_preview_and_return_to_menu(pid)
+    return true, "to_menu"
+  end
+
+  -- In the list: Cancel means "go back to LMenu".
+  -- Close cosmetics, but keep input locked so LMenu can open immediately.
+  Cosmetics.close(pid, { keep_frozen = true })
+  return true, "closed"
+end
+
 function Cosmetics.open_menu(pid)
   -- Clean any stale UI/state but keep player frozen (LMenu already did that)
   if state_by_pid[pid] then
@@ -1364,6 +1389,7 @@ local function handle_menu_button(pid, btn)
     if top > max_top then top = max_top end
     st.top_index = top
 
+    play_ui_sfx(pid, "select")
     refresh_menu_cursor(pid)
     return true
   end
@@ -1425,6 +1451,7 @@ local function handle_menu_button(pid, btn)
 
   -- Confirm selection
   if btn == "A" then
+    play_ui_sfx(pid, "choose")
     local opt = option_for_player_at(pid, st.cursor or 1)
     if not opt then
       Cosmetics.close(pid)  -- this clears the UI and unfreezes the player
@@ -1495,6 +1522,7 @@ local function handle_menu_button(pid, btn)
 
   -- LS = close cosmetics menu entirely and unfreeze
   if btn == "LS" then
+    play_ui_sfx(pid, "cancel")
     close_from_button(pid)
     return true
   end
@@ -1563,9 +1591,11 @@ local function handle_preview_button(pid, btn, kind)
     return true
   elseif btn == "A" then
     -- Confirm, apply cosmetic, and close + unfreeze.
+    play_ui_sfx(pid, "choose")
     finalize_cosmetic_from_preview(pid)
     return true
   elseif btn == "LS" then
+    play_ui_sfx(pid, "cancel")
     -- Cancel preview, go back to submenu (still frozen).
     cancel_preview_and_return_to_menu(pid)
     return true

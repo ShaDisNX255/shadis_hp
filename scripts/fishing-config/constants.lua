@@ -86,7 +86,7 @@ local CONSTANTS = {
     },
   },
   BUGFRAG = {
-    ITEM_NAME = "bugfrag",
+    ITEM_NAME = "BugBait",
     VIRUS_CHANCE = 0.70,
     HEAVINESS_CHANCES = {
       light      = 30,

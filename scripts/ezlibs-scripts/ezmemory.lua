@@ -42,7 +42,7 @@ end)
 
 local function printd(...)
     local arg={...}
-    print('[eznpcs]',table.unpack(arg))
+    print('[ezmemory]',table.unpack(arg))
 end
 
 
@@ -73,11 +73,55 @@ local function ezmemory_save_file(file_path,value)
 end
 
 local function initialize_area_memory_file(area_id)
-    area_memory[area_id] = {
-        hidden_objects = {}
-    }
-    ezmemory.save_area_memory(area_id)
+    -- IMPORTANT: never overwrite an existing area memory file.
+    -- This is called both during boot-load and as a fallback from get_area_memory().
+    local loaded = nil
+    local io_ok = (io ~= nil and io.open ~= nil)
+
+    pcall(function()
+        if not io_ok then return end
+        local function _read(path)
+            local f = io.open(path, "rb")
+            if not f then return nil end
+            local s = f:read("*a")
+            f:close()
+            return s
+        end
+
+        local base = area_path_prefix .. area_id
+        local raw = _read(base .. ".json")
+        if raw then
+            local ok, data = pcall(function() return json.decode(raw) end)
+            if ok and type(data) == "table" and data.hidden_objects ~= nil then
+                loaded = data
+                return
+            end
+        end
+
+        raw = _read(base .. "_backup.json")
+        if raw then
+            local ok, data = pcall(function() return json.decode(raw) end)
+            if ok and type(data) == "table" and data.hidden_objects ~= nil then
+                loaded = data
+                return
+            end
+        end
+    end)
+
+    if loaded then
+        area_memory[area_id] = loaded
+        return area_memory[area_id]
+    end
+
+    area_memory[area_id] = { hidden_objects = {} }
+    -- If we can't access the filesystem directly (io is unavailable), don't write.
+    -- This avoids clobbering an existing file.
+    if io_ok then
+        ezmemory.save_area_memory(area_id)
+    end
+    return area_memory[area_id]
 end
+
 
 local function load_all_memory()
     return async(function ()
@@ -254,9 +298,48 @@ end
 function ezmemory.get_area_memory(area_id)
     if area_memory[area_id] then
         return area_memory[area_id]
-    else
-        initialize_area_memory_file(area_id)
     end
+
+    -- If this area wasn't loaded at boot (or scripts are using a bucket area),
+    -- try to load the existing file from disk instead of overwriting it.
+    local loaded = nil
+    pcall(function()
+        local function _read(path)
+            local f = io.open(path, "rb")
+            if not f then return nil end
+            local s = f:read("*a")
+            f:close()
+            return s
+        end
+
+        local base = area_path_prefix .. area_id
+        local raw = _read(base .. ".json")
+        if raw then
+            local ok, data = pcall(function() return json.decode(raw) end)
+            if ok and type(data) == "table" and data.hidden_objects ~= nil then
+                loaded = data
+                return
+            end
+        end
+
+        raw = _read(base .. "_backup.json")
+        if raw then
+            local ok, data = pcall(function() return json.decode(raw) end)
+            if ok and type(data) == "table" and data.hidden_objects ~= nil then
+                loaded = data
+                return
+            end
+        end
+    end)
+
+    if loaded then
+        area_memory[area_id] = loaded
+        return area_memory[area_id]
+    end
+
+    -- New / missing / invalid: initialize minimal structure.
+    initialize_area_memory_file(area_id)
+    return area_memory[area_id]
 end
 
 function ezmemory.get_player_memory(safe_secret)
@@ -269,6 +352,7 @@ function ezmemory.get_player_memory(safe_secret)
         player_memory[safe_secret] = {
             items={},
             money=0,
+            fragments=0,
             meta={
                 joins=0
             },
@@ -382,6 +466,71 @@ function ezmemory.spend_player_money(player_id, amount)
     return false
 end
 
+-- ===================== Bug Fragment helpers =====================
+-- Mirrors the money helpers, but uses server APIs:
+--   Net.get_player_fragments(player_id)
+--   Net.set_player_fragments(player_id, fragments)
+-- Note: first time this runs on an existing server, fragments are seeded from server truth on join.
+
+function ezmemory.get_player_fragments(player_id)
+    if not (Net.get_player_fragments and Net.set_player_fragments) then
+        return nil
+    end
+    local safe_secret = helpers.get_safe_player_secret(player_id)
+    local player_memory = ezmemory.get_player_memory(safe_secret)
+    if player_memory.fragments == nil then
+        player_memory.fragments = Net.get_player_fragments(player_id) or 0
+        ezmemory.save_player_memory(safe_secret)
+    end
+    return player_memory.fragments
+end
+
+function ezmemory.set_player_fragments(player_id, fragments)
+    if not (Net.get_player_fragments and Net.set_player_fragments) then
+        error("Fragments support isn't available on this server build (missing Net.get_player_fragments / Net.set_player_fragments).")
+    end
+    local safe_secret = helpers.get_safe_player_secret(player_id)
+    local player_memory = ezmemory.get_player_memory(safe_secret)
+    Net.set_player_fragments(player_id, fragments)
+    player_memory.fragments = fragments
+    ezmemory.save_player_memory(safe_secret)
+end
+
+function ezmemory.add_player_fragments(player_id, amount)
+    if not (Net.get_player_fragments and Net.set_player_fragments) then
+        error("Fragments support isn't available on this server build (missing Net.get_player_fragments / Net.set_player_fragments).")
+    end
+    amount = tonumber(amount) or 0
+    if amount == 0 then return true end
+    local cur = ezmemory.get_player_fragments(player_id) or 0
+    ezmemory.set_player_fragments(player_id, cur + amount)
+    return true
+end
+
+function ezmemory.spend_player_fragments(player_id, amount)
+  if not (Net.get_player_fragments and Net.set_player_fragments) then
+    print("Fragments support isn't installed in ezmemory yet.")
+    return false
+  end
+
+  amount = tonumber(amount) or 0
+  if amount == 0 then
+    return true
+  end
+
+  local cur = tonumber(ezmemory.get_player_fragments(player_id) or 0) or 0
+
+  -- Same semantics as spend_player_money:
+  --  amount > 0 subtracts fragments
+  --  amount < 0 adds fragments
+  if cur >= amount then
+    ezmemory.set_player_fragments(player_id, cur - amount)
+    return true
+  end
+
+  return false
+end
+
 function ezmemory.set_player_money(player_id, money)
     local safe_secret = helpers.get_safe_player_secret(player_id)
     local player_memory = ezmemory.get_player_memory(safe_secret)
@@ -438,6 +587,40 @@ function ezmemory.hide_object_from_player_till_disconnect(player_id,area_id,obje
     if player_area == area_id then
         --if the player is in the area of the object being hidden
         Net.exclude_object_for_player(player_id, object_id)
+    end
+end
+
+function ezmemory.unhide_object_from_player_till_disconnect(player_id, area_id, object_id)
+    object_id = tostring(object_id)
+    local dict = objects_hidden_till_disconnect_for_player
+    if dict[player_id] and dict[player_id][area_id] then
+        dict[player_id][area_id][object_id] = nil
+        if next(dict[player_id][area_id]) == nil then
+            dict[player_id][area_id] = nil
+        end
+        if next(dict[player_id]) == nil then
+            dict[player_id] = nil
+        end
+    end
+
+    -- If the player is currently in this area, show it immediately
+    if Net.include_object_for_player and Net.get_player_area(player_id) == area_id then
+        pcall(Net.include_object_for_player, player_id, object_id)
+    end
+end
+
+function ezmemory.unhide_object_from_player(player_id, area_id, object_id)
+    object_id = tostring(object_id)
+    local player_area = Net.get_player_area(player_id)
+    local safe_secret = helpers.get_safe_player_secret(player_id)
+    local player_area_memory = ezmemory.get_player_area_memory(safe_secret, area_id)
+    if player_area_memory.hidden_objects[object_id] then
+        player_area_memory.hidden_objects[object_id] = nil
+        ezmemory.save_player_memory(safe_secret)
+    end
+
+    if Net.include_object_for_player and player_area == area_id then
+        pcall(Net.include_object_for_player, player_id, object_id)
     end
 end
 
@@ -504,6 +687,16 @@ function ezmemory.handle_player_join(player_id)
     end
     --Send player money
     Net.set_player_money(player_id, player_memory.money)
+    --Send player bug fragments (frags)
+    -- We *migrate* on first run: if fragments aren't in ezmemory yet, seed from server truth.
+    if Net.get_player_fragments and Net.set_player_fragments then
+        if player_memory.fragments == nil then
+            local cur_frags = Net.get_player_fragments(player_id) or 0
+            player_memory.fragments = cur_frags
+            ezmemory.save_player_memory(safe_secret)
+        end
+        Net.set_player_fragments(player_id, player_memory.fragments or 0)
+    end
     --update join count
     player_memory.meta.joins = player_memory.meta.joins + 1
     --also treat join as player transfer to do per area logic
@@ -583,7 +776,7 @@ function ezmemory.set_player_max_health(player_id, new_max_health, should_heal_b
     Net.set_player_max_health(player_id,new_max_health)
     Net.set_player_health(player_id,new_health)
     player_memory.health = new_health
-    player_memory.max_health = max_health
+    player_memory.max_health = new_max_health
     ezmemory.save_player_memory(safe_secret)
 
     update_player_health(player_id)
@@ -592,7 +785,7 @@ end
 ezmemory.set_player_health = function(player_id, new_health)
     local safe_secret = helpers.get_safe_player_secret(player_id)
     local player_memory = ezmemory.get_player_memory(safe_secret)
-    local max_health = player_memory.max_health or Net.get_player_max_health(player_id)
+    local max_health = Net.get_player_max_health(player_id) or player_memory.max_health
 
     -- dont set health to anything above the players max health
     printd('setting player health to ',new_health)

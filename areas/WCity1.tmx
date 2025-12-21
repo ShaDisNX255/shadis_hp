@@ -13,7 +13,6 @@
   <property name="Name" value="WCity1"/>
   <property name="OctoPVP" value="true"/>
   <property name="Song" value="/server/assets/wcity_1.ogg"/>
-  <property name="Stasis" value="36,20,0"/>
  </properties>
  <tileset firstgid="1" source="../assets/tiles/Custom_Central_Tiles.tsx"/>
  <tileset firstgid="9" source="../assets/tiles/hp_warp_blue.tsx"/>
@@ -1184,9 +1183,12 @@
   </object>
   <object id="208" type="Dialogue" x="1360" y="976">
    <properties>
+    <property name="Boss Money" type="int" value="90000"/>
     <property name="Dialogue Type" value="none"/>
     <property name="Event Name" value="raid"/>
     <property name="Raid ID" value="Mettaur1"/>
+    <property name="Wave1 Money" type="int" value="50000"/>
+    <property name="Wave2 Money" type="int" value="75000"/>
    </properties>
    <point/>
   </object>
