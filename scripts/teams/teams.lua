@@ -1575,4 +1575,10 @@ end
 -- Optional debug helper
 function Teams.debug_add_gp(pid, n) _add_gp(pid, n or 1, "debug") end
 
+-- Public helper for other systems (pets, etc.) to award GP using the SAME capped rules.
+-- This calls the internal _add_gp() logic so all caps and month tracking remain centralized.
+function Teams.award_activity_gp(pid, amount, why)
+  _add_gp(pid, amount or 1, why or "pet expedition")
+end
+
 return Teams

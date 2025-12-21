@@ -652,7 +652,7 @@
    <properties>
     <property name="Direction" value="Up Left"/>
     <property name="Target Area" value="default"/>
-    <property name="Target Object" value="351"/>
+    <property name="Target Object" value="16"/>
    </properties>
   </object>
  </objectgroup>

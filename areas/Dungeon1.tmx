@@ -1,18 +1,34 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="57" height="57" tilewidth="64" tileheight="32" infinite="0" nextlayerid="7" nextobjectid="157">
+<map version="1.10" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="57" height="57" tilewidth="64" tileheight="32" infinite="0" nextlayerid="7" nextobjectid="167">
  <properties>
+  <property name="Amount 1" type="int" value="1"/>
+  <property name="Amount 2" type="int" value="1"/>
+  <property name="Amount 3" type="int" value="150000"/>
+  <property name="Amount 4" type="int" value="100000"/>
   <property name="Background" value="custom"/>
   <property name="Background Animation" value="/server/assets/custom/backgrounds/dungeon1/09-graveyard.animation"/>
   <property name="Background Texture" value="/server/assets/custom/backgrounds/dungeon1/09-graveyard.png"/>
   <property name="Background Vel X" type="float" value="-0.0295"/>
   <property name="Background Vel Y" type="float" value="0"/>
+  <property name="Chance 1" type="int" value="5"/>
+  <property name="Chance 2" type="int" value="10"/>
+  <property name="Chance 3" type="int" value="25"/>
+  <property name="Chance 4" type="int" value="60"/>
   <property name="Dungeon" type="bool" value="true"/>
   <property name="DungeonKickArea" value="WCity2"/>
   <property name="DungeonKickObject" value="202"/>
   <property name="Forced Base HP" type="int" value="500"/>
-  <property name="Name" value="Dungeon1"/>
+  <property name="Name" value="Lost Lab"/>
   <property name="PunishHP" type="int" value="150"/>
+  <property name="Reward 1" value="pet_meddy"/>
+  <property name="Reward 2" value="ShadowAura"/>
+  <property name="Reward 3" value="moneyz"/>
+  <property name="Reward 4" value="moneyz"/>
   <property name="Song" value="/server/assets/dungeon1.ogg"/>
+  <property name="Type 1" value="decor"/>
+  <property name="Type 2" value="cosmetic"/>
+  <property name="Type 3" value="moneyz"/>
+  <property name="Type 4" value="moneyz"/>
  </properties>
  <tileset firstgid="1" source="../assets/objects/NoiseWaveEntrance.tsx"/>
  <tileset firstgid="5" source="../assets/tiles/bn3_undernet_tiles.tsx"/>
@@ -24,6 +40,8 @@
  <tileset firstgid="312" source="../assets/tiles/CrackedFloorForKeristero.tsx"/>
  <tileset firstgid="313" source="../assets/objects/Junkpiles.tsx"/>
  <tileset firstgid="315" source="../assets/tiles/EXE6_Shortcuts.tsx"/>
+ <tileset firstgid="363" source="../assets/ezlibs-assets/ezcheckpoints/bn5cubegreen_tile.tsx"/>
+ <tileset firstgid="367" source="../assets/ezlibs-assets/ezmystery/BlueMysteryData.tsx"/>
  <layer id="1" name="Tile Layer 0" width="57" height="57">
   <data encoding="csv">
 0,0,0,0,0,0,0,0,23,24,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -61,7 +79,7 @@
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,23,23,23,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483659,10,10,2147483660,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,23,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483654,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,30,23,23,23,2147483697,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483654,6,21,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,23,23,2147483672,23,23,24,24,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483656,6,6,8,6,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,6,6,23,23,2147483672,23,23,24,24,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483656,6,6,8,6,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,49,23,23,2147483672,2147483698,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483656,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483654,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,18,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483672,23,0,0,0,0,2147483657,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2147483656,0,0,0,0,0,0,0,0,0,0,0,
@@ -138,8 +156,8 @@
     <property name="Dialogue Type" value="first"/>
     <property name="Direction" value="Down Left"/>
     <property name="Mugshot" value="Blank"/>
-    <property name="Next 1" type="object" value="131"/>
-    <property name="Text 1" value="The Navi stares at you... unblinking. Its presence feels wrong, like corrupted data barely holding shape."/>
+    <property name="Next 1" type="object" value="146"/>
+    <property name="Text 1" value="A shade of a Heel Navi stands before you"/>
    </properties>
    <point/>
   </object>
@@ -227,19 +245,9 @@
    </properties>
    <point/>
   </object>
-  <object id="114" gid="276" x="973" y="371" width="20" height="43"/>
-  <object id="115" gid="276" x="1557" y="435" width="20" height="43"/>
-  <object id="116" gid="276" x="1781" y="1523" width="20" height="43"/>
-  <object id="117" gid="276" x="1269" y="1427" width="20" height="43"/>
-  <object id="118" gid="276" x="949" y="1523" width="20" height="43"/>
-  <object id="119" gid="276" x="275" y="403" width="20" height="43"/>
   <object id="120" gid="2147483956" x="379.5" y="1306.5" width="13" height="32"/>
   <object id="121" gid="308" x="1143.5" y="122.5" width="13" height="32"/>
   <object id="122" gid="2147483956" x="283.5" y="218.5" width="13" height="32"/>
-  <object id="123" gid="276" x="789" y="499" width="20" height="43"/>
-  <object id="124" gid="276" x="469" y="51" width="20" height="43"/>
-  <object id="125" gid="292" x="1557" y="595" width="20" height="43"/>
-  <object id="126" gid="292" x="853" y="1331" width="20" height="43"/>
   <object id="127" gid="292" x="405" y="723" width="20" height="43"/>
   <object id="129" name="To WCity2" type="Radius Warp" x="1605.5" y="914.5">
    <properties>
@@ -255,15 +263,6 @@
    <properties>
     <property name="Dialogue Type" value="DungeonHeal"/>
     <property name="Heal Amount" type="int" value="500"/>
-   </properties>
-   <point/>
-  </object>
-  <object id="131" name="Next 1" type="Dialogue" x="1105.5" y="104.5">
-   <properties>
-    <property name="Dialogue Type" value="first"/>
-    <property name="Mugshot" value="Blank"/>
-    <property name="Next 1" type="object" value="146"/>
-    <property name="Text 1" value="It slowly raises its weapon. There's no sign of recognition - only intent."/>
    </properties>
    <point/>
   </object>
@@ -288,17 +287,8 @@
     <property name="Dialogue Type" value="first"/>
     <property name="Direction" value="Down Right"/>
     <property name="Mugshot" value="Blank"/>
-    <property name="Next 1" type="object" value="134"/>
-    <property name="Text 1" value="The Navi emerges from the darkness, silhouette sharp against the flickering lights. It doesn't move... doesn't speak... but its gaze pierces through the data. You can feel its intent."/>
-   </properties>
-   <point/>
-  </object>
-  <object id="134" name="Next 1" type="Dialogue" x="366.5" y="1301.5">
-   <properties>
-    <property name="Dialogue Type" value="first"/>
-    <property name="Mugshot" value="Blank"/>
     <property name="Next 1" type="object" value="149"/>
-    <property name="Text 1" value="This navi seems out of it... (flavor text)"/>
+    <property name="Text 1" value="A shade of Noir.EXE stands before you"/>
    </properties>
    <point/>
   </object>
@@ -322,16 +312,8 @@
     <property name="Asset Name" value="elementman"/>
     <property name="Dialogue Type" value="first"/>
     <property name="Direction" value="Down Right"/>
-    <property name="Next 1" type="object" value="137"/>
-    <property name="Text 1" value="Piririri! (Heh... so you're the one trying to stop me?)"/>
-   </properties>
-   <point/>
-  </object>
-  <object id="137" name="Next 1" type="Dialogue" x="276.5" y="199.5">
-   <properties>
-    <property name="Dialogue Type" value="first"/>
-    <property name="Next 1" type="object" value="152"/>
-    <property name="Text 1" value="Pirikira! (Do you even realize what you're up against?) "/>
+    <property name="Next 1" type="object" value="153"/>
+    <property name="Text 1" value="A shade of ElementMan stands before you"/>
    </properties>
    <point/>
   </object>
@@ -361,7 +343,7 @@
     <property name="Boss Pool Max HP" type="int" value="60000"/>
     <property name="Dialogue Type" value="none"/>
     <property name="Encounter Name" value="MainBoss"/>
-    <property name="Event Name" value="DungeonBoss"/>
+    <property name="Event Name" value="MainBoss"/>
    </properties>
    <point/>
   </object>
@@ -412,7 +394,7 @@
    </properties>
    <point/>
   </object>
-  <object id="149" name="Question" type="Dialogue" x="339" y="1305">
+  <object id="149" name="Question" type="Dialogue" x="355.5" y="1314.5">
    <properties>
     <property name="Dialogue Type" value="question"/>
     <property name="Mugshot" value="Blank"/>
@@ -437,16 +419,7 @@
    </properties>
    <point/>
   </object>
-  <object id="152" name="Next 1" type="Dialogue" x="255" y="177">
-   <properties>
-    <property name="Dialogue Type" value="first"/>
-    <property name="Next 1" type="object" value="153"/>
-    <property name="Text 1">PIRIRIRAKIRI! (This power... it's beyond anything you can handle.
-Try if you dare... I'll show you the true force of the elements!)</property>
-   </properties>
-   <point/>
-  </object>
-  <object id="153" name="Question" type="Dialogue" x="222" y="164">
+  <object id="153" name="Question" type="Dialogue" x="252" y="188">
    <properties>
     <property name="Dialogue Type" value="question"/>
     <property name="Mugshot" value="Blank"/>
@@ -479,6 +452,76 @@ Try if you dare... I'll show you the true force of the elements!)</property>
     <property name="Text 1" value="Engage?"/>
    </properties>
    <point/>
+  </object>
+  <object id="159" name="Zarymura" type="NPC" x="1361.5" y="784.5">
+   <properties>
+    <property name="Asset Name" value="zarymura"/>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Direction" value="Down Left"/>
+    <property name="Next 1" type="object" value="160"/>
+    <property name="Text 1" value="Hey kid...Got some bugfrags?"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="160" name="Quiz" type="Dialogue" x="1375" y="749">
+   <properties>
+    <property name="Dialogue Type" value="quiz"/>
+    <property name="Next 1" type="object" value="164"/>
+    <property name="Next 2" type="object" value="161"/>
+    <property name="Text 1" value="Shop"/>
+    <property name="Text 2" value="Explain"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="161" name="Explain" type="Dialogue" x="1417.5" y="754.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="163"/>
+    <property name="Text 1" value="This area's different... something about it just ain't right. If you lose your HP inside, you'll get kicked out... and the viruses? Extra nasty. I can feel some strong energies in there too."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="163" name="Explain 2" type="Dialogue" x="1446" y="766">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Text 1" value="I recommend tackling this area with a friend or two. Oh! And if you happen to drop any delicious BugFrags, I'll be more than happy to trade them for some nice stuff. Lil' ol' Zary's got wares if you've got the frags~ Nyahaha!"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="164" name="Bug Frag Shop" type="Dialogue" x="1394" y="730">
+   <properties>
+    <property name="Already Owned Msg" value="Kid you already have this one, but I can take your bugfrags if you want ~"/>
+    <property name="Amount 1" type="int" value="1"/>
+    <property name="Amount 2" type="int" value="1"/>
+    <property name="Dialogue Type" value="fragshop"/>
+    <property name="Not Enough Msg" value="Sorry kid looks like you a lil short on bugfrags"/>
+    <property name="Price 1" type="int" value="8"/>
+    <property name="Price 2" type="int" value="10"/>
+    <property name="Sell 1" value="ShadowAura"/>
+    <property name="Sell 2" value="pet_meddy"/>
+    <property name="Type 1" value="cosmetic"/>
+    <property name="Type 2" value="decor"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="165" name="Cube Underground Key" type="Checkpoint" gid="363" x="672" y="1136" width="53.25" height="56">
+   <properties>
+    <property name="Description" value="This security cube seems to be sealed by a powerful dark force. There are a few words written on the surface: &quot;Only those worthy of S can walk through&quot;"/>
+    <property name="Dialogue Type" value=""/>
+    <property name="Key Name" value="UndrGrndKey"/>
+    <property name="Once" type="bool" value="true"/>
+    <property name="Required Keys" type="int" value="1"/>
+    <property name="Skip Prompt" type="bool" value="true"/>
+    <property name="Unlocked Message" value="You show your card, &quot;Curse of Dragon&quot;. The security cube opens."/>
+   </properties>
+  </object>
+  <object id="166" type="Mystery Data" gid="367" x="624" y="1136" width="14" height="43">
+   <properties>
+    <property name="Name" value="HPMem"/>
+    <property name="Next 1" type="object" value="0"/>
+    <property name="Once" type="bool" value="true"/>
+    <property name="Type" value="item"/>
+   </properties>
   </object>
  </objectgroup>
 </map>

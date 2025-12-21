@@ -54,7 +54,6 @@ local function rehydrate_secret_paths_for_area(area_id)
     if not area_id or rehydrated_secret_areas[area_id] then
         return
     end
-    print("[SecretPath] rehydrate attempt for area:", area_id)
 
     local bucket = get_secret_paths_bucket(area_id)
     if not bucket then
@@ -1239,6 +1238,263 @@ eznpcs.add_event{
     end)
   end
 }
+
+
+----------------------------------------------------------------
+-- BugFrag Dealer Shop (sells cosmetics + decors/pets for BugFrags)
+-- Dialogue Type: "fragshop"
+--
+-- Configure per-NPC via custom properties (case-insensitive):
+--   Sell 1   = ShadowAura
+--   Type 1   = cosmetic        (or decor / pet)
+--   Amount 1 = 1               (ignored for cosmetics; defaults to 1)
+--   Price 1  = 5               (BugFrag cost; defaults to 0)
+--   Sell 2 / Type 2 / Amount 2 / Price 2 ... etc
+--
+-- Optional:
+--   Shop Title = BugFrag Dealer
+--   Not Enough Msg = You don't have enough BugFrags.
+--   Already Owned Msg = You already own that cosmetic.
+----------------------------------------------------------------
+
+local BUGFRAG_SHOP_COLOR = { r = 245, g = 210, b = 70 } -- match decor/cosmetic shop yellow
+local DECOR_MEM_KEY__ONCEHUB = "oncehub_decor_inventory_v1"
+
+local function short_frags(n)
+  n = math.floor(tonumber(n) or 0)
+  return string.format("%d BF", n)
+end
+
+local function oncehub_catalog_name_for(id)
+  id = tostring(id or "")
+  local cat = rawget(_G, "ONCEHUB_CATALOG") or ONCEHUB_CATALOG
+  if type(cat) == "table" then
+    for _, e in ipairs(cat) do
+      if tostring(e.id) == id then
+        return e.name or e.label or e.title or id
+      end
+    end
+  end
+  return id
+end
+
+local function oncehub_add_owned(pid, id, qty)
+  qty = math.floor(tonumber(qty) or 0)
+  if qty == 0 then return end
+  id = tostring(id or "")
+  if id == "" then return end
+
+  local secret = (helpers and helpers.get_safe_player_secret) and helpers.get_safe_player_secret(pid) or pid
+  local pmem = ezmemory.get_player_memory(secret) or {}
+  if type(pmem[DECOR_MEM_KEY__ONCEHUB]) ~= "table" then
+    pmem[DECOR_MEM_KEY__ONCEHUB] = {}
+  end
+  local inv = pmem[DECOR_MEM_KEY__ONCEHUB]
+  inv[id] = (tonumber(inv[id]) or 0) + qty
+
+  if ezmemory.save_player_memory then
+    ezmemory.save_player_memory(secret)
+  elseif ezmemory.set_player_memory then
+    ezmemory.set_player_memory(secret, pmem)
+  end
+end
+
+local function oncehub_count_owned(pid, id)
+  id = tostring(id or "")
+  if id == "" then return 0 end
+  local secret = (helpers and helpers.get_safe_player_secret) and helpers.get_safe_player_secret(pid) or pid
+  local pmem = ezmemory.get_player_memory(secret) or {}
+  local inv = pmem[DECOR_MEM_KEY__ONCEHUB]
+  if type(inv) ~= "table" then return 0 end
+  return tonumber(inv[id] or 0) or 0
+end
+
+eznpcs.add_event{
+  name = "fragshop",
+  action = function(npc, player_id, dialogue, relay_object)
+    return async(function()
+      local mug = eznpcs.get_dialogue_mugshot(npc, player_id, dialogue)
+      local ci = build_ci_props(dialogue)
+
+      -- Ensure fragments support exists
+      if not ezmemory or not ezmemory.get_player_fragments or not ezmemory.spend_player_fragments then
+        await(Async.message_player(
+          player_id,
+          "BugFrag shop isn't available on this server build.",
+          mug.texture_path, mug.animation_path
+        ))
+        return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+      end
+
+      local title = tostring(get_ci(ci, "shop title") or "BugFrag Dealer")
+      local not_enough_msg = tostring(get_ci(ci, "not enough msg") or "You don't have enough BugFrags.")
+      local owned_msg = tostring(get_ci(ci, "already owned msg") or "You already own that cosmetic.")
+
+      -- Build offers from Sell N / Type N / Amount N / Price N
+      local offers = {}
+      local i = 1
+      while true do
+        local sell = get_ci(ci, "sell " .. i)
+        if not sell then break end
+
+        local typ = tostring(get_ci(ci, "type " .. i) or "decor")
+        typ = string.lower(typ)
+        if typ == "pet" then typ = "decor" end
+        if typ == "cosmetics" then typ = "cosmetic" end
+
+        local amount = math.floor(tonumber(get_ci(ci, "amount " .. i) or 1) or 1)
+        if amount < 1 then amount = 1 end
+
+        local price = math.floor(tonumber(get_ci(ci, "price " .. i) or get_ci(ci, "cost " .. i) or 0) or 0)
+        if price < 0 then price = 0 end
+
+        local id = tostring(sell)
+        local pretty =
+          (typ == "cosmetic" and cosmetics and cosmetics.get_name_for_id and cosmetics.get_name_for_id(id))
+          or (typ == "decor" and oncehub_catalog_name_for(id))
+          or id
+
+        table.insert(offers, {
+          id = id,
+          type = typ,
+          amount = amount,
+          price = price,
+          name = pretty,
+        })
+
+        i = i + 1
+      end
+
+      if #offers == 0 then
+        await(Async.message_player(
+          player_id,
+          "Sorry, I'm not selling anything right now.",
+          mug.texture_path, mug.animation_path
+        ))
+        return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+      end
+
+      while true do
+        local cur_frags = tonumber(ezmemory.get_player_fragments(player_id) or 0) or 0
+
+        local posts, items = {}, {}
+        for _, offer in ipairs(offers) do
+          local label
+          if offer.type == "cosmetic" then
+            local owned = cosmetics and cosmetics.has_cosmetic and cosmetics.has_cosmetic(player_id, offer.id)
+            label = owned
+              and string.format("%s (%s, Owned)", offer.name, short_frags(offer.price))
+              or  string.format("%s (%s)",        offer.name, short_frags(offer.price))
+          else
+            local owned = oncehub_count_owned(player_id, offer.id)
+            if offer.amount ~= 1 then
+              label = string.format("%s x%d (%s) [Owned:%d]", offer.name, offer.amount, short_frags(offer.price), owned)
+            else
+              label = string.format("%s (%s) [Owned:%d]", offer.name, short_frags(offer.price), owned)
+            end
+          end
+
+          local post = helpers.create_bbs_option(label)
+          table.insert(posts, post)
+          items[#posts] = offer
+        end
+
+        -- Add a "balance" footer option (non-purchasable)
+        local bal_post = helpers.create_bbs_option(string.format("Your BugFrags: %d", cur_frags))
+        bal_post.id = "__bf_balance__"
+        table.insert(posts, bal_post)
+
+        local board = ezmenus.open_menu(
+          player_id,
+          title,
+          BUGFRAG_SHOP_COLOR,
+          posts
+        )
+
+        local sel = await(board.selection_once())
+        Net.close_bbs(player_id)
+
+        if not sel then break end -- cancel
+
+        if sel == "__bf_balance__" then
+          -- just reopen (acts like a footer)
+        else
+          -- Resolve choice
+          local chosen
+          for idx, post in ipairs(posts) do
+            local pid = post.id or post.title or ""
+            if sel == pid then
+              chosen = items[idx]
+              break
+            end
+          end
+          if not chosen then
+            -- if they selected balance or something unknown, just loop
+          else
+            -- Cosmetic owned check
+            if chosen.type == "cosmetic" and cosmetics and cosmetics.has_cosmetic and cosmetics.has_cosmetic(player_id, chosen.id) then
+              await(Async.message_player(player_id, owned_msg, mug.texture_path, mug.animation_path))
+            else
+              -- Preview for cosmetics (optional)
+              if chosen.type == "cosmetic" and cosmetics and cosmetics.preview_for_shop then
+                cosmetics.preview_for_shop(player_id, chosen.id)
+              end
+
+              local question
+              if chosen.type == "decor" and chosen.amount ~= 1 then
+                question = string.format("Buy %s x%d for %s?", chosen.name, chosen.amount, short_frags(chosen.price))
+              else
+                question = string.format("Buy %s for %s?", chosen.name, short_frags(chosen.price))
+              end
+
+              local res = await(Async.question_player(player_id, question, mug.texture_path, mug.animation_path))
+              local do_buy = (res == 1)
+
+              if cosmetics and cosmetics.clear_shop_previews then
+                cosmetics.clear_shop_previews(player_id)
+              end
+
+              if do_buy then
+                if chosen.price > 0 and not ezmemory.spend_player_fragments(player_id, chosen.price) then
+                  await(Async.message_player(player_id, not_enough_msg, mug.texture_path, mug.animation_path))
+                else
+                  local reward_msg = nil
+
+                  if chosen.type == "cosmetic" then
+                    local ok, reason = cosmetics.unlock_for_player(player_id, chosen.id)
+                    if ok then
+                      reward_msg = "You got the " .. chosen.name .. " cosmetic!"
+                    else
+                      reward_msg = "Couldn't unlock that cosmetic (" .. tostring(reason or "error") .. ")."
+                    end
+                  else
+                    oncehub_add_owned(player_id, chosen.id, chosen.amount)
+                    if chosen.amount ~= 1 then
+                      reward_msg = string.format("You got %dx %s!", chosen.amount, chosen.name)
+                    else
+                      reward_msg = "You got " .. chosen.name .. "!"
+                    end
+                  end
+
+                  if sfx and sfx.item_get then
+                    pcall(Net.play_sound_for_player, player_id, sfx.item_get)
+                  end
+
+                  local new_frags = tonumber(ezmemory.get_player_fragments(player_id) or 0) or 0
+                  reward_msg = (reward_msg or "Purchase complete.") .. ("\nBugFrags: %d"):format(new_frags)
+                  await(Async.message_player(player_id, reward_msg, mug.texture_path, mug.animation_path))
+                end
+              end
+            end
+          end
+        end
+      end
+
+      return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+    end)
+  end
+}
+
 
 eznpcs.add_event{
   name = "decorclear",

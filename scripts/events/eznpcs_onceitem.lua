@@ -21,6 +21,7 @@ local ezmemory = require('scripts/ezlibs-scripts/ezmemory')
 local ezmenus  = require('scripts/ezlibs-scripts/ezmenus')
 local ezweather = require('scripts/ezlibs-scripts/ezweather')
 local custom   = require('scripts/ezlibs-custom/custom')
+local pets = require('scripts/ezlibs-custom/pets')
 
 -- ====================== Text Defaults ======================
 local DEFAULTS = {
@@ -53,6 +54,10 @@ local DEFAULTS = {
   CP_UnlockingAssetName       = "bn5cubegreen_bot",
   CP_UnlockingAnimationTimeMS = "0",
   CP_UnlockingSoundPath       = "/server/assets/ezlibs-assets/sfx/panel_change.ogg",
+}
+
+local sfx = {
+    item_get = '/server/assets/ezlibs-assets/sfx/item_get.ogg',
 }
 
 -- ====================== Session state for oncehub ======================
@@ -99,8 +104,29 @@ local ONCEHUB_CATALOG = {
   { id = "home_shortcut",  name = "Home Shortcut",  ts_source = "../assets/objects/EXE6_Shortcuts.tsx", gid = 326, layer = "Object Layer 2" },
   { id = "fish_shortcut",  name = "Fish Area Shortcut",  ts_source = "../assets/objects/EXE6_Shortcuts.tsx", gid = 322, layer = "Object Layer 2" },
   { id = "teams_shortcut",  name = "TeamsHQ Shortcut",  ts_source = "../assets/objects/EXE6_Shortcuts.tsx", gid = 330, layer = "Object Layer 2" },
+  { id = "wcity3_shortcut",  name = "WCity3 Shortcut",  ts_source = "../assets/objects/EXE6_Shortcuts.tsx", gid = 342, layer = "Object Layer 2" },
   { id = "card_frame", name = "Card Frame" },
+  { id = "pet_mettaur", name = "Pet: Mettaur" },
+  { id = "pet_meddy",  name = "Pet: Meddy" },
+  { id = "pet_ratty",  name = "Pet: Ratty" },
+  { id = "pet_spooky",  name = "Pet: Spooky" },
+  { id = "pet_swordy",  name = "Pet: Swordy" },
+  { id = "pet_moloko",  name = "Pet: Moloko" },
+  { id = "pet_powie",  name = "Pet: Powie" },
 }
+
+
+
+-- ====================== Pets Helpers ======================
+-- Pets are sold via the Decor Shop (inventory), but are NOT placed as map objects anymore.
+-- They are summoned/removed via the Home Hub -> Pets menu, and stored separately in pets.lua.
+local function is_pet_item_id(id)
+  return type(id) == "string" and id:sub(1,4) == "pet_"
+end
+
+local function pet_kind_from_item_id(id)
+  return tostring(id or ""):gsub("^pet_", ""):lower()
+end
 
 local MENU_COLOR = {
   YELLOW = {r=245,g=210,b=70},
@@ -191,7 +217,28 @@ local function normalize_key(s)
   return (tostring(s or ""):gsub("^%s+",""):gsub("%s+$",""))
 end
 
+-- Central bucket area where onceitem/oncehub data is persisted.
+-- MUST be a real area_id that exists at boot (so ezmemory loads it).
 local DEFAULT_MEM_AREA = "WCity1"
+local function _pick_existing_mem_area(fallback)
+  local areas = Net.list_areas and (Net.list_areas() or {}) or {}
+  for _, a in ipairs(areas) do if a == fallback then return fallback end end
+  for _, a in ipairs(areas) do if a == "default" then return "default" end end
+  return areas[1] or fallback
+end
+DEFAULT_MEM_AREA = _pick_existing_mem_area(DEFAULT_MEM_AREA)
+
+-- Cache area ids so we don't accidentally write bucket memory into a non-area file.
+local _AREA_ID_SET = nil
+local function _area_exists(area_id)
+  if not area_id or area_id == "" then return false end
+  if _AREA_ID_SET == nil then
+    _AREA_ID_SET = {}
+    local areas = Net.list_areas and (Net.list_areas() or {}) or {}
+    for _, a in ipairs(areas) do _AREA_ID_SET[a] = true end
+  end
+  return _AREA_ID_SET[area_id] == true
+end
 
 local function resolve_mem_area_id(dialogue, player_id, obj_custom)
   local v = nil
@@ -199,10 +246,13 @@ local function resolve_mem_area_id(dialogue, player_id, obj_custom)
   if (not v or v == "") and dialogue and dialogue.custom_properties then
     v = normalize_key(dialogue.custom_properties["Memory Area"])
   end
-  if (not v or v == "") and player_id then
-    v = Net.get_player_area(player_id)
-  end
+  -- NOTE: We intentionally do NOT default to the player's current area.
+  -- onceitem/oncehub data must live in a stable bucket area that exists at boot.
   if not v or v == "" then v = DEFAULT_MEM_AREA end
+  if not _area_exists(v) then
+    print("[onceitem] WARNING: Memory Area '"..tostring(v).."' is not a real area_id; using '"..tostring(DEFAULT_MEM_AREA).."' instead")
+    v = DEFAULT_MEM_AREA
+  end
   return v
 end
 
@@ -775,12 +825,22 @@ end
   local dist = s.cursor_distance or 0.75
   local cx, cy, cz = get_cursor_point(player_id, dist)
   if not cx then return end
-  local w, h = resolve_object_dims(s.area_id, s.template_layer_name or "Object Layer 2", s.object_gid)
 
   -- If we already have a preview, just move it to the new cursor position
   if s.preview_id then
     pcall(Net.move_object, s.area_id, s.preview_id, cx, cy, cz)
     return
+  end
+
+  -- Resolve dims ONCE (and skip heavy resolution for pet cursor previews)
+  local w, h = s._preview_w, s._preview_h
+  if not w or not h then
+    if s.mode == "pet_place" then
+      w, h = 1, 1
+    else
+      w, h = resolve_object_dims(s.area_id, s.template_layer_name or "Object Layer 2", s.object_gid)
+    end
+    s._preview_w, s._preview_h = w, h
   end
 
   -- First tick of session: purge any stale previews for this once_key in this area
@@ -1098,7 +1158,13 @@ local function rehydrate_placements(area_id, bucket_area_id, once_key)
     local o = Net.get_object_by_id(area_id, oid)
     local cp = o and o.custom_properties
     if cp and cp.placed_by_oncehub == "true" and (cp.oncehub_key or "") == (once_key or "") then
-      return false
+      -- Ignore legacy pet anchors so decor can still rehydrate.
+      if cp.pet_anchor == "true" or is_pet_item_id(cp.oncehub_id or "") then
+        -- optional cleanup: remove the legacy anchor
+        pcall(Net.remove_object, area_id, oid)
+      else
+        return false
+      end
     end
   end
 
@@ -1218,8 +1284,16 @@ local function ensure_rehydrated(player_id, dialogue)
   local once_key = normalize_key(dprop(dialogue, "Once Key", ""))
   if once_key == "" then return end
   local BUCKET   = resolve_mem_area_id(dialogue, player_id, nil)
+
+  -- Rehydrate placed decor
   rehydrate_placements(area_id, BUCKET, once_key)
+
+  -- Rehydrate pets (anchorless, stored separately)
+  if pets and pets.rehydrate_for_hp then
+    pcall(pets.rehydrate_for_hp, area_id, BUCKET, once_key)
+  end
 end
+
 
 local persist_area          -- defined later ~1372 (don't re-declare 'local' there)
 local _cleanup_expired_hp   -- defined below; used by rehydrate_all_for_area
@@ -1244,6 +1318,11 @@ _cleanup_expired_hp = function(area_id, bucket_area_id, once_key)
     end
   end
 
+  -- remove pets for this HP (pets are stored separately)
+  if pets and pets.remove_all then
+    pcall(pets.remove_all, area_id, bucket_area_id, once_key)
+  end
+
   -- persist empty so rehydrate won't bring them back
   if type(persist_area) == "function" then
     persist_area(area_id, bucket_area_id, once_key)
@@ -1264,6 +1343,11 @@ local function rehydrate_all_for_area(area_id)
 
   local function try_from(bucket_area_id)
     local mem = ezmemory.get_area_memory(bucket_area_id or area_id)
+
+    -- Rehydrate any pets stored in this bucket for the current area
+    if pets and pets.rehydrate_all_for_area then
+      pcall(pets.rehydrate_all_for_area, area_id, bucket_area_id or area_id)
+    end
     local map = mem and mem[PLACEMENTS_MEM_KEY]
     if type(map) ~= "table" then return end
 
@@ -2211,6 +2295,333 @@ local function open_visitor_decor_menu(player_id, dialogue)
   end)
 end
 
+
+
+-- ====================== Pets menu & placement ======================
+local function _pets_require()
+  if pets and pets.summon_pet and pets.list_pets and pets.remove_pet then return true end
+  return false
+end
+
+local function _pets_auth_renter(player_id, dialogue)
+  local area_id  = Net.get_player_area(player_id)
+  local once_key = normalize_key(dprop(dialogue, "Once Key", ""))
+  if once_key == "" then return nil, "This butler needs an 'Once Key' property." end
+
+  local BUCKET = resolve_mem_area_id(dialogue, player_id, nil)
+  local mem = ezmemory.get_area_memory(BUCKET); mem.onceitems = mem.onceitems or {}
+  local rec = mem.onceitems[once_key]
+  local now = os.time()
+  local secret = helpers.get_safe_player_secret(player_id)
+
+  if (not rec) or (not rec.expires_at) or (rec.expires_at <= now) or (secret ~= rec.owner_secret) then
+    return nil, "Only the current renter can manage pets."
+  end
+
+  return {
+    area_id = area_id,
+    bucket_area_id = BUCKET,
+    once_key = once_key,
+    owner_secret = secret,
+  }
+end
+
+local function start_pet_place_session(player_id, dialogue, pet_id, pet_name)
+  if not _pets_require() then
+    Async.message_player(player_id, "pets.lua is missing required functions (summon/list/remove).")
+    return false
+  end
+
+  local auth, err = _pets_auth_renter(player_id, dialogue)
+  if not auth then
+    Async.message_player(player_id, err or "You can't manage pets here.")
+    return false
+  end
+
+  stop_session(player_id) -- cancel any decorate/remove session
+
+  local area_id = auth.area_id
+  local cursor_gid = resolve_removal_cursor_gid(area_id) or try_resolve_test_gid(dialogue, area_id) or 0
+  cursor_gid = gid_base(cursor_gid)
+
+  ONCEHUB.sessions[player_id] = {
+    area_id = area_id,
+    bucket_area_id = auth.bucket_area_id,
+    once_key = auth.once_key,
+
+    -- preview tile cursor
+    object_gid = cursor_gid,
+    object_name = pet_name or "Pet",
+    object_id   = pet_id   or "pet_unknown",
+    template_layer_name = get_template_layer_name(dialogue),
+    cursor_distance = tonumber(dprop(dialogue, "Cursor Distance Tiles", "0.75")) or 0.75,
+
+    -- pet info
+    pet_id = pet_id,
+    pet_kind = pet_kind_from_item_id(pet_id),
+    owner_secret = auth.owner_secret,
+
+    mode = 'pet_place',
+    active = true,
+  }
+
+  -- keep the preview alive while session is active
+  async(function ()
+    while true do
+      local s = ONCEHUB.sessions[player_id]
+      if not s or not s.active then break end
+      ensure_preview(player_id)
+      await(Async.sleep(0.08))
+    end
+  end)
+
+  async(function ()
+    await(Async.message_player(player_id, ("Summon Mode: Aim where to spawn %s, then press A. Leave the area to cancel."):format(pet_name or "your pet")))
+  end)
+
+  return true
+end
+
+local function place_pet_current(player_id)
+  local s = ONCEHUB.sessions[player_id]; if not (s and s.active and s.mode == 'pet_place') then return end
+  if not s.preview_id then return end
+  local preview = Net.get_object_by_id(s.area_id, s.preview_id)
+  if not preview then return end
+
+  local kind = s.pet_kind
+  if not kind or kind == "" then kind = "mettaur" end
+  kind = tostring(kind):lower()
+
+  -- Enforce: can't place more than owned
+  local owned = 0
+  if s.pet_id and s.pet_id ~= "" then
+    owned = tonumber(decor_count_owned(player_id, s.pet_id) or 0) or 0
+  end
+
+  -- Count currently summoned pets of this kind in this HP
+  local placed = 0
+  if pets and pets.list_pets then
+    local cur = pets.list_pets(s.bucket_area_id, s.once_key) or {}
+    for _, p in ipairs(cur) do
+      if tostring(p.kind or ""):lower() == kind then
+        placed = placed + 1
+      end
+    end
+  end
+
+  if owned <= 0 then
+    Net.message_player(player_id, "You don't own this pet.")
+    stop_session(player_id, "Summon cancelled.")
+    return
+  end
+
+  if placed >= owned then
+    Net.message_player(player_id, ("No free slots: %d/%d %s already placed. Remove one first.")
+      :format(placed, owned, tostring(s.object_name or "pet")))
+    stop_session(player_id, "Summon cancelled.")
+    return
+  end
+
+  -- snap to nearest tile
+  local x = math.floor((preview.x or 0) + 0.5)
+  local y = math.floor((preview.y or 0) + 0.5)
+  local z = preview.z or 0
+
+  local uid, perr = pets.summon_pet(s.area_id, s.bucket_area_id, s.once_key, kind, x, y, z, s.owner_secret)
+  if not uid then
+    Net.message_player(player_id, "Couldn't summon pet: "..tostring(perr or "unknown")) -- no await
+    return
+  end
+
+  stop_session(player_id, ("Summoned %s."):format(s.object_name or "pet"))
+end
+
+local function open_pets_summon_menu(player_id, npc, dialogue)
+  return async(function ()
+    local auth, err = _pets_auth_renter(player_id, dialogue)
+    if not auth then
+      await(Async.message_player(player_id, err or "Only the current renter can summon pets."))
+      return
+    end
+
+    -- best-effort: ensure any existing pet records are normalized for this HP
+    if pets and pets.rehydrate_for_hp then
+      pcall(pets.rehydrate_for_hp, auth.area_id, auth.bucket_area_id, auth.once_key)
+    end
+
+    -- Count currently summoned pets in this HP, by kind
+    local placed_by_kind = {}
+    if pets and pets.list_pets then
+      local cur = pets.list_pets(auth.bucket_area_id, auth.once_key) or {}
+      for _, p in ipairs(cur) do
+        local k = tostring(p.kind or ""):lower()
+        if k ~= "" then
+          placed_by_kind[k] = (placed_by_kind[k] or 0) + 1
+        end
+      end
+    end
+
+    local posts, index = {}, {}
+    for _, e in ipairs(ONCEHUB_CATALOG) do
+      if is_pet_item_id(e.id) then
+        local owned = decor_count_owned(player_id, e.id)
+        if owned > 0 then
+          local kind = pet_kind_from_item_id(e.id)
+          local placed = placed_by_kind[kind] or 0
+          local free = owned - placed
+
+          local label = string.format("%s (owned %d, placed %d, free %d)",
+            e.name, owned, placed, math.max(0, free))
+
+          table.insert(posts, helpers.create_bbs_option(label))
+          index[#posts] = {
+            id = e.id,
+            name = e.name,
+            kind = kind,
+            owned = owned,
+            placed = placed,
+            free = free,
+          }
+        end
+      end
+    end
+
+    if #posts == 0 then
+      table.insert(posts, helpers.create_bbs_option("(No pets owned)"))
+    end
+
+    table.insert(posts, helpers.create_bbs_option("Back"))
+
+    local board = _open_menu_ignoring_custom(player_id, "Summon Pet", MENU_COLOR.YELLOW, posts, "oncehub:pets_summon")
+    local sel = await(board.selection_once())
+    _oh_log(player_id, "pets summon selection: "..tostring(sel))
+    menu_closed_now(player_id, 0.5)
+    fast_close_board(player_id)
+    if not sel or sel == "Back" then return end
+
+    -- match selection to an entry
+    for i, post in ipairs(posts) do
+      local title = post.title or post.id or ""
+      if sel == title then
+        local chosen = index[i]
+        if chosen then
+          if (chosen.free or 0) <= 0 then
+            await(Async.message_player(player_id,
+              ("You already have all of your %s placed. Remove one first."):format(tostring(chosen.name or "pet"))
+            ))
+            return
+          end
+
+          start_pet_place_session(player_id, dialogue, chosen.id, chosen.name)
+          return
+        end
+      end
+    end
+  end)
+end
+
+local function open_pets_remove_menu(player_id, npc, dialogue)
+  return async(function ()
+    local auth, err = _pets_auth_renter(player_id, dialogue)
+    if not auth then
+      await(Async.message_player(player_id, err or "Only the current renter can remove pets."))
+      return
+    end
+
+    -- ensure bots exist before listing
+    if pets and pets.rehydrate_for_hp then
+      pcall(pets.rehydrate_for_hp, auth.area_id, auth.bucket_area_id, auth.once_key)
+    end
+
+    local list = pets.list_pets(auth.bucket_area_id, auth.once_key) or {}
+    local posts, index = {}, {}
+
+    if #list > 0 then
+      for _, e in ipairs(list) do
+        local kind = tostring(e.kind or "pet")
+        local name = kind:gsub("^%l", string.upper)
+        local label = string.format("%s (uid %s)", name, tostring(e.uid))
+        table.insert(posts, helpers.create_bbs_option(label))
+        index[#posts] = e
+      end
+      table.insert(posts, helpers.create_bbs_option("Remove all"))
+    else
+      table.insert(posts, helpers.create_bbs_option("(No pets summoned)"))
+    end
+
+    table.insert(posts, helpers.create_bbs_option("Back"))
+
+    local board = _open_menu_ignoring_custom(player_id, "Remove Pet", MENU_COLOR.YELLOW, posts, "oncehub:pets_remove")
+    local sel = await(board.selection_once())
+    _oh_log(player_id, "pets remove selection: "..tostring(sel))
+    menu_closed_now(player_id, 0.5)
+    fast_close_board(player_id)
+    if not sel or sel == "Back" then return end
+    if sel == "(No pets summoned)" then return end
+
+    if sel == "Remove all" then
+      local removed, skipped = 0, 0
+      local ok, r, s = pcall(pets.remove_all, auth.area_id, auth.bucket_area_id, auth.once_key)
+      if ok then
+        removed = tonumber(r or 0) or 0
+        skipped = tonumber(s or 0) or 0
+      end
+
+      if skipped > 0 then
+        await(Async.message_player(player_id,
+          ("Removed %d pets. Skipped %d (cooldown/expedition)."):format(removed, skipped)))
+      else
+        await(Async.message_player(player_id, ("Removed %d pets."):format(removed)))
+      end
+      return
+    end
+
+    -- match selection
+    for i, post in ipairs(posts) do
+      local title = post.title or post.id or ""
+      if sel == title then
+        local chosen = index[i]
+        if chosen then
+          local ok, removed, msg = pcall(pets.remove_pet, auth.area_id, auth.bucket_area_id, auth.once_key, chosen.uid or chosen.bot_id)
+if (not ok) then
+  await(Async.message_player(player_id, "Couldn't remove pet (error). Check server logs."))
+  return
+end
+if removed then
+  await(Async.message_player(player_id, msg or "Pet removed."))
+else
+  await(Async.message_player(player_id, msg or "That pet can't be removed right now."))
+end
+return
+        end
+      end
+    end
+  end)
+end
+
+local function open_pets_menu(player_id, npc, dialogue)
+  return async(function ()
+    local posts = {
+      helpers.create_bbs_option("Summon Pet"),
+      helpers.create_bbs_option("Remove Pet"),
+      helpers.create_bbs_option("Back"),
+    }
+
+    local board = _open_menu_ignoring_custom(player_id, "Pets", MENU_COLOR.YELLOW, posts, "oncehub:pets")
+    local sel = await(board.selection_once())
+    _oh_log(player_id, "pets menu selection: "..tostring(sel))
+    menu_closed_now(player_id, 0.5)
+    fast_close_board(player_id)
+    if not sel or sel == "Back" then return end
+
+    if sel == "Summon Pet" then
+      await(open_pets_summon_menu(player_id, npc, dialogue))
+    elseif sel == "Remove Pet" then
+      await(open_pets_remove_menu(player_id, npc, dialogue))
+    end
+  end)
+end
+
 -- Register oncehub dialogue
 eznpcs.add_event({
   name = "oncehub",
@@ -2222,6 +2633,7 @@ eznpcs.add_event({
         helpers.create_bbs_option("Set/Clear visitor password"),
         helpers.create_bbs_option("Decorate HP"),
         helpers.create_bbs_option("Visitor Decorations"),  -- 👈 NEW
+        helpers.create_bbs_option("Pets"),
       }
 
       local board = _open_menu_ignoring_custom(player_id, "Home Hub", MENU_COLOR.YELLOW, posts, "oncehub:hub")
@@ -2237,6 +2649,8 @@ eznpcs.add_event({
         await(open_decorate_menu(player_id, dialogue))
       elseif sel == "Visitor Decorations" then                       -- 👈 NEW
         await(open_visitor_decor_menu(player_id, dialogue))
+      elseif sel == "Pets" then
+        await(open_pets_menu(player_id, npc, dialogue))
       end
     end)
   end
@@ -2253,6 +2667,8 @@ Net:on("tile_interaction", function (event)
     place_current(pid)
   elseif s.mode == 'remove' then
     remove_current(pid)
+  elseif s.mode == 'pet_place' then
+    place_pet_current(pid)
   end
 end)
 
@@ -2338,6 +2754,7 @@ eznpcs.add_event({
 
       local function save_record(r)
         mem.onceitems[once_key] = r
+        -- Await to ensure the lease is actually written before we continue (important during quick reboot testing).
         ezmemory.save_area_memory(BUCKET_AREA_ID)
       end
 
@@ -2371,7 +2788,14 @@ eznpcs.add_event({
       if record and record.expires_at and record.expires_at > now_ts then
         -- HP is currently rented
 
-        if record.owner_secret == safe_secret then
+        if record.owner_secret == safe_secret
+          or ((record.owner_secret == nil or record.owner_secret == "") and record.owner_name == player_name) then
+          -- Migration: if an old lease record is missing owner_secret but the owner_name matches,
+          -- bind it to the current player's secret so it survives restarts.
+          if (record.owner_secret == nil or record.owner_secret == "") and safe_secret and safe_secret ~= "" then
+            record.owner_secret = safe_secret
+            save_record(record)
+          end
           ----------------------------------------------------------------
           -- OWNER: OFFER RENEWAL (STACK FROM CURRENT EXPIRY)
           ----------------------------------------------------------------

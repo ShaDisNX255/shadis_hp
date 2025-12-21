@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="30" height="30" tilewidth="64" tileheight="32" infinite="0" nextlayerid="3" nextobjectid="51">
+<map version="1.10" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="30" height="30" tilewidth="64" tileheight="32" infinite="0" nextlayerid="3" nextobjectid="52">
  <properties>
   <property name="Background" value="custom"/>
   <property name="Background Animation" value="/server/assets/custom/backgrounds/wcity/01-generic1.animation"/>
@@ -108,7 +108,14 @@
     <property name="Price 24" type="int" value="500000"/>
     <property name="Price 25" type="int" value="500000"/>
     <property name="Price 26" type="int" value="500000"/>
+    <property name="Price 27" type="int" value="500000"/>
+    <property name="Price 28" type="int" value="1000000"/>
+    <property name="Price 29" type="int" value="1000000"/>
     <property name="Price 3" type="int" value="50000"/>
+    <property name="Price 30" type="int" value="1000000"/>
+    <property name="Price 31" type="int" value="1000000"/>
+    <property name="Price 32" type="int" value="1000000"/>
+    <property name="Price 33" type="int" value="1000000"/>
     <property name="Price 4" type="int" value="50000"/>
     <property name="Price 5" type="int" value="60000"/>
     <property name="Price 6" type="int" value="50000"/>
@@ -134,7 +141,14 @@
     <property name="Sell 24" value="home_shortcut"/>
     <property name="Sell 25" value="fish_shortcut"/>
     <property name="Sell 26" value="teams_shortcut"/>
+    <property name="Sell 27" value="wcity3_shortcut"/>
+    <property name="Sell 28" value="pet_mettaur"/>
+    <property name="Sell 29" value="pet_ratty"/>
     <property name="Sell 3" value="green_tree"/>
+    <property name="Sell 30" value="pet_spooky"/>
+    <property name="Sell 31" value="pet_swordy"/>
+    <property name="Sell 32" value="pet_moloko"/>
+    <property name="Sell 33" value="pet_powie"/>
     <property name="Sell 4" value="blue_tree"/>
     <property name="Sell 5" value="stuffed_bear"/>
     <property name="Sell 6" value="lan_tile"/>
@@ -267,7 +281,11 @@
     <property name="Flavor" value="You notice a Bass doll hidden back here..."/>
    </properties>
   </object>
-  <object id="48" gid="308" x="313" y="395" width="64" height="40"/>
+  <object id="48" gid="308" x="313" y="395" width="64" height="40">
+   <properties>
+    <property name="Flavor" value="You see a shortcut tile"/>
+   </properties>
+  </object>
   <object id="49" gid="352" x="624" y="208" width="64" height="64" visible="0">
    <properties>
     <property name="Ask Question" type="bool" value="true"/>
@@ -290,6 +308,11 @@
     <property name="Direction" value="Up Right"/>
     <property name="Target Area" value="RagashiiHP"/>
     <property name="Target Object" value="6"/>
+   </properties>
+  </object>
+  <object id="51" gid="324" x="388.5" y="393.5" width="64" height="40">
+   <properties>
+    <property name="Flavor" value="You see a shortcut tile"/>
    </properties>
   </object>
  </objectgroup>

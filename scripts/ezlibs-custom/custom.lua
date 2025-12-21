@@ -3601,7 +3601,6 @@ end)
 -- Clean up on join/leave
 Net:on("player_join", function(event)
   local pid = event.player_id
-  log("player_join pid", pid)
   player_using_card_bbs[pid] = false
   in_actions_menu[pid] = false
   pending_actions_menu[pid] = false

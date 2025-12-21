@@ -234,6 +234,10 @@ Net:on("object_interaction", function(event)
             ))
 
             if unlocked then
+                -- remember this boss gate so MainBoss can restore it during a dungeon reset
+                if dungeon and dungeon.record_boss_gate then
+                    pcall(dungeon.record_boss_gate, mem_area, area_id, object_id, once)
+                end
                 if #tostring(unlocked_message or "") > 0 then
                     await(Async.message_player(player_id, unlocked_message))
                 end

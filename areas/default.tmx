@@ -962,13 +962,6 @@
    </properties>
    <point/>
   </object>
-  <object id="351" name="WCity3" type="Custom Warp" gid="319" x="672" y="672" width="64" height="40">
-   <properties>
-    <property name="Direction" value="Down Left"/>
-    <property name="Target Area" value="WCity3"/>
-    <property name="Target Object" value="79"/>
-   </properties>
-  </object>
   <object id="352" name="Ball" type="SoccerBall" x="755" y="755">
    <properties>
     <property name="Asset Name" value="soccer_ball"/>

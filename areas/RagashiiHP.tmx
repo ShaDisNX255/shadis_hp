@@ -57,35 +57,6 @@
 </data>
  </layer>
  <objectgroup id="2" name="Object Layer 0">
-  <object id="1" name="HP Prog" type="NPC" x="240" y="336">
-   <properties>
-    <property name="Asset Name" value="prog"/>
-    <property name="Dialogue Type" value="first"/>
-    <property name="Direction" value="Up Left"/>
-    <property name="Next 1" type="object" value="4"/>
-    <property name="Text 1" value="Hey there"/>
-   </properties>
-   <point/>
-  </object>
-  <object id="2" name="HP" type="Checkpoint" gid="241" x="176" y="384" width="53.25" height="56">
-   <properties>
-    <property name="Consume" type="bool" value="false"/>
-    <property name="Key Name" value="__onceitem_only__"/>
-    <property name="Memory Area" value="WCity1"/>
-    <property name="Once Key" value="KeyHP01"/>
-    <property name="Password" value=""/>
-    <property name="Required Keys" type="int" value="999999"/>
-    <property name="Skip Prompt" type="bool" value="true"/>
-   </properties>
-  </object>
-  <object id="4" name="Butler" type="Dialogue" x="256" y="320">
-   <properties>
-    <property name="Dialogue Type" value="oncehub"/>
-    <property name="Memory Area" value="WCity1"/>
-    <property name="Once Key" value="KeyHP01"/>
-   </properties>
-   <point/>
-  </object>
   <object id="6" name="default" type="Custom Warp" gid="245" x="160" y="512" width="60" height="32">
    <properties>
     <property name="Direction" value="Up Right"/>
@@ -93,11 +64,11 @@
     <property name="Target Object" value="16"/>
    </properties>
   </object>
-  <object id="9" name="HP01 BBS" type="BBS" gid="257" x="48" y="288" width="48" height="69">
+  <object id="9" name="RagashiiHP" type="BBS" gid="257" x="48" y="288" width="48" height="69">
    <properties>
     <property name="BBS" type="bool" value="true"/>
     <property name="Color" type="color" value="#ffffffff"/>
-    <property name="Name" value="HP01"/>
+    <property name="Name" value="RagashiiHP"/>
     <property name="Post Limit" type="int" value="300"/>
    </properties>
   </object>

@@ -4,8 +4,22 @@
 
 local dungeon = {}
 
+-- Some environments sandbox/remove the global `debug` library.
+-- Use a safe traceback handler so xpcall never crashes while reporting an error.
+local function _safe_traceback(err)
+  local dbg = rawget(_G, "debug")
+  if type(dbg) == "table" and type(dbg.traceback) == "function" then
+    return dbg.traceback(err, 2)
+  end
+  return tostring(err)
+end
+
+
 local ezmemory = require("scripts/ezlibs-scripts/ezmemory")
 local eznpcs   = require("scripts/ezlibs-scripts/eznpcs/eznpcs")
+local helpers = require("scripts/ezlibs-scripts/helpers")
+local cosmetics_ok, cosmetics = pcall(require, "scripts/ezlibs-custom/cosmetics")
+
 
 ----------------------------------------------------------------
 -- Dungeon detection
@@ -18,6 +32,54 @@ local function is_dungeon_area(area_id)
 end
 
 dungeon.is_dungeon_area = is_dungeon_area
+
+----------------------------------------------------------------
+-- Dungeon membership tracking (for MainBoss broadcast + kick)
+-- Group key is taken from map custom properties in this order:
+--   DungeonKey / DungeonName / Name / area_id
+----------------------------------------------------------------
+local _DUNGEON_MEMBERS = {}         -- [dungeon_key] = { [pid]=true }
+local _DUNGEON_KEY_FOR_PLAYER = {}  -- [pid] = dungeon_key|nil
+
+local function _dungeon_key_from_area(area_id)
+  if not area_id then return nil end
+  local k =
+    Net.get_area_custom_property(area_id, "DungeonKey") or
+    Net.get_area_custom_property(area_id, "DungeonName") or
+    Net.get_area_custom_property(area_id, "Name") or
+    area_id
+  k = tostring(k or "")
+  if k == "" then k = area_id end
+  return k
+end
+
+local function _set_player_dungeon_key(pid, new_key)
+  local old_key = _DUNGEON_KEY_FOR_PLAYER[pid]
+  if old_key and _DUNGEON_MEMBERS[old_key] then
+    _DUNGEON_MEMBERS[old_key][pid] = nil
+    if next(_DUNGEON_MEMBERS[old_key]) == nil then
+      _DUNGEON_MEMBERS[old_key] = nil
+    end
+  end
+
+  if new_key then
+    _DUNGEON_MEMBERS[new_key] = _DUNGEON_MEMBERS[new_key] or {}
+    _DUNGEON_MEMBERS[new_key][pid] = true
+    _DUNGEON_KEY_FOR_PLAYER[pid] = new_key
+  else
+    _DUNGEON_KEY_FOR_PLAYER[pid] = nil
+  end
+end
+
+local function _list_live_dungeon_players(dungeon_key)
+  local out = {}
+  local set = _DUNGEON_MEMBERS[dungeon_key] or {}
+  for pid,_ in pairs(set) do
+    out[#out+1] = pid
+  end
+  return out
+end
+
 
 ----------------------------------------------------------------
 local DAMAGE_MSG = "Damage critical, logging out before deletion"
@@ -134,6 +196,10 @@ local function _refresh_player_dungeon_state(player_id)
   local now = is_dungeon_area(area_id)
   local was = _WAS_IN_DUNGEON[player_id] or false
 
+  -- Maintain per-dungeon membership for MainBoss logic
+  local key = now and _dungeon_key_from_area(area_id) or nil
+  _set_player_dungeon_key(player_id, key)
+
   if now and not was then
     _WAS_IN_DUNGEON[player_id] = true
     _grant_lives_on_enter(player_id, area_id)
@@ -161,6 +227,7 @@ Net:on("player_disconnect", function(event)
   local pid = event and event.player_id
   if not pid then return end
   _PENDING_KICK[pid] = nil
+  _set_player_dungeon_key(pid, nil)
   _clear_lives(pid)
 end)
 
@@ -570,6 +637,298 @@ local function _split_csv(s)
   return out
 end
 
+
+-- Boss gate unlock tracking (so MainBoss can make gates re-appear)
+local BOSS_GATES_MEM_KEY = "__dungeon_boss_gates"
+
+-- Record a boss gate so we can "unhide" it for players during a dungeon reset.
+-- Called by ezcheckpoints.lua when a Boss Gate successfully unlocks.
+function dungeon.record_boss_gate(mem_area, area_id, object_id, once)
+  mem_area = _trim(mem_area)
+  area_id = _trim(area_id)
+  object_id = tostring(object_id or "")
+
+  if mem_area == "" or area_id == "" or object_id == "" then return end
+
+  local mem = ezmemory.get_area_memory(mem_area) or {}
+  mem[BOSS_GATES_MEM_KEY] = mem[BOSS_GATES_MEM_KEY] or {}
+
+  -- de-dupe
+  for _,g in ipairs(mem[BOSS_GATES_MEM_KEY]) do
+    if tostring(g.area_id) == area_id and tostring(g.object_id) == object_id then
+      g.once = (once == true)
+      if ezmemory.set_area_memory then
+        ezmemory.set_area_memory(mem_area, mem)
+      else
+        ezmemory.save_area_memory(mem_area, mem)
+      end
+      return
+    end
+  end
+
+  table.insert(mem[BOSS_GATES_MEM_KEY], { area_id = area_id, object_id = object_id, once = (once == true) })
+
+  if ezmemory.set_area_memory then
+    ezmemory.set_area_memory(mem_area, mem)
+  else
+    ezmemory.save_area_memory(mem_area, mem)
+  end
+end
+
+local function _reset_boss_gates_for_players(mem_area, player_ids)
+  mem_area = _trim(mem_area)
+  if mem_area == "" then return end
+
+  local mem = ezmemory.get_area_memory(mem_area) or {}
+  local gates = mem[BOSS_GATES_MEM_KEY]
+  if type(gates) ~= "table" or #gates == 0 then return end
+
+  for _,pid in ipairs(player_ids or {}) do
+    for _,g in ipairs(gates) do
+      local area_id = g.area_id
+      local object_id = g.object_id
+
+      if g.once == true and ezmemory.unhide_object_from_player then
+        pcall(ezmemory.unhide_object_from_player, pid, area_id, object_id)
+      elseif ezmemory.unhide_object_from_player_till_disconnect then
+        pcall(ezmemory.unhide_object_from_player_till_disconnect, pid, area_id, object_id)
+      elseif Net.include_object_for_player then
+        -- fallback (won't clear ezmemory hidden-until-disconnect flags, but at least shows now)
+        pcall(Net.include_object_for_player, pid, tostring(object_id))
+      end
+    end
+  end
+end
+
+-- Boss pool reset (clears ALL DungeonBoss/MainBoss pools that share the same Boss Memory Area)
+function dungeon.reset_boss_pools(mem_area)
+  mem_area = _trim(mem_area)
+  if mem_area == "" then return end
+
+  local mem = ezmemory.get_area_memory(mem_area) or {}
+  mem[BOSS_MEM_KEY] = {}
+  if ezmemory.set_area_memory then
+    ezmemory.set_area_memory(mem_area, mem)
+  else
+    ezmemory.save_area_memory(mem_area, mem)
+  end
+end
+
+-- ===============================
+-- Dungeon completion rewards (MainBoss only)
+-- ===============================
+local BUGFRAG_CAP = 10
+
+local function _num(v, default)
+  local n = tonumber(v)
+  if n == nil then return default end
+  return n
+end
+
+local function _read_reward_table(area_id)
+  local entries = {}
+  for i = 1, 50 do
+    local reward = Net.get_area_custom_property(area_id, "Reward " .. i)
+    local typ    = Net.get_area_custom_property(area_id, "Type " .. i)
+    local amt    = Net.get_area_custom_property(area_id, "Amount " .. i)
+    local chance = Net.get_area_custom_property(area_id, "Chance " .. i)
+
+    if reward == nil and typ == nil and amt == nil and chance == nil then
+      -- stop at first empty slot (expected to be sequential)
+      break
+    end
+
+    reward = _trim(reward)
+    typ    = _trim(typ)
+    local amount_n = math.max(1, _num(amt, 1))
+    local chance_n = math.max(0, _num(chance, 0))
+
+    if reward ~= "" and typ ~= "" and chance_n > 0 then
+      entries[#entries+1] = {
+        reward = reward,
+        typ = typ:lower(),
+        amount = amount_n,
+        chance = chance_n,
+      }
+    end
+  end
+  return entries
+end
+
+local function _roll_reward(entries)
+  if type(entries) ~= "table" or #entries == 0 then return nil end
+  local total = 0
+  for _,e in ipairs(entries) do
+    total = total + (tonumber(e.chance) or 0)
+  end
+  if total <= 0 then return nil end
+
+  local r = math.random() * total
+  local acc = 0
+  for _,e in ipairs(entries) do
+    acc = acc + (tonumber(e.chance) or 0)
+    if r <= acc then
+      return e
+    end
+  end
+  return entries[#entries]
+end
+
+local DECOR_MEM_KEY = "oncehub_decor_inventory_v1"
+
+local function _grant_decor_owned(pid, id, qty)
+  qty = math.max(1, tonumber(qty or 1))
+  local secret = helpers.get_safe_player_secret(pid)
+  local pm = ezmemory.get_player_memory(secret) or {}
+  pm[DECOR_MEM_KEY] = pm[DECOR_MEM_KEY] or {}
+  pm[DECOR_MEM_KEY][id] = math.max(0, tonumber(pm[DECOR_MEM_KEY][id] or 0)) + qty
+
+  if ezmemory.set_player_memory then
+    ezmemory.set_player_memory(secret, pm)
+  else
+    ezmemory.save_player_memory(secret, pm)
+  end
+
+  return ("Reward: %s x%d."):format(tostring(id), qty)
+end
+
+local function _grant_cosmetic(pid, id, qty)
+  qty = math.max(1, tonumber(qty or 1))
+  if not (cosmetics_ok and cosmetics and cosmetics.unlock_for_player) then
+    return nil, "cosmetics module not available"
+  end
+  local ok, reason = cosmetics.unlock_for_player(pid, tostring(id))
+  if ok then
+    -- qty > 1 doesn't make sense for cosmetics; still report once
+    return ("Reward: cosmetic %s."):format(tostring(id))
+  end
+  return nil, tostring(reason or "unlock failed")
+end
+
+local function _grant_money(pid, amount)
+  amount = math.max(0, tonumber(amount or 0) or 0)
+  if amount <= 0 then return nil end
+  -- spend_player_money uses positive to subtract, negative to add
+  pcall(ezmemory.spend_player_money, pid, -amount)
+  return ("Reward: %d moneyz."):format(amount)
+end
+
+local function _grant_reward(pid, entry)
+  if not entry then return nil end
+  local typ = tostring(entry.typ or ""):lower()
+  local reward = tostring(entry.reward or "")
+  local amount = tonumber(entry.amount or 1) or 1
+
+  if typ == "decor" then
+    return _grant_decor_owned(pid, reward, amount)
+  elseif typ == "cosmetic" or typ == "cosmetics" then
+    local line, err = _grant_cosmetic(pid, reward, amount)
+    if line then return line end
+    print("[dungeon] failed to grant cosmetic", reward, "to", pid, "reason:", err)
+    return nil
+  elseif typ == "moneyz" or typ == "money" then
+    return _grant_money(pid, amount)
+  else
+    print("[dungeon] unknown reward type:", tostring(entry.typ))
+    return nil
+  end
+end
+
+local function _try_award_bugfrag(pid)
+  if not (ezmemory.get_player_fragments and ezmemory.add_player_fragments) then
+    return nil
+  end
+
+  local cur = tonumber(ezmemory.get_player_fragments(pid) or 0) or 0
+  if cur < BUGFRAG_CAP then
+    pcall(ezmemory.add_player_fragments, pid, 1)
+    local now = tonumber(ezmemory.get_player_fragments(pid) or (cur + 1)) or (cur + 1)
+    return ("Reward: 1 BugFrag. (%d/%d)"):format(now, BUGFRAG_CAP)
+  end
+  return nil
+end
+
+local function _eject_player_after_message(pid, fallback_area_id, message)
+  local area_id = Net.get_player_area(pid)
+  local exit = _resolve_exit_from_area(area_id) or (fallback_area_id and _resolve_exit_from_area(fallback_area_id))
+  if not exit then return end
+
+  -- Clear any death-kick state; we will manage transfer ourselves.
+  _PENDING_KICK[pid] = nil
+
+  message = tostring(message or "")
+  if message == "" then message = "The dungeon shifts..." end
+
+  if Async and Async.message_player and await then
+    async(function()
+      pcall(Net.lock_player_input, pid)
+      await(Async.message_player(pid, message))
+      pcall(Net.unlock_player_input, pid)
+      Net.transfer_player(pid, exit.area_id, true, exit.x, exit.y, exit.z, exit.dir)
+    end)
+  else
+    -- fallback: best effort (may warp after some other textbox)
+    _PENDING_KICK[pid] = { stage = "kick", from_area = area_id, exit = exit }
+    Net.message_player(pid, message)
+  end
+end
+
+local _MAINBOSS_RESET_LOCK = {} -- [mem_area]=true
+
+local function _handle_mainboss_defeated(seed_area_id, mem_area, defeated_message)
+  mem_area = _trim(mem_area)
+  if mem_area == "" then mem_area = seed_area_id end
+  if _MAINBOSS_RESET_LOCK[mem_area] then return end
+  _MAINBOSS_RESET_LOCK[mem_area] = true
+
+  local ok, err = xpcall(function()
+    -- Find all players currently in this dungeon (by dungeon key == mem_area),
+    -- fall back to players in the current (seed) area.
+    local pids = _list_live_dungeon_players(mem_area)
+    if #pids == 0 and seed_area_id then
+      local lp = Net.list_players(seed_area_id) or {}
+      for _,pid in ipairs(lp) do pids[#pids+1] = pid end
+    end
+
+    -- Rewards are defined on the map custom properties of the dungeon area.
+    local rewards = seed_area_id and _read_reward_table(seed_area_id) or {}
+
+    -- Reset boss progress first (so future runs start fresh)
+    pcall(dungeon.reset_boss_pools, mem_area)
+
+    -- Make boss gates re-appear for players in the dungeon
+    pcall(_reset_boss_gates_for_players, mem_area, pids)
+
+    -- For each player: award bugfrag (cap 10) + ONE rolled reward (weighted by Chance #),
+    -- then kick them out after they close the message.
+    for _,pid in ipairs(pids) do
+      pcall(function()
+        local lines = {}
+
+        local bf = _try_award_bugfrag(pid)
+        if bf then lines[#lines+1] = bf end
+
+        local picked = _roll_reward(rewards)
+        local rw = _grant_reward(pid, picked)
+        if rw then lines[#lines+1] = rw end
+
+        local msg = tostring(defeated_message or "Boss defeated!")
+        if #lines > 0 then
+          msg = msg .. "\n" .. table.concat(lines, "\n")
+        end
+
+        _eject_player_after_message(pid, seed_area_id, msg)
+      end)
+    end
+  end, _safe_traceback)
+
+  _MAINBOSS_RESET_LOCK[mem_area] = nil
+
+  if not ok then
+    print("[dungeon] _handle_mainboss_defeated error:", err)
+  end
+end
+
 local function _get_boss_bucket(mem_area)
   local mem = ezmemory.get_area_memory(mem_area)
   mem[BOSS_MEM_KEY] = mem[BOSS_MEM_KEY] or {}
@@ -919,6 +1278,220 @@ local DUNGEON_BOSS_DIALOGUE_EVENT = {
 }
 
 eznpcs.add_event(DUNGEON_BOSS_DIALOGUE_EVENT)
+
+
+-- =========================================================
+-- MainBoss (Dialogue Event)
+-- Same properties as DungeonBoss, but on defeat:
+--  - Broadcast Boss Defeated Message to ALL players currently in the dungeon
+--  - Reset all boss pools (DungeonBoss + MainBoss) for the Boss Memory Area
+--  - Make boss gates re-appear
+--  - Kick all dungeon players out to DungeonKickArea/DungeonKickObject
+--  - Award bugfrags (cap 10) + configured rewards from map properties
+-- =========================================================
+local MAIN_BOSS_DIALOGUE_EVENT = {
+  name = "MainBoss",
+  action = function(npc, player_id, dialogue, relay_object)
+    return async(function()
+      local props = (dialogue and dialogue.custom_properties) or {}
+
+      local function _msg(text)
+        text = tostring(text or "")
+        if text == "" then return end
+        if Async and Async.message_player then
+          await(Async.message_player(player_id, text))
+        else
+          Net.message_player(player_id, text)
+        end
+      end
+
+      local function _ask(prompt)
+        if not (Async and Async.question_player) then
+          Net.message_player(player_id, prompt)
+          return 1
+        end
+        return await(Async.question_player(player_id, prompt))
+      end
+
+      local area_id = Net.get_player_area(player_id)
+      if not is_dungeon_area(area_id) then
+        return props["Next 1"]
+      end
+
+      local encounter_name = props["Encounter Name"] or props["Encounter"] or props["Boss"] or nil
+      encounter_name = _trim(encounter_name)
+      if encounter_name == "" then encounter_name = nil end
+
+      local boss_id = props["Boss ID"] or props["Boss"] or props["Boss Id"] or nil
+      boss_id = _trim(boss_id)
+      if boss_id == "" then boss_id = "MainBoss" end
+
+      local pool_max = props["Boss Pool Max HP"] or props["Boss Pool Max"] or nil
+      pool_max = tonumber(pool_max or 0) or 0
+      if pool_max <= 0 then pool_max = 1000 end
+
+      local mem_area = props["Boss Memory Area"] or area_id
+      mem_area = _trim(mem_area)
+      if mem_area == "" then mem_area = area_id end
+
+      -- If already defeated (pool at 0), just show message and kick everyone out (fresh reset)
+      local state = _ensure_boss(mem_area, boss_id, pool_max)
+      if state and state.defeated then
+        local already = props["Already Defeated Message"] or props["Already Defeated"] or "Boss already defeated."
+        _handle_mainboss_defeated(area_id, mem_area, already)
+        return nil
+      end
+
+      -- Optional start prompt (Yes/No)
+      local prompt = props["Start Prompt"]
+      prompt = tostring(prompt or "")
+      if prompt ~= "" then
+        local choice = _ask(prompt)
+        if choice ~= 1 then
+          local decline_msg = props["Decline Message"] or props["Decline"]
+          if decline_msg then _msg(decline_msg) end
+          return props["Decline"] or props["Next 1"]
+        end
+      end
+
+      if not encounter_name then
+        print("[DUNGEON] MainBoss missing Encounter Name; can't start encounter")
+        return props["Next 1"]
+      end
+
+      -- Stash ctx so battle_results can apply pool damage
+      local boss_encounter_hp = props["Boss Encounter HP"] or props["Enemy HP"] or props["Encounter HP"] or nil
+      local boss_id_match     = props["Boss ID Match"] or props["Boss Name Match"] or props["Boss Match"] or nil
+      local win_damage        = props["Win Damage"] or nil
+
+      dungeon._boss_fight_ctx[player_id] = {
+        kind = "MainBoss",
+        mem_area = mem_area,
+        boss_id = boss_id,
+        pool_max = pool_max,
+        win_damage = tonumber(win_damage or 0) or 0,
+        boss_encounter_hp = boss_encounter_hp,
+        boss_id_match_csv = boss_id_match,
+      }
+
+      local ezenc = _get_ezencounters()
+      if not ezenc or not ezenc.begin_encounter_by_name then
+        print("[DUNGEON] ezencounters.begin_encounter_by_name missing; can't start boss encounter")
+        dungeon._boss_fight_ctx[player_id] = nil
+        return props["Next 1"]
+      end
+
+      await(ezenc.begin_encounter_by_name(player_id, encounter_name, relay_object or npc))
+
+      local out = dungeon._boss_fight_outcome[player_id]
+      dungeon._boss_fight_outcome[player_id] = nil
+
+      if not out or not out.state then
+        return props["Next 1"]
+      end
+
+      -- If ran, follow normal options (no reset)
+      if out.ran then
+        local ran_msg = props["Ran Message"]
+        if ran_msg then _msg(ran_msg) end
+        return props["Battle Ran"] or props["Next 1"]
+      end
+
+      -- If defeated NOW -> broadcast, reset pools, re-show gates, reward, kick all dungeon players
+      if out.defeated_now then
+        local defeated_msg = props["Boss Defeated Message"] or "Boss defeated!"
+        _handle_mainboss_defeated(area_id, mem_area, defeated_msg)
+        return nil
+      end
+
+      -- Not defeated yet: show progress and route like DungeonBoss
+      local hide_progress = tostring(props["Hide Progress"] or "") == "true"
+      if not hide_progress and out.state then
+        local prog = tostring(props["Progress Message"] or "")
+        if prog == "" then prog = "{id} HP: {hp}/{max} (-{dmg})" end
+        _msg(_fmt_progress(prog, boss_id, out.state, tonumber(out.applied or 0) or 0))
+      end
+
+      if (tonumber(out.hp or 0) or 0) <= 0 then
+        local kick = dungeon.kick_player_out_of_dungeon or kick_player_out_of_dungeon
+        if kick then
+          local revived = kick(player_id, false)
+          if not revived then
+            return nil
+          end
+        end
+        return props["Battle Lost"] or props["Next 1"]
+      end
+
+      return props["Battle Won"] or props["Next 1"]
+    end)
+  end
+}
+
+eznpcs.add_event(MAIN_BOSS_DIALOGUE_EVENT)
+
+
+
+
+-- =========================================================
+-- DungeonTestRewards (Dialogue Event)
+-- Test-only helper: award bugfrag + ONE configured dungeon reward,
+-- then kick ONLY the interacting player out (no boss pool reset, no gate reset).
+--
+-- Usage in Tiled dialogue:
+--   Event Name: DungeonTestRewards
+--   Optional custom properties:
+--     Test Message (string)      -> message prefix (default: "Test: Dungeon rewards")
+--     Force Reward Index (int)   -> if set (>0), grant that Reward # entry instead of rolling
+--     Skip Kick (bool)           -> "true" to only grant + message without warping
+-- =========================================================
+-- =========================================================
+-- DungeonTestRewards (Dialogue Event)
+--
+-- Test helper: simulate the full MainBoss defeat flow without running the encounter.
+-- This is intentionally designed to behave like a real MainBoss defeat:
+--  - Reset all boss pools for Boss Memory Area
+--  - Make boss gates re-appear
+--  - For every player currently in the dungeon:
+--      * award bugfrag +1 if they have < 10
+--      * roll ONE configured dungeon reward (weighted by Chance #)
+--      * send the message
+--      * kick them out to DungeonKickArea/DungeonKickObject after they close it
+--
+-- Usage in Tiled dialogue:
+--   Event Name: DungeonTestRewards
+--   Optional custom properties:
+--     Boss Memory Area (string)      -> defaults to current area id
+--     Boss Defeated Message (string) -> message sent to players (base message)
+--     Test Message (string)          -> alias for Boss Defeated Message
+-- =========================================================
+local DUNGEON_TEST_REWARDS_EVENT = {
+  name = "DungeonTestRewards",
+  action = function(npc, player_id, dialogue, relay_object)
+    return async(function()
+      local props = (dialogue and dialogue.custom_properties) or {}
+
+      -- Seed area: prefer relay_object.area_id, else player's current area, else NPC's area.
+      local seed_area_id = nil
+      if relay_object and relay_object.area_id then seed_area_id = relay_object.area_id end
+      if not seed_area_id then
+        local ok, a = pcall(Net.get_player_area, player_id)
+        if ok then seed_area_id = a end
+      end
+      if not seed_area_id and npc and npc.area_id then seed_area_id = npc.area_id end
+      if not seed_area_id then return nil end
+
+      local mem_area = props["Boss Memory Area"]
+      local msg = props["Boss Defeated Message"] or props["Test Message"] or "Boss defeated!"
+
+      _handle_mainboss_defeated(seed_area_id, mem_area, msg)
+      return nil
+    end)
+  end
+}
+
+eznpcs.add_event(DUNGEON_TEST_REWARDS_EVENT)
+
 
 
 -- =========================================================
