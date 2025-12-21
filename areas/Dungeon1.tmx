@@ -312,6 +312,7 @@
     <property name="Asset Name" value="elementman"/>
     <property name="Dialogue Type" value="first"/>
     <property name="Direction" value="Down Right"/>
+    <property name="Mugshot" value="Blank"/>
     <property name="Next 1" type="object" value="153"/>
     <property name="Text 1" value="A shade of ElementMan stands before you"/>
    </properties>
@@ -340,7 +341,7 @@
     <property name="Boss ID" value="MainBoss"/>
     <property name="Boss ID Match" value="ShadeMan"/>
     <property name="Boss Memory Area" value="Dungeon1"/>
-    <property name="Boss Pool Max HP" type="int" value="1200"/>
+    <property name="Boss Pool Max HP" type="int" value="6000"/>
     <property name="Dialogue Type" value="none"/>
     <property name="Encounter Name" value="MainBoss"/>
     <property name="Event Name" value="MainBoss"/>
@@ -461,7 +462,7 @@
    <properties>
     <property name="Dialogue Type" value="first"/>
     <property name="Next 1" type="object" value="163"/>
-    <property name="Text 1" value="This area's different... something about it just ain't right. If you lose your HP inside, you'll get kicked out... and the viruses? Extra nasty. I can feel some strong energies in there too."/>
+    <property name="Text 1" value="This area's different... something about it just ain't right. If you lose your HP inside, you'll get kicked out... and the viruses? Extra nasty. I can feel some strong energies in here too."/>
    </properties>
    <point/>
   </object>
