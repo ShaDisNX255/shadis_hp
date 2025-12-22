@@ -449,16 +449,20 @@ local function _try_team_gp_summary(raid_id, wave_label)
   return nil -- no data / no Teams support
 end
 
+local function _ensure_claims(s)
+  s.claims = s.claims or {}
+  s.claims.wave1 = s.claims.wave1 or {}
+  s.claims.wave2 = s.claims.wave2 or {}
+  s.claims.boss  = s.claims.boss  or {}
+end
+
 -- =========================
 -- ===== Money rewards =====
 -- =========================
 
 -- Record money to pay for each eligible contributor on a given wave.
 local function _queue_money_claims_for_wave(area_id, raid_id, s, wave_key)
-  s.claims       = s.claims       or { wave1 = {}, wave2 = {}, boss = {} }
-  s.claims.wave1 = s.claims.wave1 or {}
-  s.claims.wave2 = s.claims.wave2 or {}
-  s.claims.boss  = s.claims.boss  or {}
+  _ensure_claims(s)
 
   local field
   if wave_key == "wave1" or wave_key == "w1" then
@@ -487,15 +491,23 @@ local function _queue_money_claims_for_wave(area_id, raid_id, s, wave_key)
       eligible = (tonumber(c.boss_dmg or 0) or 0) > 0
     end
 
-    if eligible and not s.claims[wave_key][secret] then
-      s.claims[wave_key][secret] = per
-      print(("[RAIDS MONEY] Queued %d z for secret=%s (raid=%s, wave=%s)")
-        :format(per, tostring(secret), tostring(raid_id), tostring(wave_key)))
+    if eligible then
+      local prev = tonumber(s.claims[wave_key][secret] or 0) or 0
+      s.claims[wave_key][secret] = prev + per
+      print(("[RAIDS MONEY] Queued +%d z (total=%d) for secret=%s (raid=%s, wave=%s)")
+        :format(per, prev + per, tostring(secret), tostring(raid_id), tostring(wave_key)))
     end
   end
 
   if ezmemory and ezmemory.save_area_memory then
     ezmemory.save_area_memory(area_id)
+  end
+end
+
+local function _pay_pending_claims_for_connected(area_id, raid_id, s)
+  local pids = _all_pids(nil) -- global connected list (uses ONLINE + fallbacks)
+  for _, pid in ipairs(pids) do
+    _pay_pending_claims_for_pid(pid, area_id, raid_id, s)
   end
 end
 
@@ -896,7 +908,7 @@ local function _raid_action(npc, pid, dialogue, relay_object)
         s.wave1_points, s.wave2_points = 0, 0
         s.boss_pool_hp = s.boss_pool_max
         s.contributions = {}
-        s.claims = { wave1 = {}, wave2 = {}, boss = {} }
+        _ensure_claims(s)
         ezmemory.save_area_memory(mem_area)
       end
     end
@@ -1102,6 +1114,10 @@ end
 
         if was == 1 and s.wave == 2 then
           -- Wave 1 cleared → pay pendings
+          for _, cc in pairs(s.contributions or {}) do
+            cc.chain2 = 0
+          end
+          ezmemory.save_area_memory(mem_area)
           if TeamsOK and Teams then
             for secret2, cc in pairs(s.contributions or {}) do
               local pend = tonumber(cc._pend_w1_pts or 0) or 0
@@ -1118,7 +1134,7 @@ end
           if Config.on_wave1_cleared then pcall(Config.on_wave1_cleared, pid, raid_id, s) end
           -- Queue and pay Wave 1 money rewards
           _queue_money_claims_for_wave(mem_area, raid_id, s, "wave1")
-          _pay_pending_claims_for_pid(pid, mem_area, raid_id, s)
+          _pay_pending_claims_for_connected(mem_area, raid_id, s)
 
           -- ANNOUNCE Wave 1 cleared (Team GP summary + contributions)
           local gp = _try_team_gp_summary(raid_id, "w1")
@@ -1169,7 +1185,7 @@ end
           if Config.on_wave2_cleared then pcall(Config.on_wave2_cleared, pid, raid_id, s) end
           -- Queue and pay Wave 2 money rewards
           _queue_money_claims_for_wave(mem_area, raid_id, s, "wave2")
-          _pay_pending_claims_for_pid(pid, mem_area, raid_id, s)
+          _pay_pending_claims_for_connected(mem_area, raid_id, s)
 
           -- ANNOUNCE Wave 2 cleared (Team GP summary + contributions)
           local gp = _try_team_gp_summary(raid_id, "w2")
@@ -1263,7 +1279,7 @@ end
       end
 
       local msg = ("Boss HP: %d/%d"):format(s.boss_pool_hp or 0, s.boss_pool_max or 0)
-      if s.boss_pool_hp <= 0 then
+      if s.boss_pool_hp <= 0 and not s.defeated then
         if JobBBSOK and JobBBS and JobBBS.on_raid_progress then
           pcall(JobBBS.on_raid_progress, pid, {
             raid_id = raid_id,
@@ -1297,7 +1313,7 @@ end
         if Config.on_boss_defeated then pcall(Config.on_boss_defeated, pid, raid_id, s) end
         -- Queue and pay boss money rewards
         _queue_money_claims_for_wave(mem_area, raid_id, s, "boss")
-        _pay_pending_claims_for_pid(pid, mem_area, raid_id, s)
+        _pay_pending_claims_for_connected(mem_area, raid_id, s)
         -- ANNOUNCE top boss damage dealers
         local contribs = _contrib_list(s, "boss_dmg", 6)
         local end_msg = "RAID CLEARED - Top Damage: " .. (contribs ~= "" and contribs or "(no data)")
