@@ -428,11 +428,11 @@ local PET_IT_LINES = {
     "It wiggles happily, sparks of energy popping around it.",
     "It does a tiny victory pose, then looks back at you to see your reaction.",
     "It circles you once and settles down, content.",
-    "It bounces twice, like it’s trying to show off how energetic it feels.",
+    "It bounces twice, like it's trying to show off how energetic it feels.",
     "It happily nudges your hand again, clearly asking for one more pat.",
     "It gives a bright little beep and does a quick spin in place.",
     "It puffs itself up proudly, then relaxes with a satisfied wiggle.",
-    "It chirps and taps the floor like it’s drumming a tiny celebration.",
+    "It chirps and taps the floor like it's drumming a tiny celebration.",
   },
   neutral = {
     "It tilts its head, watching your hand carefully.",
@@ -444,7 +444,7 @@ local PET_IT_LINES = {
     "It pauses for a second, then resumes its steady little pacing.",
     "It lets you pet it, but keeps one eye on its surroundings.",
     "It gives a quiet hum, then settles into a calm stance.",
-    "It seems to appreciate it… though it won’t admit it out loud.",
+    "It seems to appreciate it... though it won't admit it out loud.",
   },
   sad = {
     "It flinches at first, then slowly relaxes under your hand.",
@@ -1129,11 +1129,11 @@ local function feed_pet(pid, e, bucket_area_id)
   end
   _dbg_frags(pid, "feed:after_spend")
 
-  -- Raise mood exactly one tier by reducing fatigue just below the threshold.
+  -- Replace the "set to threshold-1" logic with:
   if mood == "sad" then
-    e.fatigue = EXPEDITION.neutral_to_sad - 1
+    e.fatigue = math.max(0, e.fatigue - (EXPEDITION.neutral_to_sad - EXPEDITION.happy_to_neutral)) -- 20
   elseif mood == "neutral" then
-    e.fatigue = EXPEDITION.happy_to_neutral - 1
+    e.fatigue = math.max(0, e.fatigue - EXPEDITION.happy_to_neutral) -- 15
   end
 
   _set_saved_fatigue(bucket_area_id, e.owner_secret, e.kind, e.fatigue)

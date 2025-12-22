@@ -497,7 +497,7 @@
     <property name="Once" type="bool" value="true"/>
     <property name="Required Keys" type="int" value="1"/>
     <property name="Skip Prompt" type="bool" value="true"/>
-    <property name="Unlocked Message" value="You show your card, &quot;Curse of Dragon&quot;. The security cube opens."/>
+    <property name="Unlocked Message" value="You show the UnderGround Key..."/>
    </properties>
   </object>
   <object id="166" type="Mystery Data" gid="367" x="624" y="1136" width="14" height="43">
