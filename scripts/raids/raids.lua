@@ -504,13 +504,6 @@ local function _queue_money_claims_for_wave(area_id, raid_id, s, wave_key)
   end
 end
 
-local function _pay_pending_claims_for_connected(area_id, raid_id, s)
-  local pids = _all_pids(nil) -- global connected list (uses ONLINE + fallbacks)
-  for _, pid in ipairs(pids) do
-    _pay_pending_claims_for_pid(pid, area_id, raid_id, s)
-  end
-end
-
 -- Pay and clear all pending money claims for this secret in this raid.
 local function _pay_pending_claims_for_pid(pid, area_id, raid_id, s)
   if not Net or not Net.is_player or not Net.is_player(pid) then return end
@@ -560,6 +553,13 @@ local function _pay_pending_claims_for_pid(pid, area_id, raid_id, s)
 
   if ezmemory and ezmemory.save_area_memory then
     ezmemory.save_area_memory(area_id)
+  end
+end
+
+local function _pay_pending_claims_for_connected(area_id, raid_id, s)
+  local pids = _all_pids(nil) -- global connected list (uses ONLINE + fallbacks)
+  for _, pid in ipairs(pids) do
+    _pay_pending_claims_for_pid(pid, area_id, raid_id, s)
   end
 end
 
