@@ -507,7 +507,13 @@ end
 -- Pay and clear all pending money claims for this secret in this raid.
 local function _pay_pending_claims_for_pid(pid, area_id, raid_id, s)
   if not Net or not Net.is_player or not Net.is_player(pid) then return end
-  if not Net.get_player_money or not Net.set_player_money then return end
+  -- IMPORTANT: ezmemory is the source of truth for money (it pushes pm.money into Net on login).
+  -- So we must update ezmemory, not just Net, or payouts will be lost on relog.
+  if ezmemory and ezmemory.set_player_money and ezmemory.get_player_memory then
+    -- ok
+  elseif not (Net.get_player_money and Net.set_player_money) then
+    return
+  end
 
   local secret = _safe_secret(pid)
   local claims = s.claims or {}
@@ -527,8 +533,21 @@ local function _pay_pending_claims_for_pid(pid, area_id, raid_id, s)
   claims.wave2[secret] = nil
   claims.boss[secret]  = nil
 
-  local current = tonumber(Net.get_player_money(pid) or 0) or 0
-  Net.set_player_money(pid, current + total)
+  local current
+  if ezmemory and ezmemory.get_player_memory then
+    local safe_secret = helpers.get_safe_player_secret(pid)
+    local pm = ezmemory.get_player_memory(safe_secret)
+    current = tonumber(pm and pm.money or 0) or 0
+  else
+    current = tonumber(Net.get_player_money(pid) or 0) or 0
+  end
+
+  local new_balance = current + total
+  if ezmemory and ezmemory.set_player_money then
+    ezmemory.set_player_money(pid, new_balance)
+  else
+    Net.set_player_money(pid, new_balance)
+  end
 
   local name = Net.get_player_name and Net.get_player_name(pid) or tostring(pid)
   print(("[RAIDS MONEY] Paid %d z to %s (raid=%s, area=%s, secret=%s)")

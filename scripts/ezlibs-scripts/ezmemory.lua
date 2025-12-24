@@ -453,6 +453,36 @@ function ezmemory.remove_player_item(player_id, name, remove_quant)
     return 0
 end
 
+
+-- ===================== Money sync helper =====================
+-- Some systems (like Net.send_player_battle_rewards) may grant money outside ezmemory.
+-- This merges Net.get_player_money and ezmemory's stored pm.money upward (max),
+-- then writes the merged value back to BOTH so relog can't revert it.
+function ezmemory.get_player_money(player_id)
+    if not (Net.get_player_money and Net.set_player_money) then
+        return nil
+    end
+
+    local safe_secret = helpers.get_safe_player_secret(player_id)
+    local pm = ezmemory.get_player_memory(safe_secret)
+
+    local net_money = tonumber(Net.get_player_money(player_id) or 0) or 0
+    local mem_money = tonumber(pm.money or net_money) or net_money
+
+    local merged = math.max(net_money, mem_money)
+
+    if pm.money ~= merged then
+        pm.money = merged
+        ezmemory.save_player_memory(safe_secret)
+    end
+
+    if net_money ~= merged then
+        Net.set_player_money(player_id, merged)
+    end
+
+    return merged
+end
+
 function ezmemory.spend_player_money(player_id, amount)
     local safe_secret = helpers.get_safe_player_secret(player_id)
     local player_memory = ezmemory.get_player_memory(safe_secret)
@@ -701,7 +731,20 @@ function ezmemory.handle_player_join(player_id)
         end
     end
     --Send player money
-    Net.set_player_money(player_id, player_memory.money)
+    -- Merge any server-side money (if any) before pushing ezmemory money into Net.
+    if Net.get_player_money and Net.set_player_money then
+        local net_money = tonumber(Net.get_player_money(player_id) or 0) or 0
+        local mem_money = tonumber(player_memory.money or 0) or 0
+        local merged = math.max(net_money, mem_money)
+
+        if player_memory.money ~= merged then
+            player_memory.money = merged
+            ezmemory.save_player_memory(safe_secret)
+        end
+        Net.set_player_money(player_id, merged)
+    else
+        Net.set_player_money(player_id, player_memory.money)
+    end
     --Send player bug fragments (frags)
     -- We *migrate* on first run: if fragments aren't in ezmemory yet, seed from server truth.
     if Net.get_player_fragments and Net.set_player_fragments then

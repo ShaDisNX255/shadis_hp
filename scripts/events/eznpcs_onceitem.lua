@@ -2759,9 +2759,8 @@ eznpcs.add_event({
       end
 
       local function can_afford(amount)
-        return amount <= 0
-          or (Net.get_player_money(player_id) >= amount
-          and ezmemory.spend_player_money(player_id, amount))
+        -- Money is tracked in ezmemory; Net.get_player_money can be out of sync and gets overwritten on relog.
+        return amount <= 0 or ezmemory.spend_player_money(player_id, amount)
       end
 
       local function grant_key_if_missing()
