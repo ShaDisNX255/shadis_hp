@@ -85,7 +85,7 @@ local EXPEDITION = {
     { area_id="rink",   x=24, y=38, z=0, label="Ice_Rink1" },
     { area_id="rink2",   x=24, y=40, z=0, label="Ice_Rink2" },
     { area_id="rink3",   x=24, y=38, z=0, label="Ice_Rink3" },
-    { area_id="WCity",   x=42, y=34, z=3, label="WCity1" },
+    { area_id="WCity1",   x=42, y=34, z=3, label="WCity1" },
     { area_id="WCity2",   x=7, y=19, z=0, label="WCity2" },
     { area_id="WCity3",   x=28, y=17, z=0, label="WCity3" },
   },
