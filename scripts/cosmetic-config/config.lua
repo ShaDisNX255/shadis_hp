@@ -765,6 +765,31 @@ local cosmetics = {
     menu_preview_offset_y   = 7,
     menu_preview_scale          = 1.0,
   },
+  {
+    id              = "Lightning1",
+    key             = "Lightning1",
+    name            = "Lightning1",
+    texture         = "/server/assets/cosmetics/Lightning1.png",
+    animation       = "/server/assets/cosmetics/Lightning1.animation",
+    anim_state      = "LIGHTNING",
+    preview_sprite_id = "preview_Lightning1",
+    rarity          = "RED_5",
+    loop_duration = 1.6,
+
+    xforced         = 50,
+    yforced         = 0,
+
+    preview_start_x = -25,
+    preview_start_y = -60,
+
+    menu_preview_texture    = "/server/assets/cosmetics/Lightning1_preview.png",
+    menu_preview_animation  = "/server/assets/cosmetics/Lightning1_preview.animation",
+    menu_preview_anim_state = "LIGHTNING_preview",
+    menu_preview_sprite_id  = "menu_preview_Lightning1",
+    menu_preview_offset_x   = 5,
+    menu_preview_offset_y   = 0,
+    menu_preview_scale          = 1.0,
+  },
 }
 
 return {

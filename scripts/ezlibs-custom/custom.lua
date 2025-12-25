@@ -619,6 +619,8 @@ local SUMMON_NAME_OVERRIDE = {
     ["SilverFng"] = "Silver Fang",
     ["GSoStone"] = "Giant Soldier of Stone",
 	["F.A.V.Lord"] = "Vampire Lord",
+    ["F.A.Kboble"] = "Kuribohble",
+    ["F.A.REBD"] = "Red-Eyes Black Dragon",
 }
 
 -- Rarity sort order
