@@ -47,11 +47,24 @@ local JOIN_WINDOW_LAST_DAY = 14
 local TEST_ALLOW_INFINITE_SWITCH = false  -- if true, switch teams unlimited times in a month
 local TEST_ALWAYS_ALLOW_CLAIM     = false -- if true, claim monthly rewards every press (uses current month)
 
--- BBS header colors
-local TEAM_COLORS = {
+-- BBS header colors (default + optional per-month overrides)
+local TEAM_COLORS_DEFAULT = {
   [1] = { r=220, g=70,  b=70  }, -- Team 1: red
   [2] = { r=70,  g=90,  b=170 }, -- Team 2: darker blue
 }
+
+-- Set colors per month here (same key format as TEAM_NAMES_BY_MONTH: "YYYY-MM")
+local TEAM_COLORS_BY_MONTH = {
+  -- Example:
+   ["2026-01"] = {
+     [1] = { r=0,  g=93, b=245 },
+     [2] = { r=48, g=48,  b=48 },
+   },
+}
+
+-- (optional) keep old local name if you referenced TEAM_COLORS elsewhere in this file
+local TEAM_COLORS = TEAM_COLORS_DEFAULT
+
 local COLOR_TEAM  = { r=160, g=220, b=255 } -- fallback
 local COLOR_SCORE = { r=255, g=230, b=160 }
 
@@ -390,6 +403,18 @@ local function _team_name(i, t_mem, month_key)
   local key = month_key or (t_mem and t_mem.month_key) or _month_key()
   local names = (t_mem.names_by_month and t_mem.names_by_month[key]) or TEAM_NAMES_DEFAULT
   return names[i] or ("Team "..tostring(i))
+end
+
+local function _team_color(team_index, month_key)
+  month_key = month_key or _month_key()
+  local src = TEAM_COLORS_DEFAULT
+  if TEAM_COLORS_BY_MONTH and TEAM_COLORS_BY_MONTH[month_key] then
+    src = TEAM_COLORS_BY_MONTH[month_key]
+  end
+
+  local c = src and src[team_index]
+  if c and c.r and c.g and c.b then return c end
+  return COLOR_TEAM
 end
 
 local function _get_display_name(pid)
@@ -1148,7 +1173,7 @@ local function _open_team_board(pid, team)
   local posts = _team_posts(pid, team)
   _sanitize_posts(posts)
   _guard_next_two_closes(pid)
-  local color = (TEAM_COLORS and TEAM_COLORS[team]) or COLOR_TEAM
+  local color = _team_color(team)
   Net.open_board(pid, title, color, posts)
 end
 
@@ -1158,7 +1183,7 @@ local function _open_members_board(pid, team)
 
   local mem, t_mem = _roll_month_if_needed()
   local slot = t_mem.month[team] or { roster={}, gp_by_secret={} }
-  local color = (TEAM_COLORS and TEAM_COLORS[team]) or COLOR_TEAM
+  local color = _team_color(team)
 
   -- CURRENT ROSTER ONLY (do not union with gp_by_secret)
   local rows = {}

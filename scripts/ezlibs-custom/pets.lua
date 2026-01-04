@@ -1440,11 +1440,28 @@ local function open_pet_action_menu(pid, e, bucket_area_id)
     if owner == "" then owner = "someone" end
 
     local is_owner = helpers.get_safe_player_secret(pid) == (e.owner_secret or "")
-    if is_owner then
-      Net.message_player(pid, "You see your pet. It seems to be busy looking through the area.")
-    else
-      Net.message_player(pid, ("You see %s's pet. It seems to be busy."):format(owner))
+
+    -- Nickname-aware message (falls back to old messages if no nickname)
+    local nick = _sanitize_nickname(e.nickname)
+    if nick ~= tostring(e.nickname or "") then
+      e.nickname = nick
+      save_bucket(bucket_area_id)
     end
+
+    if nick ~= "" then
+      if is_owner then
+        Net.message_player(pid, ("You see %s (your pet). It seems to be busy looking through the area."):format(nick))
+      else
+        Net.message_player(pid, ("You see %s (%s's pet). It seems to be busy."):format(nick, owner))
+      end
+    else
+      if is_owner then
+        Net.message_player(pid, "You see your pet. It seems to be busy looking through the area.")
+      else
+        Net.message_player(pid, ("You see %s's pet. It seems to be busy."):format(owner))
+      end
+    end
+
     return
   end
 
