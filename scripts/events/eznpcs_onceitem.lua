@@ -134,7 +134,7 @@ local MENU_COLOR = {
   BLUE   = {r=80, g=140,b=220},
 }
 
-local ONCEHUB_DEBUG = true
+local ONCEHUB_DEBUG = false
 local function _oh_log(pid, msg)
   if not ONCEHUB_DEBUG then return end
   local name = ""
@@ -422,6 +422,177 @@ function eznpcs.player_has_active_lease(player_id, once_key, bucket_area_id)
   return false
 end
 
+-- ---------- Cursor helpers ----------
+local function dir_to_offset(dir)
+  if     dir == "Left"       then return -1, 0
+  elseif dir == "Right"      then return  1, 0
+  elseif dir == "Up"         then return  0,-1
+  elseif dir == "Down"       then return  0, 1
+  elseif dir == "Up Left"    then return -1,-1
+  elseif dir == "Up Right"   then return  1,-1
+  elseif dir == "Down Left"  then return -1, 1
+  elseif dir == "Down Right" then return  1, 1
+  else return 0,1 end
+end
+
+-- NEW: normalized fractional cursor distance
+local function get_cursor_point(player_id, dist)
+  local ok_pos, pos = pcall(Net.get_player_position, player_id)
+  if not ok_pos or not pos then return nil end  -- player not available yet
+
+  local dx, dy = 0, 1
+  local ok_dir, dir = pcall(Net.get_player_direction, player_id)
+  if ok_dir and dir then
+    dx, dy = dir_to_offset(dir)
+    if dx ~= 0 and dy ~= 0 then
+      local inv = 1 / math.sqrt(2)
+      dx, dy = dx * inv, dy * inv
+    end
+  end
+
+  return pos.x + dx * dist, pos.y + dy * dist, pos.z
+end
+
+-- --------------------------
+-- oncehub "free cursor" helpers
+-- --------------------------
+
+local function clamp_cursor_to_map(area_id, x, y, z)
+  local w = tonumber(Net.get_width(area_id) or 0) or 0
+  local h = tonumber(Net.get_height(area_id) or 0) or 0
+  if w > 0 then
+    if x < 0 then x = 0 end
+    if x > (w - 1) then x = w - 1 end
+  end
+  if h > 0 then
+    if y < 0 then y = 0 end
+    if y > (h - 1) then y = h - 1 end
+  end
+  z = tonumber(z or 0) or 0
+  return x, y, z
+end
+
+local function init_free_cursor(pid, s)
+  if not (s and s.area_id) then return end
+  local dist = s.cursor_distance or 0.75
+  local cx, cy, cz = get_cursor_point(pid, dist)
+  if not cx then
+    -- fallback: player pos
+    local p = Net.get_player_position(pid)
+    if p then cx, cy, cz = p.x, p.y, p.z end
+  end
+  if cx then
+    cx, cy, cz = clamp_cursor_to_map(s.area_id, cx, cy, cz)
+    s.cursor_x, s.cursor_y, s.cursor_z = cx, cy, cz
+  end
+end
+
+local function get_session_cursor(pid, s)
+  if s and s.cursor_x ~= nil then
+    return s.cursor_x, s.cursor_y, s.cursor_z
+  end
+  -- fallback to old behavior if not initialized
+  local dist = (s and s.cursor_distance) or 0.75
+  return get_cursor_point(pid, dist)
+end
+
+local function follow_preview_camera(pid, x, y, z)
+  local s = ONCEHUB.sessions[pid]
+  if not (s and s.active) then return end
+
+  -- only move camera if cursor changed enough OR a keepalive timer elapsed
+  local now = os.clock()
+  s._cam_last_t = s._cam_last_t or 0
+  s._cam_last_x = s._cam_last_x
+  s._cam_last_y = s._cam_last_y
+  s._cam_last_z = s._cam_last_z
+
+  local changed =
+    (s._cam_last_x == nil) or
+    (math.abs((x or 0) - (s._cam_last_x or 0)) > 0.01) or
+    (math.abs((y or 0) - (s._cam_last_y or 0)) > 0.01) or
+    (tostring(z) ~= tostring(s._cam_last_z))
+
+  local keepalive = (now - s._cam_last_t) > 0.35
+
+  if not (changed or keepalive) then
+    return
+  end
+
+  s._cam_last_t = now
+  s._cam_last_x, s._cam_last_y, s._cam_last_z = x, y, z
+
+  if ONCEHUB_DEBUG then
+    _oh_log(pid, ("cam-> (%.2f, %.2f, %s)"):format(x or -1, y or -1, tostring(z)))
+  end
+
+  -- IMPORTANT: don't unlock every tick; do it once per session
+  if not s._cam_unlocked_once then
+    if Net.unlock_player_camera then pcall(Net.unlock_player_camera, pid) end
+    s._cam_unlocked_once = true
+  end
+
+  if Net.move_player_camera then
+    -- hold >= your ensure_preview loop interval so it doesn't “pulse”
+    pcall(Net.move_player_camera, pid, x, y, z, 0.01)
+  end
+end
+
+local function lock_for_preview(pid, s)
+  if Net.lock_player_input then pcall(Net.lock_player_input, pid) end
+  s._input_locked = true
+
+  -- unlock camera once (follow_preview_camera will handle the rest)
+  if not s._cam_unlocked_once then
+    if Net.unlock_player_camera then pcall(Net.unlock_player_camera, pid) end
+    s._cam_unlocked_once = true
+  end
+end
+
+local function unlock_after_preview(pid, s)
+  -- unlock input
+  if s and s._input_locked then
+    if Net.unlock_player_input then pcall(Net.unlock_player_input, pid) end
+    s._input_locked = nil
+  end
+
+  -- Snap camera back to player NOW, then resume tracking.
+  local p = nil
+  if Net.get_player_position then
+    p = Net.get_player_position(pid)
+  end
+
+  -- during preview you likely called unlock_player_camera; do it again to be safe
+  if Net.unlock_player_camera then
+    pcall(Net.unlock_player_camera, pid)
+  end
+
+  if p and Net.move_player_camera then
+    -- 0.01 gives a near-instant snap (0 sometimes gets ignored depending on build)
+    pcall(Net.move_player_camera, pid, p.x, p.y, p.z, 0.01)
+  end
+
+  if Net.track_with_player_camera then
+    pcall(Net.track_with_player_camera, pid) -- back to normal (player) tracking
+  end
+
+  -- belt-and-suspenders: re-assert tracking on the next tick
+  -- (helps if something else momentarily touches camera state on the same frame)
+  async(function()
+    await(Async.sleep(0.02))
+    if Net.track_with_player_camera then
+      pcall(Net.track_with_player_camera, pid)
+    end
+  end)
+
+  -- clear per-session camera state so next preview starts clean
+  if s then
+    s._cam_unlocked_once = nil
+    s._cam_last_t = nil
+    s._cam_last_x, s._cam_last_y, s._cam_last_z = nil, nil, nil
+  end
+end
+
 -- ====================== oncehub core (preview + placement + remove) ======================
 local function stop_session(player_id, reason)
   local s = ONCEHUB.sessions[player_id]
@@ -443,9 +614,10 @@ local function stop_session(player_id, reason)
       pcall(Net.remove_object, s.area_id, oid)
     end
   end
-  if s.rem_cursor_id then
-    pcall(function() Net.remove_object(s.area_id, s.rem_cursor_id) end)
-  end
+
+  -- NEW: restore player control + camera
+  unlock_after_preview(player_id, s)
+
   ONCEHUB.sessions[player_id] = nil
   if reason and reason ~= "" then Async.message_player(player_id, reason) end
 end
@@ -598,37 +770,6 @@ local function resolve_object_dims(area_id, template_layer_name, gid)
   return 1, 1, "default"
 end
 
--- ---------- Cursor helpers ----------
-local function dir_to_offset(dir)
-  if     dir == "Left"       then return -1, 0
-  elseif dir == "Right"      then return  1, 0
-  elseif dir == "Up"         then return  0,-1
-  elseif dir == "Down"       then return  0, 1
-  elseif dir == "Up Left"    then return -1,-1
-  elseif dir == "Up Right"   then return  1,-1
-  elseif dir == "Down Left"  then return -1, 1
-  elseif dir == "Down Right" then return  1, 1
-  else return 0,1 end
-end
-
--- NEW: normalized fractional cursor distance
-local function get_cursor_point(player_id, dist)
-  local ok_pos, pos = pcall(Net.get_player_position, player_id)
-  if not ok_pos or not pos then return nil end  -- player not available yet
-
-  local dx, dy = 0, 1
-  local ok_dir, dir = pcall(Net.get_player_direction, player_id)
-  if ok_dir and dir then
-    dx, dy = dir_to_offset(dir)
-    if dx ~= 0 and dy ~= 0 then
-      local inv = 1 / math.sqrt(2)
-      dx, dy = dx * inv, dy * inv
-    end
-  end
-
-  return pos.x + dx * dist, pos.y + dy * dist, pos.z
-end
-
 local function object_covers_point(o, x, y, z)
   if not o or o.z ~= z then return false end
   local ox, oy = o.x, o.y
@@ -722,7 +863,7 @@ local function ensure_preview(player_id)
 
 if s.mode == 'remove' then
   local dist = s.cursor_distance or 0.75
-  local cx, cy, cz = get_cursor_point(player_id, dist)
+  local cx, cy, cz = get_session_cursor(player_id, s)
   if not cx then return end  -- player not ready this tick
 
   -- Which object would we remove right now?
@@ -733,7 +874,7 @@ if s.rem_cursor_gid then
   -- If there's a target, cursor hugs its bounds; otherwise follow the aim point at 1x1
   local tx, ty, tz, tw, th
   local want_fh, want_fv, want_fr
-
+follow_preview_camera(player_id, cx, cy, cz)
   if target then
     tx, ty, tz = target.x, target.y, target.z
     tw, th     = target.width or 1, target.height or 1
@@ -823,8 +964,12 @@ end
 
   -- PLACE mode preview: keep ONE preview and MOVE it each tick (no re-creates)
   local dist = s.cursor_distance or 0.75
-  local cx, cy, cz = get_cursor_point(player_id, dist)
+  local cx, cy, cz = get_session_cursor(player_id, s)
   if not cx then return end
+
+
+  -- always keep camera on the cursor
+  follow_preview_camera(player_id, cx, cy, cz)
 
   -- If we already have a preview, just move it to the new cursor position
   if s.preview_id then
@@ -1749,8 +1894,7 @@ end
 
 local function remove_current(player_id)
   local s = ONCEHUB.sessions[player_id]; if not s or not s.active then return end
-  local dist = s.cursor_distance or 0.75
-  local cx, cy, cz = get_cursor_point(player_id, dist)
+  local cx, cy, cz = get_session_cursor(player_id, s)
   local obj, oid = find_oncehub_object_at(s.area_id, cx, cy, cz)
   if not obj then
     Async.message_player(player_id, "No editable object in front.")
@@ -1846,9 +1990,13 @@ local function start_place_session(player_id, dialogue, chosen_gid, chosen_name,
     owner_secret   = is_renter  and secret or nil,
   }
 
-  async(function()
-    await(Async.message_player(player_id, "Place Mode: Press A to place. Leave the area to cancel."))
-  end)
+  local s = ONCEHUB.sessions[player_id]
+  init_free_cursor(player_id, s)
+  lock_for_preview(player_id, s)
+
+  --async(function()
+  --  await(Async.message_player(player_id, "Place Mode: Press A to place. Leave the area to cancel."))
+  --end)
   return true
 end
 
@@ -1918,7 +2066,8 @@ local function open_place_catalog_menu(player_id, dialogue)
             async(function ()
               while true do
                 local s = ONCEHUB.sessions[player_id]
-                if not s or not s.active then break end
+                if not (s and s.active) then break end
+                lock_for_preview(player_id, s)
                 ensure_preview(player_id)
                 await(Async.sleep(0.08))
               end
@@ -1960,9 +2109,13 @@ local function start_remove_session(player_id, dialogue)
     rem_cursor_id  = nil,
   }
 
-  async(function()
-    await(Async.message_player(player_id, "Remove Mode: Target turns mirrored. Press A to remove. Leave the area to cancel."))
-  end)
+  local s = ONCEHUB.sessions[player_id]
+  init_free_cursor(player_id, s)
+  lock_for_preview(player_id, s)
+
+  --async(function()
+    --await(Async.message_player(player_id, "Remove Mode: Target turns mirrored. Press A to remove. Leave the area to cancel."))
+  --end)
   return true
 end
 
@@ -2091,6 +2244,10 @@ local function open_decorate_menu(player_id, dialogue)
           while true do
             local s = ONCEHUB.sessions[player_id]
             if not s or not s.active then break end
+
+            -- IMPORTANT: keep input locked so virtual_input continues to fire
+            lock_for_preview(player_id, s)
+
             ensure_preview(player_id)
             await(Async.sleep(0.08))
           end
@@ -2365,19 +2522,27 @@ local function start_pet_place_session(player_id, dialogue, pet_id, pet_name)
     active = true,
   }
 
+  local s = ONCEHUB.sessions[player_id]
+  init_free_cursor(player_id, s)
+  lock_for_preview(player_id, s)
+
   -- keep the preview alive while session is active
   async(function ()
     while true do
       local s = ONCEHUB.sessions[player_id]
       if not s or not s.active then break end
+
+      -- IMPORTANT: re-lock every tick (BBS teardown / other scripts can unlock input)
+      lock_for_preview(player_id, s)
+
       ensure_preview(player_id)
       await(Async.sleep(0.08))
     end
   end)
 
-  async(function ()
-    await(Async.message_player(player_id, ("Summon Mode: Aim where to spawn %s, then press A. Leave the area to cancel."):format(pet_name or "your pet")))
-  end)
+  --async(function ()
+    --await(Async.message_player(player_id, ("Summon Mode: Aim where to spawn %s, then press A. Leave the area to cancel."):format(pet_name or "your pet")))
+  --end)
 
   return true
 end
@@ -2657,18 +2822,158 @@ eznpcs.add_event({
 })
 
 -- ====================== oncehub listeners ======================
-Net:on("tile_interaction", function (event)
-  if event.button ~= 0 then return end -- A/Confirm
+Net:on("virtual_input", function(event)
   local pid = event.player_id
-  if recently_closed_menu(pid) then return end
+  local evs = event.events
+  if not pid or not evs then return end
+
   local s = ONCEHUB.sessions[pid]
   if not (s and s.active) then return end
-  if s.mode == 'place' then
-    place_current(pid)
-  elseif s.mode == 'remove' then
-    remove_current(pid)
-  elseif s.mode == 'pet_place' then
-    place_pet_current(pid)
+  if recently_closed_menu(pid) then return end
+
+  -- ==========================================================
+  -- Tuning knobs (SENSITIVITY)
+  -- ==========================================================
+  -- Tap precision (smaller = more precise per press)
+  local TAP_STEP = 0.10
+
+  -- Hold behavior (fast movement while holding)
+  local HOLD_FIRST_REPEAT_DELAY = 0.22   -- delay before repeating starts
+  local HOLD_REPEAT_DELAY       = 0.06   -- repeat interval once it starts
+  local HOLD_STEP               = 0.10   -- step per repeat
+
+  -- Optional turbo after holding longer
+  local TURBO_AFTER_SEC         = 0.70
+  local TURBO_REPEAT_DELAY      = 0.03
+  local TURBO_STEP              = 0.20
+
+  -- Debounce Confirm/Cancel so they can't spam
+  s._vi_last_action = s._vi_last_action or {}
+  local function action_ok(key, seconds)
+    seconds = seconds or 0.25
+    local now = os.clock()
+    local last = s._vi_last_action[key] or -999
+    if (now - last) >= seconds then
+      s._vi_last_action[key] = now
+      return true
+    end
+    return false
+  end
+
+  local function nudge_cursor(dx, dy)
+    if s.cursor_x == nil or s.cursor_y == nil then
+      init_free_cursor(pid, s)
+    end
+
+    local x = tonumber(s.cursor_x or 0) or 0
+    local y = tonumber(s.cursor_y or 0) or 0
+    local z = tonumber(s.cursor_z or 0) or 0
+
+    x, y, z = clamp_cursor_to_map(s.area_id, x + dx, y + dy, z)
+    s.cursor_x, s.cursor_y, s.cursor_z = x, y, z
+
+    -- update preview immediately; ensure_preview also drives camera
+    ensure_preview(pid)
+  end
+
+  -- ==========================================================
+  -- IMPORTANT: match LMenu/cosmetics virtual_input states
+  --   1 = press
+  --   2/4 = hold/scroll-hold
+  --   anything else = treat as release/ignore for movement
+  -- ==========================================================
+
+  -- ==========================================================
+  -- PASS 1: Confirm/Cancel first
+  -- ==========================================================
+  for _, b in next, evs do
+    local name  = b.name
+    local state = b.state
+
+    local is_press = (state == 1)
+
+    if is_press then
+      if name == "Confirm" then
+        if action_ok("confirm", 0.25) then
+          if s.mode == "place" then
+            place_current(pid)
+          elseif s.mode == "remove" then
+            remove_current(pid)
+          elseif s.mode == "pet_place" then
+            place_pet_current(pid)
+          end
+        end
+        return
+      elseif name == "Cancel" then
+        if action_ok("cancel", 0.25) then
+          stop_session(pid, "Cancelled.")
+        end
+        return
+      end
+    end
+  end
+
+  -- ==========================================================
+  -- PASS 2: Movement (tap precise, hold accelerates)
+  -- ==========================================================
+  s._preview_hold = s._preview_hold or { dir = nil, start = 0, last = 0 }
+
+  for _, b in next, evs do
+    local name  = b.name
+    local state = b.state
+
+    local dx, dy = 0, 0
+    local dir = nil
+
+    if name == "Move Up" then dy = -1; dir = "U"
+    elseif name == "Move Down" then dy = 1; dir = "D"
+    elseif name == "Move Left" then dx = -1; dir = "L"
+    elseif name == "Move Right" then dx = 1; dir = "R"
+    end
+
+    if dir then
+      local now = os.clock()
+
+      local is_press       = (state == 1)
+      local is_hold_or_scr = (state == 2 or state == 4)
+
+      if is_press then
+        -- tap move immediately
+        s._preview_hold.dir   = dir
+        s._preview_hold.start = now
+        s._preview_hold.last  = now
+        nudge_cursor(dx * TAP_STEP, dy * TAP_STEP)
+
+      elseif is_hold_or_scr then
+        -- holding: repeat after a delay
+        local h = s._preview_hold
+
+        -- if direction changed mid-hold, re-init (don’t move yet)
+        if h.dir ~= dir then
+          h.dir   = dir
+          h.start = now
+          h.last  = now
+        else
+          local held_for = now - (h.start or now)
+          if held_for >= HOLD_FIRST_REPEAT_DELAY then
+            local turbo = held_for >= TURBO_AFTER_SEC
+            local rep   = turbo and TURBO_REPEAT_DELAY or HOLD_REPEAT_DELAY
+            local step  = turbo and TURBO_STEP         or HOLD_STEP
+
+            if (now - (h.last or 0)) >= rep then
+              h.last = now
+              nudge_cursor(dx * step, dy * step)
+            end
+          end
+        end
+
+      else
+        -- release/other: clear hold if this was the active direction
+        if s._preview_hold.dir == dir then
+          s._preview_hold.dir = nil
+        end
+      end
+    end
   end
 end)
 

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="50" height="50" tilewidth="64" tileheight="32" infinite="0" nextlayerid="14" nextobjectid="354">
+<map version="1.10" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="50" height="50" tilewidth="64" tileheight="32" infinite="0" nextlayerid="14" nextobjectid="383">
  <properties>
   <property name="Background" value="custom"/>
   <property name="Background Animation" value="/server/assets/custom/backgrounds/home/kottouhinyanodennou.animation"/>
@@ -68,7 +68,7 @@
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,10,11,10,11,10,11,10,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,11,8,9,8,9,8,11,0,0,8,9,8,9,8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,8,7,0,0,10,9,6,7,6,9,10,0,0,9,9,9,9,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8,7,8,13,13,11,8,7,5,7,8,11,9,9,8,9,9,9,8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8,7,8,13,13,11,8,7,5,7,8,11,9,9,8,9,9,9,8,135,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,8,7,0,10,10,9,6,7,6,9,10,0,0,9,9,9,9,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,11,8,9,6,9,8,11,0,0,8,9,8,9,8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,10,11,10,7,10,11,10,0,0,0,0,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -969,6 +969,214 @@
    </properties>
    <point/>
   </object>
+  <object id="354" name="Card Pack Seller" type="NPC" x="1136.5" y="785.5">
+   <properties>
+    <property name="Asset Name" value="prog-gold"/>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Direction" value="Up Left"/>
+    <property name="Next 1" type="object" value="355"/>
+    <property name="Text 1" value="Hey there, I sell card packs!"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="356" name="[C]PetiDrgn" type="Item" x="1179.5" y="888.5">
+   <properties>
+    <property name="Description" value="Common: Petit Dragon - A: 600 / D: 700"/>
+    <property name="Name" value="[C]PetiDrgn"/>
+    <property name="Price" value="0"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="357" name="[C]RyuKish" type="Item" x="1188" y="884">
+   <properties>
+    <property name="Description" value="Common: Ryu-Kishin - A: 1000 / D: 500"/>
+    <property name="Name" value="[C]RyuKish"/>
+    <property name="Price" value="0"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="358" name="[C]WWingCat" type="Item" x="1193.5" y="880.5">
+   <properties>
+    <property name="Description" value="Common: W-Wing Catapult - A: 1300 / D: 1500"/>
+    <property name="Name" value="[C]WWingCat"/>
+    <property name="Price" value="0"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="359" name="[C]MystHrs" type="Item" x="1201.5" y="876.5">
+   <properties>
+    <property name="Description" value="Common: Mystic Horseman - A: 1300 / D: 1550"/>
+    <property name="Name" value="[C]MystHrs"/>
+    <property name="Price" value="0"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="360" name="[C]AquaMdr" type="Item" x="1208.5" y="873.5">
+   <properties>
+    <property name="Description" value="Common: Aqua Madoor - A: 1200 / D: 2000"/>
+    <property name="Name" value="[C]AquaMdr"/>
+    <property name="Price" value="0"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="361" name="[C]LordOfD" type="Item" x="1215" y="869">
+   <properties>
+    <property name="Description" value="Common: Lord of D. - A: 1200 / D: 1100"/>
+    <property name="Name" value="[C]LordOfD"/>
+    <property name="Price" value="0"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="362" name="[R]SprDrgn" type="Item" x="1196" y="906">
+   <properties>
+    <property name="Description" value="Rare: Spear Dragon - A: 1900 / D: 0"/>
+    <property name="Name" value="[R]SprDrgn"/>
+    <property name="Price" value="0"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="363" name="[SR]RyuRan" type="Item" x="1202" y="924">
+   <properties>
+    <property name="Description" value="SRare: Ryu-Ran - A: 2200 / D: 2600"/>
+    <property name="Name" value="[SR]RyuRan"/>
+    <property name="Price" value="0"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="364" name="[UR]Seiyaryu" type="Item" x="1213" y="943">
+   <properties>
+    <property name="Description" value="URare: Seiyaryu - A: 2500 / D: 2300"/>
+    <property name="Name" value="[UR]Seiyaryu"/>
+    <property name="Price" value="0"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="365" name="[GDR]F.A.V.Lord" type="Item" x="1226.5" y="965.5">
+   <properties>
+    <property name="Description" value="FullArt: Vampire Lord - A: 2000 / D: 1500"/>
+    <property name="Name" value="[GDR]F.A.V.Lord"/>
+    <property name="Price" value="0"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="366" name="[R]LstrDrgn" type="Item" x="1204.5" y="901.5">
+   <properties>
+    <property name="Description" value="Rare: Luster Dragon - A: 1900 / D: 1600"/>
+    <property name="Name" value="[R]LstrDrgn"/>
+    <property name="Price" value="0"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="367" name="[R]LaJinn" type="Item" x="1212.5" y="897.5">
+   <properties>
+    <property name="Description" value="Rare: La Jinn the Mystical Genie of the Lamp - A: 1800 / D: 1000"/>
+    <property name="Name" value="[R]LaJinn"/>
+    <property name="Price" value="0"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="368" name="[R]RKaise" type="Item" x="1221.5" y="894.5">
+   <properties>
+    <property name="Description" value="Rare: Rude Kaiser - A: 1800 / D: 1600"/>
+    <property name="Name" value="[R]RKaise"/>
+    <property name="Price" value="0"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="369" name="[R]KsrSeaHs" type="Item" x="1229.5" y="888.5">
+   <properties>
+    <property name="Description" value="Rare: Kaiser Sea Horse - A: 1700 / D: 1650"/>
+    <property name="Name" value="[R]KsrSeaHs"/>
+    <property name="Price" value="0"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="370" name="[SR]Hyoznryu" type="Item" x="1207" y="921">
+   <properties>
+    <property name="Description" value="SRare: Hyozanryu - A: 2100 / D: 2800"/>
+    <property name="Name" value="[SR]Hyoznryu"/>
+    <property name="Price" value="0"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="372" name="[SR]CybrDrgn" type="Item" x="1219.5" y="914.5">
+   <properties>
+    <property name="Description" value="SRare: Cyber Dragon - A: 2100 / D: 1600"/>
+    <property name="Name" value="[SR]CybrDrgn"/>
+    <property name="Price" value="0"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="373" name="[SR]LstrDrg2" type="Item" x="1228.5" y="909.5">
+   <properties>
+    <property name="Description" value="SRare: Luster Dragon 2 - A: 2400 / D: 1400"/>
+    <property name="Name" value="[SR]LstrDrg2"/>
+    <property name="Price" value="0"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="375" name="[SR]KsrGldr" type="Item" x="1245" y="901">
+   <properties>
+    <property name="Description" value="SRare: Kaiser Glider - A: 2400 / D: 2200"/>
+    <property name="Name" value="[SR]KsrGldr"/>
+    <property name="Price" value="0"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="379" name="[UR]TriHrDrgn" type="Item" x="1221.5" y="936.5">
+   <properties>
+    <property name="Description" value="URare: Tri-Horned Dragon - A: 2850 / D: 2350"/>
+    <property name="Name" value="[UR]TriHrDrgn"/>
+    <property name="Price" value="0"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="380" name="[UR]TyrntDrgn" type="Item" x="1229.5" y="930.5">
+   <properties>
+    <property name="Description" value="URare: Tyrant Dragon - A: 2900 / D: 2500"/>
+    <property name="Name" value="[UR]TyrntDrgn"/>
+    <property name="Price" value="0"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="381" name="[UR]F.A.BEWD" type="Item" x="1247.5" y="952.5">
+   <properties>
+    <property name="Description" value="FullArt: Blue-Eyes White Dragon - A: 3000 / D: 2500"/>
+    <property name="Name" value="[UR]F.A.BEWD"/>
+    <property name="Price" value="0"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="382" name="[GDR]F.A.BEWD" type="Item" x="1237.5" y="958.5">
+   <properties>
+    <property name="Description" value="FullArt: Blue-Eyes White Dragon - A: 3000 / D: 2500"/>
+    <property name="Name" value="[GDR]F.A.BEWD"/>
+    <property name="Price" value="0"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
  </objectgroup>
  <layer id="6" name="Tile Layer 2" width="50" height="50" offsetx="0" offsety="-16">
   <data encoding="csv">
@@ -1358,6 +1566,44 @@
     <property name="ultra rare 2" type="object" value="325"/>
     <property name="ultra rare 3" type="object" value="326"/>
     <property name="ultra rare rate" type="int" value="8"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="355" name="Card pack" type="Dialogue" x="1239.5" y="882.5">
+   <properties>
+    <property name="Dialogue Type" value="Pack Shop"/>
+    <property name="Pack Description" value="Kaiba themed pack"/>
+    <property name="Pack Name" value="Kaiba's Revenge"/>
+    <property name="Pack Price" type="int" value="50000"/>
+    <property name="Pack Rolls" type="int" value="4"/>
+    <property name="common 1" type="object" value="356"/>
+    <property name="common 2" type="object" value="357"/>
+    <property name="common 3" type="object" value="358"/>
+    <property name="common 4" type="object" value="359"/>
+    <property name="common 5" type="object" value="360"/>
+    <property name="common 6" type="object" value="361"/>
+    <property name="common rate" type="int" value="740"/>
+    <property name="gold rare 1" type="object" value="365"/>
+    <property name="gold rare 2" type="object" value="382"/>
+    <property name="gold rare 3" type="object" value="381"/>
+    <property name="gold rare rate" type="int" value="3"/>
+    <property name="rare 1" type="object" value="369"/>
+    <property name="rare 2" type="object" value="368"/>
+    <property name="rare 3" type="object" value="367"/>
+    <property name="rare 4" type="object" value="366"/>
+    <property name="rare 5" type="object" value="362"/>
+    <property name="rare rate" type="int" value="201"/>
+    <property name="super rare 1" type="object" value="375"/>
+    <property name="super rare 2" type="object" value="363"/>
+    <property name="super rare 3" type="object" value="373"/>
+    <property name="super rare 4" type="object" value="372"/>
+    <property name="super rare 5" type="object" value="204"/>
+    <property name="super rare 6" type="object" value="370"/>
+    <property name="super rare rate" type="int" value="40"/>
+    <property name="ultra rare 1" type="object" value="364"/>
+    <property name="ultra rare 2" type="object" value="380"/>
+    <property name="ultra rare 3" type="object" value="379"/>
+    <property name="ultra rare rate" type="int" value="16"/>
    </properties>
    <point/>
   </object>

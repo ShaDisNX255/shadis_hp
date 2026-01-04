@@ -203,7 +203,20 @@ function chat_behaviour()
 
                 if not npc.dont_face_player then
                     local player_pos = Net.get_player_position(player_id)
-                    Net.set_bot_direction(npc.bot_id, Direction.from_points(npc, player_pos))
+
+                    local dir = nil
+                    if player_pos and player_pos.x ~= nil and player_pos.y ~= nil and npc.x ~= nil and npc.y ~= nil then
+                        dir = Direction.from_points(npc, player_pos)
+                    end
+
+                    -- Only call into Net if we actually got a direction back
+                    if dir ~= nil then
+                        Net.set_bot_direction(npc.bot_id, dir)
+                    else
+                        -- Fallback: keep current direction (or restore default)
+                        -- This prevents the conversation state from getting stuck.
+                        -- (Optional) Net.set_bot_direction(npc.bot_id, npc.direction or "Down")
+                    end
                 end
 
                 local dialogue = npc.first_dialogue
