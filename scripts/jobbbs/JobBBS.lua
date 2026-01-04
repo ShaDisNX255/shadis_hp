@@ -1728,18 +1728,28 @@ function JobBBS.on_raid_progress(pid, info)
 
   st.prog.raid = st.prog.raid or { battles=0, points=0, boss_dmg=0, boss_kills=0 }
 
-  local pts        = tonumber(info and info.points) or 0
-  local boss_dmg   = tonumber(info and (info.boss_damage or info.boss_dmg)) or 0
-  local killed     = info and info.killed
+  local pts      = tonumber(info and info.points) or 0
+  local boss_dmg = tonumber(info and (info.boss_damage or info.boss_dmg)) or 0
+  local killed   = info and info.killed
 
-  -- Any non-zero award counts as “participated in 1 raid battle”
+  local participated = false
+
+  -- Wave 1/2 participation (points)
   if pts > 0 then
-    st.prog.raid.points   = (st.prog.raid.points   or 0) + pts
-    st.prog.raid.battles  = (st.prog.raid.battles  or 0) + 1
+    st.prog.raid.points  = (st.prog.raid.points  or 0) + pts
+    participated = true
   end
 
+  -- Wave 3 (boss) participation (damage)
   if boss_dmg > 0 then
     st.prog.raid.boss_dmg = (st.prog.raid.boss_dmg or 0) + boss_dmg
+    participated = true
+  end
+
+  -- Count “participated in 1 raid battle” if they earned points OR dealt boss damage.
+  -- (Avoid counting the kill-only callback as a second battle.)
+  if participated then
+    st.prog.raid.battles = (st.prog.raid.battles or 0) + 1
   end
 
   if killed then

@@ -117,9 +117,9 @@ local EXPEDITION = {
   },
 
   -- Reward parameters
-  consolation_money = 1000,
-  money_min = 10000,
-  money_max = 50000,
+  consolation_money = 10000,
+  money_min = 50000,
+  money_max = 100000,
 
   gp_amount   = 1,
   frag_amount = 1,
@@ -127,12 +127,16 @@ local EXPEDITION = {
   -- If the card pool is empty, "card" rolls will fall back to money.
   card_pool = {
     -- EXAMPLES (safe placeholders). Replace with your real pool anytime.
-    { name="[GDR]Kbo", description="GDRare: Kuriboh - A: 300 / D: 200" },
-    { name="[SR]F.A.DMGirl", description="FullArt: Dark Magician Girl - A: 2000 / D: 1700"},
     { name="[UR]S.Skull", description="URare: Summoned Skull - A: 2500 / D: 1200"},
+    { name="[UR]B.L.S.", description="URare: Black Luster Soldier - A: 3000 / D: 2500"},
+    { name="[UR]Seiyaryu", description="URare: Seiyaryu - A: 2500 / D: 2300"},
     { name="[GR]DMGirl", description="GRare: Dark Magician Girl - A: 2000 / D: 1700"},
     { name="[GR]DMag", description="GRare: Dark Magician - A: 2500 / D: 2100"},
+    { name="[GR]B.Sk.D.", description="GRare: Black Skull Dragon - A: 3200 / D: 2500"},
+    { name="[GDR]Kbo", description="GDRare: Kuriboh - A: 300 / D: 200" },
     { name="[SR]F.A.V.Lord", description="FullArt: Vampire Lord - A: 2000 / D: 1500"},
+    { name="[SR]F.A.DMGirl", description="FullArt: Dark Magician Girl - A: 2000 / D: 1700"},
+    { name="[GDR]F.A.DMGirl", description="FullArt: Dark Magician Girl - A: 2000 / D: 1700"},
   },
 }
 
@@ -896,13 +900,43 @@ if reward.kind == "card" then
   end
 end
 
-local function result_flavor(mood)
+local function result_flavor(mood, reward)
+  mood = tostring(mood or "neutral")
+
+  local kind  = reward and tostring(reward.kind or "") or ""
+  local label = reward and tostring(reward.label or "") or ""
+
+  -- In your generate_reward(), consolation is { kind="money", label="scraps", amount=... }
+  local is_consolation_money = (kind == "money" and label == "scraps")
+  local is_gp = (kind == "gp")
+
+  -- "Did well" bucket (per your example): bug frag, regular money, or a card.
+  local did_well = (kind == "frag") or (kind == "card") or (kind == "money" and not is_consolation_money)
+
   if mood == "happy" then
-    return "Your virus looks a bit embarrassed it couldn't do better."
+    if is_consolation_money or is_gp then
+      return "Your virus looks a bit embarrassed it couldn't do better."
+    elseif did_well then
+      return "Your virus looks happy about the expedition."
+    end
+    return "Your virus looks pleased with the trip."
+
   elseif mood == "neutral" then
+    if is_consolation_money or is_gp then
+      return "Your virus gives a small shrug and hands you what it managed to find."
+    elseif did_well then
+      return "Your virus seems quietly satisfied with what it brought back."
+    end
     return "Your virus reports back from its trip."
+
+  else -- sad (or anything else)
+    if is_consolation_money or is_gp then
+      return "Your virus trudges back, apologetic… it didn't find much this time."
+    elseif did_well then
+      return "Your virus looks exhausted, but a little proud of what it managed to bring back."
+    end
+    return "Your virus seems exhausted after its trip."
   end
-  return "Your virus seems exhausted after its trip."
 end
 
 local function owner_on_team(pid)
@@ -1426,7 +1460,7 @@ local function open_pet_action_menu(pid, e, bucket_area_id)
       e.owner_name = Net.get_player_name(pid)
     end
 
-    Net.message_player(pid, result_flavor(e.exp.mood or mood))
+    Net.message_player(pid, result_flavor(e.exp.mood or mood, e.exp.reward))
 
     -- apply reward, with gp fallback if not on team
     local r = e.exp.reward

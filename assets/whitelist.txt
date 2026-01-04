@@ -113,4 +113,5 @@ b6de28d83fe9a2d5e7ad0965bc532644 61.Mannerek.Unified.Library
 08ec366a2374c067da789b744ac92540 com.silva.navi.zarymura.adventure
 d705c9815fb1f27b5b39ed65cb252dc7 com.darkware.navi.djangopvp
 23c87aad099bcfdca0e518c082888343 com.darkware.navi.sabatapvp
+948e91da79b1dd142219120c43db2816 com.ijuinpersonalterminalcompany.enzan.player.bluesnotproto
 

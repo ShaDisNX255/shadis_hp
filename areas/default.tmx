@@ -1492,6 +1492,8 @@
     <property name="common 5" type="object" value="224"/>
     <property name="common 6" type="object" value="223"/>
     <property name="common 7" type="object" value="222"/>
+    <property name="common 8" type="object" value="361"/>
+    <property name="common 9" type="object" value="360"/>
     <property name="common rate" type="int" value="153"/>
     <property name="ghost rare 1" type="object" value="322"/>
     <property name="ghost rare 2" type="object" value="323"/>
@@ -1499,22 +1501,28 @@
     <property name="ghost rare rate" type="int" value="5"/>
     <property name="gold rare 1" type="object" value="234"/>
     <property name="gold rare 2" type="object" value="336"/>
+    <property name="gold rare 3" type="object" value="365"/>
     <property name="gold rare rate" type="int" value="2"/>
     <property name="rare 1" type="object" value="196"/>
     <property name="rare 2" type="object" value="194"/>
     <property name="rare 3" type="object" value="227"/>
     <property name="rare 4" type="object" value="226"/>
     <property name="rare 5" type="object" value="228"/>
+    <property name="rare 6" type="object" value="368"/>
+    <property name="rare 7" type="object" value="367"/>
     <property name="rare rate" type="int" value="753"/>
     <property name="super rare 1" type="object" value="229"/>
     <property name="super rare 2" type="object" value="230"/>
     <property name="super rare 3" type="object" value="231"/>
     <property name="super rare 4" type="object" value="198"/>
+    <property name="super rare 5" type="object" value="372"/>
+    <property name="super rare 6" type="object" value="375"/>
     <property name="super rare rate" type="int" value="60"/>
     <property name="ultra rare 1" type="object" value="232"/>
     <property name="ultra rare 2" type="object" value="233"/>
     <property name="ultra rare 3" type="object" value="199"/>
     <property name="ultra rare 4" type="object" value="200"/>
+    <property name="ultra rare 5" type="object" value="364"/>
     <property name="ultra rare rate" type="int" value="27"/>
    </properties>
    <point/>
