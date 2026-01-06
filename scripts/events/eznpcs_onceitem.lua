@@ -2838,14 +2838,14 @@ Net:on("virtual_input", function(event)
   local TAP_STEP = 0.10
 
   -- Hold behavior (fast movement while holding)
-  local HOLD_FIRST_REPEAT_DELAY = 0.22   -- delay before repeating starts
-  local HOLD_REPEAT_DELAY       = 0.06   -- repeat interval once it starts
+  local HOLD_FIRST_REPEAT_DELAY = 0.12   -- delay before repeating starts
+  local HOLD_REPEAT_DELAY       = 0.04   -- repeat interval once it starts
   local HOLD_STEP               = 0.10   -- step per repeat
 
   -- Optional turbo after holding longer
-  local TURBO_AFTER_SEC         = 0.70
-  local TURBO_REPEAT_DELAY      = 0.03
-  local TURBO_STEP              = 0.20
+  local TURBO_AFTER_SEC         = 0.45
+  local TURBO_REPEAT_DELAY      = 0.02
+  local TURBO_STEP              = 0.30
 
   -- Debounce Confirm/Cancel so they can't spam
   s._vi_last_action = s._vi_last_action or {}
@@ -2883,32 +2883,41 @@ Net:on("virtual_input", function(event)
   --   anything else = treat as release/ignore for movement
   -- ==========================================================
 
+-- ==========================================================
+  -- PASS 1: Confirm/Cancel first (robust: press OR held)
   -- ==========================================================
-  -- PASS 1: Confirm/Cancel first
-  -- ==========================================================
+  s._btn_latch = s._btn_latch or { Confirm = false, Cancel = false }
+
   for _, b in next, evs do
     local name  = b.name
     local state = b.state
 
-    local is_press = (state == 1)
+    if name == "Confirm" or name == "Cancel" then
+      -- Treat any "down-ish" state as down (press + held/scroll).
+      -- This makes A/B resilient if the press frame is missed.
+      local down = (state == 1) or (state == 2) or (state == 4) or (state == 0)
 
-    if is_press then
-      if name == "Confirm" then
-        if action_ok("confirm", 0.25) then
-          if s.mode == "place" then
-            place_current(pid)
-          elseif s.mode == "remove" then
-            remove_current(pid)
-          elseif s.mode == "pet_place" then
-            place_pet_current(pid)
+      if down then
+        if not s._btn_latch[name] then
+          s._btn_latch[name] = true
+
+          if name == "Confirm" then
+            if s.mode == "place" then
+              place_current(pid)
+            elseif s.mode == "remove" then
+              remove_current(pid)
+            elseif s.mode == "pet_place" then
+              place_pet_current(pid)
+            end
+            return
+          else -- Cancel
+            stop_session(pid, "Cancelled.")
+            return
           end
         end
-        return
-      elseif name == "Cancel" then
-        if action_ok("cancel", 0.25) then
-          stop_session(pid, "Cancelled.")
-        end
-        return
+      else
+        -- release / other state -> clear latch
+        s._btn_latch[name] = false
       end
     end
   end
