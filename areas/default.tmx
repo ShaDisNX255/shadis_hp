@@ -1087,15 +1087,6 @@
    </properties>
    <point/>
   </object>
-  <object id="368" name="[R]RKaise" type="Item" x="1221.5" y="894.5">
-   <properties>
-    <property name="Description" value="Rare: Rude Kaiser - A: 1800 / D: 1600"/>
-    <property name="Name" value="[R]RKaise"/>
-    <property name="Price" value="0"/>
-    <property name="Type" value="item"/>
-   </properties>
-   <point/>
-  </object>
   <object id="369" name="[R]KsrSeaHs" type="Item" x="1229.5" y="888.5">
    <properties>
     <property name="Description" value="Rare: Kaiser Sea Horse - A: 1700 / D: 1650"/>
@@ -1508,8 +1499,7 @@
     <property name="rare 3" type="object" value="227"/>
     <property name="rare 4" type="object" value="226"/>
     <property name="rare 5" type="object" value="228"/>
-    <property name="rare 6" type="object" value="368"/>
-    <property name="rare 7" type="object" value="367"/>
+    <property name="rare 6" type="object" value="367"/>
     <property name="rare rate" type="int" value="753"/>
     <property name="super rare 1" type="object" value="229"/>
     <property name="super rare 2" type="object" value="230"/>
@@ -1596,10 +1586,9 @@
     <property name="gold rare 3" type="object" value="381"/>
     <property name="gold rare rate" type="int" value="3"/>
     <property name="rare 1" type="object" value="369"/>
-    <property name="rare 2" type="object" value="368"/>
+    <property name="rare 2" type="object" value="362"/>
     <property name="rare 3" type="object" value="367"/>
     <property name="rare 4" type="object" value="366"/>
-    <property name="rare 5" type="object" value="362"/>
     <property name="rare rate" type="int" value="201"/>
     <property name="super rare 1" type="object" value="375"/>
     <property name="super rare 2" type="object" value="363"/>
