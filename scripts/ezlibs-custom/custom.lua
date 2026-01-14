@@ -6,6 +6,7 @@ local fishing  = require('scripts/ezlibs-custom/fishing')
 local secret  = require('scripts/ezlibs-custom/secret_path_switch')
 local dungeon  = require('scripts/ezlibs-custom/dungeon')
 local soccerball  = require('scripts/ezlibs-custom/soccerball')
+local slots  = require('scripts/ezlibs-custom/slots')
 -- Optional L-Menu (net-games) support
 local LMenu
 do
