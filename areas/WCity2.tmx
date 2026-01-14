@@ -1423,12 +1423,12 @@
   </object>
   <object id="193" type="Dialogue" x="191.5" y="492.5">
    <properties>
-    <property name="Boss Money" type="int" value="100000"/>
+    <property name="Boss Money" type="int" value="120000"/>
     <property name="Dialogue Type" value="none"/>
     <property name="Event Name" value="raid"/>
     <property name="Raid ID" value="Swordy1"/>
-    <property name="Wave1 Money" type="int" value="70000"/>
-    <property name="Wave2 Money" type="int" value="80000"/>
+    <property name="Wave1 Money" type="int" value="80000"/>
+    <property name="Wave2 Money" type="int" value="90000"/>
    </properties>
    <point/>
   </object>

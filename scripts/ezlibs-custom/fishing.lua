@@ -1120,6 +1120,111 @@ local function _ensure_asset(area_id, path)
   end
 end
 
+-- Unified reward sender that:
+--  1) Always uses Net.send_player_battle_rewards (UI popup)
+--  2) Fixes up BugFrags (type=3) if the engine doesn't actually apply them server-side
+--  3) Fixes up Money (type=0) if the engine doesn't actually apply it server-side
+--  4) Syncs money/frags into ezmemory so relog can't revert
+--
+-- Usage:
+--   _send_rewards_and_fixup_wallet(player_id, rewards)
+--
+local function _send_rewards_and_fixup_wallet(player_id, rewards)
+  if not rewards or #rewards == 0 then return end
+
+  -- Sum expected deltas from the packet
+  local expected_money = 0
+  local expected_frags = 0
+  for _, r in ipairs(rewards) do
+    if r then
+      local v = tonumber(r.value) or 0
+      if r.type == 0 then
+        expected_money = expected_money + v
+      elseif r.type == 3 then
+        expected_frags = expected_frags + v
+      end
+    end
+  end
+
+  -- Snapshot server-side counters BEFORE sending (only if relevant APIs exist)
+  local money_before = nil
+  if expected_money > 0 and Net.get_player_money then
+    money_before = tonumber(Net.get_player_money(player_id) or 0) or 0
+  end
+
+  local frags_before = nil
+  if expected_frags > 0 and Net.get_player_fragments then
+    frags_before = tonumber(Net.get_player_fragments(player_id) or 0) or 0
+  end
+
+  -- 1) Send the UI reward packet (this is required for the reward popup)
+  Net.send_player_battle_rewards(player_id, rewards)
+
+  -- 2) Fixups (only if the server-side counters didn't move as expected)
+
+  -- Money fixup: if Net.get_player_money didn't increase, force-add via ezmemory
+  if expected_money > 0 and money_before ~= nil then
+    local money_after = tonumber(Net.get_player_money(player_id) or 0) or 0
+    if money_after < (money_before + expected_money) then
+      -- Force persist + server sync through ezmemory
+      -- spend_player_money with a negative amount ADDS money.
+      pcall(ezmemory.spend_player_money, player_id, -expected_money)
+
+      if BATTLE_DEBUG then
+        local now = tonumber(Net.get_player_money(player_id) or 0) or 0
+        print(('[DBG] send_player_battle_rewards DID NOT apply money; fixed up +%d. Net %d -> %d')
+          :format(expected_money, money_before, now))
+      end
+    elseif BATTLE_DEBUG then
+      print(('[DBG] send_player_battle_rewards applied money +%d. Net %d -> %d')
+        :format(expected_money, money_before, money_after))
+    end
+  end
+
+  -- BugFrag fixup: if Net.get_player_fragments didn't increase, force-add via ezmemory
+  if expected_frags > 0 and frags_before ~= nil then
+    local frags_after = tonumber(Net.get_player_fragments(player_id) or 0) or 0
+    if frags_after < (frags_before + expected_frags) then
+      pcall(ezmemory.add_player_fragments, player_id, expected_frags)
+
+      if BATTLE_DEBUG then
+        local now = tonumber(Net.get_player_fragments(player_id) or 0) or 0
+        print(('[DBG] send_player_battle_rewards DID NOT apply frags; fixed up +%d. Net %d -> %d')
+          :format(expected_frags, frags_before, now))
+      end
+    elseif BATTLE_DEBUG then
+      print(('[DBG] send_player_battle_rewards applied frags +%d. Net %d -> %d')
+        :format(expected_frags, frags_before, frags_after))
+    end
+  end
+
+  -- 3) Sync/merge into ezmemory so relog can't revert.
+  -- Note: money merge only helps if Net.get_player_money reflects reality, but we already fixed-up above.
+  local function _sync_wallet(tag)
+    if ezmemory then
+      if ezmemory.get_player_money then pcall(ezmemory.get_player_money, player_id) end
+      if ezmemory.get_player_fragments then pcall(ezmemory.get_player_fragments, player_id) end
+    end
+
+    if BATTLE_DEBUG then
+      local m = Net.get_player_money and (tonumber(Net.get_player_money(player_id) or 0) or 0) or -1
+      local f = Net.get_player_fragments and (tonumber(Net.get_player_fragments(player_id) or 0) or 0) or -1
+      print(string.format("[DBG] wallet sync (%s): money=%d frags=%d", tostring(tag or "now"), m, f))
+    end
+  end
+
+  _sync_wallet("immediate")
+
+  -- tiny delayed sync, if Async is available (harmless if missing)
+  if _G and _G.Async and _G.async and _G.await and _G.Async.sleep then
+    async(function()
+      await(Async.sleep(0.05))
+      _sync_wallet("delayed")
+    end)
+  end
+end
+
+
 local function _default_fishing_rewards(player_id, encounter_info, stats)
   -- stats = { health, score, time, ran, emotion, turns, npcs = [...] }
   if not stats or stats.ran then return end -- no rewards if ran
@@ -1137,7 +1242,7 @@ local function _default_fishing_rewards(player_id, encounter_info, stats)
     { type = 0, value = monies },  -- 0 = money
   }
 
-  Net.send_player_battle_rewards(player_id, rewards)
+  _send_rewards_and_fixup_wallet(player_id, rewards)
 
   -- NOTE: no FISHING.SFX.catch here anymore.
   -- The battle reward overlay already plays a sound.

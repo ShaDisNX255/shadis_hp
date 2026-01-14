@@ -1,17 +1,31 @@
 -- scripts/ezlibs-custom/secret_path_switch.lua
--- One-time secret path reveal via an interactable object (debug version)
+-- Secret path switch (TOGGLE + optional auto-hide) [Option A: hide = clear to empty gid=0]
 
-local secret_paths = {}
+local secret_paths = {} -- [area_id][path_id] = state
 
 local function dbg(msg)
     print("[secret_path_switch] " .. msg)
 end
 
 local function err(msg)
-    printerr("[secret_path_switch] " .. msg)
+    if printerr then
+        printerr("[secret_path_switch] " .. msg)
+    else
+        print("[secret_path_switch][ERR] " .. msg)
+    end
 end
 
 dbg("module loaded")
+
+local function to_bool(v)
+    return (v == true) or (v == 1) or (v == "1") or (v == "true") or (v == "True") or (v == "TRUE")
+end
+
+local function to_num(v, default)
+    local n = tonumber(v)
+    if n == nil then return default end
+    return n
+end
 
 local function get_area_paths(area_id)
     local area_paths = secret_paths[area_id]
@@ -23,25 +37,32 @@ local function get_area_paths(area_id)
     return area_paths
 end
 
-local function reveal_path_for_switch(area_id, obj, player_id)
-    local props = obj.custom_properties or {}
-    dbg(string.format(
-        "reveal_path_for_switch called for obj_id=%s area_id=%s player_id=%s",
-        tostring(obj.id), tostring(area_id), tostring(player_id)
-    ))
+local function get_or_create_state(area_id, path_id)
+    local area_paths = get_area_paths(area_id)
+    local state = area_paths[path_id]
+    if not state then
+        state = {
+            revealed = false,
+            layer = 0,
+            x_start = 0, x_end = 0,
+            y_start = 0, y_end = 0,
+            auto_hide_remaining = nil, -- seconds remaining; counted down in tick
+        }
+        area_paths[path_id] = state
+    end
+    return state
+end
 
-    -- Identify this path (so multiple switches on the same area don't fight)
+local function compute_path_rect(obj, props)
     local path_id = props["Path ID"] or tostring(obj.id)
-    dbg("path_id=" .. tostring(path_id))
 
     -- Use explicit Path Layer if present, otherwise default to the object's z
-    local layer = tonumber(props["Path Layer"] or obj.z or 0)
-    dbg("Path Layer prop=" .. tostring(props["Path Layer"]) .. " -> layer=" .. tostring(layer))
+    local layer = to_num(props["Path Layer"] or obj.z or 0, 0)
 
-    local x1 = tonumber(props["Path X1"] or 0)
-    local y1 = tonumber(props["Path Y1"] or 0)
-    local x2 = tonumber(props["Path X2"] or x1)
-    local y2 = tonumber(props["Path Y2"] or y1)
+    local x1 = to_num(props["Path X1"], 0)
+    local y1 = to_num(props["Path Y1"], 0)
+    local x2 = to_num(props["Path X2"], x1)
+    local y2 = to_num(props["Path Y2"], y1)
 
     -- Normalize so order in Tiled doesn’t matter
     local x_start = math.min(x1, x2)
@@ -49,49 +70,66 @@ local function reveal_path_for_switch(area_id, obj, player_id)
     local y_start = math.min(y1, y2)
     local y_end   = math.max(y1, y2)
 
+    return path_id, layer, x_start, x_end, y_start, y_end
+end
+
+local function read_auto_hide_seconds(props)
+    -- Add ONE of these properties to your switch object if you want auto-hide:
+    --   Auto Hide Seconds = 3600
+    --   Auto Hide Minutes = 60
+    --   Auto Hide Hours   = 1
+    local secs = to_num(props["Auto Hide Seconds"], 0)
+    if secs and secs > 0 then return secs end
+
+    local mins = to_num(props["Auto Hide Minutes"], 0)
+    if mins and mins > 0 then return mins * 60 end
+
+    local hours = to_num(props["Auto Hide Hours"], 0)
+    if hours and hours > 0 then return hours * 3600 end
+
+    return 0
+end
+
+local function reveal_path(area_id, obj, player_id)
+    local props = obj.custom_properties or {}
+
     dbg(string.format(
-        "path rectangle raw: (%d,%d) to (%d,%d), normalized: (%d,%d) to (%d,%d)",
-        x1, y1, x2, y2, x_start, y_start, x_end, y_end
+        "reveal_path called for obj_id=%s area_id=%s player_id=%s",
+        tostring(obj.id), tostring(area_id), tostring(player_id)
     ))
 
-    local sample_x = tonumber(props["Floor Sample X"] or 0)
-    local sample_y = tonumber(props["Floor Sample Y"] or 0)
+    local path_id, layer, x_start, x_end, y_start, y_end = compute_path_rect(obj, props)
+    dbg("path_id=" .. tostring(path_id) .. " layer=" .. tostring(layer))
 
+    local state = get_or_create_state(area_id, path_id)
+    if state.revealed then
+        dbg("path already revealed for path_id=" .. tostring(path_id))
+        Net.message_player(player_id, "Nothing seems to happen...")
+        return false
+    end
+
+    state.layer, state.x_start, state.x_end, state.y_start, state.y_end = layer, x_start, x_end, y_start, y_end
+
+    local sample_x = to_num(props["Floor Sample X"], 0)
+    local sample_y = to_num(props["Floor Sample Y"], 0)
     dbg(string.format("floor sample at: (%d,%d)", sample_x, sample_y))
 
     if sample_x == 0 and sample_y == 0 then
         err("Missing Floor Sample X/Y on switch object '" .. (obj.name or "?") .. "' (obj_id=" .. tostring(obj.id) .. ")")
         Net.message_player(player_id, "Debug: Floor Sample X/Y missing.")
-        return
+        return false
     end
 
-    local area_paths = get_area_paths(area_id)
-    local state = area_paths[path_id] or { revealed = false }
-
-    if state.revealed then
-        dbg("path already revealed for path_id=" .. tostring(path_id))
-        Net.message_player(player_id, "Nothing seems to happen...")
-        return
-    end
-
-    -- Grab the floor tile we want to copy
-    dbg(string.format("calling Net.get_tile(%s, %d, %d, %d)", tostring(area_id), sample_x, sample_y, layer))
     local floor_tile = Net.get_tile(area_id, sample_x, sample_y, layer)
     if not floor_tile then
-        err(string.format(
-            "Net.get_tile returned nil at (%d,%d,%d)",
-            sample_x, sample_y, layer
-        ))
+        err(string.format("Net.get_tile returned nil at (%d,%d,%d)", sample_x, sample_y, layer))
         Net.message_player(player_id, "Debug: Sample tile is nil.")
-        return
+        return false
     end
     if floor_tile.gid == 0 then
-        err(string.format(
-            "Floor sample at (%d,%d,%d) has gid=0 (empty)",
-            sample_x, sample_y, layer
-        ))
+        err(string.format("Floor sample at (%d,%d,%d) has gid=0 (empty)", sample_x, sample_y, layer))
         Net.message_player(player_id, "Debug: Sample tile is empty.")
-        return
+        return false
     end
 
     dbg(string.format("floor sample gid=%d (flipH=%s, flipV=%s, rot=%s)",
@@ -101,7 +139,6 @@ local function reveal_path_for_switch(area_id, obj, player_id)
         tostring(floor_tile.rotated)
     ))
 
-    -- Apply floor tile to the whole rectangle
     for tx = x_start, x_end do
         for ty = y_start, y_end do
             dbg(string.format("setting tile (%d,%d,%d) to gid=%d", tx, ty, layer, floor_tile.gid))
@@ -119,26 +156,107 @@ local function reveal_path_for_switch(area_id, obj, player_id)
     end
 
     state.revealed = true
-    area_paths[path_id] = state
-    dbg("path reveal completed for path_id=" .. tostring(path_id))
 
     -- Optional sound for everyone in the area
     if props["Sound Path"] and props["Sound Path"] ~= "" then
         dbg("playing sound: " .. tostring(props["Sound Path"]))
         Net.play_sound(area_id, props["Sound Path"])
-    else
-        dbg("no Sound Path property, skipping sound")
     end
 
-    -- Optional *post* message for the activator
+    -- Optional post message for activator
     local post_msg = props["Post Message"]
     if post_msg and post_msg ~= "" then
         dbg("sending post message to player: " .. post_msg)
         Net.message_player(player_id, post_msg)
-    else
-        dbg("no Post Message property, skipping post message")
     end
+
+    -- Optional auto-hide
+    local auto_hide_secs = read_auto_hide_seconds(props)
+    if auto_hide_secs > 0 then
+        state.auto_hide_remaining = auto_hide_secs
+        dbg("auto-hide armed: " .. tostring(auto_hide_secs) .. "s")
+    else
+        state.auto_hide_remaining = nil
+        dbg("auto-hide not armed (no Auto Hide property set)")
+    end
+
+    dbg("path reveal completed for path_id=" .. tostring(path_id))
+    return true
 end
+
+local function hide_path(area_id, obj, player_id, silent)
+    local props = obj.custom_properties or {}
+
+    dbg(string.format(
+        "hide_path called for obj_id=%s area_id=%s player_id=%s",
+        tostring(obj.id), tostring(area_id), tostring(player_id)
+    ))
+
+    local path_id, layer, x_start, x_end, y_start, y_end = compute_path_rect(obj, props)
+    dbg("path_id=" .. tostring(path_id) .. " layer=" .. tostring(layer))
+
+    local state = get_or_create_state(area_id, path_id)
+    if not state.revealed then
+        dbg("path already hidden for path_id=" .. tostring(path_id))
+        if player_id and not silent then
+            Net.message_player(player_id, "Nothing seems to happen...")
+        end
+        return false
+    end
+
+    -- Option A: "no tiles before revealed" => hide by clearing to empty gid=0
+    for tx = x_start, x_end do
+        for ty = y_start, y_end do
+            dbg(string.format("clearing tile (%d,%d,%d) to gid=0", tx, ty, layer))
+            Net.set_tile(area_id, tx, ty, layer, 0, false, false, false)
+        end
+    end
+
+    state.revealed = false
+    state.auto_hide_remaining = nil
+    state.layer, state.x_start, state.x_end, state.y_start, state.y_end = layer, x_start, x_end, y_start, y_end
+
+    if not silent and player_id then
+        local hide_msg = props["Hide Message"] or "You hear a click... the way closes."
+        if hide_msg ~= "" then
+            Net.message_player(player_id, hide_msg)
+        end
+    end
+
+    local hide_sound = props["Hide Sound Path"]
+    if hide_sound and hide_sound ~= "" then
+        Net.play_sound(area_id, hide_sound)
+    end
+
+    dbg("path hide completed for path_id=" .. tostring(path_id))
+    return true
+end
+
+-- Auto-hide countdown (delta_time in seconds)
+Net:on("tick", function(event)
+    local dt = to_num(event.delta_time, 0)
+    if dt <= 0 then return end
+
+    for area_id, area_paths in pairs(secret_paths) do
+        for _, state in pairs(area_paths) do
+            if state.revealed and state.auto_hide_remaining then
+                state.auto_hide_remaining = state.auto_hide_remaining - dt
+                if state.auto_hide_remaining <= 0 then
+                    dbg("auto-hide firing for area_id=" .. tostring(area_id))
+
+                    for tx = state.x_start, state.x_end do
+                        for ty = state.y_start, state.y_end do
+                            Net.set_tile(area_id, tx, ty, state.layer, 0, false, false, false)
+                        end
+                    end
+
+                    state.revealed = false
+                    state.auto_hide_remaining = nil
+                end
+            end
+        end
+    end
+end)
 
 Net:on("object_interaction", function(event)
     dbg(string.format(
@@ -162,7 +280,6 @@ Net:on("object_interaction", function(event)
 
     local area_id = Net.get_player_area(player_id)
     dbg("player is in area_id=" .. tostring(area_id))
-
     if not area_id then
         dbg("no area_id for player, aborting")
         return
@@ -178,67 +295,53 @@ Net:on("object_interaction", function(event)
 
     local props = obj.custom_properties or {}
 
-    -- Dump properties for debugging
-    for k, v in pairs(props) do
-        dbg(string.format("  prop[%s] = %s", tostring(k), tostring(v)))
-    end
-
     local switch_flag = props["Secret Path Switch"]
     dbg("Secret Path Switch flag value=" .. tostring(switch_flag))
-
     if not switch_flag then
         dbg("Secret Path Switch flag not set or false, ignoring object")
         return
     end
 
-    dbg("Secret Path Switch flag is set; continuing")
+    local path_id = props["Path ID"] or tostring(obj.id)
+    local state = get_or_create_state(area_id, path_id)
+
+    -- TOGGLE: if revealed, hide immediately (no question flow)
+    if state.revealed then
+        dbg("toggle: currently revealed -> hiding")
+        hide_path(area_id, obj, player_id, false)
+        return
+    end
 
     ----------------------------------------------------------------
     -- (Optional) owner/oncehub logic you already had goes here.
     -- We leave whatever you had above this comment as-is.
     ----------------------------------------------------------------
 
-    ----------------------------------------------------------------
-    -- NEW: Optional "Ask Question" flavor
-    ----------------------------------------------------------------
-    local ask_prop = props["Ask Question"]
-    local ask_question =
-        (ask_prop == true) or
-        (ask_prop == "true") or
-        (ask_prop == "True") or
-        (ask_prop == 1) or
-        (ask_prop == "1")
-
-    -- If Ask Question is not enabled, behave exactly like before
+    -- Optional "Ask Question" flavor (for revealing only)
+    local ask_question = to_bool(props["Ask Question"])
     if not ask_question then
         dbg("Ask Question not enabled; revealing path immediately")
-        reveal_path_for_switch(area_id, obj, player_id)
+        reveal_path(area_id, obj, player_id)
         return
     end
 
     dbg("Ask Question enabled; starting async question flow")
 
-    -- Read flavor strings
-    local pre_msg     = props["Message"] or "You find a secret switch..."
-    local question    = props["Question"] or "Do you want to press it?"
-    local yes_text    = props["Yes Text"] or "Who wouldn't?"
-    local no_text     = props["No Text"]
-    local post_msg    = props["Post Message"]
+    local pre_msg  = props["Message"] or "You find a secret switch..."
+    local question = props["Question"] or "Do you want to press it?"
+    local yes_text = props["Yes Text"] or "Who wouldn't?"
+    local no_text  = props["No Text"]
 
-    -- Run the widget flow asynchronously so we don't block the server
     return Async.promisify(coroutine.create(function()
-        -- 1) Show the initial flavor line
         if pre_msg and pre_msg ~= "" then
             dbg("pre_msg: " .. pre_msg)
             Async.await(Async.message_player(player_id, pre_msg))
         end
 
-        -- 2) Ask the Yes/No question
         dbg("question: " .. question)
         local answer = Async.await(Async.question_player(player_id, question))
         dbg("answer from question_player: " .. tostring(answer))
 
-        -- Assumption: question_player returns 1 for Yes, 0 or nil for No/B
         if answer ~= 1 then
             dbg("player chose No or cancelled")
             if no_text and no_text ~= "" then
@@ -248,22 +351,12 @@ Net:on("object_interaction", function(event)
             return
         end
 
-        -- 3) YES branch: "Who wouldn't?" then reveal path
         if yes_text and yes_text ~= "" then
             dbg("yes_text: " .. yes_text)
             Async.await(Async.message_player(player_id, yes_text))
         end
 
-        -- We don't want the reveal helper to reuse the Message string
-        -- as a post-reveal message, so temporarily blank it out.
-        local orig_message = props["Message"]
-        props["Message"] = nil
-
-        dbg("calling reveal_path_for_switch after YES")
-        reveal_path_for_switch(area_id, obj, player_id)
-
-        -- Restore local copy of Message (in case anything else reads props)
-        props["Message"] = orig_message
-
+        dbg("calling reveal_path after YES")
+        reveal_path(area_id, obj, player_id)
     end))
 end)

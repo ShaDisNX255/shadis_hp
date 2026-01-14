@@ -26,15 +26,15 @@ local DEFAULTS = {
     style                 = "Repeat",  -- or "Once"
     wave2_points_required = 300,       -- W1 -> W2 threshold
     wave3_points_required = 150,       -- W2 -> Boss threshold
-    boss_pool_max         = 15000,     -- shared HP pool for this boss
+    boss_pool_max         = 10000,     -- shared HP pool for this boss
     boss_win_damage       = 700,       -- fallback per win
     boss_encounter_hp     = 600,      -- HP in a single encounter
     boss_id_match         = "Quickman",
     repeat_cooldown_secs  = 14400,
     raid_memory_area      = "WCity2",
-    money_wave1           = 70000,
-    money_wave2           = 80000,
-    money_boss            = 100000,
+    money_wave1           = 80000,
+    money_wave2           = 90000,
+    money_boss            = 120000,
   },
 
   -- Fallback if some raid_id has no preset

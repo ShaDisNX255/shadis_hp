@@ -340,10 +340,10 @@ local REWARDS = {
   virus_clear6   = { money=30000 },
   virus_clear9   = { money=45000 },
   virus_clear12   = { money=60000 },
-  virus_run3     = { money=3500 },
-  virus_run6     = { money=7500 },
-  virus_run9     = { money=11500 },
-  virus_run12     = { money=15000 },
+  virus_run3     = { money=30000 },
+  virus_run6     = { money=40000 },
+  virus_run9     = { money=60000 },
+  virus_run12     = { money=80000 },
   virus_bust8_3  = { money=30000 },
   virus_bust8_6  = { money=50000 },
   virus_bust8_9  = { money=70000 },
@@ -360,7 +360,7 @@ local REWARDS = {
   duel_win2      = { money=30000 },
   duel_win3      = { money=45000 },
   pack_open1     = { money=30000 },
-  pack_open10    = { money=150000 },
+  pack_open10    = { money=250000 },
   fish_catch3       = { money = 20000 },
   fish_catch6       = { money = 35000 },
   fish_catch9       = { money = 50000 },
@@ -1728,18 +1728,28 @@ function JobBBS.on_raid_progress(pid, info)
 
   st.prog.raid = st.prog.raid or { battles=0, points=0, boss_dmg=0, boss_kills=0 }
 
-  local pts        = tonumber(info and info.points) or 0
-  local boss_dmg   = tonumber(info and (info.boss_damage or info.boss_dmg)) or 0
-  local killed     = info and info.killed
+  local pts      = tonumber(info and info.points) or 0
+  local boss_dmg = tonumber(info and (info.boss_damage or info.boss_dmg)) or 0
+  local killed   = info and info.killed
 
-  -- Any non-zero award counts as “participated in 1 raid battle”
+  local participated = false
+
+  -- Wave 1/2 participation (points)
   if pts > 0 then
-    st.prog.raid.points   = (st.prog.raid.points   or 0) + pts
-    st.prog.raid.battles  = (st.prog.raid.battles  or 0) + 1
+    st.prog.raid.points  = (st.prog.raid.points  or 0) + pts
+    participated = true
   end
 
+  -- Wave 3 (boss) participation (damage)
   if boss_dmg > 0 then
     st.prog.raid.boss_dmg = (st.prog.raid.boss_dmg or 0) + boss_dmg
+    participated = true
+  end
+
+  -- Count “participated in 1 raid battle” if they earned points OR dealt boss damage.
+  -- (Avoid counting the kill-only callback as a second battle.)
+  if participated then
+    st.prog.raid.battles = (st.prog.raid.battles or 0) + 1
   end
 
   if killed then

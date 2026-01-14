@@ -85,7 +85,7 @@ local EXPEDITION = {
     { area_id="rink",   x=24, y=38, z=0, label="Ice_Rink1" },
     { area_id="rink2",   x=24, y=40, z=0, label="Ice_Rink2" },
     { area_id="rink3",   x=24, y=38, z=0, label="Ice_Rink3" },
-    { area_id="WCity",   x=42, y=34, z=3, label="WCity1" },
+    { area_id="WCity1",   x=42, y=34, z=3, label="WCity1" },
     { area_id="WCity2",   x=7, y=19, z=0, label="WCity2" },
     { area_id="WCity3",   x=28, y=17, z=0, label="WCity3" },
   },
@@ -117,9 +117,9 @@ local EXPEDITION = {
   },
 
   -- Reward parameters
-  consolation_money = 1000,
-  money_min = 10000,
-  money_max = 50000,
+  consolation_money = 10000,
+  money_min = 50000,
+  money_max = 100000,
 
   gp_amount   = 1,
   frag_amount = 1,
@@ -127,12 +127,16 @@ local EXPEDITION = {
   -- If the card pool is empty, "card" rolls will fall back to money.
   card_pool = {
     -- EXAMPLES (safe placeholders). Replace with your real pool anytime.
-    { name="[GDR]Kbo", description="GDRare: Kuriboh - A: 300 / D: 200" },
-    { name="[SR]F.A.DMGirl", description="FullArt: Dark Magician Girl - A: 2000 / D: 1700"},
     { name="[UR]S.Skull", description="URare: Summoned Skull - A: 2500 / D: 1200"},
+    { name="[UR]B.L.S.", description="URare: Black Luster Soldier - A: 3000 / D: 2500"},
+    { name="[UR]Seiyaryu", description="URare: Seiyaryu - A: 2500 / D: 2300"},
     { name="[GR]DMGirl", description="GRare: Dark Magician Girl - A: 2000 / D: 1700"},
     { name="[GR]DMag", description="GRare: Dark Magician - A: 2500 / D: 2100"},
+    { name="[GR]B.Sk.D.", description="GRare: Black Skull Dragon - A: 3200 / D: 2500"},
+    { name="[GDR]Kbo", description="GDRare: Kuriboh - A: 300 / D: 200" },
     { name="[SR]F.A.V.Lord", description="FullArt: Vampire Lord - A: 2000 / D: 1500"},
+    { name="[SR]F.A.DMGirl", description="FullArt: Dark Magician Girl - A: 2000 / D: 1700"},
+    { name="[GDR]F.A.DMGirl", description="FullArt: Dark Magician Girl - A: 2000 / D: 1700"},
   },
 }
 
@@ -428,11 +432,11 @@ local PET_IT_LINES = {
     "It wiggles happily, sparks of energy popping around it.",
     "It does a tiny victory pose, then looks back at you to see your reaction.",
     "It circles you once and settles down, content.",
-    "It bounces twice, like it’s trying to show off how energetic it feels.",
+    "It bounces twice, like it's trying to show off how energetic it feels.",
     "It happily nudges your hand again, clearly asking for one more pat.",
     "It gives a bright little beep and does a quick spin in place.",
     "It puffs itself up proudly, then relaxes with a satisfied wiggle.",
-    "It chirps and taps the floor like it’s drumming a tiny celebration.",
+    "It chirps and taps the floor like it's drumming a tiny celebration.",
   },
   neutral = {
     "It tilts its head, watching your hand carefully.",
@@ -444,7 +448,7 @@ local PET_IT_LINES = {
     "It pauses for a second, then resumes its steady little pacing.",
     "It lets you pet it, but keeps one eye on its surroundings.",
     "It gives a quiet hum, then settles into a calm stance.",
-    "It seems to appreciate it… though it won’t admit it out loud.",
+    "It seems to appreciate it... though it won't admit it out loud.",
   },
   sad = {
     "It flinches at first, then slowly relaxes under your hand.",
@@ -896,13 +900,43 @@ if reward.kind == "card" then
   end
 end
 
-local function result_flavor(mood)
+local function result_flavor(mood, reward)
+  mood = tostring(mood or "neutral")
+
+  local kind  = reward and tostring(reward.kind or "") or ""
+  local label = reward and tostring(reward.label or "") or ""
+
+  -- In your generate_reward(), consolation is { kind="money", label="scraps", amount=... }
+  local is_consolation_money = (kind == "money" and label == "scraps")
+  local is_gp = (kind == "gp")
+
+  -- "Did well" bucket (per your example): bug frag, regular money, or a card.
+  local did_well = (kind == "frag") or (kind == "card") or (kind == "money" and not is_consolation_money)
+
   if mood == "happy" then
-    return "Your virus looks a bit embarrassed it couldn't do better."
+    if is_consolation_money or is_gp then
+      return "Your virus looks a bit embarrassed it couldn't do better."
+    elseif did_well then
+      return "Your virus looks happy about the expedition."
+    end
+    return "Your virus looks pleased with the trip."
+
   elseif mood == "neutral" then
+    if is_consolation_money or is_gp then
+      return "Your virus gives a small shrug and hands you what it managed to find."
+    elseif did_well then
+      return "Your virus seems quietly satisfied with what it brought back."
+    end
     return "Your virus reports back from its trip."
+
+  else -- sad (or anything else)
+    if is_consolation_money or is_gp then
+      return "Your virus trudges back, apologetic… it didn't find much this time."
+    elseif did_well then
+      return "Your virus looks exhausted, but a little proud of what it managed to bring back."
+    end
+    return "Your virus seems exhausted after its trip."
   end
-  return "Your virus seems exhausted after its trip."
 end
 
 local function owner_on_team(pid)
@@ -1129,11 +1163,11 @@ local function feed_pet(pid, e, bucket_area_id)
   end
   _dbg_frags(pid, "feed:after_spend")
 
-  -- Raise mood exactly one tier by reducing fatigue just below the threshold.
+  -- Replace the "set to threshold-1" logic with:
   if mood == "sad" then
-    e.fatigue = EXPEDITION.neutral_to_sad - 1
+    e.fatigue = math.max(0, e.fatigue - (EXPEDITION.neutral_to_sad - EXPEDITION.happy_to_neutral)) -- 20
   elseif mood == "neutral" then
-    e.fatigue = EXPEDITION.happy_to_neutral - 1
+    e.fatigue = math.max(0, e.fatigue - EXPEDITION.happy_to_neutral) -- 15
   end
 
   _set_saved_fatigue(bucket_area_id, e.owner_secret, e.kind, e.fatigue)
@@ -1406,11 +1440,28 @@ local function open_pet_action_menu(pid, e, bucket_area_id)
     if owner == "" then owner = "someone" end
 
     local is_owner = helpers.get_safe_player_secret(pid) == (e.owner_secret or "")
-    if is_owner then
-      Net.message_player(pid, "You see your pet. It seems to be busy looking through the area.")
-    else
-      Net.message_player(pid, ("You see %s's pet. It seems to be busy."):format(owner))
+
+    -- Nickname-aware message (falls back to old messages if no nickname)
+    local nick = _sanitize_nickname(e.nickname)
+    if nick ~= tostring(e.nickname or "") then
+      e.nickname = nick
+      save_bucket(bucket_area_id)
     end
+
+    if nick ~= "" then
+      if is_owner then
+        Net.message_player(pid, ("You see %s (your pet). It seems to be busy looking through the area."):format(nick))
+      else
+        Net.message_player(pid, ("You see %s (%s's pet). It seems to be busy."):format(nick, owner))
+      end
+    else
+      if is_owner then
+        Net.message_player(pid, "You see your pet. It seems to be busy looking through the area.")
+      else
+        Net.message_player(pid, ("You see %s's pet. It seems to be busy."):format(owner))
+      end
+    end
+
     return
   end
 
@@ -1426,7 +1477,7 @@ local function open_pet_action_menu(pid, e, bucket_area_id)
       e.owner_name = Net.get_player_name(pid)
     end
 
-    Net.message_player(pid, result_flavor(e.exp.mood or mood))
+    Net.message_player(pid, result_flavor(e.exp.mood or mood, e.exp.reward))
 
     -- apply reward, with gp fallback if not on team
     local r = e.exp.reward

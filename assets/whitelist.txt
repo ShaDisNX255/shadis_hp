@@ -110,5 +110,8 @@ f5b200a5a6defc1d69451ead69a88477 com.OFC.block.EXE6-013-UnderShirt
 f0d97c53ef8daeeb1f6c3c26bd843715 com.shadis.navi.adventure.Luigi.basic
 6c78689ae81f84cb00c399e730849cb2 com.discord.imagiknight#0510.player.OreoEXEB
 b6de28d83fe9a2d5e7ad0965bc532644 61.Mannerek.Unified.Library
-9675acc834e29dff5c1eeaacf67a303b com.silva.navi.zarymura.adventure
+08ec366a2374c067da789b744ac92540 com.silva.navi.zarymura.adventure
+d705c9815fb1f27b5b39ed65cb252dc7 com.darkware.navi.djangopvp
+23c87aad099bcfdca0e518c082888343 com.darkware.navi.sabatapvp
+948e91da79b1dd142219120c43db2816 com.ijuinpersonalterminalcompany.enzan.player.bluesnotproto
 

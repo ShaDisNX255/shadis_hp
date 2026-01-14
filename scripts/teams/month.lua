@@ -67,6 +67,35 @@ Month.MONTHS = {
       },
     },
   },
+
+  -- December 2025
+  ["2025-12"] = {
+    top_player = {
+      items_inline = {
+        { type="item", name="[UR]F.A.DMag", description="FullArt: Dark Magician - A: 2500 / D: 2100", amount=1 }
+      }
+    },
+    team_win = {
+       cosmetics = {
+         { id = "Wave1", label = "Wave1" },
+       },
+    },
+    losing_team = {
+      pack_name = "Team Pack Vol. 1",
+      pack_rolls = 1,   -- how many random cards to give from pack_pool
+      pack_pool = {
+        -- weight is relative odds; amount is how many copies of that card to give
+        { type = "item", name = "[SR]Gaia",       description = "SRare: Gaia the Fierce Knight - A: 2300 / D: 2100", amount = 1, weight = 20 },
+        { type = "item", name = "[SR]REBMD",      description = "SRare: Red-Eyes Black Metal Dragon - A: 2800 / D: 2400", amount = 1, weight = 20 },
+        { type = "item", name = "[SR]REBD",       description = "SRare: Red Eyes Black Dragon - A: 2400 / D: 2000", amount = 1, weight = 20 },
+        { type = "item", name = "[UR]S.Skull",    description = "URare: Summoned Skull - A: 2500 / D: 1200", amount = 1, weight = 20 },
+        { type = "item", name = "[GR]DMGirl",     description = "GRare: Dark Magician Girl - A: 2000 / D: 1700", amount = 1, weight = 4 },
+        { type = "item", name = "[GR]DMag",       description = "GRare: Dark Magician - A: 2500 / D: 2100", amount = 1, weight = 4 },
+        { type = "item", name = "[GDR]S.Skull",   description = "GDRare: Summoned Skull - A: 2500 / D: 1200", amount = 1, weight = 2 },
+        { type = "item", name = "[SR]F.A.DMGirl", description = "FullArt: Dark Magician Girl - A: 2000 / D: 1700", amount=1, weight = 2}
+      },
+    },
+  },
 }
 
 -- ===== Dated special events (independent of monthly rewards) =====
@@ -91,16 +120,30 @@ Month.EVENTS = {
    }
  },
   {
-   id   = "PrizeTest-021225-2",
+   id   = "Christmas-2025",
+   name = "Christmas 2025 Gift",
+   start = "2025-12-25",
+   ["end"] = "2025-12-31",
+   rewards = {
+            items_inline = {
+        { type="item", name="[SR]F.A.Kboble", description="FullArt: Kuribohble - A: 300 / D: 200", amount=1 }
+      },
+   }
+  },
+  {
+   id   = "PrizeTest-251225",
    name = "Prize Test",
-   start = "2025-12-03",
-   ["end"] = "2025-12-03",
+   start = "2025-12-21",
+   ["end"] = "2025-12-21",
    rewards = {
      cosmetics = {
-       { id = "ShadowAura", label = "ShadowAura" },
+       { id = "Lightning1", label = "Lightning1" },
+     },
+     items_inline = {
+         { type="item", name="[UR]F.A.REBD", description="FullArt: Red-Eyes Black Dragon - A: 2400 / D: 2000", amount=1 }
      },
    }
- },
+  },
 }
 
 -- ===== Utilities =====
