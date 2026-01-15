@@ -8,6 +8,19 @@
 local Displayer = require("scripts/net-games/displayer/displayer")
 Displayer:init() -- safe even if other systems use it too
 
+-- ezmemory (token currency)
+-- Prefer the same module path used by eznpcs_events.lua, but keep fallbacks for older layouts.
+local ezmemory = rawget(_G, "ezmemory")
+if not ezmemory then
+  local ok, mod = pcall(require, "scripts/ezlibs-scripts/ezmemory")
+  if ok then ezmemory = mod end
+end
+if not ezmemory then
+  local ok, mod = pcall(require, "scripts/ezlibs-custom/ezmemory")
+  if ok then ezmemory = mod end
+end
+
+
 -- Shared currency UI assets (NOT per-skin)
 local CURRENCY_TEX  = "/server/assets/slots/currency.png"
 local CURRENCY_ANIM = "/server/assets/slots/currency.animation"
@@ -33,7 +46,6 @@ local CURRENCY_TEXT = {
 -- ======================
 -- Token / payout knobs (TESTING ONLY)
 -- ======================
-local STARTING_TOKENS = 10
 local MAX_DISPLAY = 9999 -- 4-digit display clamp
 
 -- ======================
@@ -49,8 +61,8 @@ local PAY_3K = {
   badge = 120,
   bar   = 100,
   rush  = 10,
-  tango = 9,
-  beat  = 8,
+  tango = 8,
+  beat  = 9,
   prog  = 6,
 }
 
@@ -132,6 +144,26 @@ local MARK_SY = UI_SY
 local MARK_Z  = UI_Z + 3  -- above everything; adjust if you want behind icons
 
 -- ======================
+-- INFO board (hold Move Down) ✅ NEW
+-- ======================
+local INFO_REL_X = 0     -- relative to mainui top-left (ui_x/ui_y)
+local INFO_REL_Y = 0
+local INFO_SX = UI_SX
+local INFO_SY = UI_SY
+local INFO_Z  = UI_Z + 20 -- above EVERYTHING
+local INFO_SCALE = 1.25        -- uniform
+local INFO_SCALE_X = 1.0      -- optional fine-tune
+local INFO_SCALE_Y = 1.0
+
+local INFO_ID = {
+  ["slot-green"]     = "slots_info_slot_green",
+  ["digital-green"]  = "slots_info_digital_green",
+  ["slot-purple"]    = "slots_info_slot_purple",
+  ["digital-purple"] = "slots_info_digital_purple",
+}
+
+
+-- ======================
 -- Allowed SlotMachine folder values
 -- ======================
 local ALLOWED = {
@@ -182,6 +214,22 @@ for i, v in ipairs(WHEEL) do WHEEL_INDEX[v] = i end
 
 local function _wheel_prev(i) i = i - 1; if i < 1 then i = #WHEEL end; return i end
 local function _wheel_next(i) i = i + 1; if i > #WHEEL then i = 1 end; return i end
+
+-- ---------------------------
+-- SFX
+-- ---------------------------
+local SFX = {
+  win     = "/server/assets/slots/sfx/item_get.ogg",
+  lose    = "/server/assets/slots/sfx/card_error.ogg",
+  stop    = "/server/assets/slots/sfx/pause.ogg",
+  jackpot = "/server/assets/slots/sfx/item_get.ogg", -- placeholder for now
+}
+
+local function _play_sfx(pid, key)
+  local path = SFX[key]
+  if not path then return end
+  pcall(Net.play_sound_for_player, pid, path)
+end
 
 -- ======================
 -- Sprite ids
@@ -411,11 +459,34 @@ local function _fmt4(n)
   return string.format("%04d", _clamp4(n))
 end
 
+local function _norm_tokens(n)
+  n = math.floor(tonumber(n) or 0)
+  if n < 0 then n = 0 end
+  return n
+end
+
 local function _set_tokens(pid, n)
   local st = st_by_pid[pid]
   if not st then return end
-  st.tokens = _clamp4(n)
-  update_text(CURRENCY_TEXT.tokens.id, pid, _fmt4(st.tokens))
+  st.tokens_real = _norm_tokens(n)
+  update_text(CURRENCY_TEXT.tokens.id, pid, _fmt4(st.tokens_real))
+end
+
+local function _get_tokens(pid)
+  local st = st_by_pid[pid]
+  if not st then return 0 end
+  return _norm_tokens(st.tokens_real)
+end
+
+local function _sync_tokens(pid)
+  local st = st_by_pid[pid]
+  if not st then return 0 end
+  local em = ezmemory or rawget(_G, "ezmemory")
+  if em and em.get_player_tokens then
+    local cur = tonumber(em.get_player_tokens(pid) or 0) or 0
+    _set_tokens(pid, cur)
+  end
+  return _get_tokens(pid)
 end
 
 local function _set_payout(pid, n)
@@ -429,9 +500,19 @@ local function _collect_payout(pid)
   local st = st_by_pid[pid]
   if not st then return end
   if st.busy then return end
-  if (st.payout or 0) <= 0 then return end
 
-  _set_tokens(pid, (st.tokens or 0) + (st.payout or 0))
+  local payout = _norm_tokens(st.payout or 0)
+  if payout <= 0 then return end
+
+  local em = ezmemory or rawget(_G, "ezmemory")
+  if em and em.add_player_tokens then
+    pcall(function() em.add_player_tokens(pid, payout) end)
+  else
+    -- Fallback: local-only tokens (dev/testing)
+    _set_tokens(pid, _get_tokens(pid) + payout)
+  end
+
+  _sync_tokens(pid)
   _set_payout(pid, 0)
 end
 
@@ -501,6 +582,19 @@ local function _clear_currency(pid)
   _erase_text(pid, CURRENCY_TEXT.payout.id)
 end
 
+local function _erase_info(pid)
+  local st = st_by_pid[pid]
+  if not st then return end
+
+  local folder = st.folder
+  local sprite_id = INFO_ID[folder]
+  if sprite_id then
+    _erase_and_dealloc(pid, sprite_id)
+  end
+
+  st.info_down = false
+end
+
 local function _close(pid)
   local st = st_by_pid[pid]
   if not st then return end
@@ -514,6 +608,7 @@ local function _close(pid)
   _clear_all_mett(pid)
   _clear_all_mainui(pid)
   _clear_currency(pid)
+  _erase_info(pid)
   st_by_pid[pid] = nil
 
   if Net.unlock_player_input then
@@ -608,6 +703,31 @@ local function _set_mett_state(pid, state)
   -- erase first so we never “miss” an anim_state update
   _erase_only(pid, sprite_id)
   _draw_sprite(pid, sprite_id, x, y, METT_SX, METT_SY, METT_Z, state)
+end
+
+local function _draw_info(pid)
+  local st = st_by_pid[pid]
+  if not st then return end
+
+  local folder = st.folder
+  local sprite_id = INFO_ID[folder]
+  if not sprite_id then return end
+
+  local texture_path = "/server/assets/slots/" .. folder .. "/info.png"
+  local anim_path    = "/server/assets/slots/" .. folder .. "/info.animation"
+  local anim_state   = "info"
+
+  local x = st.ui_x + INFO_REL_X
+  local y = st.ui_y + INFO_REL_Y
+
+  -- allocate + draw (erase first to avoid state weirdness)
+  _alloc_sprite_safely(pid, sprite_id, texture_path, anim_path, anim_state)
+  _erase_only(pid, sprite_id)
+  local sx = INFO_SX * INFO_SCALE * INFO_SCALE_X
+  local sy = INFO_SY * INFO_SCALE * INFO_SCALE_Y
+  _draw_sprite(pid, sprite_id, x, y, sx, sy, INFO_Z, anim_state)
+
+  st.info_down = true
 end
 
 -- ======================
@@ -777,8 +897,11 @@ local function _draw_reel_result(pid, reel_index, mid_stop)
 
   -- draw the 3 cells in this reel (use canonical anim states)
   _draw_icon_cell(pid, reel_index,     top_symbol)
+  _play_sfx(pid, "stop")
   _draw_icon_cell(pid, reel_index + 3, mid_symbol)
+  _play_sfx(pid, "stop")
   _draw_icon_cell(pid, reel_index + 6, bot_symbol)
+  _play_sfx(pid, "stop")
 end
 
 
@@ -975,16 +1098,33 @@ local function _start_round(pid)
   local wager = st.wager or 1
   if wager < 1 then wager = 1 elseif wager > 3 then wager = 3 end
 
+  -- Sync tokens from ezmemory (or keep local value if ezmemory isn't available)
+  local have = _sync_tokens(pid)
+
   -- Block spin if not enough tokens
-  local have = st.tokens or 0
   if have < wager then
+    _play_sfx(pid, "lose")
     return
   end
 
-  -- Deduct wager immediately
-  _set_tokens(pid, have - wager)
+  -- Deduct wager immediately (from ezmemory tokens)
+  local em = ezmemory or rawget(_G, "ezmemory")
+  if em and em.spend_player_tokens then
+    local ok = em.spend_player_tokens(pid, wager)
+    if not ok then
+      _sync_tokens(pid)
+      _play_sfx(pid, "lose")
+      return
+    end
+  else
+    -- Fallback: local-only tokens (dev/testing)
+    _set_tokens(pid, have - wager)
+  end
 
-  -- Reset payout display at spin start (testing phase)
+  -- Refresh display after wager deduction
+  _sync_tokens(pid)
+
+  -- Reset payout display at spin start
   _set_payout(pid, 0)
 
   st.busy = true
@@ -1041,9 +1181,11 @@ local function _start_round(pid)
     -- ✅ Set Mettaur to win/lose and keep it looping until next roll
     if payout_total > 0 then
       _set_mett_state(pid, "win")
+      _play_sfx(pid, "win")
       _flash_wins(pid, token, wins.icon_cells, wins.mark_lines)
     else
       _set_mett_state(pid, "lose")
+      _play_sfx(pid, "lose")
     end
 
     local st5 = st_by_pid[pid]
@@ -1055,6 +1197,7 @@ end
 
 -- ======================
 -- Open
+
 -- ======================
 local function _open(pid, folder)
   if st_by_pid[pid] ~= nil then return end
@@ -1081,7 +1224,7 @@ local function _open(pid, folder)
     round_token = 0,
     wager = 1, -- default wager on open
     grid = {},
-    tokens = STARTING_TOKENS,
+    tokens_real = 0,
     payout = 0,
   }
 
@@ -1093,7 +1236,7 @@ local function _open(pid, folder)
   _draw_currency_ui(pid)
   _draw_currency_text(pid)
 
-  _set_tokens(pid, STARTING_TOKENS)
+  _sync_tokens(pid)
   _set_payout(pid, 0)
 
   _draw_initial_icons(pid)
@@ -1158,6 +1301,24 @@ Net:on("virtual_input", function(event)
         _collect_payout(pid)
       else
         _start_round(pid)
+      end
+      return
+    end
+
+    -- INFO BOARD (engine states: 1=press, 2/4=held-repeat)
+    if name == "Move Down" then
+      local is_press = (state == 1 or state == 0)      -- keep 0 just in case some clients still send it
+      local is_hold  = (state == 2 or state == 4)
+
+      if is_press or is_hold then
+        if not st.info_down then
+          _draw_info(pid)
+        end
+      else
+        -- anything else = treat as release
+        if st.info_down then
+          _erase_info(pid)
+        end
       end
       return
     end

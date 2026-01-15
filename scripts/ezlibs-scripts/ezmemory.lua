@@ -353,6 +353,7 @@ function ezmemory.get_player_memory(safe_secret)
             items={},
             money=0,
             fragments=0,
+			tokens=0,
             meta={
                 joins=0
             },
@@ -576,6 +577,68 @@ function ezmemory.spend_player_fragments(player_id, amount)
   return false
 end
 
+-- ===================== Token helpers =====================
+-- Tokens are ezmemory-only currency (no Net sync).
+-- Stored on disk in player_memory[safe_secret].tokens.
+local function _normalize_tokens(value)
+    value = tonumber(value) or 0
+    value = math.floor(value)
+    if value < 0 then value = 0 end
+    return value
+end
+
+function ezmemory.get_player_tokens(player_id)
+    local safe_secret = helpers.get_safe_player_secret(player_id)
+    local pm = ezmemory.get_player_memory(safe_secret)
+    if pm.tokens == nil then
+        pm.tokens = 0
+        ezmemory.save_player_memory(safe_secret)
+    end
+    return _normalize_tokens(pm.tokens)
+end
+
+function ezmemory.set_player_tokens(player_id, tokens)
+    local safe_secret = helpers.get_safe_player_secret(player_id)
+    local pm = ezmemory.get_player_memory(safe_secret)
+    tokens = _normalize_tokens(tokens)
+    pm.tokens = tokens
+    ezmemory.save_player_memory(safe_secret)
+    return tokens
+end
+
+function ezmemory.add_player_tokens(player_id, amount)
+    amount = tonumber(amount) or 0
+    if amount == 0 then
+        return ezmemory.get_player_tokens(player_id)
+    end
+    local cur = ezmemory.get_player_tokens(player_id)
+    return ezmemory.set_player_tokens(player_id, cur + amount)
+end
+
+function ezmemory.spend_player_tokens(player_id, amount)
+    amount = tonumber(amount) or 0
+    if amount == 0 then
+        return true
+    end
+
+    local cur = ezmemory.get_player_tokens(player_id)
+
+    -- Same semantics as spend_player_money / spend_player_fragments:
+    --  amount > 0 subtracts tokens (fails if insufficient)
+    --  amount < 0 adds tokens
+    if amount < 0 then
+        ezmemory.set_player_tokens(player_id, cur - amount)
+        return true
+    end
+
+    if cur >= amount then
+        ezmemory.set_player_tokens(player_id, cur - amount)
+        return true
+    end
+
+    return false
+end
+
 function ezmemory.set_player_money(player_id, money)
     local safe_secret = helpers.get_safe_player_secret(player_id)
     local player_memory = ezmemory.get_player_memory(safe_secret)
@@ -754,6 +817,10 @@ function ezmemory.handle_player_join(player_id)
             ezmemory.save_player_memory(safe_secret)
         end
         Net.set_player_fragments(player_id, player_memory.fragments or 0)
+    end
+    -- Add tokens to players who previously didn't have any
+    if player_memory.tokens == nil then
+        player_memory.tokens = 0
     end
     --update join count
     player_memory.meta.joins = player_memory.meta.joins + 1

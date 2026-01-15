@@ -1496,6 +1496,136 @@ eznpcs.add_event{
 }
 
 
+
+
+----------------------------------------------------------------
+-- Token Vendor Shop (sells Tokens for Moneyz)
+-- Dialogue Type: "tokenshop"
+--
+-- Fixed offers:
+--   1 Token  for 20000
+--   3 Tokens for 60000
+--   5 Tokens for 100000
+--   10 Tokens for 200000
+--
+-- Optional (case-insensitive) custom properties:
+--   Shop Title = Token Vendor
+--   Not Enough Msg = You don't have enough money.
+----------------------------------------------------------------
+
+local TOKEN_SHOP_COLOR = { r = 110, g = 220, b = 255 } -- bright cyan
+local TOKEN_OFFERS = {
+  { id = "__tok_buy_1__",  qty = 1,  price = 20000  },
+  { id = "__tok_buy_3__",  qty = 3,  price = 60000  },
+  { id = "__tok_buy_5__",  qty = 5,  price = 100000 },
+  { id = "__tok_buy_10__", qty = 10, price = 200000 },
+}
+
+eznpcs.add_event{
+  name = "tokenshop",
+  action = function(npc, player_id, dialogue, relay_object)
+    return async(function()
+      local mug = eznpcs.get_dialogue_mugshot(npc, player_id, dialogue)
+      local ci = build_ci_props(dialogue)
+
+      -- Ensure token + money helpers exist
+      if not ezmemory
+        or not ezmemory.get_player_tokens
+        or not ezmemory.add_player_tokens
+        or not ezmemory.spend_player_money
+      then
+        await(Async.message_player(
+          player_id,
+          "Token shop isn't available on this server build.",
+          mug.texture_path, mug.animation_path
+        ))
+        return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+      end
+
+      local title = tostring(get_ci(ci, "shop title") or "Token Vendor")
+      local not_enough_msg = tostring(get_ci(ci, "not enough msg") or "You don't have enough money.")
+
+      while true do
+        local cur_tokens = tonumber(ezmemory.get_player_tokens(player_id) or 0) or 0
+
+        local posts = {}
+
+        for _, offer in ipairs(TOKEN_OFFERS) do
+          local label = string.format(
+            "Buy %d Token%s (%s)",
+            offer.qty,
+            (offer.qty == 1 and "" or "s"),
+            short_money(offer.price)
+          )
+          local post = helpers.create_bbs_option(label)
+          post.id = offer.id
+          table.insert(posts, post)
+        end
+
+        -- Balance footer option (non-purchasable)
+        local bal_post = helpers.create_bbs_option(string.format("Your Tokens: %d", cur_tokens))
+        bal_post.id = "__tok_balance__"
+        table.insert(posts, bal_post)
+
+        local board = ezmenus.open_menu(
+          player_id,
+          title,
+          TOKEN_SHOP_COLOR,
+          posts
+        )
+
+        local sel = await(board.selection_once())
+        Net.close_bbs(player_id)
+
+        if not sel then break end -- cancel
+
+        if sel ~= "__tok_balance__" then
+          local chosen
+          for _, offer in ipairs(TOKEN_OFFERS) do
+            if sel == offer.id then
+              chosen = offer
+              break
+            end
+          end
+
+          if chosen then
+            local question = string.format(
+              "Buy %d Token%s for %s?",
+              chosen.qty,
+              (chosen.qty == 1 and "" or "s"),
+              short_money(chosen.price)
+            )
+
+            local res = await(Async.question_player(player_id, question, mug.texture_path, mug.animation_path))
+            local do_buy = (res == 1)
+
+            if do_buy then
+              if chosen.price > 0 and not ezmemory.spend_player_money(player_id, chosen.price) then
+                await(Async.message_player(player_id, not_enough_msg, mug.texture_path, mug.animation_path))
+              else
+                ezmemory.add_player_tokens(player_id, chosen.qty)
+
+                if sfx and sfx.item_get then
+                  pcall(Net.play_sound_for_player, player_id, sfx.item_get)
+                end
+
+                local new_tokens = tonumber(ezmemory.get_player_tokens(player_id) or 0) or 0
+                await(Async.message_player(
+                  player_id,
+                  string.format("You bought %d Token%s!\nTokens: %d", chosen.qty, (chosen.qty == 1 and "" or "s"), new_tokens),
+                  mug.texture_path, mug.animation_path
+                ))
+              end
+            end
+          end
+        end
+      end
+
+      return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+    end)
+  end
+}
+
 eznpcs.add_event{
   name = "decorclear",
   action = function(npc, player_id, dialogue, relay_object)
