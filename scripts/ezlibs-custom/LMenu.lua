@@ -9,6 +9,51 @@ _G.LMenu = LMenu  -- expose globally so other scripts can query state if needed
 
 local suppress_next_open = {}
 LMenu._suppress_next_open = suppress_next_open
+-- ---------------------------------------------------------------------------
+-- Guard: block LMenu while Slots (or other modal UI) is open
+-- Slots.lua exposes either _G.Slots.is_open_for(pid) or _G.slots_ui_is_open(pid).
+-- ---------------------------------------------------------------------------
+local function is_slots_open(pid)
+  local Slots = rawget(_G, "Slots")
+  if type(Slots) == "table" and type(Slots.is_open_for) == "function" then
+    local ok, open = pcall(Slots.is_open_for, pid)
+    if ok and open then
+      return true
+    end
+  end
+
+  local f = rawget(_G, "slots_ui_is_open")
+  if type(f) == "function" then
+    local ok, open = pcall(f, pid)
+    if ok and open then
+      return true
+    end
+  end
+
+  return false
+end
+
+local function is_blackjack_open(pid)
+  local Blackjack = rawget(_G, "Blackjack")
+  if type(Blackjack) == "table" and type(Blackjack.is_open_for) == "function" then
+    local ok, open = pcall(Blackjack.is_open_for, pid)
+    if ok and open then return true end
+  end
+
+  local f = rawget(_G, "blackjack_ui_is_open")
+  if type(f) == "function" then
+    local ok, open = pcall(f, pid)
+    if ok and open then return true end
+  end
+
+  return false
+end
+
+local function is_modal_open(pid)
+  return is_slots_open(pid) or is_blackjack_open(pid)
+end
+
+
 
 -- ---------------------------------------------------------------------------
 -- net-games framework
@@ -722,9 +767,14 @@ end
 function LMenu.is_open_for(pid)
   return st_by_pid[pid] ~= nil
 end
-
 function LMenu.open(pid)
   if st_by_pid[pid] then
+    return
+  end
+
+
+  -- Slots UI is modal; don't open LMenu over it.
+  if is_modal_open(pid) then
     return
   end
 
@@ -846,6 +896,10 @@ local function handle_lmenu_button(pid, btn)
   -- Menu closed: LS opens it
   if not st then
     if btn == "LS" then
+      -- Don't open LMenu while Slots is open.
+      if is_modal_open(pid) then
+        return
+      end
       -- If Cosmetics just closed from this same button press, skip opening.
       if suppress_next_open[pid] then
         suppress_next_open[pid] = nil
@@ -1022,6 +1076,11 @@ if Net and Net.on then
       return
     end
 
+
+    -- Block LMenu open while Slots UI is up
+    if btn == "LS" and is_modal_open(pid) then
+      return
+    end
     -- If either LMenu or Cosmetics are already open for this player,
     -- ignore button_press. Input while "frozen" is handled by virtual_input.
     local lmenu_open = (st_by_pid[pid] ~= nil)
@@ -1180,7 +1239,12 @@ if Net and Net.on then
           local btn = nil
 
           if name == "Shoulder L" or name == "LS" then           -- open/close LMenu
-            btn = "LS"
+            -- If Slots is open, ignore LS (prevents opening LMenu over Slots UI)
+            if (not lmenu_open) and is_modal_open(pid) then
+              -- ignore
+            else
+              btn = "LS"
+            end
           elseif name == "Confirm" then
             btn = "A"
           elseif name == "Move Up" then

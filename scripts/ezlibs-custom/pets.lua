@@ -148,10 +148,11 @@ local PET_DEFS = {
   mettaur = { name = "Mettaur", texture = "mettaur.png", animation = "mettaur.animation" },
   meddy  = { name = "Meddy",  texture = "meddy.png",  animation = "meddy.animation"  },
   ratty  = { name = "Ratty",  texture = "ratty.png",  animation = "ratty.animation"  },
-  spooky  = { name = "Spooky",  texture = "Spooky.png",  animation = "Spooky.animation"  },
+  spooky  = { name = "Spooky",  texture = "spooky.png",  animation = "spooky.animation"  },
   swordy  = { name = "Swordy",  texture = "Swordy.png",  animation = "Swordy.animation"  },
   moloko  = { name = "Moloko",  texture = "Moloko.png",  animation = "Moloko.animation"  },
   powie  = { name = "Powie",  texture = "Powie.png",  animation = "Powie.animation"  },
+  kabutank  = { name = "Kabutank",  texture = "kabutank.png",  animation = "kabutank.animation"  },
 }
 
 local function build_paths(kind)

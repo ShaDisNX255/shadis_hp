@@ -1783,8 +1783,25 @@ end
 
 -- queue: start fishing only after the player closes a message
 local _PENDING_START = {} -- pid -> { used_bait = bool }
+
+-- Guard against double-start (spam A / lag spikes can fire object_interaction twice)
+local _START_GUARD = {} -- pid -> { since = now_s() }
+local function _start_guarded(pid)
+  local rec = _START_GUARD[pid]
+  if not rec then return false end
+  local age = (_now_s() or 0) - (rec.since or 0)
+  -- fail-safe: auto-clear after a while so nobody gets stuck forever
+  if age > (FISHING.START_GUARD_TIMEOUT_S or 120) then
+    _START_GUARD[pid] = nil
+    return false
+  end
+  return true
+end
+local function _set_start_guard(pid) _START_GUARD[pid] = { since = _now_s() or 0 } end
+local function _clear_start_guard(pid) _START_GUARD[pid] = nil end
 local function _queue_start_after_message(pid, msg, choice)
   _PENDING_START = _PENDING_START or {}
+  if _PENDING_START[pid] then return end -- already queued (guard)
   local used_bait, used_bugfrag = false, false
   if type(choice) == "table" then
     used_bait    = choice.used_bait and true or false
@@ -1798,6 +1815,8 @@ end
 local function _begin_pending_start(pid)
   local rec = _PENDING_START[pid]; if not rec then return end
   _PENDING_START[pid] = nil
+  _clear_start_guard(pid)
+  if SESS[pid] and SESS[pid].active then return end -- already fishing (extra safety)
   _start_session(pid, rec) -- pass { used_bait = true/false }
 end
 
@@ -1903,8 +1922,13 @@ Net:on("object_interaction", function(ev)
   local is_yes = (water == true) or (tostring(water or ""):lower() == "yes") or (tostring(water or ""):lower() == "true")
   if not is_yes then return end
 
+
+  -- Guard against double-start (spam A / lag spikes)
+  if _start_guarded(pid) or _PENDING_START[pid] then return end
+  _set_start_guard(pid)
   -- Ask to use bait (yes/no). Start after the player closes the message.
   async(function()
+    local ok, err = pcall(function()
     local area_id       = Net.get_player_area(pid)
     local bait_conf     = _bait_for(area_id)
     local bugfrag_conf  = _bugfrag_for(area_id)
@@ -1944,6 +1968,16 @@ Net:on("object_interaction", function(ev)
       -- Fish without items
       _queue_start_after_message(pid, "Starting to fish...", { used_bait=false, used_bugfrag=false })
     end
+    end)
+    if not ok then
+      print("[fishing] start flow error: " .. tostring(err))
+      _clear_start_guard(pid)
+      return
+    end
+    -- If we didn't successfully queue a pending start (or auto-start), release the guard
+    if not _PENDING_START[pid] and not (SESS[pid] and SESS[pid].active) then
+      _clear_start_guard(pid)
+    end
   end)
 end)
 
@@ -1968,6 +2002,9 @@ Net:on("player_transfer", function(ev)
     if JobBBS and JobBBS.on_fish_fail then pcall(JobBBS.on_fish_fail, pid) end
     _stop(pid, "Fishing cancelled.", FISHING.SFX.fail)
   end
+  _PENDING_START[pid] = nil
+  _PENDING_VIRUS[pid] = nil
+  _clear_start_guard(pid)
 end)
 
 Net:on("player_join_area", function(ev)
@@ -1991,6 +2028,10 @@ Net:on("player_area_transfer", function(ev)
   if not pid then return end
   local from = PLAYER_AREA[pid] or ev.from_area_id or ev.area_id
   if from and AREA_PLAYERS[from] then AREA_PLAYERS[from][pid] = nil end
+  _PENDING_START[pid] = nil
+  _PENDING_VIRUS[pid] = nil
+  _clear_start_guard(pid)
+
 
   local to = ev.to_area_id or Net.get_player_area(pid)
   if to then
@@ -2012,6 +2053,10 @@ Net:on("player_quit", function(ev)
   if aid and AREA_PLAYERS[aid] then AREA_PLAYERS[aid][pid] = nil end
   PLAYER_AREA[pid] = nil
   if SESS[pid] and SESS[pid].active then _stop(pid, nil, nil) end
+  _PENDING_START[pid] = nil
+  _PENDING_VIRUS[pid] = nil
+  _clear_start_guard(pid)
+
 end)
 
 Net:on("player_disconnect", function(ev)
@@ -2021,6 +2066,10 @@ Net:on("player_disconnect", function(ev)
   if aid and AREA_PLAYERS[aid] then AREA_PLAYERS[aid][pid] = nil end
   PLAYER_AREA[pid] = nil
   if SESS[pid] and SESS[pid].active then _stop(pid, nil, nil) end
+  _PENDING_START[pid] = nil
+  _PENDING_VIRUS[pid] = nil
+  _clear_start_guard(pid)
+
   _cleanup_all_for_pid(pid)
   _despawn_meter(pid)
   _despawn_timer(pid)

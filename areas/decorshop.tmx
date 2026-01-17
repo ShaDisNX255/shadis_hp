@@ -115,7 +115,6 @@
     <property name="Price 30" type="int" value="1000000"/>
     <property name="Price 31" type="int" value="1000000"/>
     <property name="Price 32" type="int" value="1000000"/>
-    <property name="Price 33" type="int" value="1000000"/>
     <property name="Price 4" type="int" value="50000"/>
     <property name="Price 5" type="int" value="60000"/>
     <property name="Price 6" type="int" value="50000"/>
@@ -145,10 +144,9 @@
     <property name="Sell 28" value="pet_mettaur"/>
     <property name="Sell 29" value="pet_ratty"/>
     <property name="Sell 3" value="green_tree"/>
-    <property name="Sell 30" value="pet_spooky"/>
+    <property name="Sell 30" value="pet_powie"/>
     <property name="Sell 31" value="pet_swordy"/>
     <property name="Sell 32" value="pet_moloko"/>
-    <property name="Sell 33" value="pet_powie"/>
     <property name="Sell 4" value="blue_tree"/>
     <property name="Sell 5" value="stuffed_bear"/>
     <property name="Sell 6" value="lan_tile"/>
