@@ -1,0 +1,22 @@
+animation state="tokens"
+frame duration="1.5" x="0" y="0" w="32" h="22" originx="0" originy="0"
+
+animation state="payout"
+frame duration="1.5" x="0" y="32" w="32" h="22" originx="0" originy="0"
+
+animation state="IDLE_D"
+
+animation state="IDLE_DL"
+
+animation state="IDLE_DR"
+
+animation state="IDLE_L"
+
+animation state="IDLE_R"
+
+animation state="IDLE_U"
+
+animation state="IDLE_UL"
+
+animation state="IDLE_UR"
+ 
