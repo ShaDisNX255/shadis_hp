@@ -13,6 +13,7 @@ local teams = require('scripts/teams/teams')
 local raids    = require('scripts/raids/raids')
 local cosmetics = require('scripts/ezlibs-custom/cosmetics')
 local ezmenus   = require('scripts/ezlibs-scripts/ezmenus')
+local duels  = require('scripts/ezlibs-custom/duels')
 
 local COSMETIC_SHOP_COLOR = { r = 245, g = 210, b = 70 } -- same yellow as decorshop
 
@@ -969,12 +970,22 @@ eznpcs.add_event{
       if #deck_ids ~= 10 then deck_ids = nil end
 
       -- Start the duel and inject an on_finish that completes our wait
-      custom.start_card_battle(player_id, {
+      duels.start_card_battle(player_id, {
         npc_name = npc_name,
         npc_deck_ids = deck_ids,
         on_finish = function(res)
           result = res
           done   = true
+          -- JobBBS hook (matches what custom.lua used to do)
+          local JobBBS = rawget(_G, "JobBBS")
+          if JobBBS and JobBBS.on_npc_duel_result and res then
+            local winner = res.player_won and 1 or 2 -- JobBBS only counts when winner==1
+            pcall(JobBBS.on_npc_duel_result, player_id, {
+              winner = winner,
+              npc_name = npc_name,
+              kos = 3,
+            })
+          end
         end
       })
 
@@ -1519,6 +1530,9 @@ local TOKEN_OFFERS = {
   { id = "__tok_buy_3__",  qty = 3,  price = 60000  },
   { id = "__tok_buy_5__",  qty = 5,  price = 100000 },
   { id = "__tok_buy_10__", qty = 10, price = 200000 },
+  { id = "__tok_buy_30__", qty = 30, price = 600000 },
+  { id = "__tok_buy_50__", qty = 50, price = 1000000 },
+  { id = "__tok_buy_100__", qty = 100, price = 2000000 },
 }
 
 eznpcs.add_event{
@@ -1615,6 +1629,264 @@ eznpcs.add_event{
                   string.format("You bought %d Token%s!\nTokens: %d", chosen.qty, (chosen.qty == 1 and "" or "s"), new_tokens),
                   mug.texture_path, mug.animation_path
                 ))
+              end
+            end
+          end
+        end
+      end
+
+      return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+    end)
+  end
+}
+
+----------------------------------------------------------------
+-- Token Redeem Shop (spends Tokens to grant rewards)
+-- Dialogue Type: "tokenredeem"
+--
+-- Build offers from (case-insensitive) custom properties:
+--   Sell 1   = <id or name>
+--   Type 1   = cosmetic | decor | pet | item | card
+--   Amount 1 = <int> (default 1)
+--   Price 1  = <int tokens>
+--
+-- For Type=item/card you can optionally provide:
+--   Desc 1 / Description 1 = <item description>
+--   Key 1 / Key Item 1     = true/false  (creates as key item when true)
+--
+-- Optional (case-insensitive) custom properties:
+--   Shop Title        = Token Redeemer
+--   Not Enough Msg    = You don't have enough Tokens.
+--   Already Owned Msg = You already own that cosmetic.
+--   Currency Label    = Tokens
+--   Default Desc      = Redeemed from the Token Shop.
+----------------------------------------------------------------
+
+local TOKEN_REDEEM_COLOR = { r = 245, g = 210, b = 70 } -- gold/yellow
+
+local function _short_tokens(n)
+  n = math.floor(tonumber(n or 0) or 0)
+  return tostring(n)
+end
+
+local function _parse_bool(v)
+  if v == nil then return false end
+  if type(v) == "boolean" then return v end
+  local s = string.lower(tostring(v))
+  return (s == "true" or s == "1" or s == "yes" or s == "y" or s == "on")
+end
+
+eznpcs.add_event{
+  name = "tokenredeem",
+  action = function(npc, player_id, dialogue, relay_object)
+    return async(function()
+      local mug = eznpcs.get_dialogue_mugshot(npc, player_id, dialogue)
+      local ci = build_ci_props(dialogue)
+
+      -- Ensure token support exists
+      if not ezmemory
+        or not ezmemory.get_player_tokens
+        or not ezmemory.spend_player_tokens
+      then
+        await(Async.message_player(
+          player_id,
+          "Token redeem shop isn't available on this server build.",
+          mug.texture_path, mug.animation_path
+        ))
+        return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+      end
+
+      local title = tostring(get_ci(ci, "shop title") or "Token Redeemer")
+      local not_enough_msg = tostring(get_ci(ci, "not enough msg") or "You don't have enough Tokens.")
+      local owned_msg = tostring(get_ci(ci, "already owned msg") or "You already own that cosmetic.")
+      local currency_label = tostring(get_ci(ci, "currency label") or "Tokens")
+      local default_desc = tostring(get_ci(ci, "default desc") or "Redeemed from the Token Shop.")
+
+      -- Build offers from Sell N / Type N / Amount N / Price N (+ optional Desc/Key)
+      local offers = {}
+      local i = 1
+      while true do
+        local sell = get_ci(ci, "sell " .. i)
+        if not sell then break end
+
+        local typ = tostring(get_ci(ci, "type " .. i) or "decor")
+        typ = string.lower(typ)
+        if typ == "pet" then typ = "decor" end
+        if typ == "cosmetics" then typ = "cosmetic" end
+        if typ == "cards" or typ == "card" then typ = "item" end
+        if typ == "items" then typ = "item" end
+
+        local amount = math.floor(tonumber(get_ci(ci, "amount " .. i) or 1) or 1)
+        if amount < 1 then amount = 1 end
+
+        local price = math.floor(tonumber(get_ci(ci, "price " .. i) or get_ci(ci, "cost " .. i) or 0) or 0)
+        if price < 0 then price = 0 end
+
+        local id = tostring(sell)
+        local pretty =
+          (typ == "cosmetic" and cosmetics and cosmetics.get_name_for_id and cosmetics.get_name_for_id(id))
+          or (typ == "decor" and oncehub_catalog_name_for(id))
+          or id
+
+        local desc = get_ci(ci, "desc " .. i) or get_ci(ci, "description " .. i)
+        local key_item = _parse_bool(get_ci(ci, "key " .. i) or get_ci(ci, "key item " .. i))
+
+        table.insert(offers, {
+          id = id,
+          type = typ,
+          amount = amount,
+          price = price,
+          name = pretty,
+          desc = desc,
+          key_item = key_item,
+        })
+
+        i = i + 1
+      end
+
+      if #offers == 0 then
+        await(Async.message_player(
+          player_id,
+          "Sorry, I'm not redeeming anything right now.",
+          mug.texture_path, mug.animation_path
+        ))
+        return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+      end
+
+      while true do
+        local cur_tokens = tonumber(ezmemory.get_player_tokens(player_id) or 0) or 0
+
+        local posts = {}
+        local items = {}
+
+        for _, offer in ipairs(offers) do
+          local label
+          if offer.type == "cosmetic" then
+            local owned = cosmetics and cosmetics.has_cosmetic and cosmetics.has_cosmetic(player_id, offer.id)
+            label = owned
+              and string.format("%s (%s %s, Owned)", offer.name, _short_tokens(offer.price), currency_label)
+              or  string.format("%s (%s %s)",        offer.name, _short_tokens(offer.price), currency_label)
+          elseif offer.type == "decor" then
+            local owned = oncehub_count_owned(player_id, offer.id)
+            if offer.amount ~= 1 then
+              label = string.format("%s x%d (%s %s) [Owned:%d]", offer.name, offer.amount, _short_tokens(offer.price), currency_label, owned)
+            else
+              label = string.format("%s (%s %s) [Owned:%d]", offer.name, _short_tokens(offer.price), currency_label, owned)
+            end
+          else -- item
+            if offer.amount ~= 1 then
+              label = string.format("%s x%d (%s %s)", offer.name, offer.amount, _short_tokens(offer.price), currency_label)
+            else
+              label = string.format("%s (%s %s)", offer.name, _short_tokens(offer.price), currency_label)
+            end
+          end
+
+          local post = helpers.create_bbs_option(label)
+          table.insert(posts, post)
+          items[#posts] = offer
+        end
+
+        -- Add a "balance" footer option (non-purchasable)
+        local bal_post = helpers.create_bbs_option(string.format("Your %s: %d", currency_label, cur_tokens))
+        bal_post.id = "__tok_balance__"
+        table.insert(posts, bal_post)
+
+        local board = ezmenus.open_menu(
+          player_id,
+          title,
+          TOKEN_REDEEM_COLOR,
+          posts
+        )
+
+        local sel = await(board.selection_once())
+        Net.close_bbs(player_id)
+
+        if not sel then break end -- cancel
+
+        if sel == "__tok_balance__" then
+          -- footer; just reopen
+        else
+          -- Resolve choice
+          local chosen
+          for idx, post in ipairs(posts) do
+            local pid = post.id or post.title or ""
+            if sel == pid then
+              chosen = items[idx]
+              break
+            end
+          end
+
+          if chosen then
+            -- Cosmetic owned check
+            if chosen.type == "cosmetic"
+              and cosmetics
+              and cosmetics.has_cosmetic
+              and cosmetics.has_cosmetic(player_id, chosen.id)
+            then
+              await(Async.message_player(player_id, owned_msg, mug.texture_path, mug.animation_path))
+            else
+              -- Confirmation
+              local question
+              if (chosen.type ~= "cosmetic") and chosen.amount ~= 1 then
+                question = string.format("Redeem %s x%d for %s %s?", chosen.name, chosen.amount, _short_tokens(chosen.price), currency_label)
+              else
+                question = string.format("Redeem %s for %s %s?", chosen.name, _short_tokens(chosen.price), currency_label)
+              end
+
+              local res = await(Async.question_player(player_id, question, mug.texture_path, mug.animation_path))
+              local do_buy = (res == 1)
+
+              if cosmetics and cosmetics.clear_shop_previews then
+                cosmetics.clear_shop_previews(player_id)
+              end
+
+              if do_buy then
+                if chosen.price > 0 and not ezmemory.spend_player_tokens(player_id, chosen.price) then
+                  await(Async.message_player(player_id, not_enough_msg, mug.texture_path, mug.animation_path))
+                else
+                  local reward_msg
+
+                  if chosen.type == "cosmetic" then
+                    if cosmetics and cosmetics.unlock_for_player then
+                      local ok, reason = cosmetics.unlock_for_player(player_id, chosen.id)
+                      if ok then
+                        reward_msg = "You got the " .. chosen.name .. " cosmetic!"
+                      else
+                        reward_msg = "Couldn't unlock that cosmetic (" .. tostring(reason or "error") .. ")."
+                      end
+                    else
+                      reward_msg = "Cosmetics system isn't installed on this server."
+                    end
+                  elseif chosen.type == "decor" then
+                    oncehub_add_owned(player_id, chosen.id, chosen.amount)
+                    if chosen.amount ~= 1 then
+                      reward_msg = string.format("You got %dx %s!", chosen.amount, chosen.name)
+                    else
+                      reward_msg = "You got " .. chosen.name .. "!"
+                    end
+                  else -- item
+                    if ezmemory.get_or_create_item and ezmemory.give_player_item then
+                      local desc = tostring(chosen.desc or default_desc)
+                      ezmemory.get_or_create_item(chosen.id, desc, chosen.key_item) -- ensure it exists
+                      ezmemory.give_player_item(player_id, chosen.id, chosen.amount) -- pass NAME (not id)
+                      if chosen.amount ~= 1 then
+                        reward_msg = string.format("You got %dx %s!", chosen.amount, chosen.name)
+                      else
+                        reward_msg = "You got " .. chosen.name .. "!"
+                      end
+                    else
+                      reward_msg = "Item system isn't installed on this server build."
+                    end
+                  end
+
+                  if sfx and sfx.item_get then
+                    pcall(Net.play_sound_for_player, player_id, sfx.item_get)
+                  end
+
+                  local new_tokens = tonumber(ezmemory.get_player_tokens(player_id) or 0) or 0
+                  reward_msg = (reward_msg or "Redeem complete.") .. ("\n%s: %d"):format(currency_label, new_tokens)
+                  await(Async.message_player(player_id, reward_msg, mug.texture_path, mug.animation_path))
+                end
               end
             end
           end
@@ -1772,6 +2044,69 @@ eznpcs.add_event{
         return dialogue.custom_properties["Next 1"]
       end
       return nil
+    end)
+  end
+}
+
+-- Duel rules menu (BBS selector -> jump to another dialogue)
+local DUEL_RULES_COLOR = { r = 110, g = 220, b = 255 } -- pick any color you want
+
+eznpcs.add_event{
+  name = "Duel Rules Menu",
+  action = function(npc, player_id, dialogue, relay_object)
+    return async(function()
+      -- (optional) Mug, if you want to show message_player prompts before/after
+      -- local mug = eznpcs.get_dialogue_mugshot(npc, player_id, dialogue)
+
+      -- Case-insensitive props (you already have these helpers in this file)
+      local ci = build_ci_props(dialogue)
+
+      -- Accept both "Monster Exp" and "Monsters Exp", etc.
+      local monsters_next = get_ci(ci, "monsters exp") or get_ci(ci, "monster exp")
+      local spells_next   = get_ci(ci, "spells exp")  or get_ci(ci, "spell exp")
+      local battles_next  = get_ci(ci, "battles exp") or get_ci(ci, "battle exp")
+
+      -- Where to go if player cancels / exits
+      local on_cancel = get_ci(ci, "on cancel") or (dialogue.custom_properties and dialogue.custom_properties["Next 1"])
+
+      -- Build menu posts with stable IDs
+      local posts = {}
+
+      local p1 = helpers.create_bbs_option("Monsters")
+      p1.id = "__duel_rules_monsters__"
+      table.insert(posts, p1)
+
+      local p2 = helpers.create_bbs_option("Spells")
+      p2.id = "__duel_rules_spells__"
+      table.insert(posts, p2)
+
+      local p3 = helpers.create_bbs_option("Battles")
+      p3.id = "__duel_rules_battles__"
+      table.insert(posts, p3)
+
+      local p4 = helpers.create_bbs_option("Exit")
+      p4.id = "__duel_rules_exit__"
+      table.insert(posts, p4)
+
+      local title = get_ci(ci, "board title") or "Duel Rules"
+
+      local board = ezmenus.open_menu(player_id, title, DUEL_RULES_COLOR, posts)
+      local sel = await(board.selection_once())
+      Net.close_bbs(player_id)
+
+      if not sel or sel == "__duel_rules_exit__" then
+        return on_cancel
+      end
+
+      if sel == "__duel_rules_monsters__" then
+        return monsters_next or on_cancel
+      elseif sel == "__duel_rules_spells__" then
+        return spells_next or on_cancel
+      elseif sel == "__duel_rules_battles__" then
+        return battles_next or on_cancel
+      end
+
+      return on_cancel
     end)
   end
 }

@@ -908,24 +908,23 @@ local function _streak_check(pid, st, base_key, need)
   local base = (st.prog.baseline and st.prog.baseline[base_key]
                and st.prog.baseline[base_key].fish) or {}
 
-  local best_now  = tonumber(st.prog.fish.streak or 0) or 0        -- best streak today
-  local base_best = tonumber(base.streak or 0) or 0                -- best streak at accept
-  local live      = tonumber(st.prog.fish.streak_live or 0) or 0   -- current ongoing streak
-  local cur_c     = tonumber(st.prog.fish.catches or 0) or 0       -- total catches today (after gating)
-  local base_c    = tonumber(base.catches or 0) or 0               -- catches at accept
+  local best_now   = tonumber(st.prog.fish.streak or 0) or 0
+  local base_best  = tonumber(base.streak or 0) or 0
+  local live       = tonumber(st.prog.fish.streak_live or 0) or 0
+  local cur_c      = tonumber(st.prog.fish.catches or 0) or 0
+  local base_c     = tonumber(base.catches or 0) or 0
+  local since_c    = math.max(0, cur_c - base_c)
 
-  -- A) Classic path: you beat your baseline best
+  -- Live streak that is guaranteed to be fully after acceptance
+  local live_since_accept = math.min(live, since_c)
+
+  -- Completion should be “sticky” if you achieved the needed streak at any point since accept
   local beat_baseline = (best_now >= need) and (best_now > base_best)
+  local done = beat_baseline or (live_since_accept >= need)
 
-  -- B) Exact “since accept” path: you are currently on a live streak of length >= need,
-  --    and that entire live streak happened after accepting (no pre-accept carryover).
-  local catches_since_accept = math.max(0, cur_c - base_c)
-  local live_since_accept    = (live >= need) and (catches_since_accept >= live)
+  -- Progress UI should reflect the CURRENT live streak (so it drops when you fail)
+  local prog = math.min(live_since_accept, need)
 
-  local done = beat_baseline or live_since_accept
-
-  -- progress UI: show whichever looks more informative (live vs best), clamped to need
-  local prog = math.min(math.max(live, best_now), need)
   return done, prog, need
 end
   J('fish_streak3', 'On a Roll', 'HowlerMan', "Me a better fisher than you, ook! Bet you can't catch 3 fish in a row!",
@@ -1236,11 +1235,18 @@ local function open_progress_board(pid)
               author = '' -- or job.poster if you want
             }
 
-            -- Line 2: Pure numeric progress (no "In progress"/"Complete" text)
+            -- Line 2: Progress line
+            -- If done, show "Complete" (prevents e.g. 4/3, 5/3 from continuing to climb).
+            local cur_i  = math.floor(tonumber(cur)  or 0)
+            local need_i = math.floor(tonumber(need) or 0)
+            if cur_i < 0 then cur_i = 0 end
+            if need_i < 0 then need_i = 0 end
+            if (not done) and need_i > 0 and cur_i > need_i then cur_i = need_i end
+
             posts[#posts+1] = {
               id     = '__jobprog:prog:'..board_id..':'..jid,
               read   = true,
-              title  = string.format('Progress: %d/%d', cur, need),
+              title  = done and 'Progress: Complete' or string.format('Progress: %d/%d', cur_i, need_i),
               author = ''
             }
           end
@@ -1333,6 +1339,22 @@ function JobBBS.handle_post_selection(event)
       else
         local _, cur, need = job.check(pid, st, base_key)
         Net.message_player(pid, string.format('Progress: %d/%d', cur or 0, need or 0))
+
+        -- Extra visibility for streak fishing jobs: show why the streak last broke.
+        if tostring(job.id):match('^fish_streak') then
+          local F = st.prog and st.prog.fish
+          local r = F and F.last_break
+          if r then
+            local pretty = ({
+              moved       = 'Moved (scared the fish)',
+              timeout     = 'Timer ran out',
+              missed_bite = 'Missed the bite window',
+              transfer    = 'Area transfer / cancelled',
+              virus_spawn = 'Virus encounter',
+            })[r] or tostring(r)
+            Net.message_player(pid, 'Last streak break: ' .. pretty)
+          end
+        end
       end
     else
       B.awaiting_kind = 'accept'
@@ -1692,18 +1714,43 @@ function JobBBS.on_fish_catch(pid, info)
   save_mem(pid, st)
 end
 
-function JobBBS.on_fish_fail(pid)
+function JobBBS.on_fish_fail(pid, info)
   ensure_daily_reset(pid)
   local st = attach_state(pid); if not st then return end
   st.prog = st.prog or {}; st.prog.active = st.prog.active or {}
   if not st.prog.active.fish then return end
   st.prog.fish = st.prog.fish or { streak_live=0 }
   st.prog.fish.streak_live = 0
+
+  -- Optional debug/help for players: remember what broke the streak last.
+  -- (fishing.lua can pass { reason = 'moved'|'timeout'|'missed_bite'|'transfer'|... })
+  if type(info) == 'table' then
+    st.prog.fish.last_break = info.reason or st.prog.fish.last_break
+    st.prog.fish.last_break_phase = info.phase or st.prog.fish.last_break_phase
+    st.prog.fish.last_break_at = os.time()
+  end
   save_mem(pid, st)
 end
 
 function JobBBS.on_fish_virus_start(pid, info)
-  -- Currently not needed for checks, but you can track attempts here if you like.
+  -- Treat a virus spawn as a "non-catch" that breaks a fish-catch streak.
+  -- Otherwise streak jobs can feel inconsistent (you didn't catch a fish, but the streak kept going).
+  ensure_daily_reset(pid)
+  local st = attach_state(pid); if not st then return end
+  st.prog = st.prog or {}; st.prog.active = st.prog.active or {}
+  if not st.prog.active.fish then return end
+  st.prog.fish = st.prog.fish or { streak_live = 0 }
+  st.prog.fish.streak_live = 0
+  if type(info) == 'table' then
+    st.prog.fish.last_break = info.reason or 'virus_spawn'
+    st.prog.fish.last_break_phase = 'reeling'
+    st.prog.fish.last_break_at = os.time()
+  else
+    st.prog.fish.last_break = 'virus_spawn'
+    st.prog.fish.last_break_phase = 'reeling'
+    st.prog.fish.last_break_at = os.time()
+  end
+  save_mem(pid, st)
 end
 
 function JobBBS.on_fish_virus_result(pid, info)

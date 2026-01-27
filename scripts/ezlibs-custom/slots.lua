@@ -3,6 +3,7 @@
 -- Adds: wager marks + wager changing (1..3)
 -- Adds: win detection + win flashing (NO payouts wired)
 -- Adds: Mettaur UI sprite (idle/win/lose)
+-- Fix: prevent closing before claiming payout; allow Confirm to claim immediately (even during flashing)
 
 -- net-games Displayer (for font-based numbers only)
 local Displayer = require("scripts/net-games/displayer/displayer")
@@ -47,6 +48,7 @@ local CURRENCY_TEXT = {
 -- Token / payout knobs (TESTING ONLY)
 -- ======================
 local MAX_DISPLAY = 9999 -- 4-digit display clamp
+local FALLBACK_STARTING_TOKENS = 10 -- used only when ezmemory token API isn't available
 
 -- ======================
 -- Payout tables (tokens)  ✅ FINALIZED
@@ -222,7 +224,7 @@ local SFX = {
   win     = "/server/assets/slots/sfx/item_get.ogg",
   lose    = "/server/assets/slots/sfx/card_error.ogg",
   stop    = "/server/assets/slots/sfx/pause.ogg",
-  jackpot = "/server/assets/slots/sfx/item_get.ogg", -- placeholder for now
+  jackpot = "/server/assets/slots/sfx/jackpot.ogg", -- placeholder for now
 }
 
 local function _play_sfx(pid, key)
@@ -377,13 +379,28 @@ end
 --   busy=true/false,
 --   round_token=int,
 --   wager=1..3,
---   grid = { [1]=symbol,...,[9]=symbol }
+--   grid = { [1]=symbol,...,[9]=symbol },
+--   await_claim=bool,   -- payout pending + must be claimed before closing
 -- }
 -- ======================
 local st_by_pid = {}
 
 local function _is_open(pid) return st_by_pid[pid] ~= nil end
 
+
+-- Expose Slots open-state so other UI systems (e.g. LMenu) can respect this modal UI.
+-- (We keep both a table API and a simple function alias for convenience.)
+do
+  local Slots = rawget(_G, "Slots")
+  if type(Slots) ~= "table" then Slots = {} end
+
+  function Slots.is_open_for(pid)
+    return st_by_pid[pid] ~= nil
+  end
+
+  rawset(_G, "Slots", Slots)
+  rawset(_G, "slots_ui_is_open", Slots.is_open_for)
+end
 local function _center_mainui_pos()
   local w = MAINUI_W * UI_SX
   local h = MAINUI_H * UI_SY
@@ -465,6 +482,15 @@ local function _norm_tokens(n)
   return n
 end
 
+local function _has_ez_tokens_api()
+  local em = ezmemory or rawget(_G, "ezmemory")
+  if type(em) ~= "table" then return false end
+  -- Require full token API so we don't accidentally mix modes.
+  return type(em.get_player_tokens) == "function"
+     and type(em.add_player_tokens) == "function"
+     and type(em.spend_player_tokens) == "function"
+end
+
 local function _set_tokens(pid, n)
   local st = st_by_pid[pid]
   if not st then return end
@@ -481,11 +507,17 @@ end
 local function _sync_tokens(pid)
   local st = st_by_pid[pid]
   if not st then return 0 end
-  local em = ezmemory or rawget(_G, "ezmemory")
-  if em and em.get_player_tokens then
-    local cur = tonumber(em.get_player_tokens(pid) or 0) or 0
-    _set_tokens(pid, cur)
+
+  -- Only sync from ezmemory when we explicitly chose that backend on open.
+  if st.use_ez_tokens then
+    local em = ezmemory or rawget(_G, "ezmemory")
+    if em and em.get_player_tokens then
+      local ok, cur = pcall(em.get_player_tokens, pid)
+      cur = tonumber(ok and cur or 0) or 0
+      _set_tokens(pid, cur)
+    end
   end
+
   return _get_tokens(pid)
 end
 
@@ -496,24 +528,34 @@ local function _set_payout(pid, n)
   update_text(CURRENCY_TEXT.payout.id, pid, _fmt4(st.payout))
 end
 
-local function _collect_payout(pid)
+-- redraw all 9 icon cells from st.grid (used to restore after canceling flashing)
+local function _restore_result_grid(pid)
   local st = st_by_pid[pid]
   if not st then return end
-  if st.busy then return end
+  local folder = st.folder
+  if not folder then return end
 
-  local payout = _norm_tokens(st.payout or 0)
-  if payout <= 0 then return end
-
-  local em = ezmemory or rawget(_G, "ezmemory")
-  if em and em.add_player_tokens then
-    pcall(function() em.add_player_tokens(pid, payout) end)
-  else
-    -- Fallback: local-only tokens (dev/testing)
-    _set_tokens(pid, _get_tokens(pid) + payout)
+  for idx = 1, 9 do
+    local sym = st.grid and st.grid[idx]
+    if sym then
+      local sprite_id = ICON_ID[folder][idx]
+      local x, y = (function()
+        local r = math.floor((idx - 1) / 3) + 1
+        local c = ((idx - 1) % 3) + 1
+        local x0 = st.ui_x + ICON_REL_X + (c - 1) * (ICON_W + ICON_GAP_X)
+        local y0 = st.ui_y + ICON_REL_Y + (r - 1) * (ICON_H + ICON_GAP_Y)
+        return x0, y0
+      end)()
+      pcall(Net.player_draw_sprite, pid, sprite_id, {
+        id = sprite_id .. "_obj",
+        x = x * UI_POS_MULT,
+        y = y * UI_POS_MULT,
+        sx = ICON_SX, sy = ICON_SY,
+        z = ICON_Z,
+        anim_state = sym,
+      })
+    end
   end
-
-  _sync_tokens(pid)
-  _set_payout(pid, 0)
 end
 
 local function _draw_sprite(pid, sprite_id, x, y, sx, sy, z, anim_state)
@@ -599,7 +641,7 @@ local function _close(pid)
   local st = st_by_pid[pid]
   if not st then return end
 
-  -- cancel any in-flight async round
+  -- cancel any in-flight async round (also cancels flashing)
   st.round_token = (st.round_token or 0) + 1
 
   _clear_all_spins(pid)
@@ -932,7 +974,7 @@ end
 local function _set_wager(pid, new_wager)
   local st = st_by_pid[pid]
   if not st then return end
-  if st.busy then return end -- only when not spinning / not flashing
+  if st.busy then return end -- only when not spinning / not flashing / not awaiting claim
 
   if new_wager < 1 then new_wager = 1 end
   if new_wager > 3 then new_wager = 3 end
@@ -956,9 +998,17 @@ local function _count_mystery(sa, sb, sc)
   return n
 end
 
+-- "Big four" jackpot symbols (3-of-a-kind)
+local JACKPOT_BIG4 = {
+  seven = true,
+  mega  = true,
+  bar   = true,
+  badge = true,
+}
+
 -- returns: wins_table, payout_total
 local function _evaluate_wins(st)
-  local wins = { any = false, icon_cells = {}, mark_lines = {} }
+  local wins = { any = false, icon_cells = {}, mark_lines = {}, jackpot = false }
   local payout_total = 0
 
   local wager = st.wager or 1
@@ -975,6 +1025,11 @@ local function _evaluate_wins(st)
 
     -- 1) 3-of-a-kind
     if sa == sb and sb == sc then
+      -- Jackpot if it's one of the big four
+      if (not _is_mystery(sa)) and JACKPOT_BIG4[sa] then
+        wins.jackpot = true
+      end
+
       wins.any = true
       wins.icon_cells[a] = true
       wins.icon_cells[b] = true
@@ -1035,8 +1090,6 @@ local function _flash_wins(pid, token, icon_cells_set, mark_lines_set)
   if not st then return end
   local folder = st.folder
 
-  local unlocked = false
-
   for i = 1, WIN_FLASH_TIMES do
     local st2 = st_by_pid[pid]
     if not st2 or st2.round_token ~= token then return end
@@ -1074,15 +1127,6 @@ local function _flash_wins(pid, token, icon_cells_set, mark_lines_set)
       end
     end
 
-    -- ✅ Unlock input after the FIRST blink completes its SHOW
-    if not unlocked then
-      local st4 = st_by_pid[pid]
-      if st4 and st4.round_token == token then
-        st4.busy = false
-      end
-      unlocked = true
-    end
-
     sleep(WIN_FLASH_INTERVAL_SEC)
   end
 end
@@ -1090,26 +1134,55 @@ end
 -- ======================
 -- Round control
 -- ======================
+local function _collect_payout(pid)
+  local st = st_by_pid[pid]
+  if not st then return end
+
+  local payout = _norm_tokens(st.payout or 0)
+  if payout <= 0 then return end
+
+  local em = ezmemory or rawget(_G, "ezmemory")
+  if st.use_ez_tokens and em and em.add_player_tokens then
+    pcall(function() em.add_player_tokens(pid, payout) end)
+    _sync_tokens(pid)
+  else
+    _set_tokens(pid, _get_tokens(pid) + payout)
+  end
+
+  _set_payout(pid, 0)
+
+  -- Stop flashing immediately (snappy): bump token so _flash_wins exits
+  st.round_token = (st.round_token or 0) + 1
+
+  -- Restore grid + wager marks so we don't get stuck “hidden” mid-flash
+  _restore_result_grid(pid)
+  _refresh_wager_marks(pid)
+
+  -- Now unlock UI controls
+  st.await_claim = false
+  st.busy = false
+end
+
 local function _start_round(pid)
   local st = st_by_pid[pid]
   if not st then return end
   if st.busy then return end
 
+  -- Reset claim flag at spin start
+  st.await_claim = false
+
   local wager = st.wager or 1
   if wager < 1 then wager = 1 elseif wager > 3 then wager = 3 end
 
-  -- Sync tokens from ezmemory (or keep local value if ezmemory isn't available)
   local have = _sync_tokens(pid)
 
-  -- Block spin if not enough tokens
   if have < wager then
     _play_sfx(pid, "lose")
     return
   end
 
-  -- Deduct wager immediately (from ezmemory tokens)
   local em = ezmemory or rawget(_G, "ezmemory")
-  if em and em.spend_player_tokens then
+  if st.use_ez_tokens and em and em.spend_player_tokens then
     local ok = em.spend_player_tokens(pid, wager)
     if not ok then
       _sync_tokens(pid)
@@ -1117,14 +1190,10 @@ local function _start_round(pid)
       return
     end
   else
-    -- Fallback: local-only tokens (dev/testing)
     _set_tokens(pid, have - wager)
   end
 
-  -- Refresh display after wager deduction
   _sync_tokens(pid)
-
-  -- Reset payout display at spin start
   _set_payout(pid, 0)
 
   st.busy = true
@@ -1132,17 +1201,11 @@ local function _start_round(pid)
   st.round_token = (st.round_token or 0) + 1
   local token = st.round_token
 
-  -- ✅ Guard: make sure wager lines are ON before spinning
   _refresh_wager_marks(pid)
-
-  -- ✅ Mettaur goes back to idle at the start of every roll
   _set_mett_state(pid, "idle")
 
-  -- Clear prior icons (initial or results), but keep wager marks up
   _clear_all_icons(pid)
   st.grid = {}
-
-  -- Draw 3 spinning reels
   _draw_spins(pid)
 
   async(function()
@@ -1173,15 +1236,14 @@ local function _start_round(pid)
 
     local wins, payout_total = _evaluate_wins(st4)
 
-    -- update payout text if anything won
     if payout_total > 0 then
+      st4.await_claim = true
       _set_payout(pid, payout_total)
     end
 
-    -- ✅ Set Mettaur to win/lose and keep it looping until next roll
     if payout_total > 0 then
       _set_mett_state(pid, "win")
-      _play_sfx(pid, "win")
+      _play_sfx(pid, wins.jackpot and "jackpot" or "win")
       _flash_wins(pid, token, wins.icon_cells, wins.mark_lines)
     else
       _set_mett_state(pid, "lose")
@@ -1191,13 +1253,17 @@ local function _start_round(pid)
     local st5 = st_by_pid[pid]
     if not st5 or st5.round_token ~= token then return end
 
-    st5.busy = false
+    -- Lock until payout is claimed (but Confirm can claim immediately via virtual_input busy-override)
+    if (st5.payout or 0) > 0 then
+      st5.busy = true
+    else
+      st5.busy = false
+    end
   end)
 end
 
 -- ======================
 -- Open
-
 -- ======================
 local function _open(pid, folder)
   if st_by_pid[pid] ~= nil then return end
@@ -1222,21 +1288,28 @@ local function _open(pid, folder)
     phase = "initial",
     busy = false,
     round_token = 0,
-    wager = 1, -- default wager on open
+    wager = 1,
     grid = {},
     tokens_real = 0,
     payout = 0,
+    use_ez_tokens = false,
+
+    -- payout-claim gating
+    await_claim = false,
   }
 
   _draw_mainui(pid, folder, x, y)
-
-  -- ✅ Mettaur idles on open
   _set_mett_state(pid, "idle")
 
   _draw_currency_ui(pid)
   _draw_currency_text(pid)
 
-  _sync_tokens(pid)
+  st_by_pid[pid].use_ez_tokens = _has_ez_tokens_api()
+  if st_by_pid[pid].use_ez_tokens then
+    _sync_tokens(pid)
+  else
+    _set_tokens(pid, FALLBACK_STARTING_TOKENS)
+  end
   _set_payout(pid, 0)
 
   _draw_initial_icons(pid)
@@ -1281,8 +1354,17 @@ Net:on("virtual_input", function(event)
   local evs = event.events
   if not evs then return end
 
-  -- Busy = ignore ALL inputs until results + first blink unlock (or lose)
+  -- Busy = ignore ALL inputs
+  -- EXCEPT: allow Confirm to claim payout immediately (even during flashing)
   if st.busy then
+    for _, button in next, evs do
+      if button.state == 1 and button.name == "Confirm" then
+        if (st.payout or 0) > 0 and st.await_claim then
+          _collect_payout(pid)
+        end
+        return
+      end
+    end
     return
   end
 
@@ -1296,7 +1378,6 @@ Net:on("virtual_input", function(event)
     end
 
     if state == 1 and name == "Confirm" then
-      -- If there's payout pending, first Confirm collects it
       if (st.payout or 0) > 0 then
         _collect_payout(pid)
       else
@@ -1307,7 +1388,7 @@ Net:on("virtual_input", function(event)
 
     -- INFO BOARD (engine states: 1=press, 2/4=held-repeat)
     if name == "Move Down" then
-      local is_press = (state == 1 or state == 0)      -- keep 0 just in case some clients still send it
+      local is_press = (state == 1 or state == 0)
       local is_hold  = (state == 2 or state == 4)
 
       if is_press or is_hold then
@@ -1315,7 +1396,6 @@ Net:on("virtual_input", function(event)
           _draw_info(pid)
         end
       else
-        -- anything else = treat as release
         if st.info_down then
           _erase_info(pid)
         end

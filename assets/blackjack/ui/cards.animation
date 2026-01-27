@@ -1,0 +1,176 @@
+animation state="face-down"
+frame duration="0.1" x="5" y="6" w="34" h="46" originx="0" originy="0"
+
+animation state="heart-ace"
+frame duration="0.1" x="460" y="6" w="34" h="46" originx="0" originy="0"
+
+animation state="heart-two"
+frame duration="0.1" x="40" y="6" w="34" h="46" originx="0" originy="0"
+
+animation state="heart-three"
+frame duration="0.1" x="75" y="6" w="34" h="46" originx="0" originy="0"
+
+animation state="heart-four"
+frame duration="0.1" x="110" y="6" w="34" h="46" originx="0" originy="0"
+
+animation state="heart-five"
+frame duration="0.1" x="145" y="6" w="34" h="46" originx="0" originy="0"
+
+animation state="heart-six"
+frame duration="0.1" x="180" y="6" w="34" h="46" originx="0" originy="0"
+
+animation state="heart-seven"
+frame duration="0.1" x="215" y="6" w="34" h="46" originx="0" originy="0"
+
+animation state="heart-eight"
+frame duration="0.1" x="250" y="6" w="34" h="46" originx="0" originy="0"
+
+animation state="heart-nine"
+frame duration="0.1" x="285" y="6" w="34" h="46" originx="0" originy="0"
+
+animation state="heart-ten"
+frame duration="0.1" x="320" y="6" w="34" h="46" originx="0" originy="0"
+
+animation state="heart-jack"
+frame duration="0.1" x="355" y="6" w="34" h="46" originx="0" originy="0"
+
+animation state="heart-queen"
+frame duration="0.1" x="390" y="6" w="34" h="46" originx="0" originy="0"
+
+animation state="heart-king"
+frame duration="0.1" x="425" y="6" w="34" h="46" originx="0" originy="0"
+
+animation state="club-ace"
+frame duration="0.1" x="460" y="53" w="34" h="46" originx="0" originy="0"
+
+animation state="club-two"
+frame duration="0.1" x="40" y="53" w="34" h="46" originx="0" originy="0"
+
+animation state="club-three"
+frame duration="0.1" x="75" y="53" w="34" h="46" originx="0" originy="0"
+
+animation state="club-four"
+frame duration="0.1" x="110" y="53" w="34" h="46" originx="0" originy="0"
+
+animation state="club-five"
+frame duration="0.1" x="145" y="53" w="34" h="46" originx="0" originy="0"
+
+animation state="club-six"
+frame duration="0.1" x="180" y="53" w="34" h="46" originx="0" originy="0"
+
+animation state="club-seven"
+frame duration="0.1" x="215" y="53" w="34" h="46" originx="0" originy="0"
+
+animation state="club-eight"
+frame duration="0.1" x="250" y="53" w="34" h="46" originx="0" originy="0"
+
+animation state="club-nine"
+frame duration="0.1" x="285" y="53" w="34" h="46" originx="0" originy="0"
+
+animation state="club-ten"
+frame duration="0.1" x="320" y="53" w="34" h="46" originx="0" originy="0"
+
+animation state="club-jack"
+frame duration="0.1" x="355" y="53" w="34" h="46" originx="0" originy="0"
+
+animation state="club-queen"
+frame duration="0.1" x="390" y="53" w="34" h="46" originx="0" originy="0"
+
+animation state="club-king"
+frame duration="0.1" x="425" y="53" w="34" h="46" originx="0" originy="0"
+
+animation state="diamond-ace"
+frame duration="0.1" x="460" y="100" w="34" h="46" originx="0" originy="0"
+
+animation state="diamond-two"
+frame duration="0.1" x="40" y="100" w="34" h="46" originx="0" originy="0"
+
+animation state="diamond-three"
+frame duration="0.1" x="75" y="100" w="34" h="46" originx="0" originy="0"
+
+animation state="diamond-four"
+frame duration="0.1" x="110" y="100" w="34" h="46" originx="0" originy="0"
+
+animation state="diamond-five"
+frame duration="0.1" x="145" y="100" w="34" h="46" originx="0" originy="0"
+
+animation state="diamond-six"
+frame duration="0.1" x="180" y="100" w="34" h="46" originx="0" originy="0"
+
+animation state="diamond-seven"
+frame duration="0.1" x="215" y="100" w="34" h="46" originx="0" originy="0"
+
+animation state="diamond-eight"
+frame duration="0.1" x="250" y="100" w="34" h="46" originx="0" originy="0"
+
+animation state="diamond-nine"
+frame duration="0.1" x="285" y="100" w="34" h="46" originx="0" originy="0"
+
+animation state="diamond-ten"
+frame duration="0.1" x="320" y="100" w="34" h="46" originx="0" originy="0"
+
+animation state="diamond-jack"
+frame duration="0.1" x="355" y="100" w="34" h="46" originx="0" originy="0"
+
+animation state="diamond-queen"
+frame duration="0.1" x="390" y="100" w="34" h="46" originx="0" originy="0"
+
+animation state="diamond-king"
+frame duration="0.1" x="425" y="100" w="34" h="46" originx="0" originy="0"
+
+animation state="spade-ace"
+frame duration="0.1" x="460" y="147" w="34" h="46" originx="0" originy="0"
+
+animation state="spade-two"
+frame duration="0.1" x="40" y="147" w="34" h="46" originx="0" originy="0"
+
+animation state="spade-three"
+frame duration="0.1" x="75" y="147" w="34" h="46" originx="0" originy="0"
+
+animation state="spade-four"
+frame duration="0.1" x="110" y="147" w="34" h="46" originx="0" originy="0"
+
+animation state="spade-five"
+frame duration="0.1" x="145" y="147" w="34" h="46" originx="0" originy="0"
+
+animation state="spade-six"
+frame duration="0.1" x="180" y="147" w="34" h="46" originx="0" originy="0"
+
+animation state="spade-seven"
+frame duration="0.1" x="215" y="147" w="34" h="46" originx="0" originy="0"
+
+animation state="spade-eight"
+frame duration="0.1" x="250" y="147" w="34" h="46" originx="0" originy="0"
+
+animation state="spade-nine"
+frame duration="0.1" x="285" y="147" w="34" h="46" originx="0" originy="0"
+
+animation state="spade-ten"
+frame duration="0.1" x="320" y="147" w="34" h="46" originx="0" originy="0"
+
+animation state="spade-jack"
+frame duration="0.1" x="355" y="147" w="34" h="46" originx="0" originy="0"
+
+animation state="spade-queen"
+frame duration="0.1" x="390" y="147" w="34" h="46" originx="0" originy="0"
+
+animation state="spade-king"
+frame duration="0.1" x="425" y="147" w="34" h="46" originx="0" originy="0"
+
+
+animation state="IDLE_D"
+
+animation state="IDLE_DL"
+
+animation state="IDLE_DR"
+
+animation state="IDLE_L"
+
+animation state="IDLE_R"
+
+animation state="IDLE_U"
+
+animation state="IDLE_UL"
+
+animation state="IDLE_UR"
+ 

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="30" height="30" tilewidth="64" tileheight="32" infinite="0" nextlayerid="3" nextobjectid="72">
+<map version="1.10" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="30" height="30" tilewidth="64" tileheight="32" infinite="0" nextlayerid="3" nextobjectid="110">
  <properties>
   <property name="Background" value="custom"/>
   <property name="Background Animation" value="/server/assets/custom/backgrounds/wcity/01-generic1.animation"/>
@@ -7,7 +7,7 @@
   <property name="Background Vel X" type="float" value="0.45"/>
   <property name="Background Vel Y" type="float" value="0.25"/>
   <property name="Name" value="Casino"/>
-  <property name="Song" value="/server/assets/Decor Shop.ogg"/>
+  <property name="Song" value="/server/assets/casino.ogg"/>
  </properties>
  <tileset firstgid="1" source="../assets/tiles/central_platform.tsx"/>
  <tileset firstgid="241" source="../assets/tiles/vendor_desk.tsx"/>
@@ -31,6 +31,12 @@
  <tileset firstgid="352" source="../assets/tiles/Roadblock.tsx"/>
  <tileset firstgid="354" source="../assets/tiles/ShademanCompWarpAnimation.tsx"/>
  <tileset firstgid="360" source="../assets/objects/SlotMachine_OW.tsx"/>
+ <tileset firstgid="364" source="../assets/objects/BlackjackTable_OW.tsx"/>
+ <tileset firstgid="365" source="../assets/objects/pokemon_huge_128x96_128x96.tsx"/>
+ <tileset firstgid="366" source="../assets/objects/pokemon_small_32x32_32x32.tsx"/>
+ <tileset firstgid="398" source="../assets/objects/pokemon_mid_72x96_72x96.tsx"/>
+ <tileset firstgid="422" source="../assets/objects/pokemon_pairs_128x96_128x96.tsx"/>
+ <tileset firstgid="428" source="../assets/objects/midrug_72x96_72x96.tsx"/>
  <layer id="1" name="Tile Layer 1" width="30" height="30">
   <data encoding="csv">
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -40,15 +46,15 @@
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,294,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,62,63,63,63,63,63,63,63,63,63,63,63,73,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,61,72,72,72,72,72,72,72,72,72,72,72,83,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,61,72,72,72,72,72,72,72,72,72,72,72,83,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,61,72,72,72,72,72,72,72,72,72,72,72,83,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,61,72,72,72,72,72,72,72,72,72,72,72,83,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,61,72,72,72,72,72,72,72,72,72,72,72,83,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,61,72,72,72,72,72,72,72,72,72,72,72,83,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,61,72,72,72,72,72,72,72,72,72,72,72,83,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,61,72,72,72,72,72,72,72,72,72,72,72,83,0,0,0,0,0,0,0,0,
+0,0,0,62,63,63,73,0,0,62,63,63,63,63,63,63,63,63,63,63,63,73,0,0,0,0,0,0,0,0,
+0,0,0,61,72,72,83,0,0,61,72,72,72,72,72,72,72,72,72,72,72,83,0,0,0,0,0,0,0,0,
+0,0,0,61,72,72,83,0,0,61,72,72,72,72,72,72,72,72,72,72,72,83,0,0,0,0,0,0,0,0,
+0,0,0,61,72,72,83,0,0,61,72,72,72,72,72,72,72,72,72,72,72,83,0,0,0,0,0,0,0,0,
+0,0,0,61,72,72,83,93,111,61,72,72,72,72,72,72,72,72,72,72,72,83,0,0,0,0,0,0,0,0,
+0,0,0,61,72,72,83,0,0,61,72,72,72,72,72,72,72,72,72,72,72,83,0,0,0,0,0,0,0,0,
+0,0,0,61,72,72,83,0,0,61,72,72,72,72,72,72,72,72,72,72,72,83,0,0,0,0,0,0,0,0,
+0,0,0,61,72,72,83,0,0,61,72,72,72,72,72,72,72,72,72,72,72,83,0,0,0,0,0,0,0,0,
+0,0,0,71,81,81,82,0,0,61,72,72,72,72,72,72,72,72,72,72,72,83,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,71,81,81,81,81,81,81,81,81,81,81,81,82,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,112,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,48,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -66,27 +72,27 @@
 </data>
  </layer>
  <objectgroup id="2" name="Object Layer 1">
-  <object id="1" gid="241" x="336" y="288" width="35" height="45">
+  <object id="1" gid="2147483889" x="327.5" y="282.5" width="35" height="45">
    <properties>
     <property name="Interact Relay" type="object" value="3"/>
    </properties>
   </object>
-  <object id="2" gid="243" x="365.5" y="282.5" width="35" height="45">
+  <object id="2" gid="2147483891" x="322" y="312" width="35" height="45">
    <properties>
     <property name="Interact Relay" type="object" value="3"/>
    </properties>
   </object>
-  <object id="3" name="Merchant Zel" type="NPC" x="347.5" y="260.5">
+  <object id="3" name="Merchant Zel" type="NPC" x="318" y="280">
    <properties>
     <property name="Asset Name" value="heel-navi-exe4_black"/>
     <property name="Dialogue Type" value="first"/>
-    <property name="Direction" value="Down Left"/>
+    <property name="Direction" value="Down Right"/>
     <property name="Next 1" type="object" value="4"/>
     <property name="Text 1" value="Welcome, I sell tokens"/>
    </properties>
    <point/>
   </object>
-  <object id="4" name="Token Shop" type="Dialogue" x="347" y="217">
+  <object id="4" name="Token Shop" type="Dialogue" x="265.5" y="234.5">
    <properties>
     <property name="Dialogue Type" value="tokenshop"/>
    </properties>
@@ -99,105 +105,168 @@
     <property name="Target Object" value="388"/>
    </properties>
   </object>
-  <object id="52" name="SlotMachine" gid="360" x="672" y="272" width="29" height="51">
+  <object id="58" name="SlotMachine" gid="360" x="640" y="272" width="29" height="51">
    <properties>
     <property name="SlotMachine" value="slot-purple"/>
    </properties>
   </object>
-  <object id="53" name="SlotMachine" gid="361" x="672" y="320" width="29" height="51">
-   <properties>
-    <property name="SlotMachine" value="digital-purple"/>
-   </properties>
-  </object>
-  <object id="54" name="SlotMachine" gid="362" x="672" y="416" width="29" height="51">
-   <properties>
-    <property name="SlotMachine" value="slot-green"/>
-   </properties>
-  </object>
-  <object id="55" name="SlotMachine" gid="363" x="672" y="368" width="29" height="51">
-   <properties>
-    <property name="SlotMachine" value="digital-green"/>
-   </properties>
-  </object>
-  <object id="56" name="SlotMachine" gid="360" x="640" y="272" width="29" height="51">
+  <object id="59" name="SlotMachine" gid="360" x="576" y="272" width="29" height="51">
    <properties>
     <property name="SlotMachine" value="slot-purple"/>
    </properties>
   </object>
-  <object id="57" name="SlotMachine" gid="360" x="608" y="272" width="29" height="51">
-   <properties>
-    <property name="SlotMachine" value="slot-purple"/>
-   </properties>
-  </object>
-  <object id="58" name="SlotMachine" gid="360" x="576" y="272" width="29" height="51">
-   <properties>
-    <property name="SlotMachine" value="slot-purple"/>
-   </properties>
-  </object>
-  <object id="59" name="SlotMachine" gid="360" x="544" y="272" width="29" height="51">
-   <properties>
-    <property name="SlotMachine" value="slot-purple"/>
-   </properties>
-  </object>
-  <object id="60" name="SlotMachine" gid="361" x="640" y="320" width="29" height="51">
+  <object id="62" name="SlotMachine" gid="361" x="608" y="272" width="29" height="51">
    <properties>
     <property name="SlotMachine" value="digital-purple"/>
    </properties>
   </object>
-  <object id="61" name="SlotMachine" gid="361" x="608" y="320" width="29" height="51">
+  <object id="63" name="SlotMachine" gid="361" x="672" y="272" width="29" height="51">
    <properties>
     <property name="SlotMachine" value="digital-purple"/>
    </properties>
   </object>
-  <object id="62" name="SlotMachine" gid="361" x="576" y="320" width="29" height="51">
-   <properties>
-    <property name="SlotMachine" value="digital-purple"/>
-   </properties>
-  </object>
-  <object id="63" name="SlotMachine" gid="361" x="544" y="320" width="29" height="51">
-   <properties>
-    <property name="SlotMachine" value="digital-purple"/>
-   </properties>
-  </object>
-  <object id="64" name="SlotMachine" gid="363" x="640" y="368" width="29" height="51">
+  <object id="66" name="SlotMachine" gid="363" x="576" y="320" width="29" height="51">
    <properties>
     <property name="SlotMachine" value="digital-green"/>
    </properties>
   </object>
-  <object id="65" name="SlotMachine" gid="363" x="608" y="368" width="29" height="51">
+  <object id="67" name="SlotMachine" gid="363" x="640" y="320" width="29" height="51">
    <properties>
     <property name="SlotMachine" value="digital-green"/>
    </properties>
   </object>
-  <object id="66" name="SlotMachine" gid="363" x="576" y="368" width="29" height="51">
-   <properties>
-    <property name="SlotMachine" value="digital-green"/>
-   </properties>
-  </object>
-  <object id="67" name="SlotMachine" gid="363" x="544" y="368" width="29" height="51">
-   <properties>
-    <property name="SlotMachine" value="digital-green"/>
-   </properties>
-  </object>
-  <object id="68" name="SlotMachine" gid="362" x="640" y="416" width="29" height="51">
+  <object id="70" name="SlotMachine" gid="362" x="608" y="320" width="29" height="51">
    <properties>
     <property name="SlotMachine" value="slot-green"/>
    </properties>
   </object>
-  <object id="69" name="SlotMachine" gid="362" x="608" y="416" width="29" height="51">
+  <object id="71" name="SlotMachine" gid="362" x="672" y="320" width="29" height="51">
    <properties>
     <property name="SlotMachine" value="slot-green"/>
    </properties>
   </object>
-  <object id="70" name="SlotMachine" gid="362" x="576" y="416" width="29" height="51">
+  <object id="72" name="Blackjack" gid="364" x="479" y="279" width="68" height="58">
    <properties>
-    <property name="SlotMachine" value="slot-green"/>
+    <property name="Blackjack" type="bool" value="true"/>
    </properties>
   </object>
-  <object id="71" name="SlotMachine" gid="362" x="544" y="416" width="29" height="51">
+  <object id="73" name="Blackjack" gid="364" x="420" y="280" width="68" height="58">
    <properties>
-    <property name="SlotMachine" value="slot-green"/>
+    <property name="Blackjack" type="bool" value="true"/>
    </properties>
   </object>
+  <object id="74" gid="2147483889" x="324.5" y="349.5" width="35" height="45">
+   <properties>
+    <property name="Interact Relay" type="object" value="76"/>
+   </properties>
+  </object>
+  <object id="75" gid="2147483891" x="319" y="379" width="35" height="45">
+   <properties>
+    <property name="Interact Relay" type="object" value="76"/>
+   </properties>
+  </object>
+  <object id="76" name="Merchant Tel" type="NPC" x="315" y="347">
+   <properties>
+    <property name="Asset Name" value="heel-navi-exe4_black"/>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Direction" value="Down Right"/>
+    <property name="Next 1" type="object" value="77"/>
+    <property name="Text 1" value="Welcome, I echange tokens for prizes"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="77" name="Token Redeem" type="Dialogue" x="262.5" y="301.5">
+   <properties>
+    <property name="Dialogue Type" value="tokenredeem"/>
+    <property name="Sell 1" value="poke_ball"/>
+    <property name="Amount 1" value="1"/>
+    <property name="Type 1" value="decor"/>
+    <property name="Price 1" value="20"/>
+    <property name="Sell 2" value="poke_great"/>
+    <property name="Amount 2" value="1"/>
+    <property name="Type 2" value="decor"/>
+    <property name="Price 2" value="25"/>
+    <property name="Sell 3" value="poke_master"/>
+    <property name="Amount 3" value="1"/>
+    <property name="Type 3" value="decor"/>
+    <property name="Price 3" value="30"/>
+    <property name="Sell 4" value="poke_plant"/>
+    <property name="Amount 4" value="1"/>
+    <property name="Type 4" value="decor"/>
+    <property name="Price 4" value="45"/>
+    <property name="Sell 5" value="poke_chooser"/>
+    <property name="Amount 5" value="1"/>
+    <property name="Type 5" value="decor"/>
+    <property name="Price 5" value="55"/>
+    <property name="Sell 6" value="pokeshelf_silver"/>
+    <property name="Amount 6" value="1"/>
+    <property name="Type 6" value="decor"/>
+    <property name="Price 6" value="60"/>
+    <property name="Sell 7" value="pokeshelf_brown"/>
+    <property name="Amount 7" value="1"/>
+    <property name="Type 7" value="decor"/>
+    <property name="Price 7" value="60"/>
+    <property name="Sell 8" value="poke_desk"/>
+    <property name="Amount 8" value="1"/>
+    <property name="Type 8" value="decor"/>
+    <property name="Price 8" value="75"/>
+    <property name="Sell 9" value="pokedesk_brown"/>
+    <property name="Amount 9" value="1"/>
+    <property name="Type 9" value="decor"/>
+    <property name="Price 9" value="75"/>
+    <property name="Sell 10" value="poketable_silver"/>
+    <property name="Amount 10" value="1"/>
+    <property name="Type 10" value="decor"/>
+    <property name="Price 10" value="75"/>
+    <property name="Sell 11" value="med_rug"/>
+    <property name="Amount 11" value="1"/>
+    <property name="Type 11" value="decor"/>
+    <property name="Price 11" value="80"/>
+    <property name="Sell 12" value="giant_rug"/>
+    <property name="Amount 12" value="1"/>
+    <property name="Type 12" value="decor"/>
+    <property name="Price 12" value="500"/>
+    <property name="Sell 13" value="pet_kabutank"/>
+    <property name="Amount 13" value="1"/>
+    <property name="Type 13" value="pet"/>
+    <property name="Price 13" value="100"/>
+    <property name="Sell 14" value="pet_spooky"/>
+    <property name="Amount 14" value="1"/>
+    <property name="Type 14" value="pet"/>
+    <property name="Price 14" value="100"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="78" name="Dealer Prog" type="NPC" x="395" y="245">
+   <properties>
+    <property name="Asset Name" value="ProgDealer"/>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Direction" value="Down Left"/>
+    <property name="Text 1" value="Let's play, join the table"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="79" name="Dealer Prog" type="NPC" x="453" y="243">
+   <properties>
+    <property name="Asset Name" value="ProgDealer"/>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Direction" value="Down Left"/>
+    <property name="Text 1" value="Let's play, join the table"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="96" gid="2147484026" x="151" y="254" width="32" height="32"/>
+  <object id="97" gid="2147484022" x="162" y="253" width="32" height="32"/>
+  <object id="98" gid="2147484021" x="172" y="251" width="32" height="32"/>
+  <object id="99" gid="407" x="222.5" y="257.5" width="72" height="96"/>
+  <object id="100" gid="407" x="125.5" y="260.5" width="72" height="96"/>
+  <object id="101" gid="409" x="222.5" y="285.5" width="72" height="96"/>
+  <object id="102" gid="409" x="106.5" y="289.5" width="72" height="96"/>
+  <object id="103" gid="412" x="177" y="305" width="72" height="96"/>
+  <object id="105" gid="414" x="179.5" y="514.5" width="72" height="96"/>
+  <object id="106" gid="422" x="163.5" y="432.5" width="128" height="96"/>
+  <object id="107" gid="424" x="81" y="419" width="128" height="96"/>
+  <object id="108" gid="365" x="113" y="317" width="128" height="96"/>
+  <object id="109" gid="428" x="137" y="229" width="64" height="49"/>
  </objectgroup>
 </map>

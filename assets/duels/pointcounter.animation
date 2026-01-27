@@ -1,0 +1,41 @@
+animation state="empty1"
+frame duration="0.1" x="0" y="0" w="19" h="5" originx="0" originy="0"
+
+animation state="empty2"
+frame duration="0.1" x="0" y="5" w="20" h="5" originx="0" originy="0"
+
+animation state="empty3"
+frame duration="0.1" x="0" y="10" w="17" h="5" originx="0" originy="0"
+
+animation state="filled1"
+frame duration="0.1" x="19" y="0" w="19" h="5" originx="0" originy="0"
+
+animation state="filled2"
+frame duration="0.1" x="20" y="5" w="20" h="5" originx="0" originy="0"
+
+animation state="filled3"
+frame duration="0.1" x="17" y="10" w="17" h="5" originx="0" originy="0"
+
+animation state="IDLE_DR"
+
+animation state="IDLE_DL"
+
+animation state="IDLE_UR"
+
+animation state="IDLE_UL"
+
+animation state="WALK_DR"
+
+animation state="WALK_DL"
+
+animation state="WALK_UR"
+
+animation state="WALK_UL"
+
+animation state="RUN_DR"
+
+animation state="RUN_DL"
+
+animation state="RUN_UR"
+
+animation state="RUN_UL"

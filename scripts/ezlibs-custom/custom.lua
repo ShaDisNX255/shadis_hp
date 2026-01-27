@@ -7,6 +7,8 @@ local secret  = require('scripts/ezlibs-custom/secret_path_switch')
 local dungeon  = require('scripts/ezlibs-custom/dungeon')
 local soccerball  = require('scripts/ezlibs-custom/soccerball')
 local slots  = require('scripts/ezlibs-custom/slots')
+local blackjack = require('scripts/ezlibs-custom/blackjack')
+local duels  = require('scripts/ezlibs-custom/duels')
 -- Optional L-Menu (net-games) support
 local LMenu
 do
@@ -1006,7 +1008,26 @@ do
     -- This is your existing local helper; we just wrap it.
     return open_card_list(pid)
   end
+function api.arm_card(pid, item_name)
+  item_name = tostring(item_name or "")
+  if item_name == "" then return false end
+
+  local png, anim = build_mug_paths_for_name(item_name)
+  local ow_png, ow_anim = build_overworld_paths_for_name(item_name)
+
+  last_viewed_card_by_player[pid] = {
+    name = item_name,
+    png = png,
+    anim = anim,
+    ow_png = ow_png,
+    ow_anim = ow_anim,
+  }
+
+  return true
 end
+
+end
+
 
 -- Wrapper so LMenu can open the card collection
 function custom.open_card_collection_from_lmenu(pid)
@@ -1155,7 +1176,7 @@ local trade_refreshing  = trade_refreshing  or {} -- [pid]=true while we are pro
 local trade_reopen      = trade_reopen      or {} -- [pid]=true to reopen after close
 
 local TRADE_BOARD_COLOR = { r=180, g=220, b=255 }
-local TRADE_PER_PAGE  = 12
+local TRADE_PER_PAGE  = 9999
 local TRADE_TARGET    = 10
 local TRADE_CONFIRM   = "__trade_confirm__"
 local TRADE_CLEAR     = "__trade_clear__"
