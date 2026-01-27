@@ -563,7 +563,7 @@ AI = {
     y = 20,
     z = 206,
   },
-  TIME_SCALE = 0.18, -- 0.25 for 75% faster (more aggressive)
+  TIME_SCALE = 0.2, -- 0.25 for 75% faster (more aggressive)
 }
 
 do
