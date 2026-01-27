@@ -13,6 +13,7 @@ local teams = require('scripts/teams/teams')
 local raids    = require('scripts/raids/raids')
 local cosmetics = require('scripts/ezlibs-custom/cosmetics')
 local ezmenus   = require('scripts/ezlibs-scripts/ezmenus')
+local duels  = require('scripts/ezlibs-custom/duels')
 
 local COSMETIC_SHOP_COLOR = { r = 245, g = 210, b = 70 } -- same yellow as decorshop
 
@@ -969,12 +970,22 @@ eznpcs.add_event{
       if #deck_ids ~= 10 then deck_ids = nil end
 
       -- Start the duel and inject an on_finish that completes our wait
-      custom.start_card_battle(player_id, {
+      duels.start_card_battle(player_id, {
         npc_name = npc_name,
         npc_deck_ids = deck_ids,
         on_finish = function(res)
           result = res
           done   = true
+          -- JobBBS hook (matches what custom.lua used to do)
+          local JobBBS = rawget(_G, "JobBBS")
+          if JobBBS and JobBBS.on_npc_duel_result and res then
+            local winner = res.player_won and 1 or 2 -- JobBBS only counts when winner==1
+            pcall(JobBBS.on_npc_duel_result, player_id, {
+              winner = winner,
+              npc_name = npc_name,
+              kos = 3,
+            })
+          end
         end
       })
 
@@ -2033,6 +2044,69 @@ eznpcs.add_event{
         return dialogue.custom_properties["Next 1"]
       end
       return nil
+    end)
+  end
+}
+
+-- Duel rules menu (BBS selector -> jump to another dialogue)
+local DUEL_RULES_COLOR = { r = 110, g = 220, b = 255 } -- pick any color you want
+
+eznpcs.add_event{
+  name = "Duel Rules Menu",
+  action = function(npc, player_id, dialogue, relay_object)
+    return async(function()
+      -- (optional) Mug, if you want to show message_player prompts before/after
+      -- local mug = eznpcs.get_dialogue_mugshot(npc, player_id, dialogue)
+
+      -- Case-insensitive props (you already have these helpers in this file)
+      local ci = build_ci_props(dialogue)
+
+      -- Accept both "Monster Exp" and "Monsters Exp", etc.
+      local monsters_next = get_ci(ci, "monsters exp") or get_ci(ci, "monster exp")
+      local spells_next   = get_ci(ci, "spells exp")  or get_ci(ci, "spell exp")
+      local battles_next  = get_ci(ci, "battles exp") or get_ci(ci, "battle exp")
+
+      -- Where to go if player cancels / exits
+      local on_cancel = get_ci(ci, "on cancel") or (dialogue.custom_properties and dialogue.custom_properties["Next 1"])
+
+      -- Build menu posts with stable IDs
+      local posts = {}
+
+      local p1 = helpers.create_bbs_option("Monsters")
+      p1.id = "__duel_rules_monsters__"
+      table.insert(posts, p1)
+
+      local p2 = helpers.create_bbs_option("Spells")
+      p2.id = "__duel_rules_spells__"
+      table.insert(posts, p2)
+
+      local p3 = helpers.create_bbs_option("Battles")
+      p3.id = "__duel_rules_battles__"
+      table.insert(posts, p3)
+
+      local p4 = helpers.create_bbs_option("Exit")
+      p4.id = "__duel_rules_exit__"
+      table.insert(posts, p4)
+
+      local title = get_ci(ci, "board title") or "Duel Rules"
+
+      local board = ezmenus.open_menu(player_id, title, DUEL_RULES_COLOR, posts)
+      local sel = await(board.selection_once())
+      Net.close_bbs(player_id)
+
+      if not sel or sel == "__duel_rules_exit__" then
+        return on_cancel
+      end
+
+      if sel == "__duel_rules_monsters__" then
+        return monsters_next or on_cancel
+      elseif sel == "__duel_rules_spells__" then
+        return spells_next or on_cancel
+      elseif sel == "__duel_rules_battles__" then
+        return battles_next or on_cancel
+      end
+
+      return on_cancel
     end)
   end
 }

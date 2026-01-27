@@ -1,0 +1,41 @@
+animation state="C"
+frame duration="0.1" x="1" y="1" w="18" h="18" originx="0" originy="0"
+
+animation state="R"
+frame duration="0.1" x="21" y="1" w="18" h="18" originx="0" originy="0"
+
+animation state="SR"
+frame duration="0.1" x="41" y="1" w="18" h="18" originx="0" originy="0"
+
+animation state="UR"
+frame duration="0.1" x="61" y="1" w="18" h="18" originx="0" originy="0"
+
+animation state="GR"
+frame duration="0.1" x="81" y="1" w="18" h="18" originx="0" originy="0"
+
+animation state="GDR"
+frame duration="0.1" x="101" y="1" w="18" h="18" originx="0" originy="0"
+
+animation state="IDLE_DR"
+
+animation state="IDLE_DL"
+
+animation state="IDLE_UR"
+
+animation state="IDLE_UL"
+
+animation state="WALK_DR"
+
+animation state="WALK_DL"
+
+animation state="WALK_UR"
+
+animation state="WALK_UL"
+
+animation state="RUN_DR"
+
+animation state="RUN_DL"
+
+animation state="RUN_UR"
+
+animation state="RUN_UL"

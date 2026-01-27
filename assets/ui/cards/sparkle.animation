@@ -1,0 +1,38 @@
+animation state="sparkle"
+frame duration="0.1" x="0" y="0" w="32" h="32" originx="0" originy="0"
+frame duration="0.1" x="32" y="0" w="32" h="32" originx="0" originy="0"
+frame duration="0.1" x="64" y="0" w="32" h="32" originx="0" originy="0"
+frame duration="0.1" x="96" y="0" w="32" h="32" originx="0" originy="0"
+frame duration="0.1" x="128" y="0" w="32" h="32" originx="0" originy="0"
+frame duration="0.1" x="160" y="0" w="32" h="32" originx="0" originy="0"
+frame duration="0.1" x="192" y="0" w="32" h="32" originx="0" originy="0"
+frame duration="0.1" x="224" y="0" w="32" h="32" originx="0" originy="0"
+frame duration="0.1" x="256" y="0" w="32" h="32" originx="0" originy="0"
+frame duration="0.1" x="288" y="0" w="32" h="32" originx="0" originy="0"
+frame duration="0.1" x="320" y="0" w="32" h="32" originx="0" originy="0"
+frame duration="0.1" x="352" y="0" w="32" h="32" originx="0" originy="0"
+
+
+animation state="IDLE_DR"
+
+animation state="IDLE_DL"
+
+animation state="IDLE_UR"
+
+animation state="IDLE_UL"
+
+animation state="WALK_DR"
+
+animation state="WALK_DL"
+
+animation state="WALK_UR"
+
+animation state="WALK_UL"
+
+animation state="RUN_DR"
+
+animation state="RUN_DL"
+
+animation state="RUN_UR"
+
+animation state="RUN_UL"

@@ -1611,7 +1611,9 @@ local function _start_session(pid, opts)
       local p = Net.get_player_position(pid); if not p then return end
       local dx = (p.x - cur.last_pos.x); local dy = (p.y - cur.last_pos.y); local dz = (p.z - cur.last_pos.z)
       if math.abs(dx) > 0.01 or math.abs(dy) > 0.01 or math.abs(dz) > 0.01 then
-        if JobBBS and JobBBS.on_fish_fail then pcall(JobBBS.on_fish_fail, pid) end
+        if JobBBS and JobBBS.on_fish_fail then
+          pcall(JobBBS.on_fish_fail, pid, { reason = 'moved', phase = 'waiting' })
+        end
         _stop(pid, "Stopped fishing because you scared the fish. Stay still next time.", FISHING.SFX.fail)
         return
       end
@@ -1639,7 +1641,9 @@ local function _start_session(pid, opts)
 
       -- missed the window?
       if cur.bite_active and (cur.wait_elapsed > (cur.bite_until_rel or 0)) then
-        if JobBBS and JobBBS.on_fish_fail then pcall(JobBBS.on_fish_fail, pid) end
+        if JobBBS and JobBBS.on_fish_fail then
+          pcall(JobBBS.on_fish_fail, pid, { reason = 'missed_bite', phase = 'waiting' })
+        end
         _stop(pid, "Too slow! The fish slipped away.", FISHING.SFX.fail)
         return
       end
@@ -1670,13 +1674,17 @@ local function _begin_reeling(pid)
       local p = Net.get_player_position(pid); if not p then return end
       local dx = (p.x - cur.last_pos.x); local dy = (p.y - cur.last_pos.y); local dz = (p.z - cur.last_pos.z)
       if math.abs(dx) > 0.01 or math.abs(dy) > 0.01 or math.abs(dz) > 0.01 then
-        if JobBBS and JobBBS.on_fish_fail then pcall(JobBBS.on_fish_fail, pid) end
+        if JobBBS and JobBBS.on_fish_fail then
+          pcall(JobBBS.on_fish_fail, pid, { reason = 'moved', phase = 'reeling' })
+        end
         _stop(pid, "Stopped fishing because you scared the fish. Stay still next time.", FISHING.SFX.fail)
         return
       end
       -- time out
       if _now_s() >= (cur.ends_at or 0) then
-        if JobBBS and JobBBS.on_fish_fail then pcall(JobBBS.on_fish_fail, pid) end
+        if JobBBS and JobBBS.on_fish_fail then
+          pcall(JobBBS.on_fish_fail, pid, { reason = 'timeout', phase = 'reeling' })
+        end
         _stop(pid, "The fish got away!", FISHING.SFX.fail)
         return
       end
@@ -1719,7 +1727,7 @@ local function _begin_reeling(pid)
           local enc = _pick_virus_encounter(aid)
           -- ADD: mark that a fishing virus started (for “Clean the Pond” jobs)
           if JobBBS and JobBBS.on_fish_virus_start then
-            pcall(JobBBS.on_fish_virus_start, pid, { area = aid })
+            pcall(JobBBS.on_fish_virus_start, pid, { area = aid, reason = 'virus_spawn' })
           end
           _stop(pid, nil, nil)
           _queue_virus_battle(pid, enc, aid)
@@ -1999,7 +2007,9 @@ end)
 Net:on("player_transfer", function(ev)
   local pid = ev.player_id
   if SESS[pid] and SESS[pid].active then
-    if JobBBS and JobBBS.on_fish_fail then pcall(JobBBS.on_fish_fail, pid) end
+    if JobBBS and JobBBS.on_fish_fail then
+      pcall(JobBBS.on_fish_fail, pid, { reason = 'transfer', phase = (SESS[pid] and SESS[pid].phase) or 'unknown' })
+    end
     _stop(pid, "Fishing cancelled.", FISHING.SFX.fail)
   end
   _PENDING_START[pid] = nil

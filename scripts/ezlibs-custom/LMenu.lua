@@ -33,6 +33,22 @@ local function is_slots_open(pid)
   return false
 end
 
+local function is_duel_open(pid)
+  local Duels = rawget(_G, "Duels")
+  if type(Duels) == "table" and type(Duels.is_open_for) == "function" then
+    local ok, open = pcall(Duels.is_open_for, pid)
+    if ok and open then return true end
+  end
+
+  local f = rawget(_G, "duel_ui_is_open")
+  if type(f) == "function" then
+    local ok, open = pcall(f, pid)
+    if ok and open then return true end
+  end
+
+  return false
+end
+
 local function is_blackjack_open(pid)
   local Blackjack = rawget(_G, "Blackjack")
   if type(Blackjack) == "table" and type(Blackjack.is_open_for) == "function" then
@@ -50,7 +66,7 @@ local function is_blackjack_open(pid)
 end
 
 local function is_modal_open(pid)
-  return is_slots_open(pid) or is_blackjack_open(pid)
+  return is_slots_open(pid) or is_blackjack_open(pid) or is_duel_open(pid)
 end
 
 
@@ -81,6 +97,15 @@ end
 local CosmeticsOK, Cosmetics = pcall(require, "scripts/ezlibs-custom/cosmetics")
 if not CosmeticsOK then
   Cosmetics = nil
+end
+
+-- ---------------------------------------------------------------------------
+-- Cards submenu (new sprites-api UI)
+-- ---------------------------------------------------------------------------
+
+local CardsOK, Cards = pcall(require, "scripts/ezlibs-custom/cards")
+if not CardsOK then
+  Cards = nil
 end
 
 -- ---------------------------------------------------------------------------
@@ -953,16 +978,25 @@ local function handle_lmenu_button(pid, btn)
 
     local api = card_api()
 
-    -- Cards: open card collection
+    -- Cards: open new Cards UI (sprites-api)
     if row.id == "cards" then
-      LMenu.close(pid)
-      if api and type(api.open_card_list) == "function" then
-        local ok2, err2 = pcall(api.open_card_list, pid)
+      -- Close the LMenu but keep the player locked, then open Cards.
+      LMenu.close(pid, { keep_frozen = true })
+
+      if Cards and type(Cards.open_menu) == "function" then
+        local ok2, err2 = pcall(Cards.open_menu, pid)
         if not ok2 then
-          warn("open_card_list failed:", tostring(err2))
+          warn("Cards.open_menu failed:", tostring(err2))
+          -- Fail-safe: unlock so the player isn't stuck
+          if Net and Net.unlock_player_input then
+            pcall(Net.unlock_player_input, pid)
+          end
         end
       else
-        Net.message_player(pid, "(Card Collection not available.)")
+        Net.message_player(pid, "(Cards menu not available.)")
+        if Net and Net.unlock_player_input then
+          pcall(Net.unlock_player_input, pid)
+        end
       end
       return
     end
@@ -1091,7 +1125,13 @@ if Net and Net.on then
       cosmetics_open = ok and open
     end
 
-    if lmenu_open or cosmetics_open then
+    local cards_open = false
+    if Cards and type(Cards.is_open) == "function" then
+      local ok, open = pcall(Cards.is_open, pid)
+      cards_open = ok and open
+    end
+
+    if lmenu_open or cosmetics_open or cards_open then
       return
     end
 
@@ -1123,6 +1163,16 @@ if Net and Net.on then
     end
 
     local cosmetics_open = is_cosmetics_open()
+
+    local function is_cards_open()
+      if not (Cards and type(Cards.is_open) == "function") then
+        return false
+      end
+      local ok, open = pcall(Cards.is_open, pid)
+      return ok and open
+    end
+
+    local cards_open = is_cards_open()
     local lmenu_open     = (st_by_pid[pid] ~= nil)
 
     for _, button in next, evs do
@@ -1136,7 +1186,7 @@ if Net and Net.on then
       ----------------------------------------------------------------
       -- 1) Global hard-close: Pause / Shoulder R
       ----------------------------------------------------------------
-      if state == 1 and (name == "Pause" or name == "Shoulder R") then
+      if state == 1 and (name == "Pause" or (name == "Shoulder R" and not cards_open)) then
         local did_any = false
 
         -- Close Cosmetics if open
@@ -1146,6 +1196,16 @@ if Net and Net.on then
             warn("Cosmetics.close via Pause/Shoulder R failed for", pid, ":", tostring(errc))
           end
           cosmetics_open = false
+          did_any = true
+        end
+
+        -- Close Cards if open
+        if cards_open and Cards and type(Cards.close) == "function" then
+          local okd, errd = pcall(Cards.close, pid)
+          if not okd then
+            warn("Cards.close via Pause/Shoulder R failed for", pid, ":", tostring(errd))
+          end
+          cards_open = false
           did_any = true
         end
 
@@ -1206,6 +1266,29 @@ if Net and Net.on then
             lmenu_open = true
           end
           return
+        elseif cards_open then
+          -- Cards UI is open: Cancel means "back to LMenu".
+          if Cards and type(Cards.handle_cancel) == "function" then
+            local okd, handled = pcall(Cards.handle_cancel, pid)
+            if not okd then
+              warn("Cards.handle_cancel failed for", pid, ":", tostring(handled))
+            end
+          elseif Cards and type(Cards.close) == "function" then
+            local okd, errd = pcall(Cards.close, pid, { keep_frozen = true })
+            if not okd then
+              warn("Cards.close (keep_frozen) via Cancel failed for", pid, ":", tostring(errd))
+            end
+          end
+
+          cards_open = false
+
+          -- Immediately go back to LMenu (still locked)
+          if not st_by_pid[pid] then
+            play_sfx(pid, "cancel")
+            LMenu.open(pid)
+            lmenu_open = true
+          end
+          return
         elseif lmenu_open then
 		  play_sfx(pid, "cancel")
           -- LMenu is open: Cancel acts as back/close
@@ -1221,7 +1304,7 @@ if Net and Net.on then
       --    - Taps on U/D move immediately
       --    - Holds on U/D wait 1s, then repeat every 0.15s
       ----------------------------------------------------------------
-      if not cosmetics_open then
+      if not cosmetics_open and not cards_open then
         -- Map engine button names to old LMenu logical buttons:
         --   LS = "Shoulder L"
         --   U  = "Move Up"
@@ -1291,13 +1374,20 @@ if Net and Net.on then
   Net:on("player_disconnect", function(e)
     if e and e.player_id then
       opened_once[e.player_id] = nil
+      -- Close Cards UI if open (it does not auto-clean itself on disconnect)
+      if Cards and type(Cards.close) == "function" then
+        pcall(Cards.close, e.player_id)
+      end
       LMenu.close(e.player_id)
     end
   end)
 
   Net:on("area_transfer", function(e)
     if e and e.player_id then
-      -- Area change: close menu so states don't leak between maps
+      -- Area change: close UIs so states don't leak between maps
+      if Cards and type(Cards.close) == "function" then
+        pcall(Cards.close, e.player_id)
+      end
       LMenu.close(e.player_id)
     end
   end)

@@ -1,0 +1,23 @@
+animation state="idle"
+frame duration="0.08" x="0" y="3" w="21" h="30" originx="10.5" originy="15"
+frame duration="0.08" x="23" y="2" w="21" h="30" originx="10.5" originy="15"
+frame duration="0.08" x="46" y="1" w="21" h="30" originx="10.5" originy="15"
+frame duration="0.08" x="69" y="1" w="21" h="30" originx="10.5" originy="15"
+frame duration="0.08" x="92" y="1" w="21" h="30" originx="10.5" originy="15"
+frame duration="0.08" x="115" y="2" w="21" h="30" originx="10.5" originy="15"
+
+animation state="IDLE_D"
+
+animation state="IDLE_DL"
+
+animation state="IDLE_DR"
+
+animation state="IDLE_L"
+
+animation state="IDLE_R"
+
+animation state="IDLE_U"
+
+animation state="IDLE_UL"
+
+animation state="IDLE_UR"
