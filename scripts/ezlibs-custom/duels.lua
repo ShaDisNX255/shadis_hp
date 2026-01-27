@@ -388,7 +388,8 @@ PAUSE_MENU = {
 
   -- Slide-in animation (from left -> final position)
   slide_enabled = true,
-  slide_from_x = -20,     -- starting offset in layout px (negative means offscreen-left)
+  slide_from_x = -35,     -- starting offset in layout px (negative means offscreen-left)
+  slide_duration = 0.5,
   },
 
 -- Spells menu
@@ -453,13 +454,13 @@ AI = {
   type = "default",
 
   -- Delay before the AI starts acting on its turn (seconds)
-  think_delay = 0.25,
+  think_delay = 0.20,
 
   -- Delay between finishing a summon/position-change and starting an attack (seconds)
-  attack_delay = 0.75,
+  attack_delay = 0.45,
 
   -- If the AI has no legal action, how long to wait before ending its turn (seconds)
-  end_turn_delay = 0.6,
+  end_turn_delay = 0.4,
 
   -- Print the AI plan + reason to logs
   debug = false,
@@ -562,7 +563,43 @@ AI = {
     y = 20,
     z = 206,
   },
+  TIME_SCALE = 0.18, -- 0.25 for 75% faster (more aggressive)
 }
+
+do
+  local TS = tonumber(duels.KNOBS.TIME_SCALE) or 1.0
+  if TS ~= 1.0 then
+    local function scale_frames(v)
+      return math.max(1, math.floor(v * TS + 0.5))
+    end
+
+    local function walk(t)
+      for k, v in pairs(t) do
+        if type(v) == "table" then
+          walk(v)
+        elseif type(v) == "number" then
+          local ks = tostring(k)
+          -- seconds-ish knobs
+          if ks == "duration"
+            or ks == "hold"
+            or ks == "end_hold"
+            or ks == "slide_duration"
+            or ks:match("_delay$")
+            or ks:match("_duration$")
+            or ks:match("_hold$")
+          then
+            t[k] = v * TS
+          -- tick/frame-ish knobs
+          elseif ks == "life_frames" then
+            t[k] = scale_frames(v)
+          end
+        end
+      end
+    end
+
+    walk(duels.KNOBS)
+  end
+end
 
 -- ---------------------------------------------------------------------------
 -- State per player
