@@ -1002,6 +1002,12 @@ eznpcs.add_event{
         await(_tick())
       end
 
+      -- IMPORTANT: duels calls on_finish BEFORE it clears/deallocates the duel sprites.
+      -- So wait until the duel UI is actually closed before continuing.
+      while duels.is_open_for and duels.is_open_for(player_id) do
+        await(_tick())
+      end
+
       if result and result.player_won then
         return dialogue.custom_properties["Battle Won"]
       else
