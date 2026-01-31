@@ -222,18 +222,25 @@
     <property name="Amount 11" value="1"/>
     <property name="Type 11" value="decor"/>
     <property name="Price 11" value="80"/>
-    <property name="Sell 12" value="giant_rug"/>
+    <property name="Sell 12" value="pet_kabutank"/>
     <property name="Amount 12" value="1"/>
-    <property name="Type 12" value="decor"/>
-    <property name="Price 12" value="500"/>
-    <property name="Sell 13" value="pet_kabutank"/>
+    <property name="Type 12" value="pet"/>
+    <property name="Price 12" value="100"/>
+    <property name="Sell 13" value="pet_spooky"/>
     <property name="Amount 13" value="1"/>
     <property name="Type 13" value="pet"/>
     <property name="Price 13" value="100"/>
-    <property name="Sell 14" value="pet_spooky"/>
+    <property name="Sell 14" value="giant_rug"/>
     <property name="Amount 14" value="1"/>
-    <property name="Type 14" value="pet"/>
-    <property name="Price 14" value="100"/>
+    <property name="Type 14" value="decor"/>
+    <property name="Price 14" value="500"/>
+    <property name="Sell 15" value="Tokens"/>
+    <property name="Type 15" value="cosmetic"/>
+    <property name="Price 15" value="500"/>
+    <property name="Sell 16" value="[GDR]F.A.REBD"/>
+    <property name="Amount 16" value="1"/>
+    <property name="Type 16" value="item"/>
+    <property name="Price 16" value="500"/>
    </properties>
    <point/>
   </object>

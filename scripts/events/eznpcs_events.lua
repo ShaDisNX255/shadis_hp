@@ -1831,6 +1831,11 @@ eznpcs.add_event{
             then
               await(Async.message_player(player_id, owned_msg, mug.texture_path, mug.animation_path))
             else
+              -- Preview for cosmetics (optional)
+              if chosen.type == "cosmetic" and cosmetics and cosmetics.preview_for_shop then
+                cosmetics.preview_for_shop(player_id, chosen.id)
+              end
+
               -- Confirmation
               local question
               if (chosen.type ~= "cosmetic") and chosen.amount ~= 1 then
