@@ -121,7 +121,7 @@ Month.MONTHS = {
         { type = "item", name = "[GR]DMGirl",     description = "GRare: Dark Magician Girl - A: 2000 / D: 1700", amount = 1, weight = 4 },
         { type = "item", name = "[GR]DMag",       description = "GRare: Dark Magician - A: 2500 / D: 2100", amount = 1, weight = 4 },
         { type = "item", name = "[GDR]S.Skull",   description = "GDRare: Summoned Skull - A: 2500 / D: 1200", amount = 1, weight = 2 },
-        { type = "item", name = "[SR]F.A.DMGirl", description = "FullArt: Dark Magician Girl - A: 2000 / D: 1700", amount=1, weight = 2}
+        { type = "item", name = "[SR]F.A.DMGirl", description = "FullArt: Dark Magician Girl - A: 2000 / D: 1700", amount=1, weight = 2},
         { type = "item", name = "[UR]F.A.DMag",   description = "FullArt: Dark Magician - A: 2500 / D: 2100", amount=1, weight = 2}
       },
     },
@@ -163,8 +163,8 @@ Month.EVENTS = {
   {
    id   = "PrizeTest-260203",
    name = "Prize Test",
-   start = "2026-02-03",
-   ["end"] = "2026-02-03",
+   start = "2026-02-02",
+   ["end"] = "2026-02-02",
    rewards = {
      cosmetics = {
        { id = "Lightning1", label = "Lightning1" },
