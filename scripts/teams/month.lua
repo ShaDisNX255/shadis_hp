@@ -127,7 +127,6 @@ Month.MONTHS = {
     },
   },
 }
-}
 
 -- ===== Dated special events (independent of monthly rewards) =====
 -- Dates inclusive, format "YYYY-MM-DD"
@@ -164,8 +163,8 @@ Month.EVENTS = {
   {
    id   = "PrizeTest-260203",
    name = "Prize Test",
-   start = "2026-02-01",
-   ["end"] = "2026-02-01",
+   start = "2026-02-03",
+   ["end"] = "2026-02-03",
    rewards = {
      cosmetics = {
        { id = "Lightning1", label = "Lightning1" },
