@@ -790,6 +790,31 @@ local cosmetics = {
     menu_preview_offset_y   = 0,
     menu_preview_scale          = 1.0,
   },
+  {
+    id              = "Tokens",
+    key             = "Tokens",
+    name            = "Tokens",
+    texture         = "/server/assets/cosmetics/Tokens.png",
+    animation       = "/server/assets/cosmetics/Tokens.animation",
+    anim_state      = "Tokens",
+    preview_sprite_id = "preview_Tokens",
+    rarity          = "CYAN_5",
+    loop_duration = 1.6,
+
+    xforced         = 37,
+    yforced         = 0,
+
+    preview_start_x = -18,
+    preview_start_y = -48,
+
+    menu_preview_texture    = "/server/assets/cosmetics/Tokens_preview.png",
+    menu_preview_animation  = "/server/assets/cosmetics/Tokens_preview.animation",
+    menu_preview_anim_state = "Tokens_preview",
+    menu_preview_sprite_id  = "menu_preview_Tokens",
+    menu_preview_offset_x   = 5,
+    menu_preview_offset_y   = 5,
+    menu_preview_scale          = 1.0,
+  },
 }
 
 return {

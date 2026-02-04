@@ -1002,6 +1002,12 @@ eznpcs.add_event{
         await(_tick())
       end
 
+      -- IMPORTANT: duels calls on_finish BEFORE it clears/deallocates the duel sprites.
+      -- So wait until the duel UI is actually closed before continuing.
+      while duels.is_open_for and duels.is_open_for(player_id) do
+        await(_tick())
+      end
+
       if result and result.player_won then
         return dialogue.custom_properties["Battle Won"]
       else
@@ -1825,6 +1831,11 @@ eznpcs.add_event{
             then
               await(Async.message_player(player_id, owned_msg, mug.texture_path, mug.animation_path))
             else
+              -- Preview for cosmetics (optional)
+              if chosen.type == "cosmetic" and cosmetics and cosmetics.preview_for_shop then
+                cosmetics.preview_for_shop(player_id, chosen.id)
+              end
+
               -- Confirmation
               local question
               if (chosen.type ~= "cosmetic") and chosen.amount ~= 1 then
