@@ -212,6 +212,11 @@ local cfg = {
   fade_alpha   = 120,   -- 0..255 (how dark it gets while menu is open)
   fade_in_sec  = 0.08,  -- tweak 0.05..0.15
   fade_out_sec = 0.08,
+
+  row_x_pvp       = nil,
+
+  pvp_texture     = "/server/assets/ui/lmenu/lpvp.png",
+  pvp_anim        = "/server/assets/ui/lmenu/lpvp.animation",
 }
 
 local function lmenu_fade(pid, alpha, duration)
@@ -246,6 +251,7 @@ local SPRITE_ID_JOBS       = "lmenu_jobs"
 local SPRITE_ID_LINE       = "lmenu_line"
 local SPRITE_ID_ONLINE_TAB = "lmenu_online_tab"
 local ONLINE_TEXT_ID       = "lmenu_online_count"
+local SPRITE_ID_PVP        = "lmenu_pvp"
 
 -- ---------------------------------------------------------------------------
 -- Logging (safe even if helpers module isn't present)
@@ -477,6 +483,8 @@ local function build_rows_for_player(pid)
 
   -- Cosmetics: always show the row
   rows[#rows+1] = { id = "cosmetics" }
+
+  rows[#rows+1] = { id = "pvp" }
 
   return rows
 end
@@ -715,6 +723,31 @@ local function ensure_online_tab_ui(pid)
   end
 end
 
+local function ensure_pvp_ui(pid, y, selected)
+  local x = cfg.row_x_pvp or cfg.base_x
+
+  pcall(frame.add_ui_element,
+    SPRITE_ID_PVP,
+    pid,
+    cfg.pvp_texture,
+    cfg.pvp_anim,
+    selected and "PVP_SELECTED" or "PVP_UNSELECTED",
+    x, y,
+    cfg.z,
+    cfg.scale, cfg.scale
+  )
+
+  if frame.update_ui_position then
+    pcall(frame.update_ui_position, SPRITE_ID_PVP, pid, x, y, cfg.z)
+  end
+  if frame.set_ui_animation then
+    pcall(frame.set_ui_animation, SPRITE_ID_PVP, pid, selected and "PVP_SELECTED" or "PVP_UNSELECTED")
+  end
+  if frame.update_ui_element then
+    pcall(frame.update_ui_element, SPRITE_ID_PVP, pid, { opacity = 255 })
+  end
+end
+
 local function hide_summon_ui(pid)
   if not frame.update_ui_element then
     return
@@ -731,6 +764,7 @@ local function clear_all_ui(pid)
     pcall(frame.remove_ui_element, SPRITE_ID_FRIENDS,    pid)
     pcall(frame.remove_ui_element, SPRITE_ID_COSMETICS,  pid)
     pcall(frame.remove_ui_element, SPRITE_ID_JOBS,       pid)
+    pcall(frame.remove_ui_element, SPRITE_ID_PVP,        pid)
   end
 
   if Displayer and Displayer.Font and Displayer.Font.eraseTextDisplay then
@@ -776,6 +810,8 @@ local function rebuild_and_redraw(pid)
       ensure_cosmetics_ui(pid, y, selected)
     elseif row.id == "jobs" then
       ensure_jobs_ui(pid, y, selected)
+    elseif row.id == "pvp" then
+      ensure_pvp_ui(pid, y, selected)
     end
   end
 
@@ -1058,6 +1094,46 @@ local function handle_lmenu_button(pid, btn)
       else
         Net.message_player(pid, "(Job progress viewer not available.)")
       end
+      return
+    end
+
+    if row.id == "pvp" then
+      LMenu.close(pid)
+
+      -- 1) Prefer Net bridge (works even if _G is sandboxed)
+      if type(Net) == "table" and type(Net.__octo_open_open_pvp_menu) == "function" then
+        local ok, err = pcall(Net.__octo_open_open_pvp_menu, pid)
+        if not ok then
+          Net.message_player(pid, "(Open PVP error: " .. tostring(err) .. ")")
+        end
+        return
+      end
+
+      -- 2) If not loaded yet, try loading Octo on demand (covers “Octo only loaded in WCity”)
+      if type(Net) == "table" and not Net.__octo_pvp_loaded then
+        pcall(require, "scripts/octo-ranking/main")
+      end
+
+      -- Try the bridge again after require
+      if type(Net) == "table" and type(Net.__octo_open_open_pvp_menu) == "function" then
+        local ok, err = pcall(Net.__octo_open_open_pvp_menu, pid)
+        if not ok then
+          Net.message_player(pid, "(Open PVP error: " .. tostring(err) .. ")")
+        end
+        return
+      end
+
+      -- 3) Fallback: _G hook (works only if globals are shared)
+      local Octo = rawget(_G, "OctoPVP")
+      if type(Octo) == "table" and type(Octo.open_open_pvp_menu) == "function" then
+        local ok, err = pcall(Octo.open_open_pvp_menu, pid)
+        if not ok then
+          Net.message_player(pid, "(Open PVP error: " .. tostring(err) .. ")")
+        end
+        return
+      end
+
+      Net.message_player(pid, "(Open PVP menu not available.)")
       return
     end
 
