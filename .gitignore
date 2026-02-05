@@ -6,8 +6,10 @@ memory/*
 memory/players.json.json
 memory/players.json_backup.json
 scripts/bbs/data.json
-scripts/octo-ranking/player_id_ranks.json
-scripts/octo-ranking/player_id_ranks.txt
+scripts/octo-ranking/player_id_ranks_open.json
+scripts/octo-ranking/player_id_ranks_open.txt
+scripts/octo-ranking/player_id_ranks_wcity.json
+scripts/octo-ranking/player_id_ranks_wcity.txt
 logs.txt
 assets/displayer/*
 assets/net-games/*
