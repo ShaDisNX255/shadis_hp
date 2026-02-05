@@ -151,8 +151,8 @@ end
 
 local cfg = {
   -- Logical UI coordinates (0..240 x, 0..160 y); framework doubles them internally.
-  base_x      = 15,   -- default X for rows (used if row_x_* is nil)
-  base_y      = 30,   -- move menu up/down
+  base_x      = 13,   -- default X for rows (used if row_x_* is nil)
+  base_y      = 26,   -- move menu up/down
   row_spacing = 18,   -- vertical distance between rows
   z           = 6,    -- UI Z-depth
   scale       = 2,    -- change if tabs feel too big/small
@@ -164,6 +164,7 @@ local cfg = {
   row_x_friends   = nil,
   row_x_cosmetics = 12,
   row_x_jobs      = nil,
+  row_x_pvp       = nil,
 
   -- Cards row (always present)
   cards_texture   = "/server/assets/ui/lmenu/lcards.png",
@@ -183,6 +184,10 @@ local cfg = {
   -- Jobs row button
   jobs_texture    = "/server/assets/ui/lmenu/ljobs.png",
   jobs_anim       = "/server/assets/ui/lmenu/ljobs.animation",
+
+  -- PVP row button (OpenPVP; hidden in WCity areas)
+  pvp_texture     = "/server/assets/ui/lmenu/lpvp.png",
+  pvp_anim        = "/server/assets/ui/lmenu/lpvp.animation",
 
   -- Decorative line at the bottom
   line_texture    = "/server/assets/ui/lmenu/lline.png",
@@ -243,6 +248,7 @@ local SPRITE_ID_SUMMON     = "lmenu_summon"      -- used for both Summon and Uns
 local SPRITE_ID_FRIENDS    = "lmenu_friends"
 local SPRITE_ID_COSMETICS  = "lmenu_cosmetics"
 local SPRITE_ID_JOBS       = "lmenu_jobs"
+local SPRITE_ID_PVP        = "lmenu_pvp"
 local SPRITE_ID_LINE       = "lmenu_line"
 local SPRITE_ID_ONLINE_TAB = "lmenu_online_tab"
 local ONLINE_TEXT_ID       = "lmenu_online_count"
@@ -472,6 +478,17 @@ local function build_rows_for_player(pid)
   -- Jobs: always show the row
   rows[#rows+1] = { id = "jobs" }
 
+  -- OpenPVP row (hidden in WCity areas where OctoPVP="true")
+  local in_wcity = false
+  if Net and Net.get_player_area and Net.get_area_custom_property then
+    local area = Net.get_player_area(pid)
+    local v    = Net.get_area_custom_property(area, "OctoPVP")
+    in_wcity = (v == "true")
+  end
+  if not in_wcity then
+    rows[#rows+1] = { id = "pvp" }
+  end
+
   -- Friends is always available
   rows[#rows+1] = { id = "friends" }
 
@@ -615,6 +632,39 @@ local function ensure_jobs_ui(pid, y, selected)
   end
 end
 
+
+local function ensure_pvp_ui(pid, y, selected)
+  if not cfg.pvp_texture or cfg.pvp_texture == "" then
+    return
+  end
+
+  local anim = selected and "PVP_SELECTED" or "PVP_UNSELECTED"
+  local x    = cfg.row_x_pvp or cfg.base_x
+
+  frame.add_ui_element(
+    SPRITE_ID_PVP,
+    pid,
+    cfg.pvp_texture,
+    cfg.pvp_anim,
+    anim,
+    x,
+    y,
+    cfg.z,
+    cfg.scale,
+    cfg.scale
+  )
+
+  if frame.update_ui_position then
+    frame.update_ui_position(SPRITE_ID_PVP, pid, x, y, cfg.z)
+  end
+  if frame.set_ui_animation then
+    frame.set_ui_animation(SPRITE_ID_PVP, pid, anim)
+  end
+  if frame.update_ui_element then
+    frame.update_ui_element(SPRITE_ID_PVP, pid, { opacity = 255 })
+  end
+end
+
 local function ensure_cosmetics_ui(pid, y, selected)
   if not cfg.cosmetics_texture or cfg.cosmetics_texture == "" then
     -- Asset not configured; keep row logic but no sprite
@@ -731,6 +781,7 @@ local function clear_all_ui(pid)
     pcall(frame.remove_ui_element, SPRITE_ID_FRIENDS,    pid)
     pcall(frame.remove_ui_element, SPRITE_ID_COSMETICS,  pid)
     pcall(frame.remove_ui_element, SPRITE_ID_JOBS,       pid)
+    pcall(frame.remove_ui_element, SPRITE_ID_PVP,        pid)
   end
 
   if Displayer and Displayer.Font and Displayer.Font.eraseTextDisplay then
@@ -776,6 +827,8 @@ local function rebuild_and_redraw(pid)
       ensure_cosmetics_ui(pid, y, selected)
     elseif row.id == "jobs" then
       ensure_jobs_ui(pid, y, selected)
+    elseif row.id == "pvp" then
+      ensure_pvp_ui(pid, y, selected)
     end
   end
 
@@ -1028,6 +1081,22 @@ local function handle_lmenu_button(pid, btn)
         return
       end
       rebuild_and_redraw(pid)
+      return
+    end
+
+    -- OpenPVP
+    if row.id == "pvp" then
+      LMenu.close(pid)
+
+      local octo = rawget(_G, "OctoPVP")
+      if octo and type(octo.open_openpvp_menu) == "function" then
+        local okp, errp = pcall(octo.open_openpvp_menu, pid)
+        if not okp then
+          warn("OctoPVP.open_openpvp_menu failed for", pid, ":", tostring(errp))
+        end
+      else
+        Net.message_player(pid, "(Open PVP not available.)")
+      end
       return
     end
 
