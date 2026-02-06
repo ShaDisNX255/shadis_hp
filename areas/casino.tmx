@@ -238,6 +238,7 @@
     <property name="Type 15" value="cosmetic"/>
     <property name="Price 15" value="500"/>
     <property name="Sell 16" value="[GDR]F.A.REBD"/>
+    <property name="Desc 16" value="FullArt: Red-Eyes Black Dragon - A: 2400 / D: 2000"/>
     <property name="Amount 16" value="1"/>
     <property name="Type 16" value="item"/>
     <property name="Price 16" value="500"/>
