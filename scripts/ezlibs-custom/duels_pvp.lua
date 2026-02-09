@@ -58,6 +58,14 @@ if type(duels.KNOBS) == "table" then
 end
 
 -- ---------------------------------------------------------------------------
+-- Time helper (server-safe): accumulate wall time from Net:on("tick") delta_time
+-- ---------------------------------------------------------------------------
+duels._time = duels._time or 0.0
+duels._now  = duels._now  or function()
+  return duels._time
+end
+
+-- ---------------------------------------------------------------------------
 -- helpers + ezmemory (same pattern as cards.lua)
 -- ---------------------------------------------------------------------------
 local helpers_ok, helpers = pcall(require, "scripts/ezlibs-scripts/helpers")
@@ -535,7 +543,7 @@ end
 
 local function _set_turn_status(st)
   -- “pop” for 2 seconds whenever turn changes (we’ll keep a small label permanently too)
-  st.turn_status_pop_until = os.clock() + 2.0
+  st.turn_status_pop_until = duels._now() + 2.0
 end
 
 local function _update_turn_status(pid, st, now)
@@ -1428,7 +1436,7 @@ local function _start_summon_anim(pid, st, card, start_x, start_y, start_s, end_
     flip_min = 0.06
   end
 
-  local now = os.clock()
+  local now = duels._now()
   st.summon_anim = {
     active = true,
     started_at = now,
@@ -1474,7 +1482,7 @@ local function _update_summon_anim(pid, st)
   local a = st and st.summon_anim
   if not (a and a.active) then return false end
 
-  local now = os.clock()
+  local now = duels._now()
   local t = (now - (a.started_at or now)) / (a.duration or 0.35)
   t = _clamp01(t)
 
@@ -1560,7 +1568,7 @@ local function _update_pos_anim(pid, st)
   local a = st and st.pos_anim
   if not (a and a.active) then return false end
 
-  local now = os.clock()
+  local now = duels._now()
   local t = (now - (a.started_at or now)) / (a.duration or 0.18)
   t = _clamp01(t)
 
@@ -1864,7 +1872,7 @@ local function _start_attack_anim(pid, st, attacker_side)
 
   local a = {
     active = true,
-    started_at = os.clock(),
+    started_at = duels._now(),
     duration = tonumber(ak.duration) or 0.22,
     attacker_side = attacker_side,
     defender_side = defender_side,
@@ -1962,7 +1970,7 @@ local function _update_attack_anim(pid, st)
   local a = st and st.attack_anim
   if not (a and a.active) then return false end
 
-  local now = os.clock()
+  local now = duels._now()
   local dur = tonumber(a.duration) or 0.22
   if dur <= 0 then dur = 0.001 end
   local t = (now - (a.started_at or now)) / dur
@@ -2270,7 +2278,7 @@ local function _start_draw_anim(pid, st, side, forced_deck_index, t0_now)
     active = true,
     side = side,
     stage = 1,
-    t0 = t0_now or os.clock(),
+    t0 = t0_now or duels._now(),
     pending_draw = true,
     vis_before = vis_before,
     drawn_card = nil,
@@ -2527,7 +2535,7 @@ if n > 1 then
         local pick = (ply.rng and _rng_int(ply.rng, 1, #pile)) or math.random(1, #pile)
         local deck_index = pile[pick]
 
-        local t0 = os.clock()
+        local t0 = duels._now()
         local started_owner  = _start_draw_anim(pid, st, "ply", deck_index, t0)
         local started_mirror = _start_draw_anim(other_pid, other_st, "opp", deck_index, t0)
 
@@ -2554,7 +2562,7 @@ if n > 1 then
 
   elseif (not st.pvp) then
     -- (Shouldn't happen in duels_pvp, but safe)
-    local started = _start_draw_anim(pid, st, side, nil, os.clock())
+    local started = _start_draw_anim(pid, st, side, nil, duels._now())
     if not started then
       _draw_one_at_start_of_turn(pid, st, side)
     end
@@ -2719,7 +2727,7 @@ local function _draw_pause_menu(pid, st)
   end
 
   local mk = duels.KNOBS.PAUSE_MENU or {}
-  local now = os.clock()
+  local now = duels._now()
 
   -- If slide_enabled gets toggled ON while open, restart the slide.
   local slide_enabled = (mk.slide_enabled ~= false)
@@ -3172,7 +3180,7 @@ function _end_duel_by_points(pid, st)
   end
 
   local hold = tonumber((duels.KNOBS.POINT_COUNTER or {}).end_hold) or 1.0
-  st.pending_close_at = os.clock() + hold
+  st.pending_close_at = duels._now() + hold
 end
 
 function _draw_hands(pid, st)
@@ -3722,7 +3730,7 @@ local function _toggle_player_monster_position(pid, st)
   st.pos_anim = {
     active = true,
     target_side = "ply",
-    started_at = os.clock(),
+    started_at = duels._now(),
     duration = tonumber(pk.duration) or 0.18,
 
     kind = kind,
@@ -3795,7 +3803,7 @@ local function _start_reveal_def_anim(pid, st, target_side)
   st.pos_anim = {
     active = true,
     target_side = target_side,
-    started_at = os.clock(),
+    started_at = duels._now(),
     duration = tonumber(pk.duration) or 0.18,
 
     kind = "fd_to_def",
@@ -3908,7 +3916,7 @@ function _toggle_opponent_monster_position(pid, st)
   st.pos_anim = {
     active = true,
     target_side = "opp",
-    started_at = os.clock(),
+    started_at = duels._now(),
     duration = tonumber(pk.duration) or 0.18,
 
     kind = kind,
@@ -4670,7 +4678,7 @@ Net:on("virtual_input", function(event)
 
             st.in_pause_menu = true
             st.pause_choice = 1
-            st.pause_menu_opened_at = os.clock()
+            st.pause_menu_opened_at = duels._now()
             st.pause_menu_last_slide_enabled = nil
 
             _erase_obj(pid, duels.CURSOR_SPRITE_ID .. "_obj")
@@ -4874,12 +4882,12 @@ end
 
             st.duel_over = true
             st.duel_outcome = "opp" -- you conceded, you lose
-            st.pending_close_at = os.clock()
+            st.pending_close_at = duels._now()
 
             if other_st then
               other_st.duel_over = true
               other_st.duel_outcome = "ply" -- opponent wins
-              other_st.pending_close_at = os.clock()
+              other_st.pending_close_at = duels._now()
               _close(other_pid)
             end
 
@@ -5270,8 +5278,14 @@ end
 if not rawget(_G, "__duels_pvp_tick_v1_registered") then
   rawset(_G, "__duels_pvp_tick_v1_registered", true)
 
-Net:on("tick", function()
-  local now = os.clock()
+Net:on("tick", function(ev)
+  -- advance wall-time (clamp to avoid huge jumps if the server hitches)
+  local dt = (ev and ev.delta_time) or (1/60)
+  if dt < 0 then dt = 0 end
+  if dt > 0.25 then dt = 0.25 end
+  duels._time = duels._time + dt
+
+  local now = duels._now()
 
   for pid, st in pairs(st_by_pid) do
     if st then
