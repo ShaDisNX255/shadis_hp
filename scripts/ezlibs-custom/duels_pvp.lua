@@ -66,12 +66,16 @@ if not helpers_ok then helpers = nil end
 local ezmemory_ok, ezmemory = pcall(require, "scripts/ezlibs-scripts/ezmemory")
 if not ezmemory_ok then ezmemory = nil end
 
--- ---------------------------------------------------------------------------
--- Opponent AI module (decision logic only)
--- ---------------------------------------------------------------------------
-local duels_AI_ok, duels_AI = pcall(require, "scripts/ezlibs-custom/duels_AI")
-if not duels_AI_ok then duels_AI = nil end
-
+local function _ensure_runtime_deps()
+  if not helpers then
+    local ok, m = pcall(require, "scripts/ezlibs-scripts/helpers")
+    if ok and type(m) == "table" then helpers = m end
+  end
+  if not ezmemory then
+    local ok, m = pcall(require, "scripts/ezlibs-scripts/ezmemory")
+    if ok and type(m) == "table" then ezmemory = m end
+  end
+end
 
 local sleeves_ok, card_sleeves = pcall(require, "scripts/ezlibs-custom/card_sleeves")
 if not sleeves_ok then card_sleeves = nil end
@@ -174,6 +178,7 @@ duels.SPELLS_MENU_ICON_PREFIX = "duel_spells_menu_icon_"
 duels.SPELLS_MENU_COST_PREFIX = "duel_spells_menu_cost_"
 duels.SPELLS_MENU_TEXT_NAME_PREFIX = "duel_spells_menu_name_"
 duels.SPELLS_MENU_TEXT_DESC_PREFIX = "duel_spells_menu_desc_"
+duels.TURN_STATUS_TEXT_ID = "ygo_pvp_turn_status"
 
 duels.PLY_SPELL_OBJ_PREFIX = "duel_ply_spell_"
 duels.OPP_SPELL_OBJ_PREFIX = "duel_opp_spell_"
@@ -193,6 +198,9 @@ local _toggle_opponent_monster_position
 local _draw_point_counters
 local _end_duel_by_points
 local _ai_opp_try_cast_spell
+local _clear_all
+local _draw_field
+local _erase_spells_menu
 
 -- ---------------------------------------------------------------------------
 -- Knobs
@@ -203,6 +211,12 @@ local _ai_opp_try_cast_spell
 -- State per player
 -- ---------------------------------------------------------------------------
 local st_by_pid = {}
+
+-- PVP: we build states immediately, but wait to OPEN UI until board_close
+local pending_pvp_state_by_pid = {}
+local pending_pvp_open_by_pid  = {}
+
+local pvp_end_notified_by_match = {}
 
 -- Last duel result (persists after _close so other systems can query it)
 local last_duel_result_by_pid = {}
@@ -246,10 +260,23 @@ local function split_area_id(raw_id)
 end
 
 local function get_safe_secret(pid)
+  _ensure_runtime_deps()
+
   if helpers and type(helpers.get_safe_player_secret) == "function" then
     local ok, res = pcall(helpers.get_safe_player_secret, pid)
-    if ok and res ~= nil then return res end
+    if ok and res ~= nil then
+      return res
+    end
   end
+
+  -- Fallback if helpers isn't available yet
+  if Net and type(Net.get_player_secret) == "function" then
+    local ok, res = pcall(Net.get_player_secret, pid)
+    if ok and res ~= nil then
+      return res
+    end
+  end
+
   return pid
 end
 
@@ -265,11 +292,29 @@ local function clone_counts(t)
 end
 
 local function get_player_mem(pid)
+  _ensure_runtime_deps()
+
   if not (ezmemory and ezmemory.get_player_memory) then return {} end
+
   local secret = get_safe_secret(pid)
-  local ok, pmem = pcall(ezmemory.get_player_memory, secret)
-  if ok and type(pmem) == "table" then return pmem end
-  return {}
+
+  local ok1, pmem1 = pcall(ezmemory.get_player_memory, secret)
+  if ok1 and type(pmem1) == "table" then
+    -- If it already contains deck key, we're done
+    if pmem1[duels.DECK_MEM_KEY] ~= nil then
+      return pmem1
+    end
+  end
+
+  -- Fallback: sometimes memory is keyed directly by pid
+  local ok2, pmem2 = pcall(ezmemory.get_player_memory, pid)
+  if ok2 and type(pmem2) == "table" then
+    if pmem2[duels.DECK_MEM_KEY] ~= nil then
+      return pmem2
+    end
+  end
+
+  return (type(pmem1) == "table" and pmem1) or {}
 end
 
 local function load_deck_counts(pid)
@@ -484,6 +529,50 @@ local function parse_atk_def_from_text(text)
   return tonumber(A), tonumber(D)
 end
 
+local function _erase_turn_status(pid)
+  erase_text(pid, duels.TURN_STATUS_TEXT_ID)
+end
+
+local function _set_turn_status(st)
+  -- “pop” for 2 seconds whenever turn changes (we’ll keep a small label permanently too)
+  st.turn_status_pop_until = os.clock() + 2.0
+end
+
+local function _update_turn_status(pid, st, now)
+  if not st or not st.pvp then
+    _erase_turn_status(pid)
+    if st then
+      st._turn_status_last_text = nil
+      st._turn_status_last_scale = nil
+    end
+    return
+  end
+
+  ensure_player_fonts(pid)
+
+  local my_turn = (st.turn == "ply")
+  local text = my_turn and "Your Turn" or "Opp Turn"
+
+  -- bottom-right-ish (tweak later if you want)
+  local x, y = 180, 145
+  local z = 260
+
+  local scale = 1.4
+  if st.turn_status_pop_until then
+    if now < st.turn_status_pop_until then
+      scale = 2.0
+    else
+      st.turn_status_pop_until = nil
+    end
+  end
+
+  if text ~= st._turn_status_last_text or scale ~= st._turn_status_last_scale then
+    erase_text(pid, duels.TURN_STATUS_TEXT_ID)
+    draw_text(pid, text, x, y, "THICK", scale, z, duels.TURN_STATUS_TEXT_ID)
+    st._turn_status_last_text = text
+    st._turn_status_last_scale = scale
+  end
+end
 
 local function _clear_info_panel(pid)
   erase_text(pid, duels.INFO_NAME_ID)
@@ -881,7 +970,7 @@ local function _hash_string(s)
   return h
 end
 
-local function _resolve_facedown_tex(pid)
+local function _resolve_facedown_tex_for_pid(pid)
   if card_sleeves and card_sleeves.get_equipped and card_sleeves.get_tex_for_id then
     local ok_id, id = pcall(card_sleeves.get_equipped, pid)
     if ok_id and id then
@@ -894,23 +983,35 @@ local function _resolve_facedown_tex(pid)
   return duels.FACE_DOWN_TEX
 end
 
-local function _ensure_facedown_sprite(pid, st)
-  if not st then return duels.OPP_HAND_SPRITE_ID end
+local function _facedown_tex_for_side(st, side)
+  side = side or "opp"
+  local t = st and st.facedown_tex_by_side
+  local tex = t and t[side]
+  if tex and tex ~= "" then return tex end
+  return duels.FACE_DOWN_TEX
+end
 
-  local tex = st.facedown_tex or duels.FACE_DOWN_TEX
-  if not tex or tex == "" then tex = duels.FACE_DOWN_TEX end
-
-  -- Cache a unique sprite_id per facedown texture to avoid “sprite id doesn’t update” issues.
-  local sid = st.facedown_sprite_id
-  if sid then return sid end
-
-  sid = "duel_facedown_" .. tostring(_hash_string(tex))
-  st.facedown_sprite_id = sid
+local function _ensure_facedown_sprite(pid, st, side)
+  if not (pid and st) then return duels.OPP_HAND_SPRITE_ID end
+  side = side or "opp"
 
   st.allocated_card_sprites = st.allocated_card_sprites or {}
-  st.allocated_card_sprites[#st.allocated_card_sprites + 1] = sid
 
-  _alloc_sprite(pid, sid, tex, duels.CARD_ANIM, duels.CARD_STATE)
+  -- cache per-tex so ply/opp can share if they happen to use same sleeve
+  st.facedown_sprite_by_tex = st.facedown_sprite_by_tex or {}
+  st.facedown_sprite_id_by_side = st.facedown_sprite_id_by_side or {}
+
+  local tex = _facedown_tex_for_side(st, side)
+
+  local sid = st.facedown_sprite_by_tex[tex]
+  if not sid then
+    sid = "duel_facedown_" .. tostring(_hash_string(tex))
+    st.facedown_sprite_by_tex[tex] = sid
+    st.allocated_card_sprites[#st.allocated_card_sprites + 1] = sid
+    _alloc_sprite(pid, sid, tex, duels.CARD_ANIM, duels.CARD_STATE)
+  end
+
+  st.facedown_sprite_id_by_side[side] = sid
   return sid
 end
 
@@ -1292,7 +1393,8 @@ local function _start_summon_anim(pid, st, card, start_x, start_y, start_s, end_
   local sprite_id
   if hidden_set then
     -- Opponent SET: keep FaceDown.png for the entire flight (never show the real card).
-    sprite_id = _ensure_facedown_sprite(pid, st)
+    local swap_side = (opts and opts.target_side) or "opp"
+    sprite_id = _ensure_facedown_sprite(pid, st, swap_side)
   else
     -- ensure the sprite resource exists for this card
     sprite_id = _ensure_card_sprite(pid, st, card)
@@ -1307,7 +1409,8 @@ local function _start_summon_anim(pid, st, card, start_x, start_y, start_s, end_
 
   if kind == "set" then
     -- ensure facedown sprite resource exists (swap target)
-    local fd_sid = _ensure_facedown_sprite(pid, st)
+    local swap_side = (opts and opts.target_side) or "ply"
+    local fd_sid = _ensure_facedown_sprite(pid, st, swap_side)
 
     -- rotate into DEF-style by the end
     ro0 = 0
@@ -1317,6 +1420,7 @@ local function _start_summon_anim(pid, st, card, start_x, start_y, start_s, end_
 
     if not hidden_set then
       alt_sprite_id = fd_sid
+      -- swap right at the "edge-on" moment (mid flight)
       swap_t = 0.50
     end
 
@@ -1789,7 +1893,7 @@ local function _start_attack_anim(pid, st, attacker_side)
     local sprite_id, ro
 
     if mon.facedown then
-      sprite_id = _ensure_facedown_sprite(pid, st)
+      sprite_id = _ensure_facedown_sprite(pid, st, "opp")
       ro = def_ro
     else
       sprite_id = _ensure_card_sprite(pid, st, mon.card)
@@ -1821,7 +1925,7 @@ local function _start_attack_anim(pid, st, attacker_side)
     local sprite_id, ro
 
     if mon.facedown then
-      sprite_id = _ensure_facedown_sprite(pid, st)
+      sprite_id = _ensure_facedown_sprite(pid, st, "ply")
       ro = def_ro
     else
       sprite_id = _ensure_card_sprite(pid, st, mon.card)
@@ -1951,6 +2055,10 @@ end
 
 local function _update_cursor(pid, st)
   if not st then return end
+  if st.pvp and st.turn ~= "ply" then
+    _erase_obj(pid, duels.CURSOR_SPRITE_ID .. "_obj")
+    return
+  end
   if st.in_summon_menu or st.in_field_menu or st.in_pause_menu or st.in_spells_menu or (st.pos_anim and st.pos_anim.active) or (st.attack_anim and st.attack_anim.active) then
     _erase_obj(pid, duels.CURSOR_SPRITE_ID .. "_obj")
     return
@@ -2039,261 +2147,6 @@ local function _draw_random_from_deck(st_side)
   local deck_index = table.remove(pile, pick)
   return deck and deck[deck_index] or nil
 end
--- ---------------------------------------------------------------------------
--- ---------------------------------------------------------------------------
--- Turn flow + Opponent AI
--- ---------------------------------------------------------------------------
-
-local function _ai_knobs()
-  return duels.KNOBS.AI or {}
-end
-
-local function _ai_enabled()
-  local ak = _ai_knobs()
-  return (ak.enabled ~= false) and (duels_AI ~= nil)
-end
-
-local function _ai_ctx(st)
-  local ak = _ai_knobs()
-  local ai_type = (st and st.cfg and st.cfg.ai_type) or ak.type or "default"
-  local rng = st and st.opp and st.opp.rng
-
-  return {
-    ai_type = ai_type,
-    get_card_atk_def = _get_card_atk_def,
-    rng_int = function(lo, hi)
-      lo = math.floor(tonumber(lo) or 1)
-      hi = math.floor(tonumber(hi) or lo)
-      if hi < lo then lo, hi = hi, lo end
-      if rng then
-        return _rng_int(rng, lo, hi)
-      end
-      return math.random(lo, hi)
-    end,
-  }
-end
-
-local function _ai_log(st, plan)
-  local ak = _ai_knobs()
-  if ak.debug ~= true then return end
-
-  local t = (st and st.turn_index) or 0
-  local r = (plan and plan.reason) or ""
-  local kind = (plan and plan.play and plan.play.kind) or "none"
-  local pos  = (plan and plan.play and plan.play.pos) or ""
-  local atk  = (plan and plan.attack) and "attack" or ""
-  local tog  = (plan and plan.toggle_to_atk) and "toggle_to_atk" or ""
-
-  print(("[Duels][AI][t=%d] plan=%s %s %s %s reason=%s"):format(t, kind, pos, tog, atk, r))
-end
-
-local function _ai_clear_pending(st)
-  if not st then return end
-  st.ai_after_summon = nil
-  st.ai_after_pos = nil
-end
-
-local function _ai_opp_queue_attack(pid, st, now)
-  if not _ai_enabled() then return false end
-  if not (st and st.field) then return false end
-
-  -- Rule: only 1 attack per turn (AI)
-  if (st.opp_attacked_turn_index or -1) == (st.turn_index or 0) then
-    return false
-  end
-  -- Attack if we have a face-up ATK monster AND the player has a target monster (no direct attacks).
-  local mon = st.field.opp_monster
-  if not _can_attack(mon) then return false end
-  if not (st.field.ply_monster and st.field.ply_monster.card) then return false end
-
-  local ak = _ai_knobs()
-  local t = now or os.clock()
-  st.pending_opp_attack = true
-  st.pending_opp_attack_at = t + (tonumber(ak.attack_delay) or 0.75)
-  return true
-end
-
-local function _ai_opp_queue_end_turn(pid, st, now)
-  if not _ai_enabled() then return false end
-  if not st then return false end
-  local ak = _ai_knobs()
-  st.pending_opp_end_turn_at = (now or os.clock()) + (tonumber(ak.end_turn_delay) or 0.6)
-  return true
-end
-
-local function _ai_opp_execute_plan(pid, st, plan, now)
-  if not (plan and st and st.opp and st.field) then
-    _ai_opp_queue_end_turn(pid, st, now)
-    return
-  end
-
-  -- Prevent re-entrance while animations are running
-  if (st.summon_anim and st.summon_anim.active) or (st.pos_anim and st.pos_anim.active) or (st.attack_anim and st.attack_anim.active) then
-    return
-  end
-  if st.pending_opp_attack or st.pending_opp_end_turn_at then
-    return
-  end
-
-  _ai_clear_pending(st)
-
-  -- 0) Cast spell immediately (if not tied to a summon)
-  if plan.spell_id and not plan.play then
-    _ai_opp_try_cast_spell(pid, st, plan.spell_id)
-  end
-
-  -- ------------------------------------------------------------
-  -- 1) Play from hand (summon/set) if requested
-  -- ------------------------------------------------------------
-  if plan.play then
-    local hand = st.opp.hand or {}
-    if #hand <= 0 then
-      _ai_opp_queue_end_turn(pid, st, now)
-      return
-    end
-
-    local idx = tonumber(plan.play.hand_index or plan.play.idx or plan.play.i) or 1
-    if idx < 1 then idx = 1 end
-    if idx > #hand then idx = #hand end
-
-    local card = hand[idx]
-    if not card then
-      _ai_opp_queue_end_turn(pid, st, now)
-      return
-    end
-
-    -- Capture start position BEFORE removing from hand
-    local hk = duels.KNOBS.HAND
-    local start_tl_x, start_tl_y = _get_opponent_hand_card_tl(st, idx)
-    local start_x, start_y = _apply_card_origin_if_needed(start_tl_x or 0, start_tl_y or 0, hk.scale or 1, hk.scale or 1)
-
-    -- Remove from opponent hand
-    table.remove(hand, idx)
-
-    -- Clear UI bits that would look weird during AI action
-    _erase_obj(pid, duels.CURSOR_SPRITE_ID .. "_obj")
-    -- only clear opponent zone (prevents player-zone flicker)
-    _erase_obj(pid, duels.MZ1_OBJ_ID)
-    _erase_obj(pid, duels.ATTACK_MZ1_OBJ_ID)
-
-    -- Redraw hands immediately (card leaves hand now)
-    _draw_hands(pid, st)
-
-    st.opp_summoned_this_turn = true
-
-    local mz = duels.KNOBS.MZ1 or {}
-    local end_x, end_y = _apply_card_origin_if_needed(mz.x, mz.y, mz.sx, mz.sy)
-    local start_s = hk.scale or 1
-    local end_s   = mz.sx or 1
-
-    local atk_ro = tonumber(mz.ro) or 0
-    local def_ro = (atk_ro + 90) % 360
-
-    local kind = tostring(plan.play.kind or "summon")
-    local pos  = tostring(plan.play.pos or "atk")
-
-    -- What to do after this summon anim finishes
-    st.ai_after_summon = {
-      spell_id = plan.spell_id,
-      attack = (plan.attack == true),
-      end_turn = (plan.end_turn ~= false),
-    }
-
-    if kind == "set" then
-      _start_summon_anim(pid, st, card, start_x, start_y, start_s, end_x, end_y, end_s, "set", {
-        target_side = "opp",
-        hidden = true,
-        ro0 = 0,
-        ro2 = def_ro,
-        target_pos = "def",
-      })
-      return
-    end
-
-    -- kind == "summon"
-    local ro2 = (pos == "def") and def_ro or atk_ro
-    local target_pos = (pos == "def") and "def" or "atk"
-    _start_summon_anim(pid, st, card, start_x, start_y, start_s, end_x, end_y, end_s, "summon", {
-      target_side = "opp",
-      ro0 = 0,
-      ro2 = ro2,
-      target_pos = target_pos,
-    })
-    return
-  end
-
-  -- ------------------------------------------------------------
-  -- 2) Position toggle (only if already has a monster)
-  -- ------------------------------------------------------------
-  if plan.toggle_to_atk then
-    st.ai_after_pos = {
-      attack = (plan.attack == true),
-      end_turn = (plan.end_turn ~= false),
-    }
-
-    _toggle_opponent_monster_position(pid, st)
-
-    -- If an anim started, we'll wait for it to finish and then continue.
-    if st.pos_anim and st.pos_anim.active then
-      return
-    end
-
-    -- If toggle was not allowed / didn't animate, just fall through.
-  end
-
-  -- ------------------------------------------------------------
-  -- 3) Attack (no summon this turn)
-  -- ------------------------------------------------------------
-  if plan.attack == true then
-    local attacked = _ai_opp_queue_attack(pid, st, now)
-    if attacked then return end
-  end
-
-  -- ------------------------------------------------------------
-  -- 4) End turn
-  -- ------------------------------------------------------------
-  if plan.end_turn ~= false then
-    _ai_opp_queue_end_turn(pid, st, now)
-  end
-end
-
-local function _ai_opp_take_turn(pid, st, now)
-  if not _ai_enabled() then return end
-  if not st then return end
-  if st.in_pause_menu or st.in_spells_menu then return end
-  if st.turn ~= "opp" then return end
-  if not duels_AI then return end
-
-  local ak = _ai_knobs()
-  local delay = tonumber(ak.think_delay) or 0.25
-  local t = now or os.clock()
-
-  -- Plan once per opponent turn
-  if st.ai_planned_for_turn ~= (st.turn_index or 0) then
-    st.ai_planned_for_turn = (st.turn_index or 0)
-    st.ai_plan_at = t + delay
-    st.ai_cached_plan = nil
-  end
-
-  if st.ai_cached_plan == nil and t >= (st.ai_plan_at or 0) then
-    st.ai_cached_plan = duels_AI.plan(st, _ai_ctx(st))
-    _ai_log(st, st.ai_cached_plan)
-  end
-
-  if st.ai_cached_plan then
-    _ai_opp_execute_plan(pid, st, st.ai_cached_plan, now)
-
-    -- Clear cache once we start an animation or schedule something
-    if (st.summon_anim and st.summon_anim.active)
-      or (st.pos_anim and st.pos_anim.active)
-      or (st.pending_opp_attack)
-      or (st.pending_opp_end_turn_at) then
-      st.ai_cached_plan = nil
-    end
-  end
-end
-
-
 
 local function _hand_max_for_side(st, side)
   local hm = duels.KNOBS.HAND_MAX or {}
@@ -2355,13 +2208,11 @@ local function _draw_deck_stack(pid, st, side)
   local prefix = (side == "opp") and duels.OPP_DECK_OBJ_PREFIX or duels.PLY_DECK_OBJ_PREFIX
   local base = (side == "opp") and duels.KNOBS.OPP_HAND_POS or duels.KNOBS.PLY_HAND_POS
 
-  -- Deck anchor: exactly under the hand’s tuned base (revealed by sliding the hand away)
   local x0_tl = (base.x or 0)
   local y0_tl = (base.y or 0)
 
-  local fd_sid = _ensure_facedown_sprite(pid, st)
+  local fd_sid = _ensure_facedown_sprite(pid, st, side)
 
-  -- Draw stack bottom->top
   for i = 1, vis do
     local x_tl = x0_tl + (i - 1) * dk.stack_dx
     local y_tl = y0_tl + (i - 1) * dk.stack_dy
@@ -2369,7 +2220,6 @@ local function _draw_deck_stack(pid, st, side)
     _draw_sprite_obj(pid, fd_sid, prefix .. i, x, y, hsx, hsy, dk.z + i, duels.CARD_STATE, base.ro)
   end
 
-  -- erase stale
   for i = vis + 1, dk.max_visible do
     _erase_obj(pid, prefix .. i)
   end
@@ -2386,7 +2236,19 @@ local function _hand_slot_tl_for_count(st, side, count_new, index_new)
   return x_tl, y_tl
 end
 
-local function _start_draw_anim(pid, st, side)
+local function _pile_remove_value(pile, v)
+  if type(pile) ~= "table" then return false end
+  for i = #pile, 1, -1 do
+    if pile[i] == v then
+      table.remove(pile, i)
+      return true
+    end
+  end
+  return false
+end
+
+-- NOTE: duels_pvp needs a "forced deck_index" so both clients animate the SAME draw.
+local function _start_draw_anim(pid, st, side, forced_deck_index, t0_now)
   if not st then return false end
   if st.draw_anim and st.draw_anim.active then return false end
 
@@ -2407,11 +2269,12 @@ local function _start_draw_anim(pid, st, side)
   st.draw_anim = {
     active = true,
     side = side,
-    stage = 1,          -- 1=slide_out, 2=move, 3=slide_in
-    t0 = os.clock(),
+    stage = 1,
+    t0 = t0_now or os.clock(),
     pending_draw = true,
     vis_before = vis_before,
     drawn_card = nil,
+    forced_deck_index = forced_deck_index, -- PVP: same index on both clients
   }
 
   return true
@@ -2430,7 +2293,6 @@ local function _update_draw_anim(pid, st, now)
   end
 
   local function finish()
-    -- restore
     st.ply_hand_slide_dy = 0
     st.opp_hand_slide_dy = 0
     anim.active = false
@@ -2457,13 +2319,28 @@ local function _update_draw_anim(pid, st, now)
   end
 
   if anim.stage == 2 then
-    -- draw exactly once at the start of the “pickup/move” stage
     local p = (side == "opp") and st.opp or st.ply
+
     if anim.pending_draw then
-      local c = _draw_random_from_deck(p)
+      local c = nil
+
+      if anim.forced_deck_index then
+        local deck_index = anim.forced_deck_index
+        local ok_rm = _pile_remove_value(p.pile, deck_index)
+        if ok_rm then
+          c = p.deck and p.deck[deck_index] or nil
+        end
+      end
+
+      -- Fallback (shouldn't happen in PVP, but safe)
+      if not c then
+        c = _draw_random_from_deck(p)
+      end
+
       if not c then
         return finish()
       end
+
       anim.drawn_card = c
       anim.pending_draw = false
       anim.hand_count_before = #(p.hand or {})
@@ -2475,12 +2352,10 @@ local function _update_draw_anim(pid, st, now)
     if u >= 1 then u = 1 end
     local eased = _smoothstep(_clamp01(u))
 
-    -- moving card start = “top of stack” position before draw
     local base = (side == "opp") and duels.KNOBS.OPP_HAND_POS or duels.KNOBS.PLY_HAND_POS
     local x0_tl = (base.x or 0) + (math.max(1, anim.vis_before) - 1) * dk.stack_dx
     local y0_tl = (base.y or 0) + (math.max(1, anim.vis_before) - 1) * dk.stack_dy
 
-    -- moving card end = new hand slot (count+1), at the fully-slid hand position
     local new_count = (anim.hand_count_before or 0) + 1
     local x1_tl, y1_tl = _hand_slot_tl_for_count(st, side, new_count, new_count)
     y1_tl = (y1_tl or 0) + (dir * dk.slide_dy)
@@ -2494,11 +2369,10 @@ local function _update_draw_anim(pid, st, now)
 
     _draw_hands(pid, st)
     _draw_deck_stack(pid, st, side)
-    local fd_sid = _ensure_facedown_sprite(pid, st)
+    local fd_sid = _ensure_facedown_sprite(pid, st, side)
     _draw_sprite_obj(pid, fd_sid, duels.DRAW_CARD_OBJ_ID, x, y, hsx, hsy, (dk.z + 999), duels.CARD_STATE, base.ro)
 
     if u >= 1 then
-      -- Commit card into hand AFTER the card reaches the hand area
       p.hand[#p.hand + 1] = anim.drawn_card
       anim.drawn_card = nil
       _erase_obj(pid, duels.DRAW_CARD_OBJ_ID)
@@ -2529,6 +2403,82 @@ local function _update_draw_anim(pid, st, now)
   return finish()
 end
 
+local function _array_remove_value(t, v)
+  if type(t) ~= "table" then return end
+  for i = #t, 1, -1 do
+    if t[i] == v then
+      table.remove(t, i)
+      return
+    end
+  end
+end
+
+local function _clone_card_entry(c)
+  if type(c) ~= "table" then return c end
+  local out = {}
+  for k, v in pairs(c) do out[k] = v end
+  return out
+end
+
+local function _clone_deck_list(deck)
+  local out = {}
+  for i = 1, #(deck or {}) do
+    out[i] = _clone_card_entry(deck[i])
+  end
+  return out
+end
+
+-- Draw 1 card from owner_st.ply deck AND mirror it into mirror_st.opp hand.
+local function _pvp_draw_one_pair(owner_st, mirror_st)
+  if not (owner_st and mirror_st and owner_st.ply and mirror_st.opp) then return false end
+
+  local ply = owner_st.ply
+  local opp = mirror_st.opp
+
+  local max_ply = _hand_max_for_side(owner_st, "ply")
+  local max_opp = _hand_max_for_side(mirror_st, "opp")
+
+  if #(ply.hand or {}) >= max_ply then return false end
+  if #(opp.hand or {}) >= max_opp then return false end
+  if type(ply.pile) ~= "table" or #ply.pile == 0 then return false end
+
+  -- Pick deck_index from owner's pile using owner's RNG
+  local pick = (ply.rng and _rng_int(ply.rng, 1, #ply.pile)) or math.random(1, #ply.pile)
+  local deck_index = table.remove(ply.pile, pick)
+
+  -- Mirror: remove same deck_index from opponent-view pile
+  _array_remove_value(opp.pile, deck_index)
+
+  ply.hand[#ply.hand + 1] = ply.deck[deck_index]
+  opp.hand[#opp.hand + 1] = opp.deck[deck_index]
+  return true
+end
+
+-- Opens a duel UI using a prebuilt state (instead of calling _init_game_state).
+local function _open_from_state(pid, st)
+  if not (pid and st) then return end
+  if st_by_pid[pid] then return end
+
+  if Net.lock_player_input then pcall(Net.lock_player_input, pid) end
+
+  st.cfg = st.cfg or {}
+
+  if st.pvp then
+    _set_turn_status(st)
+  end
+  _clear_all(pid, st)
+
+  _draw_field(pid, st)
+  _draw_point_counters(pid, st)
+  duels._draw_spell_counters(pid, st)
+  _ensure_destroy_dust(pid, st)
+
+  _draw_hands(pid, st)
+  _draw_monsters(pid, st)
+
+  st_by_pid[pid] = st
+end
+
 -- Starts a new turn for `side` ("ply" or "opp"), applying draw rules + per-turn resets.
 -- Draw rule: no draw on each player's first turn; draw 1 card starting from their 2nd turn.
 local function _begin_turn(pid, st, side)
@@ -2537,62 +2487,214 @@ local function _begin_turn(pid, st, side)
 
   st.turn = side
   st.turn_index = (st.turn_index or 0) + 1
-  -- clear any opponent end-turn scheduling on a new turn
+
+  if st.pvp then
+    _set_turn_status(st)
+  end
+
+  -- clear AI-era scheduling (kept harmless)
   st.pending_opp_end_turn_at = nil
   st.pending_opp_attack = false
   st.pending_opp_attack_at = nil
-
 
   if duels._spells and duels._spells.on_begin_turn then
     pcall(duels._spells.on_begin_turn, st, side)
   end
 
-  if side == "opp" then
-    st.opp_turn = (st.opp_turn or 0) + 1
-    st.opp_summoned_this_turn = false
-  else
+  if side == "ply" then
     st.ply_turn = (st.ply_turn or 0) + 1
     st.ply_summoned_this_turn = false
+  else
+    st.opp_turn = (st.opp_turn or 0) + 1
+    st.opp_summoned_this_turn = false
   end
 
-  -- Auto-apply "atk_then_def" position change on the NEXT opponent turn (can't change position same turn as summon).
-  if side == "opp" and st.pending_opp_pos_on_next_opp_turn then
-    st.pending_opp_pos_on_next_opp_turn = nil
-    local mon = st.field and st.field.opp_monster
-    if mon and mon.card and (not mon.facedown) and ((mon.pos or "atk") == "atk") then
-      _toggle_opponent_monster_position(pid, st)
+  -- Draw rule:
+  -- no draw on your first turn, draw 1 starting from 2nd.
+  local n = (side == "ply") and (st.ply_turn or 1) or (st.opp_turn or 1)
+if n > 1 then
+  -- PVP: draw anim on BOTH clients (active draws as "ply", opponent sees it as "opp")
+  if st.pvp and side == "ply" then
+    local other_pid = st.pvp.other_pid
+    local other_st  = other_pid and st_by_pid[other_pid]
+
+    if other_st then
+      local ply = st.ply
+      local pile = ply and ply.pile or {}
+
+      if #pile > 0 then
+        -- Pick a deck_index from the owner's pile using owner's RNG (DO NOT remove yet)
+        local pick = (ply.rng and _rng_int(ply.rng, 1, #pile)) or math.random(1, #pile)
+        local deck_index = pile[pick]
+
+        local t0 = os.clock()
+        local started_owner  = _start_draw_anim(pid, st, "ply", deck_index, t0)
+        local started_mirror = _start_draw_anim(other_pid, other_st, "opp", deck_index, t0)
+
+        if not (started_owner and started_mirror) then
+          -- If anim couldn't start (hand full / etc), fall back to instant draw.
+          if started_owner then
+            st.draw_anim = nil
+            st.ply_hand_slide_dy = 0
+            st.opp_hand_slide_dy = 0
+            _erase_deck_stack(pid)
+          end
+          if started_mirror then
+            other_st.draw_anim = nil
+            other_st.ply_hand_slide_dy = 0
+            other_st.opp_hand_slide_dy = 0
+            _erase_deck_stack(other_pid)
+          end
+
+          _pvp_draw_one_pair(st, other_st)
+          _draw_hands(other_pid, other_st)
+        end
+      end
     end
-  end
 
-  local n = (side == "opp") and (st.opp_turn or 1) or (st.ply_turn or 1)
-  if n > 1 then
-    local started = _start_draw_anim(pid, st, side)
+  elseif (not st.pvp) then
+    -- (Shouldn't happen in duels_pvp, but safe)
+    local started = _start_draw_anim(pid, st, side, nil, os.clock())
     if not started then
       _draw_one_at_start_of_turn(pid, st, side)
     end
   end
+end
 
-  -- close any modal menus on turn switch
+  -- close menus on turn switch
   st.in_summon_menu = false
-  st.in_field_menu = false
+  st.in_field_menu  = false
+  st.in_spells_menu = false
   st.selected_hand_index = nil
   _erase_summon_menu(pid)
   _erase_field_menu(pid)
+  _erase_spells_menu(pid)
 
-  -- redraw everything
+  _draw_hands(pid, st)
+  _draw_monsters(pid, st)
+end
+
+-- Sync the opponent's perspective state from the authoritative (current-active) state.
+-- Call this AFTER any authoritative mutation (battle resolution, spell effects, etc.).
+local function _pvp_sync_from_authority(author_pid, author_st)
+  if not (author_st and author_st.pvp) then return end
+  local other_pid = author_st.pvp.other_pid
+  local other_st  = other_pid and st_by_pid[other_pid]
+  if not other_st then return end
+
+  other_st.field = other_st.field or {}
+
+  local function sync_mon(dst, src)
+    if not src then return nil end
+    dst = dst or {}
+
+    -- Keep existing card table if iid matches; otherwise copy a fresh card entry.
+    local src_iid = src.card and src.card.iid
+    local dst_iid = dst.card and dst.card.iid
+    if src.card and (not dst.card or (src_iid and dst_iid and src_iid ~= dst_iid)) then
+      dst.card = _clone_card_entry(src.card)
+    end
+
+    dst.facedown = src.facedown
+    dst.pos = src.pos
+    dst.def_current = src.def_current
+    dst.atk_bonus = src.atk_bonus
+    dst.atk_bonus_expires_turn = src.atk_bonus_expires_turn
+    dst.summoned_turn_index = src.summoned_turn_index
+    return dst
+  end
+
+  local before_ply = other_st.field.ply_monster and other_st.field.ply_monster.card
+  local before_opp = other_st.field.opp_monster and other_st.field.opp_monster.card
+
+  -- Perspective swap:
+  --  author.ply  == other.opp
+  --  author.opp  == other.ply
+  other_st.field.opp_monster = author_st.field and author_st.field.ply_monster
+    and sync_mon(other_st.field.opp_monster, author_st.field.ply_monster)
+    or nil
+
+  other_st.field.ply_monster = author_st.field and author_st.field.opp_monster
+    and sync_mon(other_st.field.ply_monster, author_st.field.opp_monster)
+    or nil
+
+  -- Swap scalar state that is side-relative
+  other_st.ply_points = author_st.opp_points
+  other_st.opp_points = author_st.ply_points
+
+  other_st.ply_spell_counters = author_st.opp_spell_counters
+  other_st.opp_spell_counters = author_st.ply_spell_counters
+
+  other_st.ply_spell_used_turn_index = author_st.opp_spell_used_turn_index
+  other_st.opp_spell_used_turn_index = author_st.ply_spell_used_turn_index
+
+  other_st.ply_attacked_turn_index = author_st.opp_attacked_turn_index
+  other_st.opp_attacked_turn_index = author_st.ply_attacked_turn_index
+
+  other_st.ply_pos_changed_turn_index = author_st.opp_pos_changed_turn_index
+  other_st.opp_pos_changed_turn_index = author_st.ply_pos_changed_turn_index
+
+  other_st.ply_summoned_this_turn = author_st.opp_summoned_this_turn
+  other_st.opp_summoned_this_turn = author_st.ply_summoned_this_turn
+
+  -- Pending end-turn switches from spells (Earthquake etc.)
+  other_st.ply_pending_end_turn_switch_to_def = author_st.opp_pending_end_turn_switch_to_def
+  other_st.opp_pending_end_turn_switch_to_def = author_st.ply_pending_end_turn_switch_to_def
+  other_st.ply_pending_end_turn_switch_to_def_set_turn = author_st.opp_pending_end_turn_switch_to_def_set_turn
+  other_st.opp_pending_end_turn_switch_to_def_set_turn = author_st.ply_pending_end_turn_switch_to_def_set_turn
+
+  -- Duel end flags
+  -- Duel end flags (NOTE: duel_outcome must be perspective-swapped)
+  other_st.duel_over = author_st.duel_over
+
+  local oc = author_st.duel_outcome
+  if oc == "ply" then
+    other_st.duel_outcome = "opp"
+  elseif oc == "opp" then
+    other_st.duel_outcome = "ply"
+  else
+    other_st.duel_outcome = oc -- "tie" or nil
+  end
+
+  other_st.pending_close_at = author_st.pending_close_at
+
+  -- FX if a monster disappeared
+  if before_ply and not (other_st.field.ply_monster and other_st.field.ply_monster.card) then
+    _spawn_destroy_dust(other_pid, other_st, "ply")
+  end
+  if before_opp and not (other_st.field.opp_monster and other_st.field.opp_monster.card) then
+    _spawn_destroy_dust(other_pid, other_st, "opp")
+  end
+
+  _draw_hands(other_pid, other_st)
+  _draw_monsters(other_pid, other_st)
+  _draw_point_counters(other_pid, other_st)
+  duels._draw_spell_counters(other_pid, other_st)
+end
+
+local function _end_turn(pid, st)
+  if not st or not st.pvp then
+    -- non-pvp fallback (shouldn't be used in duels_pvp, but safe)
+    _begin_turn(pid, st, "opp")
+    return
+  end
+
+  -- Only active player can end turn
+  if st.turn ~= "ply" then return end
+
+  local other_pid = st.pvp.other_pid
+  local other_st  = other_pid and st_by_pid[other_pid]
+  if not other_st then return end
+
+  -- Switch: current becomes opp-view, other becomes ply-view
+  _begin_turn(pid, st, "opp")
+  _begin_turn(other_pid, other_st, "ply")
+
   _draw_hands(pid, st)
   _draw_monsters(pid, st)
 
-  -- Kick AI on opponent turns (summon or attack)
-  if side == "opp" and not st.pending_reveal_battle then
-    _ai_opp_take_turn(pid, st)
-  end
-end
-
-
-local function _end_turn(pid, st)
-  if not st then return end
-  _begin_turn(pid, st, "opp")
+  _draw_hands(other_pid, other_st)
+  _draw_monsters(other_pid, other_st)
 end
 
 
@@ -2692,7 +2794,7 @@ end
 -- ---------------------------------------------------------------------------
 -- Spells menu (UI only)
 -- ---------------------------------------------------------------------------
-local function _erase_spells_menu(pid)
+function _erase_spells_menu(pid)
   _erase_obj(pid, duels.SPELLS_MENU_BG_OBJ_ID)
   _erase_obj(pid, duels.SPELLS_MENU_CURSOR_OBJ_ID)
 
@@ -2872,7 +2974,7 @@ end
 -- ---------------------------------------------------------------------------
 -- Rendering: field + hands
 -- ---------------------------------------------------------------------------
-local function _draw_field(pid, st)
+function _draw_field(pid, st)
   _alloc_sprite(pid, duels.FIELD_SPRITE_ID, duels.FIELD_TEX, duels.FIELD_ANIM, duels.FIELD_STATE)
 
   local fk = duels.KNOBS.FIELD
@@ -3081,7 +3183,8 @@ function _draw_hands(pid, st)
   local hz = hk.z
   local step_x = hk.spacing_x or 0
 
-  local fd_sid = _ensure_facedown_sprite(pid, st)
+  -- Ensure facedown sprite exists (opponent hand can share one sprite resource)
+  local fd_opp = _ensure_facedown_sprite(pid, st, "opp")
 
   -- -------------------------------------------------------------------------
   -- Opponent hand (FaceDown)
@@ -3096,7 +3199,7 @@ function _draw_hands(pid, st)
       local x_tl = start_x + (i - 1) * step_x
       local x, y = _apply_card_origin_if_needed(x_tl, y_tl, hsx, hsy)
       local zi = (hz or 0) + i
-      _draw_sprite_obj(pid, fd_sid, duels.OPP_HAND_OBJ_PREFIX .. i, x, y, hsx, hsy, zi, duels.CARD_STATE, oh.ro)
+      _draw_sprite_obj(pid, fd_opp, duels.OPP_HAND_OBJ_PREFIX .. i, x, y, hsx, hsy, zi, duels.CARD_STATE, oh.ro)
     end
 
     -- erase stale objects beyond current count
@@ -3276,6 +3379,9 @@ local function _get_player_hand_card_tl(st, index)
   local lift = tonumber(hk.highlight_lift_y) or 0
   local y_tl_i = y_tl
   local highlight_i = nil
+  if st.draw_anim and st.draw_anim.active then
+    highlight_i = nil
+  end
   if st.in_summon_menu then
     highlight_i = (st.selected_hand_index or st.cursor_index or 1)
   elseif (st.cursor_mode or "hand") == "hand" then
@@ -3364,7 +3470,7 @@ function _erase_monsters(pid)
 end
 
 
-local function _clear_all(pid, st)
+function _clear_all(pid, st)
   -- Field background (safety: erase both legacy + current object ids)
   _erase_obj(pid, duels.FIELD_SPRITE_ID)
   _erase_and_dealloc(pid, duels.FIELD_SPRITE_ID, duels.FIELD_SPRITE_ID .. "_obj")
@@ -3375,13 +3481,6 @@ local function _clear_all(pid, st)
   for i = 1, max_wipe do
     _erase_obj(pid, duels.OPP_HAND_OBJ_PREFIX .. i)
     _erase_obj(pid, duels.PLY_HAND_OBJ_PREFIX .. i)
-  end
-
-  _erase_deck_stack(pid)
-  if st then
-    st.ply_hand_slide_dy = 0
-    st.opp_hand_slide_dy = 0
-    st.draw_anim = nil
   end
 
   -- erase big cursor
@@ -3422,9 +3521,6 @@ local function _clear_all(pid, st)
   _clear_opp_info_panel(pid)
   _dealloc_sprite(pid, duels.ATKDEF_SPRITE_ID)
 
-  -- dealloc opponent facedown sprite resource
-  _dealloc_sprite(pid, duels.OPP_HAND_SPRITE_ID)
-
   -- erase + destroy any destroy-burst particles
   _clear_destroy_dust(pid, st)
 
@@ -3435,6 +3531,16 @@ local function _clear_all(pid, st)
   -- erase + dealloc spell counter UI
   duels._erase_spell_counters(pid)
   _dealloc_sprite(pid, duels.SPELLCOUNTER_SPRITE_ID)
+
+  _erase_turn_status(pid)
+
+  _erase_deck_stack(pid)
+
+  if st then
+    st.draw_anim = nil
+    st.ply_hand_slide_dy = 0
+    st.opp_hand_slide_dy = 0
+  end
 
   -- dealloc any per-card sprites allocated this duel
   if st and st.allocated_card_sprites then
@@ -3473,7 +3579,7 @@ function _draw_monsters(pid, st)
   else
     local mz1 = st.field.opp_monster
     if mz1 and mz1.card then
-      local marker = mz1.facedown and (st.facedown_tex or duels.FACE_DOWN_TEX) or ((mz1.card and mz1.card.tex) or "__missing_tex__")
+      local marker = mz1.facedown and _facedown_tex_for_side(st, "opp") or ((mz1.card and mz1.card.tex) or "__missing_tex__")
       if st.field_obj_tex.mz1 ~= marker then
         _erase_obj(pid, duels.MZ1_OBJ_ID)
         st.field_obj_tex.mz1 = marker
@@ -3487,9 +3593,8 @@ function _draw_monsters(pid, st)
       local def_ro = (atk_ro + 90) % 360
 
       if mz1.facedown then
-      local fd_sid = _ensure_facedown_sprite(pid, st)
-      _draw_sprite_obj(pid, fd_sid, duels.MZ1_OBJ_ID,
-          x, y, sx, sy, k.z, duels.CARD_STATE, def_ro)
+        local fd = _ensure_facedown_sprite(pid, st, "opp")
+        _draw_sprite_obj(pid, fd, duels.MZ1_OBJ_ID, x, y, sx, sy, k.z, duels.CARD_STATE, def_ro)
       else
         local sprite_id = _ensure_card_sprite(pid, st, mz1.card)
         local ro = ((mz1.pos or "atk") == "def") and def_ro or atk_ro
@@ -3510,7 +3615,7 @@ function _draw_monsters(pid, st)
   else
     local mz2 = st.field.ply_monster
     if mz2 and mz2.card then
-      local marker = mz2.facedown and (st.facedown_tex or duels.FACE_DOWN_TEX) or ((mz2.card and mz2.card.tex) or "__missing_tex__")
+      local marker = mz2.facedown and _facedown_tex_for_side(st, "ply") or ((mz2.card and mz2.card.tex) or "__missing_tex__")
       if st.field_obj_tex.mz2 ~= marker then
         _erase_obj(pid, duels.MZ2_OBJ_ID)
         st.field_obj_tex.mz2 = marker
@@ -3521,9 +3626,8 @@ function _draw_monsters(pid, st)
       local x, y = _apply_card_origin_if_needed(k.x, k.y, sx, sy)
 
       if mz2.facedown then
-        local fd_sid = _ensure_facedown_sprite(pid, st)
-        _draw_sprite_obj(pid, fd_sid, duels.MZ2_OBJ_ID,
-          x, y, sx, sy, k.z, duels.CARD_STATE, 90)
+        local fd = _ensure_facedown_sprite(pid, st, "ply")
+        _draw_sprite_obj(pid, fd, duels.MZ2_OBJ_ID, x, y, sx, sy, k.z, duels.CARD_STATE, 90)
       else
         local sprite_id = _ensure_card_sprite(pid, st, mz2.card)
         _draw_sprite_obj(pid, sprite_id, duels.MZ2_OBJ_ID,
@@ -3586,7 +3690,7 @@ local function _toggle_player_monster_position(pid, st)
     target_facedown = false
     target_pos = "atk"
 
-    sprite_id = _ensure_facedown_sprite(pid, st)
+    sprite_id = _ensure_facedown_sprite(pid, st, "opp")
     alt_sprite_id = _ensure_card_sprite(pid, st, mz.card)
 
     ro0 = 90
@@ -3672,7 +3776,8 @@ local function _start_reveal_def_anim(pid, st, target_side)
     ro_def = 90
   end
 
-  local fd_sid = _ensure_facedown_sprite(pid, st)
+  -- ensure sprites exist (back + revealed face)
+  local fd = _ensure_facedown_sprite(pid, st, target_side)
   local alt = _ensure_card_sprite(pid, st, mz.card)
 
   -- Hide the static monster while animating
@@ -3704,7 +3809,7 @@ local function _start_reveal_def_anim(pid, st, target_side)
     ro0 = ro_def,
     ro2 = ro_def,
 
-    sprite_id = fd_sid,
+    sprite_id = fd,
     alt_sprite_id = alt,
 
     peak_mul = tonumber(pk.peak_mul) or 1.08,
@@ -3772,7 +3877,7 @@ function _toggle_opponent_monster_position(pid, st)
     target_facedown = false
     target_pos = "atk"
 
-    sprite_id = _ensure_facedown_sprite(pid, st)
+    sprite_id = _ensure_facedown_sprite(pid, st, "ply")
     alt_sprite_id = _ensure_card_sprite(pid, st, mz.card)
 
     ro0 = def_ro
@@ -3945,7 +4050,7 @@ end
 -- ---------------------------------------------------------------------------
 -- Game init + draw actions
 -- ---------------------------------------------------------------------------
-local function _init_game_state(pid, cfg)
+local function _init_game_state_pvp(p1,p2,cfg)
   cfg = cfg or {}
 
   local DECK_N = math.floor(tonumber(cfg.deck_size) or 10)
@@ -4206,6 +4311,28 @@ local function _close(pid)
   local st = st_by_pid[pid]
   if not st then return end
 
+  -- PVP: tell the player the result (duels can otherwise feel abrupt)
+  if st.pvp and not st._pvp_result_msg_sent and Net.message_player then
+    st._pvp_result_msg_sent = true
+
+    local p = tonumber(st.ply_points) or 0
+    local o = tonumber(st.opp_points) or 0
+    local outcome = st.duel_outcome -- "ply" | "opp" | "tie" | nil
+
+    local msg
+    if outcome == "ply" then
+      msg = ("[YGO] You win! (%d-%d)"):format(p, o)
+    elseif outcome == "opp" then
+      msg = ("[YGO] You lose. (%d-%d)"):format(p, o)
+    elseif outcome == "tie" then
+      msg = ("[YGO] Tie game. (%d-%d)"):format(p, o)
+    else
+      msg = "[YGO] Duel ended."
+    end
+
+    pcall(Net.message_player, pid, msg)
+  end
+
   -- Notify once on close (covers normal finish + disconnect during finish window)
   if not st._finish_notified then
     st._finish_notified = true
@@ -4229,6 +4356,31 @@ local function _close(pid)
     local JobBBS = rawget(_G, "JobBBS")
     if st.duel_over and JobBBS and JobBBS.on_npc_duel_result then
       pcall(JobBBS.on_npc_duel_result, pid, { winner = winner, npc_name = npc_name, kos = 3 })
+    end
+  end
+
+  -- PVP: free the duel table so it can be used again (use real winner/loser)
+  if st.pvp then
+    local ok_mod, ygo_pvp = pcall(require, "scripts/ezlibs-custom/ygo_pvp")
+    if ok_mod and ygo_pvp and ygo_pvp.on_ygo_pvp_end then
+      local other_pid = st.pvp.other_pid
+      local outcome = st.duel_outcome
+
+      local winner_pid, loser_pid
+      if outcome == "ply" then
+        winner_pid, loser_pid = pid, other_pid
+      elseif outcome == "opp" then
+        winner_pid, loser_pid = other_pid, pid
+      else
+        -- tie/unknown: still free the table deterministically
+        winner_pid, loser_pid = pid, other_pid
+      end
+
+      local mid = st.pvp.match_id or (tostring(st.cfg and st.cfg.table_id or "") .. ":" .. tostring(pid) .. ":" .. tostring(other_pid))
+      if not pvp_end_notified_by_match[mid] then
+        pvp_end_notified_by_match[mid] = true
+        pcall(ygo_pvp.on_ygo_pvp_end, winner_pid, loser_pid, { table_id = (st.cfg and st.cfg.table_id) })
+      end
     end
   end
 
@@ -4259,9 +4411,6 @@ local function _open(pid, cfg)
   end
   st.cfg = cfg
 
-  st.facedown_tex = _resolve_facedown_tex(pid)
-  st.facedown_sprite_id = nil
-
   -- Clear any stale objects (hot reload / crash)
   _clear_all(pid, st)
 
@@ -4283,6 +4432,170 @@ local function _open(pid, cfg)
   st_by_pid[pid] = st
 end
 
+function duels.handle_board_close(event)
+  local pid = event and event.player_id
+  if not pid then return false end
+
+  local st = pending_pvp_state_by_pid[pid]
+  print(("[duels_pvp] handle_board_close pid=%s pending_open=%s pending_state=%s"):format(
+    tostring(pid),
+    tostring(pending_pvp_open_by_pid[pid]),
+    tostring(st ~= nil)
+  ))
+
+  -- Don’t require pending_open; if state exists we can open.
+  if not st then return false end
+
+  pending_pvp_open_by_pid[pid] = nil
+  pending_pvp_state_by_pid[pid] = nil
+
+  _open_from_state(pid, st)
+  print(("[duels_pvp] opened duel UI for pid=%s"):format(tostring(pid)))
+  return true
+end
+
+function duels.cancel_pending(pid)
+  pending_pvp_open_by_pid[pid]  = nil
+  pending_pvp_state_by_pid[pid] = nil
+end
+
+function duels.start_card_battle_pvp(pidA, pidB, cfg)
+  if not pidA or not pidB or pidA == pidB then return false end
+  cfg = cfg or {}
+  _ensure_runtime_deps()
+
+  -- Prevent re-entry / double-duel
+  if st_by_pid[pidA] or st_by_pid[pidB] or pending_pvp_state_by_pid[pidA] or pending_pvp_state_by_pid[pidB] then
+    return false
+  end
+
+  -- Strict requirement: BOTH must have a valid saved deck of exactly DECK_N cards
+  local countsA = load_deck_counts(pidA)
+  local countsB = load_deck_counts(pidB)
+
+  print(("[duels_pvp] deck_counts sizes: A=%s B=%s"):format(
+    tostring(countsA and (next(countsA) ~= nil)),
+    tostring(countsB and (next(countsB) ~= nil))
+  ))
+
+  local deckA = _build_deck_list_from_counts(pidA, countsA)
+  local deckB = _build_deck_list_from_counts(pidB, countsB)
+
+  local DECK_N = math.floor(tonumber(cfg.deck_size) or 10)
+  if DECK_N <= 0 then DECK_N = 10 end
+
+  print(("[duels_pvp] expanded deck sizes: A=%d B=%d want=%d"):format(#deckA, #deckB, DECK_N))
+
+  if #deckA ~= DECK_N or #deckB ~= DECK_N then
+    if Net.message_player then
+      pcall(Net.message_player, pidA, "[YGO] Duel cancelled: one or both players have no valid saved 10-card deck.")
+      pcall(Net.message_player, pidB, "[YGO] Duel cancelled: one or both players have no valid saved 10-card deck.")
+    end
+    return false
+  end
+
+  -- Shared RNG objects per real player (so their two “copies” stay deterministic when we draw)
+  local rngA = { seed = _rng_seed_from(pidA) }
+  local rngB = { seed = _rng_seed_from(pidB) }
+
+  -- Randomize who goes first (independent of seat A/B)
+  local rngFirst = { seed = (rngA.seed + rngB.seed) % duels.RNG_MOD }
+  if rngFirst.seed <= 0 then rngFirst.seed = 1 end
+  local first_pid = (_rng_int(rngFirst, 1, 2) == 1) and pidA or pidB
+  local a_starts = (first_pid == pidA)
+
+  -- Build TWO perspective states:
+  --  stA: pidA is "ply", pidB is "opp"
+  --  stB: pidB is "ply", pidA is "opp"
+  local stA = {
+    cfg = cfg,
+    ply = { deck = _clone_deck_list(deckA), pile = _make_pile(#deckA), hand = {}, rng = rngA },
+    opp = { deck = _clone_deck_list(deckB), pile = _make_pile(#deckB), hand = {}, rng = rngB },
+    field = { ply_monster=nil, opp_monster=nil },
+
+    selected_hand_index=nil, in_summon_menu=false, summon_choice=1,
+    in_field_menu=false, field_choice=1,
+    cursor_index=1, cursor_mode="hand",
+    _btn = {},
+
+    ply_spell_counters=0, opp_spell_counters=0,
+    ply_spell_used_turn_index=-1, opp_spell_used_turn_index=-1,
+
+    turn = a_starts and "ply" or "opp", turn_index = 1,
+    ply_turn = a_starts and 1 or 0, opp_turn = a_starts and 0 or 1,
+    ply_attacked_turn_index=-1, opp_attacked_turn_index=-1,
+    ply_pos_changed_turn_index=-1, opp_pos_changed_turn_index=-1,
+    ply_summoned_this_turn=false, opp_summoned_this_turn=false,
+
+    ply_points=0, opp_points=0,
+    duel_over=false, duel_outcome=nil, pending_close_at=nil,
+  }
+
+  local stB = {
+    cfg = cfg,
+    ply = { deck = _clone_deck_list(deckB), pile = _make_pile(#deckB), hand = {}, rng = rngB },
+    opp = { deck = _clone_deck_list(deckA), pile = _make_pile(#deckA), hand = {}, rng = rngA },
+    field = { ply_monster=nil, opp_monster=nil },
+
+    selected_hand_index=nil, in_summon_menu=false, summon_choice=1,
+    in_field_menu=false, field_choice=1,
+    cursor_index=1, cursor_mode="hand",
+    _btn = {},
+
+    ply_spell_counters=0, opp_spell_counters=0,
+    ply_spell_used_turn_index=-1, opp_spell_used_turn_index=-1,
+
+    turn = a_starts and "opp" or "ply", turn_index = 1,
+    ply_turn = a_starts and 0 or 1, opp_turn = a_starts and 1 or 0,
+    ply_attacked_turn_index=-1, opp_attacked_turn_index=-1,
+    ply_pos_changed_turn_index=-1, opp_pos_changed_turn_index=-1,
+    ply_summoned_this_turn=false, opp_summoned_this_turn=false,
+
+    ply_points=0, opp_points=0,
+    duel_over=false, duel_outcome=nil, pending_close_at=nil,
+  }
+
+  -- Spells init (if present) must run on both states
+  if duels._spells and duels._spells.init_state then
+    pcall(duels._spells.init_state, stA)
+    pcall(duels._spells.init_state, stB)
+  end
+
+  -- Attach pvp meta to both
+  local match_id = tostring(cfg.table_id or "pvp") .. ":" .. tostring(os.clock()) .. ":" .. tostring(first_pid)
+  stA.pvp = { other_pid = pidB, first_pid = first_pid, match_id = match_id }
+  stB.pvp = { other_pid = pidA, first_pid = first_pid, match_id = match_id }
+
+  local texA = _resolve_facedown_tex_for_pid(pidA)
+  local texB = _resolve_facedown_tex_for_pid(pidB)
+
+  -- Per-perspective mapping:
+  --  stA: ply=A sleeve, opp=B sleeve
+  --  stB: ply=B sleeve, opp=A sleeve
+  stA.facedown_tex_by_side = { ply = texA, opp = texB }
+  stB.facedown_tex_by_side = { ply = texB, opp = texA }
+
+  -- reset caches (safe)
+  stA.facedown_sprite_by_tex = nil
+  stA.facedown_sprite_id_by_side = nil
+  stB.facedown_sprite_by_tex = nil
+  stB.facedown_sprite_id_by_side = nil
+
+  -- Initial draws: both players draw 2 cards
+  for _=1,2 do _pvp_draw_one_pair(stA, stB) end -- A draws into A.ply + B.opp
+  for _=1,2 do _pvp_draw_one_pair(stB, stA) end -- B draws into B.ply + A.opp
+
+  -- Store pending, wait for board_close to open UI cleanly
+  pending_pvp_state_by_pid[pidA] = stA
+  pending_pvp_state_by_pid[pidB] = stB
+  pending_pvp_open_by_pid[pidA]  = true
+  pending_pvp_open_by_pid[pidB]  = true
+
+  print(("[duels_pvp] queued pending open A=%s B=%s"):format(tostring(pidA), tostring(pidB)))
+  return true
+end
+
+
 function duels.start_card_battle(pid, cfg)
   if not pid then return end
   _open(pid, cfg)
@@ -4302,12 +4615,12 @@ Net:on("virtual_input", function(event)
 
   st._btn = st._btn or {}
 
-  local evs = event.events
-  if not evs then return end
-
   if st.draw_anim and st.draw_anim.active then
     return
   end
+
+  local evs = event.events
+  if not evs then return end
 
   for _, button in next, evs do
     local name = button.name
@@ -4463,6 +4776,29 @@ if st.in_spells_menu then
 
       local ok_call
       ok_call, ok_spell, reason = pcall(duels._spells.activate, st, "ply", def.id, api)
+      if ok_spell and st.pvp then
+        local other_pid = st.pvp.other_pid
+        local other_st  = other_pid and st_by_pid[other_pid]
+        if other_st then
+          local api2 = {
+            pid = other_pid,
+            st  = other_st,
+            toggle_opponent_monster_position = function() _toggle_opponent_monster_position(other_pid, other_st) end,
+            toggle_player_monster_position   = function() _toggle_player_monster_position(other_pid, other_st) end,
+            destroy_monster                  = function(side) _destroy_monster(other_pid, other_st, side) end,
+            award_point                      = function(side)
+              if side == "opp" then
+                other_st.opp_points = (other_st.opp_points or 0) + 1
+              else
+                other_st.ply_points = (other_st.ply_points or 0) + 1
+              end
+            end,
+            end_duel_by_points               = function() _end_duel_by_points(other_pid, other_st) end,
+          }
+
+          pcall(duels._spells.activate, other_st, "opp", def.id, api2)
+        end
+      end
       if not ok_call then
         ok_spell = false
         reason = "spell_runtime_error"
@@ -4531,9 +4867,29 @@ end
       if name == "Confirm" and pressed then
         local choice = st.pause_choice or 1
         if choice == 3 then
-          -- Concede: close the duel
+          -- Concede: set outcomes, then close
+          if st.pvp then
+            local other_pid = st.pvp.other_pid
+            local other_st = other_pid and st_by_pid[other_pid]
+
+            st.duel_over = true
+            st.duel_outcome = "opp" -- you conceded, you lose
+            st.pending_close_at = os.clock()
+
+            if other_st then
+              other_st.duel_over = true
+              other_st.duel_outcome = "ply" -- opponent wins
+              other_st.pending_close_at = os.clock()
+              _close(other_pid)
+            end
+
+            _close(pid)
+            return
+          end
+
           _close(pid)
           return
+
 elseif choice == 2 then
   -- Spells menu (UI only for now)
   st.in_pause_menu = false
@@ -4608,6 +4964,14 @@ elseif choice == 2 then
           local def = st.field and st.field.opp_monster
           if _can_attack(mon) and def and def.card then
             _start_attack_anim(pid, st, "ply")
+            if st.pvp then
+              local other_pid = st.pvp.other_pid
+              local other_st  = other_pid and st_by_pid[other_pid]
+              if other_st then
+                -- On opponent screen, attacker is "opp"
+                _start_attack_anim(other_pid, other_st, "opp")
+              end
+            end
             return
           end
 
@@ -4616,6 +4980,13 @@ elseif choice == 2 then
           return
         else
           _toggle_player_monster_position(pid, st)
+          if st.pvp then
+            local other_pid = st.pvp.other_pid
+            local other_st  = other_pid and st_by_pid[other_pid]
+            if other_st then
+              _toggle_opponent_monster_position(other_pid, other_st)
+            end
+          end
           return
         end
       end
@@ -4666,6 +5037,46 @@ elseif choice == 2 then
         local start_x, start_y = _apply_card_origin_if_needed(start_x_tl or 0, start_y_tl or 0, hk.scale or 1, hk.scale or 1)
 
         table.remove(st.ply.hand, idx)
+        -- PVP mirror: remove same card index from opponent-view hand and animate opponent summon/set.
+        if st.pvp then
+          local other_pid = st.pvp.other_pid
+          local other_st  = other_pid and st_by_pid[other_pid]
+          if other_st then
+            -- compute opponent-hand start BEFORE removing (so coords use the old layout)
+            local ox_tl, oy_tl = _get_opponent_hand_card_tl(other_st, idx)
+            local ox, oy = _apply_card_origin_if_needed(ox_tl or 0, oy_tl or 0, hk.scale or 1, hk.scale or 1)
+
+            local other_card = other_st.opp.hand[idx]
+            table.remove(other_st.opp.hand, idx)
+
+            -- animate into opponent monster zone on that player's screen (MZ1)
+            local kz = duels.KNOBS.MZ1
+            local end_x2, end_y2 = _apply_card_origin_if_needed(kz.x, kz.y, kz.sx, kz.sy)
+            local start_s2 = hk.scale or 1
+            local end_s2   = kz.sx or 1
+
+            _erase_obj(other_pid, duels.MZ1_OBJ_ID)
+            _erase_obj(other_pid, duels.ATTACK_MZ1_OBJ_ID)
+
+            if st.summon_choice == 2 then
+              -- SET: keep it hidden for the opponent for the whole flight
+              _start_summon_anim(other_pid, other_st, other_card,
+                ox, oy, start_s2,
+                end_x2, end_y2, end_s2,
+                "set",
+                { target_side = "opp", hidden = true })
+            else
+              _start_summon_anim(other_pid, other_st, other_card,
+                ox, oy, start_s2,
+                end_x2, end_y2, end_s2,
+                "summon",
+                { target_side = "opp" })
+            end
+
+            _draw_hands(other_pid, other_st)
+          end
+        end
+
         local new_count = #(st.ply.hand or {})
         if new_count <= 0 then
           st.cursor_index = 1
@@ -4844,22 +5255,20 @@ do
   local Duels = rawget(_G, "Duels")
   if type(Duels) ~= "table" then Duels = {} end
 
-  function Duels.is_open_for(pid)
+  function Duels.is_pvp_open_for(pid)
     return st_by_pid[pid] ~= nil
   end
-
-  duels.is_open_for = Duels.is_open_for
-
+  duels.is_pvp_open_for = Duels.is_pvp_open_for
   rawset(_G, "Duels", Duels)
-  rawset(_G, "duel_ui_is_open", Duels.is_open_for)
+  rawset(_G, "duel_pvp_ui_is_open", Duels.is_pvp_open_for)
 end
 
 
 -- ---------------------------------------------------------------------------
 -- Tick: drive summon animation updates
 -- ---------------------------------------------------------------------------
-if not rawget(_G, "__duels_tick_v1_registered") then
-  rawset(_G, "__duels_tick_v1_registered", true)
+if not rawget(_G, "__duels_pvp_tick_v1_registered") then
+  rawset(_G, "__duels_pvp_tick_v1_registered", true)
 
 Net:on("tick", function()
   local now = os.clock()
@@ -4867,6 +5276,7 @@ Net:on("tick", function()
   for pid, st in pairs(st_by_pid) do
     if st then
       _draw_destroy_dust(pid, st)
+      _update_turn_status(pid, st, now)
 
       -- ------------------------------------------------------------
       -- 0) If duel has ended, close after the configured hold
@@ -4881,20 +5291,20 @@ Net:on("tick", function()
       end
 
       -- ------------------------------------------------------------
-      -- 1) Drive draw/pickup animation (blocks AI/actions while active)
+      -- 1) Drive draw/pickup animation (blocks other logic while active)
       -- ------------------------------------------------------------
       if st.draw_anim and st.draw_anim.active then
-        local done = _update_draw_anim(pid, st, now)
-        if not done then
+        local finished = _update_draw_anim(pid, st, now)
+        if not finished then
           goto continue_pid
         end
       end
 
-      -- ------------------------------------------------------------
-      -- 1.5) Let the opponent AI think/act during opponent turns
-      -- ------------------------------------------------------------
-      if (st.turn == "opp") and (not st.in_pause_menu) and (not st.pending_reveal_battle) then
-        _ai_opp_take_turn(pid, st, now)
+      -- 1.5) PVP has no AI (duels.lua owns AI). Keep this guarded.
+      if (not st.pvp) and (st.turn == "opp") and (not st.in_pause_menu) and (not st.pending_reveal_battle) then
+        if _ai_opp_take_turn then
+          _ai_opp_take_turn(pid, st, now)
+        end
       end
 
       -- ------------------------------------------------------------
@@ -4943,7 +5353,7 @@ Net:on("tick", function()
           _draw_monsters(pid, st)
 
           -- If opponent just finished a summon/set during opponent turn, follow the AI plan.
-          if (side == "opp") and (st.turn == "opp") then
+          if (not st.pvp) and (side == "opp") and (st.turn == "opp") then
             local after = st.ai_after_summon
             st.ai_after_summon = nil
 
@@ -4962,7 +5372,7 @@ Net:on("tick", function()
               _ai_opp_queue_end_turn(pid, st, now)
             else
               -- Fallback: if AI is enabled and we didn't schedule anything, end the turn.
-              if _ai_enabled() then
+              if (_ai_enabled and _ai_enabled()) then
                 if not (st.pending_opp_attack and st.pending_opp_attack_at) then
                   _ai_opp_queue_end_turn(pid, st, now)
                 end
@@ -5012,7 +5422,7 @@ Net:on("tick", function()
           _draw_point_counters(pid, st)
 
           -- If this position change was AI-driven (opponent), continue with queued action.
-          if (anim and anim.target_side == "opp") and (st.turn == "opp") then
+          if (not st.pvp) and (anim and anim.target_side == "opp") and (st.turn == "opp") then
             local after = st.ai_after_pos
             st.ai_after_pos = nil
             if after and after.attack then
@@ -5079,14 +5489,24 @@ Net:on("tick", function()
           end
 
           if not deferred then
-            _resolve_attack_battle(pid, st, attacker_side)
+            -- Authoritative resolution in PVP:
+            -- only the attacker (attacker_side == "ply") resolves, then we sync to the opponent state.
+            if (not st.pvp) or attacker_side == "ply" then
+              _resolve_attack_battle(pid, st, attacker_side)
+              if st.pvp and attacker_side == "ply" then
+                _pvp_sync_from_authority(pid, st)
+              end
+            end
+
+            -- Always redraw locally (we hide MZ sprites during the anim)
             _draw_monsters(pid, st)
             _draw_hands(pid, st)
             _draw_point_counters(pid, st)
 
             if st.duel_over then goto continue_pid end
 
-            if attacker_side == "opp" and _ai_enabled() then
+            -- AI-only auto-turn restore (kept safe)
+            if (not st.pvp) and attacker_side == "opp" and (_ai_enabled and _ai_enabled()) then
               _begin_turn(pid, st, "ply")
             end
           end
@@ -5105,14 +5525,26 @@ Net:on("tick", function()
             st.reveal_hold_until = nil
             st.reveal_hold_seconds = nil
 
-            _resolve_attack_battle(pid, st, (pb and pb.attacker_side) or "ply")
+            local attacker_side = (pb and pb.attacker_side) or "ply"
+
+            -- Authoritative resolution in PVP:
+            -- only the attacker (attacker_side == "ply") resolves, then we sync to the opponent state.
+            if (not st.pvp) or attacker_side == "ply" then
+              _resolve_attack_battle(pid, st, attacker_side)
+              if st.pvp and attacker_side == "ply" then
+                _pvp_sync_from_authority(pid, st)
+              end
+            end
+
+            -- Always redraw locally (we hide MZ sprites during the reveal/attack flow)
             _draw_monsters(pid, st)
             _draw_hands(pid, st)
             _draw_point_counters(pid, st)
 
             if st.duel_over then goto continue_pid end
 
-            if (pb and pb.end_turn_after) and _ai_enabled() then
+            -- AI-only auto-turn restore (kept safe)
+            if (not st.pvp) and (pb and pb.end_turn_after) and (_ai_enabled and _ai_enabled()) then
               _begin_turn(pid, st, "ply")
             end
           end
@@ -5122,7 +5554,7 @@ Net:on("tick", function()
       -- ------------------------------------------------------------
       -- 5) Drive opponent scheduled attack (after summon delay)
       -- ------------------------------------------------------------
-      if st.pending_opp_attack and (st.turn == "opp") then
+      if (not st.pvp) and st.pending_opp_attack and (st.turn == "opp") then
         local when = st.pending_opp_attack_at or 0
         if now >= when then
           if not st.pending_reveal_battle
@@ -5136,7 +5568,7 @@ Net:on("tick", function()
 
             -- safety: if attack cannot start (e.g., target disappeared), end the opponent turn shortly
             if not (st.attack_anim and st.attack_anim.active) then
-              if _ai_enabled() then
+              if (_ai_enabled and _ai_enabled()) then
                 _ai_opp_queue_end_turn(pid, st, now)
               end
             end
@@ -5147,7 +5579,7 @@ Net:on("tick", function()
       -- ------------------------------------------------------------
       -- 6) Drive opponent scheduled end-turn (when no legal attack happens)
       -- ------------------------------------------------------------
-      if st.pending_opp_end_turn_at and (st.turn == "opp") then
+      if (not st.pvp) and st.pending_opp_end_turn_at and (st.turn == "opp") then
         local when = st.pending_opp_end_turn_at or 0
         if now >= when then
           if not st.pending_reveal_battle

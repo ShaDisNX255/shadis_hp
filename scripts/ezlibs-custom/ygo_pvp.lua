@@ -12,6 +12,8 @@ local helpers  = require('scripts/ezlibs-scripts/helpers')
 
 local M = {}
 
+local duels_pvp_ok, duels_pvp = false, nil
+
 -- ===== DEBUG =====
 local YGO_PVP_DEBUG = true
 local function dlog(msg) if YGO_PVP_DEBUG then print("[ygo_pvp] " .. tostring(msg)) end end
@@ -19,9 +21,22 @@ local function dlogf(fmt, ...) if YGO_PVP_DEBUG then print("[ygo_pvp] " .. strin
 
 -- injection API (top of ygo_pvp.lua)
 local start_pvp_fn = nil
-function M.set_start_fn(fn)
+local starter_locked = false
+
+function M.set_start_fn(fn, lock)
+  if starter_locked then
+    dlog("set_start_fn ignored: starter locked")
+    return false
+  end
   start_pvp_fn = fn
-  dlog("set_start_fn injected")
+  if lock == true then starter_locked = true end
+  dlog("set_start_fn injected" .. (starter_locked and " (locked)" or ""))
+  return true
+end
+
+duels_pvp_ok, duels_pvp = pcall(require, "scripts/ezlibs-custom/duels_pvp")
+if duels_pvp_ok and duels_pvp and duels_pvp.start_card_battle_pvp then
+  M.set_start_fn(duels_pvp.start_card_battle_pvp, true)
 end
 
 dlog("Starting Yu-Gi-Oh PVP tables")
@@ -236,11 +251,11 @@ local function _set_ready(pid, area_id, table_id, ready)
     dlogf("_set_ready: BOTH READY at table=%s (A=%s, B=%s)", tostring(table_id), tostring(p1), tostring(p2))
 
     -- prefer injected starter; fallback to global
-    local starter = start_pvp_fn or (custom and custom.start_card_battle_pvp)
+    local starter = start_pvp_fn
     if not starter then
       dlog("_set_ready: starter MISSING")
-      Net.message_player(p1, "[YGO] PVP entrypoint missing (custom.start_card_battle_pvp).")
-      Net.message_player(p2, "[YGO] PVP entrypoint missing (custom.start_card_battle_pvp).")
+      Net.message_player(p1, "[YGO] PVP entrypoint missing (duels_pvp.start_card_battle_pvp).")
+      Net.message_player(p2, "[YGO] PVP entrypoint missing (duels_pvp.start_card_battle_pvp).")
       slot.seatA.ready, slot.seatB.ready = false, false
       slot.status = "idle"
       _reopen(p1); _reopen(p2)
@@ -343,6 +358,7 @@ local function _open_board(pid)
   refreshing_flag[pid] = true
   _open_table_board(pid, seat.area_id, seat.object_id)
 end
+
 -- Expose a board_close hook the main router can call
 function M.handle_board_close(event)
   local pid = event.player_id
@@ -390,7 +406,15 @@ function M.handle_board_close(event)
     refreshing_flag[pid] = nil
 
     if status == "dueling" then
-      _dlog("refresh path: in dueling → not consuming; delegating to custom.lua")
+      if duels_pvp and duels_pvp.handle_board_close then
+      local ok, res = pcall(duels_pvp.handle_board_close, event)
+      if not ok then
+        _dlog("duels_pvp.handle_board_close ERROR: " .. tostring(res))
+        return false
+      end
+      _dlog("duels_pvp.handle_board_close returned " .. tostring(res))
+      return res == true
+      end
       return false
     else
       _dlog("refresh path: swallowing one-shot close (consumed)")
@@ -408,9 +432,26 @@ function M.handle_board_close(event)
     _dlog("delegate path: no seat or _get_table missing")
   end
 
-  _dlog("delegating board_close to custom.lua")
+  -- If the table is dueling, let duels_pvp open the duel UI
+  local seat = seated_by_pid and seated_by_pid[pid]
+  if seat and type(_get_table) == "function" then
+    local slot = _get_table(seat.area_id, seat.table_id)
+    local status = slot and slot.status
+    if status == "dueling" then
+      if duels_pvp and duels_pvp.handle_board_close then
+      local ok, res = pcall(duels_pvp.handle_board_close, event)
+      if not ok then
+        _dlog("duels_pvp.handle_board_close ERROR: " .. tostring(res))
+        return false
+      end
+      _dlog("duels_pvp.handle_board_close returned " .. tostring(res))
+      return res == true
+      end
+    end
+  end
+
   return false
-end
+  end
 
 -- Clean up seats when a player leaves/disconnects
 Net:on("player_disconnect", function(event)

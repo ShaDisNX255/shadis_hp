@@ -44,6 +44,9 @@ if not helpers_ok then helpers = nil end
 local ezmemory_ok, ezmemory = pcall(require, "scripts/ezlibs-scripts/ezmemory")
 if not ezmemory_ok then ezmemory = nil end
 
+local sleeves_ok, card_sleeves = pcall(require, "scripts/ezlibs-custom/card_sleeves")
+if not sleeves_ok then card_sleeves = nil end
+
 -- ---------------------------------------------------------------------------
 -- Config knobs
 -- ---------------------------------------------------------------------------
@@ -245,6 +248,12 @@ list_rarity_scale          = 1.1,
   mainui_gallery_r = 255,
   mainui_gallery_g = 255,
   mainui_gallery_b = 255,
+
+  -- sleeve preview (small, left side; tweak if you want)
+  sleeve_preview_x      = 51,
+  sleeve_preview_y      = 53,
+  sleeve_preview_z      = 300,
+  sleeve_preview_scale  = 2.0,
 }
 
 -- ---------------------------------------------------------------------------
@@ -478,6 +487,7 @@ local state_by_pid = {}
 
 local MODE_GALLERY = "gallery"
 local MODE_DECK    = "deck"
+local MODE_SLEEVES = "sleeves"
 
 local function clone_counts(t)
   local out = {}
@@ -600,6 +610,78 @@ local function build_deck_entries(st)
   return out
 end
 
+local function make_deck_sleeve_entry(pid)
+  local equipped_id = "normal"
+  if card_sleeves and card_sleeves.get_equipped then
+    local ok, id = pcall(card_sleeves.get_equipped, pid)
+    if ok and id then equipped_id = tostring(id) end
+  end
+
+  local equipped_name = equipped_id
+  if card_sleeves and card_sleeves.get_name_for_id then
+    local ok, name = pcall(card_sleeves.get_name_for_id, equipped_id)
+    if ok and name and name ~= "" then equipped_name = name end
+  end
+
+  return {
+    is_sleeve_entry = true,
+    sleeve_id = equipped_id,
+    display_name = "Card Sleeves",
+    description = "Choose your card sleeves",
+    raw_name = "",
+    base_name = "",
+  }
+end
+
+local function build_deck_entries_with_sleeve(pid, st)
+  local out = build_deck_entries(st)
+  table.insert(out, 1, make_deck_sleeve_entry(pid))
+  return out
+end
+
+local function build_owned_sleeve_entries(pid)
+  local out = {}
+
+  local equipped = "normal"
+  if card_sleeves and card_sleeves.get_equipped then
+    local ok, id = pcall(card_sleeves.get_equipped, pid)
+    if ok and id then equipped = tostring(id) end
+  end
+
+  if card_sleeves and card_sleeves.list_defs and card_sleeves.has_sleeve then
+    for _, def in ipairs(card_sleeves.list_defs() or {}) do
+      if def and def.id then
+        local ok_owned, owned = pcall(card_sleeves.has_sleeve, pid, def.id)
+        if ok_owned and owned then
+          local disp = tostring(def.name or def.id)
+
+          out[#out+1] = {
+            is_sleeve_entry = true,
+            sleeve_id = tostring(def.id),
+            display_name = disp,
+            description = "Equip this sleeve for your face-down cards.",
+            raw_name = "",
+            base_name = "",
+          }
+        end
+      end
+    end
+  end
+
+  if #out == 0 then
+    out[#out+1] = {
+      is_sleeve_entry = true,
+      sleeve_id = "normal",
+      display_name = "Normal",
+      description = "Default sleeve.",
+      raw_name = "",
+      base_name = "",
+    }
+  end
+
+  return out
+end
+
 local function sanitize_deck_counts(pid, st)
   -- 1) drop missing, clamp to owned
   local cleaned = {}
@@ -710,7 +792,7 @@ local function get_selected_entry(st)
   return st.entries and st.entries[idx] or nil
 end
 
-local function set_mode_only(st, mode)
+local function set_mode_only(st, mode, pid)
   if mode ~= MODE_GALLERY and mode ~= MODE_DECK then
     mode = MODE_GALLERY
   end
@@ -719,7 +801,11 @@ local function set_mode_only(st, mode)
   if mode == MODE_GALLERY then
     st.entries = st.gallery_entries or {}
   else
-    st.entries = build_deck_entries(st)
+    if pid then
+      st.entries = build_deck_entries_with_sleeve(pid, st)
+    else
+      st.entries = build_deck_entries(st)
+    end
   end
   st.cursor_index = (#st.entries > 0 and 1) or 0
   st.top_index = 1
@@ -1095,7 +1181,14 @@ local function update_mode_deck_texts(pid)
 
   local deck_total = tonumber(st.deck_total) or 0
   local deck_size  = cfg.deck_size or 10
-  local mode_name  = (st.mode == MODE_DECK) and "DECK" or "GALLERY"
+  local mode_name
+  if st.mode == MODE_SLEEVES then
+    mode_name = "SLEEVES"
+  elseif st.mode == MODE_DECK then
+    mode_name = "DECK"
+  else
+    mode_name = "GALLERY"
+  end
 
   draw_text(
     pid,
@@ -1122,9 +1215,29 @@ local function update_mode_deck_texts(pid)
     limit_label = label or ""
   end
 
+  -- Always show the ACTUAL equipped sleeve (not the highlighted one)
+  local equipped_id = "normal"
+  if card_sleeves and card_sleeves.get_equipped then
+    local ok, id = pcall(card_sleeves.get_equipped, pid)
+    if ok and id then equipped_id = tostring(id) end
+  end
+
+  local equipped_name = equipped_id
+  if card_sleeves and card_sleeves.get_name_for_id then
+    local ok, name = pcall(card_sleeves.get_name_for_id, equipped_id)
+    if ok and name and name ~= "" then equipped_name = name end
+  end
+
+  local line1
+  if st.mode == MODE_SLEEVES or (entry and entry.is_sleeve_entry) then
+    line1 = "Equipped: " .. tostring(equipped_name)
+  else
+    line1 = string.format("In Deck: %d/%d", in_deck, cap)
+  end
+
   draw_text(
     pid,
-    string.format("In Deck: %d/%d", in_deck, cap),
+    line1,
     cfg.deckinfo_x or 0,
     cfg.deckinfo_y or 0,
     cfg.deckinfo_font or "THICK",
@@ -1559,35 +1672,52 @@ local function redraw_visible_rows(pid)
     if idx <= total then
       local e = entries[idx]
       local name = e and e.display_name or ""
-      local qty  = e and (tonumber(e.qty) or 0) or 0
 
-      draw_list_rarity_icon(pid, i, e and e.raw_name or "", y)
+      if e and e.is_sleeve_entry then
+        draw_list_rarity_icon(pid, i, nil, y)
 
-      draw_text(
-        pid,
-        name,
-        cfg.list_x + cfg.list_pad_x,
-        y + cfg.list_pad_y,
-        cfg.list_font,
-        cfg.list_font_scale,
-        cfg.list_z,
-        cfg.list_text_id_base .. tostring(i)
-      )
+        draw_text(
+          pid,
+          name,
+          cfg.list_x + cfg.list_pad_x,
+          y + cfg.list_pad_y,
+          cfg.list_font,
+          cfg.list_font_scale,
+          cfg.list_z,
+          cfg.list_text_id_base .. tostring(i)
+        )
+        -- no count draw for sleeves
+      else
+        local qty  = e and (tonumber(e.qty) or 0) or 0
 
-      draw_text(
-        pid,
-        string.format("%03d", qty),
-        cfg.count_x + cfg.count_pad_x,
-        y + cfg.list_pad_y,
-        cfg.count_font,
-        cfg.count_font_scale,
-        cfg.count_z,
-        cfg.count_text_id_base .. tostring(i)
-      )
+        draw_list_rarity_icon(pid, i, e and e.raw_name or "", y)
+
+        draw_text(
+          pid,
+          name,
+          cfg.list_x + cfg.list_pad_x,
+          y + cfg.list_pad_y,
+          cfg.list_font,
+          cfg.list_font_scale,
+          cfg.list_z,
+          cfg.list_text_id_base .. tostring(i)
+        )
+
+        draw_text(
+          pid,
+          string.format("%03d", qty),
+          cfg.count_x + cfg.count_pad_x,
+          y + cfg.list_pad_y,
+          cfg.count_font,
+          cfg.count_font_scale,
+          cfg.count_z,
+          cfg.count_text_id_base .. tostring(i)
+        )
+      end
     else
-      -- NEW: no entry in this line, erase the old rarity icon so it doesn't linger
+      -- IMPORTANT: clear leftover rarity icon sprites on empty rows
       draw_list_rarity_icon(pid, i, nil, y)
-    end
+	end
   end
 
   update_cursor_position(pid)
@@ -1791,6 +1921,31 @@ local function update_preview(pid)
   if not st then return end
 
   local entry = get_selected_entry(st)
+  -- Always clear sleeve preview unless the current selection is a sleeve entry
+  if card_sleeves and card_sleeves.clear_shop_previews then
+    pcall(card_sleeves.clear_shop_previews, pid)
+  end
+
+  if entry and entry.is_sleeve_entry then
+    clear_preview_art(pid)
+    clear_fa_chip_overlay(pid)
+    clear_rarity_sparkle(pid)
+    clear_rarity_icon(pid)
+    clear_stats_text(pid)
+    update_mode_deck_texts(pid)
+
+    if card_sleeves and card_sleeves.preview_for_shop then
+      pcall(card_sleeves.preview_for_shop, pid, entry.sleeve_id, {
+        x  = cfg.sleeve_preview_x or 18,
+        y  = cfg.sleeve_preview_y or 26,
+        sx = cfg.sleeve_preview_scale or 0.9,
+        sy = cfg.sleeve_preview_scale or 0.9,
+        z  = cfg.sleeve_preview_z or 999,
+      })
+    end
+
+    return
+  end
   if not entry then
     clear_preview_art(pid)
     clear_fa_chip_overlay(pid)
@@ -1851,6 +2006,65 @@ local function update_preview(pid)
 
   -- IMPORTANT: always call with (pid, sprite_id, art_path)
   draw_preview_art(pid, stable_id, art_path)
+end
+
+local function open_sleeves_mode(pid)
+  local st = state_by_pid[pid]
+  if not st then return end
+
+  st._pre_sleeves_mode   = st.mode
+  st._pre_sleeves_cursor = st.cursor_index
+  st._pre_sleeves_top    = st.top_index
+
+  st.mode = MODE_SLEEVES
+  st.entries = build_owned_sleeve_entries(pid)
+
+  local equipped = "normal"
+  if card_sleeves and card_sleeves.get_equipped then
+    local ok, id = pcall(card_sleeves.get_equipped, pid)
+    if ok and id then equipped = tostring(id) end
+  end
+
+  local idx = 1
+  for i, e in ipairs(st.entries) do
+    if e and e.sleeve_id == equipped then
+      idx = i
+      break
+    end
+  end
+
+  st.cursor_index = (#st.entries > 0 and idx) or 0
+  st.top_index = 1
+  st.armed_item_id = nil
+
+  redraw_visible_rows(pid)
+  update_preview(pid)
+end
+
+function close_sleeves_mode(pid)
+  local st = state_by_pid[pid]
+  if not st then return end
+
+  if card_sleeves and card_sleeves.clear_shop_previews then
+    pcall(card_sleeves.clear_shop_previews, pid)
+  end
+
+  st.mode = st._pre_sleeves_mode or MODE_DECK
+  st._pre_sleeves_mode = nil
+
+  if st.mode == MODE_DECK then
+    st.entries = build_deck_entries_with_sleeve(pid, st)
+  else
+    st.entries = st.gallery_entries or {}
+  end
+
+  st.cursor_index = st._pre_sleeves_cursor or ((#st.entries > 0 and 1) or 0)
+  st.top_index    = st._pre_sleeves_top or 1
+  st._pre_sleeves_cursor = nil
+  st._pre_sleeves_top = nil
+
+  redraw_visible_rows(pid)
+  update_preview(pid)
 end
 
 -- ---------------------------------------------------------------------------
@@ -2001,7 +2215,11 @@ local function handle_cards_button(pid, name, state)
   -- Toggle modes
   if is_press and (name == "Move Left" or name == "Left") then
     if st.mode ~= MODE_DECK then
-      set_mode_only(st, MODE_DECK)
+      if st.mode == MODE_SLEEVES then
+        close_sleeves_mode(pid)
+        return true
+      end
+      set_mode_only(st, MODE_DECK, pid)
       apply_mainui_tint(pid, true)
       redraw_visible_rows(pid)
       update_preview(pid)
@@ -2011,7 +2229,11 @@ local function handle_cards_button(pid, name, state)
 
   if is_press and (name == "Move Right" or name == "Right") then
     if st.mode ~= MODE_GALLERY then
-      set_mode_only(st, MODE_GALLERY)
+      if st.mode == MODE_SLEEVES then
+        close_sleeves_mode(pid)
+        return true
+      end
+      set_mode_only(st, MODE_GALLERY, pid)
       apply_mainui_tint(pid, false)
       redraw_visible_rows(pid)
       update_preview(pid)
@@ -2022,6 +2244,23 @@ local function handle_cards_button(pid, name, state)
   -- Confirm: 1st press arms, 2nd press acts (add/remove)
   if is_press and (name == "Confirm" or name == "A") then
     local entry = get_selected_entry(st)
+    if entry and entry.is_sleeve_entry then
+      if st.mode == MODE_DECK then
+        open_sleeves_mode(pid)
+        return true
+      elseif st.mode == MODE_SLEEVES then
+        if card_sleeves and card_sleeves.set_equipped then
+          local ok = select(1, card_sleeves.set_equipped(pid, entry.sleeve_id))
+          if ok then
+            play_card_choose_sfx(pid)
+            close_sleeves_mode(pid) -- return to deck editor immediately
+          else
+            play_card_cancel_sfx(pid)
+          end
+        end
+        return true
+      end
+    end
     if not entry or not entry.item_id then
       return true
     end
@@ -2150,6 +2389,10 @@ local function handle_cards_button(pid, name, state)
 
   -- Back to LMenu
   if is_press and name == "Cancel" then
+    if st.mode == MODE_SLEEVES then
+      close_sleeves_mode(pid)
+      return true
+    end
     Cards.handle_cancel(pid)
     return true
   end
@@ -2272,6 +2515,10 @@ function Cards.close(pid, opts)
   -- text
   erase_all_text(pid)
 
+  if card_sleeves and card_sleeves.clear_shop_previews then
+    pcall(card_sleeves.clear_shop_previews, pid)
+  end
+
   state_by_pid[pid] = nil
 
   if not opts.keep_frozen then
@@ -2283,11 +2530,18 @@ end
 
 
 function Cards.handle_cancel(pid)
-  -- Close Cards UI, keep overworld frozen.
-  Cards.close(pid, { keep_frozen = true })
+  local st = state_by_pid[pid]
 
-  -- Defer reopening LMenu by one tick so the same Cancel press
-  -- doesn't immediately close LMenu.
+  -- If we're inside the sleeve selector, Cancel should go back to deck editor
+  -- (NOT close the whole Cards UI / return to LMenu).
+  if st and st.mode == MODE_SLEEVES then
+    close_sleeves_mode(pid)
+    pending_lmenu_open[pid] = nil
+    return true
+  end
+
+  -- Otherwise, normal cancel behavior: close Cards UI and reopen LMenu next tick.
+  Cards.close(pid, { keep_frozen = true })
   pending_lmenu_open[pid] = true
   return true
 end

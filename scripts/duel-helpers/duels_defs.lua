@@ -520,7 +520,15 @@ local defs = {
       y = 20,
       z = 206,
     },
-    TIME_SCALE = 0.2, -- 0.25 for 75% faster (more aggressive)
+    DRAW_ANIM = {
+      slide_dy       = 20,
+      slide_duration = 0.22, -- scaled by TIME_SCALE automatically
+      move_duration  = 0.28, -- scaled by TIME_SCALE automatically
+      max_visible    = 10,
+      stack_dx       = 1,
+      stack_dy       = -1,
+    },
+    TIME_SCALE = 0.35, -- 0.25 for 75% faster (more aggressive)
   },
 }
 

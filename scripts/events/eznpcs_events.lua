@@ -14,6 +14,7 @@ local raids    = require('scripts/raids/raids')
 local cosmetics = require('scripts/ezlibs-custom/cosmetics')
 local ezmenus   = require('scripts/ezlibs-scripts/ezmenus')
 local duels  = require('scripts/ezlibs-custom/duels')
+local card_sleeves = require('scripts/ezlibs-custom/card_sleeves')
 
 local COSMETIC_SHOP_COLOR = { r = 245, g = 210, b = 70 } -- same yellow as decorshop
 
@@ -1256,6 +1257,146 @@ eznpcs.add_event{
   end
 }
 
+eznpcs.add_event{
+  name = "sleeveshop",
+  action = function(npc, player_id, dialogue, relay_object)
+    return async(function()
+      local mug = eznpcs.get_dialogue_mugshot(npc, player_id, dialogue)
+
+      if not card_sleeves or not card_sleeves.unlock_for_player then
+        await(Async.message_player(
+          player_id,
+          "Card sleeves system is not available right now.",
+          mug.texture_path, mug.animation_path
+        ))
+        return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+      end
+
+      local ci = build_ci_props(dialogue)
+      local title = tostring(get_ci(ci, "shop title") or "Card Sleeve Shop")
+
+      -- Build offers from Sell N / Price N; if none configured, sell ALL known sleeves at Price=0.
+      local offers = {}
+      local i = 1
+      while true do
+        local sell = get_ci(ci, "sell " .. i)
+        if not sell then break end
+
+        local price = tonumber(get_ci(ci, "price " .. i) or get_ci(ci, "cost " .. i) or 0) or 0
+        if price < 0 then price = 0 end
+
+        local sleeve_id = tostring(sell)
+        table.insert(offers, {
+          sleeve_id = sleeve_id,
+          price = price,
+          name = (card_sleeves.get_name_for_id and card_sleeves.get_name_for_id(sleeve_id)) or sleeve_id,
+        })
+
+        i = i + 1
+      end
+
+      if #offers == 0 then
+        for _, def in ipairs(card_sleeves.list_defs()) do
+          table.insert(offers, {
+            sleeve_id = def.id,
+            price = 0,
+            name = def.name or def.id,
+          })
+        end
+      end
+
+      if #offers == 0 then
+        await(Async.message_player(
+          player_id,
+          "Sorry, I'm not selling any card sleeves right now.",
+          mug.texture_path, mug.animation_path
+        ))
+        return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+      end
+
+      while true do
+        local posts, items = {}, {}
+
+        for _, offer in ipairs(offers) do
+          local owned = card_sleeves.has_sleeve(player_id, offer.sleeve_id)
+          local label = owned
+            and string.format("%s (%s, Owned)", offer.name, short_money(offer.price))
+            or  string.format("%s (%s)",        offer.name, short_money(offer.price))
+
+          table.insert(posts, helpers.create_bbs_option(label))
+          items[#posts] = offer
+        end
+
+        local board = ezmenus.open_menu(player_id, title, COSMETIC_SHOP_COLOR, posts)
+        local sel = await(board.selection_once())
+        Net.close_bbs(player_id)
+
+        if not sel then break end
+
+        local chosen
+        for idx, post in ipairs(posts) do
+          local pid = post.id or post.title or ""
+          if sel == pid then
+            chosen = items[idx]
+            break
+          end
+        end
+        if not chosen then break end
+
+        if card_sleeves.has_sleeve(player_id, chosen.sleeve_id) then
+          await(Async.message_player(
+            player_id,
+            "You already own the " .. chosen.name .. " sleeve.",
+            mug.texture_path, mug.animation_path
+          ))
+        else
+          -- Preview in the center while confirming purchase
+          card_sleeves.preview_for_shop(player_id, chosen.sleeve_id)
+
+          local q = string.format("Buy %s sleeve for %s?", chosen.name, short_money(chosen.price))
+          local res = await(Async.question_player(player_id, q, mug.texture_path, mug.animation_path))
+          local do_buy = (res == 1)
+
+          card_sleeves.clear_shop_previews(player_id)
+
+          if do_buy then
+            local price = chosen.price or 0
+            if price > 0 and not ezmemory.spend_player_money(player_id, price) then
+              await(Async.message_player(
+                player_id,
+                "You don't have enough money.",
+                mug.texture_path, mug.animation_path
+              ))
+            else
+              local ok, reason = card_sleeves.unlock_for_player(player_id, chosen.sleeve_id)
+              if ok then
+                -- Since selector isn’t built yet, auto-equip what they bought
+                pcall(card_sleeves.set_equipped, player_id, chosen.sleeve_id)
+
+                if sfx and sfx.item_get then
+                  Net.play_sound_for_player(player_id, sfx.item_get)
+                end
+                await(Async.message_player(
+                  player_id,
+                  "You got the " .. chosen.name .. " sleeve! (Equipped)",
+                  mug.texture_path, mug.animation_path
+                ))
+              else
+                await(Async.message_player(
+                  player_id,
+                  "Couldn't unlock that sleeve (" .. tostring(reason or "error") .. ").",
+                  mug.texture_path, mug.animation_path
+                ))
+              end
+            end
+          end
+        end
+      end
+
+      return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+    end)
+  end
+}
 
 ----------------------------------------------------------------
 -- BugFrag Dealer Shop (sells cosmetics + decors/pets for BugFrags)
