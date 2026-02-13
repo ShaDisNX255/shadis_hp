@@ -2,7 +2,8 @@
 d2e6ca836f8de25f96351a4a5910d0f0 com.OFC.card.EXE4-148-Attack+10
 87f3d20d886040656dfe4e016bb2fdef com.OFC.card.EXE4-148-Attack+10
 8f7d425622e9be4f9651355df089f03f com.OFC.card.EXE6-001-Cannon
-
+29211b7981416b4bf524b77bb14c30aa com.alrysc.card.BusterUp
+c81aaf22631981e586578c8d9b308e22 com.keristero.k1rbyat1na.card.EXE6-058-MiniBomb
 f19ac8da5e3db97da4be0db3910d20ca com.OFC.card.EXE6-004-AirShoot
 5d79d38b822d094a2f0cf319d2a74325 com.OFC.card.EXE6-004-AirShoot
 1ea2339e8b3e8ce1d21b0dfb9f4df8ee com.OFC.card.EXE6-009-SpreadGun1
@@ -114,4 +115,12 @@ b6de28d83fe9a2d5e7ad0965bc532644 61.Mannerek.Unified.Library
 d705c9815fb1f27b5b39ed65cb252dc7 com.darkware.navi.djangopvp
 23c87aad099bcfdca0e518c082888343 com.darkware.navi.sabatapvp
 948e91da79b1dd142219120c43db2816 com.ijuinpersonalterminalcompany.enzan.player.bluesnotproto
+39d13030848aa532188ca7f008830519 com.RaitoADV.player.BlackNormalNavi
+758551c7d1dc4c275de5f7556cd0f624 com.RaitoADV.player.BlueNormalNavi
+e5064b950de194bbd8a210bd893e8c72 com.RaitoADV.player.GreenNormalNavi
+7d7eb239772b50cbddfce88ac1c83def com.RaitoADV.player.PinkNormalNavi
+de941c9687c565e7b710a7e29e5346fe com.RaitoADV.player.PurpleNormalNavi
+e06b7158a8cc52fd19a783240586c1ee com.RaitoADV.player.RedNormalNavi
+c1a9de2a38537874eb47c565a445ca1f com.RaitoADV.player.WhiteNormalNavi
+cc35c5d13c826691e606e4f77e40f260 com.RaitoADV.player.YellowNormalNavi
 
