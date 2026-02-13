@@ -528,7 +528,7 @@ local defs = {
       stack_dx       = 1,
       stack_dy       = -1,
     },
-    TIME_SCALE = 0.35, -- 0.25 for 75% faster (more aggressive)
+    TIME_SCALE = 0.60, -- 0.25 for 75% faster (more aggressive)
   },
 }
 
