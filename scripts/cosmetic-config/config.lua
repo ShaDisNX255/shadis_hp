@@ -815,6 +815,31 @@ local cosmetics = {
     menu_preview_offset_y   = 5,
     menu_preview_scale          = 1.0,
   },
+  {
+    id              = "ProtoBadge",
+    key             = "ProtoBadge",
+    name            = "ProtoBadge",
+    texture         = "/server/assets/cosmetics/ProtoBadge.png",
+    animation       = "/server/assets/cosmetics/ProtoBadge.animation",
+    anim_state      = "idle_protobadge",
+    preview_sprite_id = "preview_ProtoBadge",
+    rarity          = "GREEN_5",
+    loop_duration = 2.9,
+
+    xforced         = 23,
+    yforced         = -2,
+
+    preview_start_x = -12,
+    preview_start_y = -2,
+
+    menu_preview_texture    = "/server/assets/cosmetics/ProtoBadge_preview.png",
+    menu_preview_animation  = "/server/assets/cosmetics/ProtoBadge_preview.animation",
+    menu_preview_anim_state = "idle_protobadge",
+    menu_preview_sprite_id  = "menu_preview_ProtoBadge",
+    menu_preview_offset_x   = 8,
+    menu_preview_offset_y   = 12,
+    menu_preview_scale          = 1.0,
+  },
 }
 
 return {

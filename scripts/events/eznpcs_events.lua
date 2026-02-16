@@ -15,6 +15,7 @@ local cosmetics = require('scripts/ezlibs-custom/cosmetics')
 local ezmenus   = require('scripts/ezlibs-scripts/ezmenus')
 local duels  = require('scripts/ezlibs-custom/duels')
 local card_sleeves = require('scripts/ezlibs-custom/card_sleeves')
+local ezquests = require('scripts/ezlibs-scripts/ezquests')
 
 local COSMETIC_SHOP_COLOR = { r = 245, g = 210, b = 70 } -- same yellow as decorshop
 
@@ -2262,6 +2263,71 @@ eznpcs.add_event{
     end)
   end
 }
+
+local echo_boss = {
+    name="echo_boss",
+    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    enemies={
+        {name="FireManPoN",rank=3},
+    },
+    obstacles={
+    },
+    positions={
+        {0,0,0,0,0,0},
+        {0,0,0,0,1,0},
+        {0,0,0,0,0,0},
+    },
+    obstacle_positions={
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+    },
+    player_positions={
+        {0,0,0,0,0,0},
+        {0,1,0,0,0,0},
+        {0,0,0,0,0,0},
+    },
+    tiles={
+        {1,1,1,1,1,1},
+        {1,1,1,1,1,1},
+        {1,1,1,1,1,1},
+    },
+    teams={
+        {2,2,2,1,1,1},
+        {2,2,2,1,1,1},
+        {2,2,2,1,1,1},
+    },
+}
+
+local EchoProgram_Battle = {
+    name="EchoProgram Battle",
+    action=function(npc, player_id, dialogue, relay_object)
+        return async(function()
+            local stats = await(ezencounters.begin_encounter(player_id, echo_boss))
+            if stats.ran or stats.health == 0 then
+                return dialogue.custom_properties["Battle Lost"]
+            else
+                return dialogue.custom_properties["Battle Won"]
+            end
+        end)
+    end
+}
+eznpcs.add_event(EchoProgram_Battle)
+
+local EchoProgram_GameOver = {
+    name="EchoProgram GameOver",
+    action=function(npc, player_id, dialogue, relay_object)
+        return async(function()
+            -- Reset quest progress then kick (game over)
+            await(ezquests.quest_event(player_id, "EchoProgram", "reset"))
+            await(Async.message_player(player_id, "GAME OVER"))
+            Net.kick_player(player_id, "Game Over", false)
+            return nil
+        end)
+    end
+}
+eznpcs.add_event(EchoProgram_GameOver)
+
 
 -- Repaint any already-revealed paths when players appear in an area
 Net:on("player_join", function(ev)

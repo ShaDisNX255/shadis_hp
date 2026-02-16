@@ -2,6 +2,7 @@
 local helpers = require('scripts/ezlibs-scripts/helpers')
 local ezmemory = require('scripts/ezlibs-scripts/ezmemory')
 local ezquests = require('scripts/ezlibs-scripts/ezquests')
+local ezemail = require('scripts/ezlibs-scripts/ezemail')
 
 --Dialogue Types
 local dialogue_types = {
@@ -100,6 +101,66 @@ local dialogue_types = {
                     next_dialogue_id = next_dialogues[2]
                 end
                 return next_dialogue_id
+            end)
+        end
+    },
+    questcheck={
+        name = "questcheck",
+        action = function(npc, player_id, dialogue, relay_object)
+            return async(function ()
+                local next_dialogues = helpers.extract_numbered_properties(dialogue,"Next ")
+
+                local quest_name = dialogue.custom_properties["Quest Name"]
+                local flag_name  = dialogue.custom_properties["Flag Name"]
+
+                -- Optional:
+                -- - If Flag Value is empty/nil => truthy check
+                -- - If Flag Value exists => compare (string compare by default)
+                local expected   = dialogue.custom_properties["Flag Value"]
+                local op         = dialogue.custom_properties["Operator"] or dialogue.custom_properties["Op"] -- ==, !=, >=, <=, >, <
+                local invert     = dialogue.custom_properties["Invert"] == "true"
+
+                if not quest_name or not flag_name then
+                    warn("[eznpcs] questcheck missing Quest Name / Flag Name on dialogue node", dialogue.id)
+                    return next_dialogues[2] or next_dialogues[1]
+                end
+
+                local value = ezquests.get_player_quest_flag(player_id, quest_name, flag_name)
+
+                local passed = false
+
+                if expected == nil or expected == "" then
+                    -- truthy check (treat nil/false/"false" as false)
+                    passed = not (value == nil or value == false or value == "false")
+                else
+                    local cmp = op or "=="
+                    if cmp == "==" or cmp == "=" then
+                        passed = tostring(value) == tostring(expected)
+                    elseif cmp == "!=" then
+                        passed = tostring(value) ~= tostring(expected)
+                    else
+                        -- numeric operators if possible
+                        local a = tonumber(value)
+                        local b = tonumber(expected)
+                        if a ~= nil and b ~= nil then
+                            if     cmp == ">=" then passed = a >= b
+                            elseif cmp == "<=" then passed = a <= b
+                            elseif cmp == ">"  then passed = a >  b
+                            elseif cmp == "<"  then passed = a <  b
+                            else
+                                passed = tostring(value) == tostring(expected)
+                            end
+                        else
+                            passed = tostring(value) == tostring(expected)
+                        end
+                    end
+                end
+
+                if invert then
+                    passed = not passed
+                end
+
+                return next_dialogues[passed and 1 or 2]
             end)
         end
     },
@@ -228,6 +289,128 @@ local dialogue_types = {
                     ezmemory.give_item_with_optional_notify(player_id,area_id,item_id,nil,notify_player)
                 end
                 return dialogue.custom_properties["Next 1"]
+            end)
+        end
+    },
+    email={
+        name = "email",
+        action = function(npc, player_id, dialogue, relay_object)
+            return async(function()
+                local next_dialogues = helpers.extract_numbered_properties(dialogue,"Next ")
+                local next_id = first_value_from_table(next_dialogues)
+
+                local MUG_DIR = "/server/assets/ezlibs-assets/eznpcs/mug/"
+
+                local function has_asset(path)
+                    if not path or path == "" then return false end
+                    if not (Net and Net.has_asset) then return true end
+                    local ok, res = pcall(Net.has_asset, path)
+                    if ok and res == true then return true end
+                    if ok and res == false then return false end
+                    return true
+                end
+
+                local function ensure_ext(p, ext)
+                    if not p or p == "" then return nil end
+                    -- if it already has an extension, leave it
+                    if p:match("%.[%w]+$") then return p end
+                    return p .. ext
+                end
+
+                local function resolve_texture(raw)
+                    if not raw or raw == "" then return nil end
+                    -- full path provided
+                    if raw:find("/") then
+                        return ensure_ext(raw, ".png")
+                    end
+                    -- shorthand name
+                    local name = raw
+                    if not name:match("%.png$") then name = name .. ".png" end
+                    return MUG_DIR .. name
+                end
+
+                local function resolve_anim(raw)
+                    if raw == nil or raw == "" then
+                        return MUG_DIR .. "mug.animation"
+                    end
+                    if raw:find("/") then
+                        return ensure_ext(raw, ".animation")
+                    end
+                    local name = raw
+                    if not name:match("%.animation$") then name = name .. ".animation" end
+                    return MUG_DIR .. name
+                end
+
+                local id = dialogue.custom_properties["Email Id"]
+                if not id or id == "" then
+                    warn("[eznpcs] email dialogue missing Email Id on node", dialogue.id)
+                    return next_id
+                end
+
+                local icon  = tonumber(dialogue.custom_properties["Email Icon"] or "1") or 1
+                local title = dialogue.custom_properties["Email Title"] or "Mail"
+                local from  = dialogue.custom_properties["Email From"] or "???"
+
+                local body_lines = helpers.extract_numbered_properties(dialogue,"Body ")
+                local body = ""
+                if body_lines and #body_lines > 0 then
+                    body = table.concat(body_lines, "\n\n")
+                else
+                    body = dialogue.custom_properties["Email Body"] or ""
+                end
+
+                local notify = (dialogue.custom_properties["Dont Notify"] ~= "true")
+                local delay  = tonumber(dialogue.custom_properties["Notify Delay"])
+                local msg    = dialogue.custom_properties["Notify Message"] or "Looks like you got an e-mail."
+                local persist = (dialogue.custom_properties["Persist"] ~= "false")
+
+                -- Mug rules
+                local tex_raw  = dialogue.custom_properties["Mug Texture Path"]
+                local anim_raw = dialogue.custom_properties["Mug Animation Path"]
+
+                local tex_path = resolve_texture(tex_raw)
+                local anim_path = nil
+
+                if tex_path then
+                    anim_path = resolve_anim(anim_raw)
+
+                    -- If either is missing, send with no mug + warn
+                    if not has_asset(tex_path) or not has_asset(anim_path) then
+                        warn("[eznpcs] email mug asset missing. tex=", tex_path, "anim=", anim_path, " -> sending without mug")
+                        tex_path = nil
+                        anim_path = nil
+                    end
+                end
+
+                local mail = {
+                    id = tostring(id),
+                    icon = icon,
+                    title = title,
+                    from = from,
+                    body = body,
+                }
+
+                if tex_path and anim_path then
+                    mail.mug_texture_path = tex_path
+                    mail.mug_animation_path = anim_path
+                end
+
+                if persist then
+                    -- guarded by ezemail memory (won't create duplicates)
+                    ezemail.send_once(player_id, mail, {
+                        notify = notify,
+                        notify_message = msg,
+                        notify_delay = delay
+                    })
+                else
+                    ezemail.send_temp(player_id, mail, {
+                        notify = notify,
+                        notify_message = msg,
+                        notify_delay = delay
+                    })
+                end
+
+                return next_id
             end)
         end
     }
