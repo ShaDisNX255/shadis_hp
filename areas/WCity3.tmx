@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="50" height="50" tilewidth="64" tileheight="32" infinite="0" nextlayerid="3" nextobjectid="80">
+<map version="1.10" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="50" height="50" tilewidth="64" tileheight="32" infinite="0" nextlayerid="3" nextobjectid="110">
  <properties>
   <property name="Background" value="custom"/>
   <property name="Background Animation" value="/server/assets/custom/backgrounds/wcity/01-generic1.animation"/>
@@ -105,11 +105,12 @@
   <object id="6" name="ProtoMan" type="NPC" x="1041.5" y="465">
    <properties>
     <property name="Asset Name" value="protoman-bn5"/>
-    <property name="Dialogue Type" value="itemcheck"/>
+    <property name="Dialogue Type" value="questcheck"/>
     <property name="Direction" value="Up Left"/>
-    <property name="Item 1" type="object" value="14"/>
-    <property name="Next 1" type="object" value="15"/>
-    <property name="Next 2" type="object" value="16"/>
+    <property name="Flag Name" value="need_protoman"/>
+    <property name="Next 1" type="object" value="85"/>
+    <property name="Next 2" type="object" value="83"/>
+    <property name="Quest Name" value="EchoProgram"/>
     <property name="Text 1" value="I'm here on official business"/>
    </properties>
    <point/>
@@ -654,6 +655,167 @@
     <property name="Target Area" value="default"/>
     <property name="Target Object" value="16"/>
    </properties>
+  </object>
+  <object id="80" name="OffclChip" type="Item" x="1040" y="500">
+   <properties>
+    <property name="Description" value="A blank-crest NaviChip stamped by the Officials. It doesn't function."/>
+    <property name="Name" value="OffclChip"/>
+    <property name="Price" value="0"/>
+    <property name="Type" value="keyitem"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="81" name="ProtoBadge" type="Item" x="1070" y="500">
+   <properties>
+    <property name="Description" value="A modified NetBattler badge with its tracker removed. It grants limited access to restricted networks. ProtoMan entrusted it to you for a quiet investigation."/>
+    <property name="Name" value="ProtoBadge"/>
+    <property name="Price" value="0"/>
+    <property name="Type" value="keyitem"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="82" name="ProtoMan_DefaultRouter" type="Dialogue" x="1000" y="520">
+   <properties>
+    <property name="Dialogue Type" value="itemcheck"/>
+    <property name="Item 1" type="object" value="14"/>
+    <property name="Next 1" type="object" value="15"/>
+    <property name="Next 2" type="object" value="16"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="83" name="ProtoMan_PostRouter" type="Dialogue" x="1040" y="520">
+   <properties>
+    <property name="Dialogue Type" value="questcheck"/>
+    <property name="Flag Name" value="completed"/>
+    <property name="Next 1" type="object" value="84"/>
+    <property name="Next 2" type="object" value="82"/>
+    <property name="Quest Name" value="EchoProgram"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="84" name="EP_Proto_After" type="Dialogue" x="1080" y="520">
+   <properties>
+    <property name="Dialogue Type" value="itemcheck"/>
+    <property name="Item 1" type="object" value="14"/>
+    <property name="Next 1" type="object" value="108"/>
+    <property name="Next 2" type="object" value="82"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="108" name="EP_Proto_AfterText" type="Dialogue" x="1120" y="520">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Text 1" value="I'll get in contact with you when we make a move..."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="85" name="EP_Proto_1" type="Dialogue" x="1120" y="520">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="87"/>
+    <property name="Text 1" value="... That chip. Where did you get this? This is a licensed NaviChip, approved by the NetBattler Officials but the Navi crest is blank. That shouldn't even be possible. Hand it over..."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="87" name="EP_Proto_Q" type="Dialogue" x="1200" y="520">
+   <properties>
+    <property name="Dialogue Type" value="question"/>
+    <property name="Mugshot" value="player"/>
+    <property name="Next 1" type="object" value="88"/>
+    <property name="Next 2" type="object" value="101"/>
+    <property name="Text 1" value="Give ProtoMan the chip?"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="101" name="EP_Proto_No" type="Dialogue" x="1200" y="560">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Text 1" value="Hmph, then leave. If you keep carrying it, you're just painting a target on yourself. Come back when you're ready to do this properly"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="88" name="EP_Proto_NarrHand" type="Dialogue" x="1240" y="520">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Mugshot" value="Blank"/>
+    <property name="Next 1" type="object" value="89"/>
+    <property name="Text 1" value="*You hand the OffclChip to ProtoMan*"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="89" name="EP_Proto_TakeOfficial" type="Dialogue" x="1280" y="520">
+   <properties>
+    <property name="Dialogue Type" value="itemcheck"/>
+    <property name="Item 1" type="object" value="80"/>
+    <property name="Next 1" type="object" value="90"/>
+    <property name="Next 2" type="object" value="102"/>
+    <property name="Take Item" value="true"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="102" name="EP_Proto_Missing" type="Dialogue" x="1280" y="560">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Text 1" value="If you're going to do this, bring me the chip."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="90" name="EP_Proto_3" type="Dialogue" x="1320" y="520">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="92"/>
+    <property name="Text 1" value="Good. How'd you get this?"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="92" name="EP_Proto_5" type="Dialogue" x="1360" y="520">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="103"/>
+    <property name="Text 1" value="I see, that's quite the journey. If the previous Underking is already making a move, then this is serious. It looks like we'll need all the help we can get. After the Cybeast incident, we couldn't rely on only a few extraordinary NetBattlers. So the Officials approved a regulated initiative: the 'Legend' Program. This program was created by the NetBattler Officials to train regular battlers. We're allowing 'Echo' Navis to be mass produced. They're copies patterned after Legendary Navi feats, used by battlers to hone their skills. You probably already used a few 'Echo' Navis before. Thing is, 'Echo' Navis aren't supposed to drop NaviChips. How could they? They're just copies, it doesn't have the Navi's original programming. The fact that an 'Echo' Navi dropped this means some protocols are being ignored. Something deep is going on. The 'Legend' program is being overseen by the Officials, sure, but we don't directly produce the 'Echo' Navis. If the manufacturer is doing something shady, then we should've caught on immediately. The fact that SSS NetBattler Officials are being kept in the dark, and Serenade is already making a move, can only mean there could be corruption on the inside."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="103" name="EP_Proto_14" type="Dialogue" x="1418" y="534">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="104"/>
+    <property name="Text 1" value="You did the right thing by bringing me this. It looks like I'll need all the help I can get, seems like I can't fully trust all the Officials. Here, take this..."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="104" name="EP_Proto_GiveBadge" type="Dialogue" x="1458" y="534">
+   <properties>
+    <property name="Dialogue Type" value="item"/>
+    <property name="Item 1" type="object" value="81"/>
+    <property name="Next 1" type="object" value="106"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="106" name="EP_Proto_15" type="Dialogue" x="1497" y="535">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="107"/>
+    <property name="Text 1" value="It's not an official NetBattler badge, I removed the tracker. This should still give you access to a few areas, might come in handy. I'll get in contact with you when we make a move"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="107" name="EP_Proto_QuestEvent" type="Dialogue" x="1525" y="531">
+   <properties>
+    <property name="Dialogue Type" value="quest_event"/>
+    <property name="Event Value" value="protoman_briefing"/>
+    <property name="Next 1" type="object" value="109"/>
+    <property name="Quest Name" value="EchoProgram"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="109" name="ProtoBadgeCosmetic" type="Dialogue" x="1541.5" y="530.5">
+   <properties>
+    <property name="CosmeticID" value="ProtoBadge"/>
+    <property name="Dialogue Type" value="cosmeticgift"/>
+    <property name="Mugshot" value="none"/>
+   </properties>
+   <point/>
   </object>
  </objectgroup>
 </map>

@@ -796,11 +796,12 @@
   <object id="112" name="Roll" type="NPC" x="1232" y="432">
    <properties>
     <property name="Asset Name" value="roll"/>
-    <property name="Dialogue Type" value="itemcheck"/>
+    <property name="Dialogue Type" value="questcheck"/>
     <property name="Direction" value="Up Left"/>
-    <property name="Item 1" type="object" value="117"/>
-    <property name="Next 1" type="object" value="116"/>
-    <property name="Next 2" type="object" value="118"/>
+    <property name="Quest Name" value="EchoProgram"/>
+    <property name="Flag Name" value="need_roll"/>
+    <property name="Next 1" type="object" value="250"/>
+    <property name="Next 2" type="object" value="208"/>
     <property name="Text 1" value=""/>
    </properties>
    <point/>
@@ -927,11 +928,12 @@
   <object id="130" name="GutsMan" type="NPC" x="1034" y="814">
    <properties>
     <property name="Asset Name" value="gutsman"/>
-    <property name="Dialogue Type" value="itemcheck"/>
+    <property name="Dialogue Type" value="questcheck"/>
     <property name="Direction" value="Down Right"/>
-    <property name="Item 1" type="object" value="131"/>
-    <property name="Next 1" type="object" value="140"/>
-    <property name="Next 2" type="object" value="139"/>
+    <property name="Quest Name" value="EchoProgram"/>
+    <property name="Flag Name" value="need_gutsman"/>
+    <property name="Next 1" type="object" value="220"/>
+    <property name="Next 2" type="object" value="209"/>
     <property name="Text 1" value=""/>
    </properties>
    <point/>
@@ -1447,6 +1449,298 @@
     <property name="Leave Animation" value="arrow_up_left_out"/>
     <property name="Target Area" value="Dungeon1"/>
     <property name="Target Object" value="129"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="203" name="CorruptChp" type="Item" x="930" y="780">
+   <properties>
+    <property name="Description" value="A warped NaviChip crackling with static and bitterness. A battler NetNavi might recognize what type of chip this is"/>
+    <property name="Name" value="CorruptChp"/>
+    <property name="Price" value="0"/>
+    <property name="Type" value="keyitem"/>
+   </properties>
+   <point/>
+  </object>
+
+  <object id="204" name="DamagedChp" type="Item" x="960" y="780">
+   <properties>
+    <property name="Description" value="A damaged NaviChip. A NetNavi skilled in healing might be able to recover it."/>
+    <property name="Name" value="DamagedChp"/>
+    <property name="Price" value="0"/>
+    <property name="Type" value="keyitem"/>
+   </properties>
+   <point/>
+  </object>
+
+  <object id="205" name="RadiateChp" type="Item" x="990" y="780">
+   <properties>
+    <property name="Description" value="A chip giving off strange energy. It seems like it was developed in secret."/>
+    <property name="Name" value="RadiateChp"/>
+    <property name="Price" value="0"/>
+    <property name="Type" value="keyitem"/>
+   </properties>
+   <point/>
+  </object>
+
+  <!-- Default routers (preserve existing quests) -->
+  <object id="206" name="Roll_DefaultRouter" type="Dialogue" x="1248" y="452">
+   <properties>
+    <property name="Dialogue Type" value="itemcheck"/>
+    <property name="Item 1" type="object" value="117"/>
+    <property name="Next 1" type="object" value="116"/>
+    <property name="Next 2" type="object" value="118"/>
+   </properties>
+   <point/>
+  </object>
+
+  <object id="207" name="GutsMan_DefaultRouter" type="Dialogue" x="1048" y="834">
+   <properties>
+    <property name="Dialogue Type" value="itemcheck"/>
+    <property name="Item 1" type="object" value="131"/>
+    <property name="Next 1" type="object" value="140"/>
+    <property name="Next 2" type="object" value="139"/>
+   </properties>
+   <point/>
+  </object>
+
+  <!-- Post story routing -->
+  <object id="208" name="Roll_PostRouter" type="Dialogue" x="1264" y="452">
+   <properties>
+    <property name="Dialogue Type" value="questcheck"/>
+    <property name="Quest Name" value="EchoProgram"/>
+    <property name="Flag Name" value="need_darknavi"/>
+    <property name="Next 1" type="object" value="210"/>
+    <property name="Next 2" type="object" value="206"/>
+   </properties>
+   <point/>
+  </object>
+
+  <object id="209" name="GutsMan_PostRouter" type="Dialogue" x="1064" y="834">
+   <properties>
+    <property name="Dialogue Type" value="questcheck"/>
+    <property name="Quest Name" value="EchoProgram"/>
+    <property name="Flag Name" value="need_roll"/>
+    <property name="Next 1" type="object" value="211"/>
+    <property name="Next 2" type="object" value="207"/>
+   </properties>
+   <point/>
+  </object>
+
+  <object id="210" name="EP_Roll_AfterRadiating" type="Dialogue" x="1280" y="452">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Text 1" value="I have a feeling that chip was developed somewhere away from prying eyes. A place where you would have the equipment and with strong viruses to keep it hard to reach"/>
+   </properties>
+   <point/>
+  </object>
+
+  <object id="211" name="EP_Guts_AfterDamaged" type="Dialogue" x="1080" y="834">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Text 1" value="I think you should get rid of it, but if you really want to try to salvage it then maybe an old friend of mine could... NAH. Get rid of it, trust me!"/>
+   </properties>
+   <point/>
+  </object>
+
+  <!-- ===================== -->
+  <!-- GutsMan story branch  -->
+  <!-- ===================== -->
+  <object id="220" name="EP_Guts_1" type="Dialogue" x="1034" y="794">
+  <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="223"/>
+    <property name="Text 1" value="That's a weird chip you have there, where'd you get it? This is not a normal battle chip... I've fought against all types of battle chips including Dark Chips, this is something else entirely. Let me see that."/>
+  </properties>
+   <point/>
+  </object>
+
+  <object id="223" name="EP_Guts_Q" type="Dialogue" x="1034" y="734">
+   <properties>
+    <property name="Dialogue Type" value="question"/>
+    <property name="Mugshot" value="player"/>
+    <property name="Next 1" type="object" value="225"/>
+    <property name="Next 2" type="object" value="224"/>
+    <property name="Text 1" value="Hand the CorruptChp to GutsMan?"/>
+   </properties>
+   <point/>
+  </object>
+
+  <object id="224" name="EP_Guts_No" type="Dialogue" x="1034" y="714">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Text 1" value="Suit yourself..."/>
+   </properties>
+   <point/>
+  </object>
+
+  <object id="225" name="EP_Guts_NarrHand" type="Dialogue" x="1034" y="694">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Mugshot" value="Blank"/>
+    <property name="Next 1" type="object" value="226"/>
+    <property name="Text 1" value="*You hand over the CorruptChp*"/>
+   </properties>
+   <point/>
+  </object>
+
+  <object id="226" name="EP_Guts_TakeCorrupt" type="Dialogue" x="1034" y="674">
+   <properties>
+    <property name="Dialogue Type" value="itemcheck"/>
+    <property name="Item 1" type="object" value="203"/>
+    <property name="Take Item" value="true"/>
+    <property name="Next 1" type="object" value="227"/>
+    <property name="Next 2" type="object" value="234"/>
+   </properties>
+   <point/>
+  </object>
+
+  <object id="234" name="EP_Guts_Missing" type="Dialogue" x="1034" y="654">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Text 1" value="Huh? You don't seem to have it on you."/>
+   </properties>
+   <point/>
+  </object>
+
+  <object id="227" name="EP_Guts_Yes1" type="Dialogue" x="1034" y="634">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="228"/>
+    <property name="Text 1" value="Here we go, GUTS TIME!"/>
+   </properties>
+   <point/>
+  </object>
+
+  <object id="228" name="EP_Guts_Action" type="Dialogue" x="1034" y="614">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Mugshot" value="Blank"/>
+    <property name="Next 1" type="object" value="229"/>
+    <property name="Text 1" value="*GutsMan starts hammering at the CorruptChp*"/>
+   </properties>
+   <point/>
+  </object>
+
+  <object id="229" name="EP_Guts_4" type="Dialogue" x="1034" y="594">
+  <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="231"/>
+    <property name="Text 1" value="I knew it, this isn't a regular NaviChip. A regular chip can withstand physical attacks, but this one got damaged. I suggest you get rid of it, it won't even work. Here you go."/>
+  </properties>
+   <point/>
+  </object>
+
+  <object id="231" name="EP_Guts_GiveDamaged" type="Dialogue" x="1034" y="554">
+   <properties>
+    <property name="Dialogue Type" value="item"/>
+    <property name="Item 1" type="object" value="204"/>
+    <property name="Next 1" type="object" value="233"/>
+   </properties>
+   <point/>
+  </object>
+
+  <object id="232" name="EP_Guts_YouGotDamaged" type="Dialogue" x="1034" y="534">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Mugshot" value="Blank"/>
+    <property name="Next 1" type="object" value="233"/>
+    <property name="Text 1" value="You got: DamagedChp"/>
+   </properties>
+   <point/>
+  </object>
+
+  <object id="233" name="EP_Guts_QuestEvent" type="Dialogue" x="1034" y="514">
+   <properties>
+    <property name="Dialogue Type" value="quest_event"/>
+    <property name="Quest Name" value="EchoProgram"/>
+    <property name="Event Value" value="gutsman_smash"/>
+   </properties>
+   <point/>
+  </object>
+
+  <!-- ===================== -->
+  <!-- Roll story branch     -->
+  <!-- ===================== -->
+  <object id="250" name="EP_Roll_1" type="Dialogue" x="1232" y="412">
+  <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="252"/>
+    <property name="Text 1" value="What happened to your battle chip? Haha GutsMan did this? Typical, he attacks first and asks questions later. I can help you get it fixed."/>
+  </properties>
+   <point/>
+  </object>
+
+  <object id="252" name="EP_Roll_NarrHand" type="Dialogue" x="1232" y="372">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Mugshot" value="Blank"/>
+    <property name="Next 1" type="object" value="253"/>
+    <property name="Text 1" value="*You hand over the DamagedChp*"/>
+   </properties>
+   <point/>
+  </object>
+
+  <object id="253" name="EP_Roll_TakeDamaged" type="Dialogue" x="1232" y="352">
+   <properties>
+    <property name="Dialogue Type" value="itemcheck"/>
+    <property name="Item 1" type="object" value="204"/>
+    <property name="Take Item" value="true"/>
+    <property name="Next 1" type="object" value="254"/>
+    <property name="Next 2" type="object" value="260"/>
+   </properties>
+   <point/>
+  </object>
+
+  <object id="260" name="EP_Roll_Missing" type="Dialogue" x="1232" y="332">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Text 1" value="Uh... you don't have the chip on you."/>
+   </properties>
+   <point/>
+  </object>
+
+  <object id="254" name="EP_Roll_3" type="Dialogue" x="1232" y="312">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="255"/>
+    <property name="Text 1" value="Hmm... this chip is giving off weird energy. I have a feeling we shouldn't be messing with it. Here, it is yours after all"/>
+   </properties>
+   <point/>
+  </object>
+
+  <object id="255" name="EP_Roll_GiveRadiating" type="Dialogue" x="1232" y="292">
+   <properties>
+    <property name="Dialogue Type" value="item"/>
+    <property name="Item 1" type="object" value="205"/>
+    <property name="Next 1" type="object" value="257"/>
+   </properties>
+   <point/>
+  </object>
+
+  <object id="256" name="EP_Roll_YouGotRadiating" type="Dialogue" x="1232" y="272">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Mugshot" value="Blank"/>
+    <property name="Next 1" type="object" value="257"/>
+    <property name="Text 1" value="You got: RadiateChp"/>
+   </properties>
+   <point/>
+  </object>
+
+  <object id="257" name="EP_Roll_4" type="Dialogue" x="1232" y="252">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="258"/>
+    <property name="Text 1" value="I don't think I've ever seen this type of chip. I have a feeling it was developed in a place that was never meant to be found."/>
+   </properties>
+   <point/>
+  </object>
+
+  <object id="258" name="EP_Roll_QuestEvent" type="Dialogue" x="1232" y="232">
+   <properties>
+    <property name="Dialogue Type" value="quest_event"/>
+    <property name="Quest Name" value="EchoProgram"/>
+    <property name="Event Value" value="roll_fix"/>
    </properties>
    <point/>
   </object>

@@ -172,7 +172,16 @@
    </properties>
    <point/>
   </object>
-  <object id="104" name="Prisoner2 (DailyQuest )" x="273" y="13">
+  <object id="104" name="DarkNavi" type="NPC" x="273" y="13">
+   <properties>
+    <property name="Asset Name" value="heel-navi-exe4_black"/>
+    <property name="Dialogue Type" value="questcheck"/>
+    <property name="Direction" value="Down Left"/>
+    <property name="Flag Name" value="need_darknavi"/>
+    <property name="Next 1" type="object" value="170"/>
+    <property name="Next 2" type="object" value="169"/>
+    <property name="Quest Name" value="EchoProgram"/>
+   </properties>
    <point/>
   </object>
   <object id="106" name="HeelNavi" type="NPC" x="881" y="1549">
@@ -441,10 +450,12 @@
   <object id="159" name="Zarymura" type="NPC" x="1361.5" y="784.5">
    <properties>
     <property name="Asset Name" value="zarymura"/>
-    <property name="Dialogue Type" value="first"/>
+    <property name="Dialogue Type" value="questcheck"/>
     <property name="Direction" value="Down Left"/>
-    <property name="Next 1" type="object" value="160"/>
-    <property name="Text 1" value="Hey kid...Got some bugfrags?"/>
+    <property name="Flag Name" value="need_zary_dungeon"/>
+    <property name="Next 1" type="object" value="182"/>
+    <property name="Next 2" type="object" value="187"/>
+    <property name="Quest Name" value="EchoProgram"/>
    </properties>
    <point/>
   </object>
@@ -507,6 +518,152 @@
     <property name="Once" type="bool" value="true"/>
     <property name="Type" value="item"/>
    </properties>
+  </object>
+  <object id="167" name="RadiateChp" type="Item" x="300" y="60">
+   <properties>
+    <property name="Description" value="A chip giving off strange energy. It seems like it was developed in secret."/>
+    <property name="Name" value="RadiateChp"/>
+    <property name="Price" value="0"/>
+    <property name="Type" value="keyitem"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="168" name="SuppresChp" type="Item" x="330" y="60">
+   <properties>
+    <property name="Description" value="Its energy has been contained. Someone familiar with bugs may know more."/>
+    <property name="Name" value="SuppresChp"/>
+    <property name="Price" value="0"/>
+    <property name="Type" value="keyitem"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="169" name="DarkNavi_Default" type="Dialogue" x="320" y="20">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Text 1" value="Can you feel the energy around here? I have a feeling this Lab was used just recently, but I don't know for what..."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="170" name="EP_Dark_1" type="Dialogue" x="360" y="20">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="172"/>
+    <property name="Text 1" value="That chip... it's emitting the exact same energy I can feel here. I think you should suppress the energy it's giving out if you want to figure out where it came from. I can help you with that, let me see that."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="172" name="EP_Dark_NarrHand" type="Dialogue" x="440" y="20">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Mugshot" value="Blank"/>
+    <property name="Next 1" type="object" value="173"/>
+    <property name="Text 1" value="*You hand over the RadiateChp*"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="173" name="EP_Dark_TakeRadiating" type="Dialogue" x="480" y="20">
+   <properties>
+    <property name="Dialogue Type" value="itemcheck"/>
+    <property name="Item 1" type="object" value="167"/>
+    <property name="Next 1" type="object" value="174"/>
+    <property name="Next 2" type="object" value="179"/>
+    <property name="Take Item" value="true"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="179" name="EP_Dark_Missing" type="Dialogue" x="480" y="60">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Text 1" value="I don't see the chip on you."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="174" name="EP_Dark_3" type="Dialogue" x="520" y="20">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="175"/>
+    <property name="Text 1" value="I managed to suppress it. I don't think you'll find answers here, but maybe someone in the surface who's an expert in bugs or DarkChips can help you figure it out. Very interesting chip you found there. I wonder how it came to be..."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="175" name="EP_Dark_GiveSuppressed" type="Dialogue" x="560" y="20">
+   <properties>
+    <property name="Dialogue Type" value="item"/>
+    <property name="Item 1" type="object" value="168"/>
+    <property name="Next 1" type="object" value="178"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="178" name="EP_Dark_QuestEvent" type="Dialogue" x="680" y="20">
+  <properties>
+    <property name="Dialogue Type" value="quest_event"/>
+    <property name="Quest Name" value="EchoProgram"/>
+    <property name="Event Value" value="darknavi_suppress"/>
+    <property name="Next 1" type="object" value="176"/>
+  </properties>
+   <point/>
+  </object>
+<object id="176" name="EP_Email_Stop" type="Dialogue" x="720" y="20">
+  <properties>
+    <property name="Dialogue Type" value="email"/>
+    <property name="Email Id" value="EchoProgram_Stop"/>
+    <property name="Email Icon" type="int" value="1"/>
+    <property name="Email Title" value="Drop it..."/>
+    <property name="Email From" value="???"/>
+
+    <property name="Body 1" value="I've been watching you. You're digging into something you won't like. I already noticed what you're doing. How long will it be before 'they' notice too?"/>
+    <property name="Body 2" value="That place is heavily monitored by 'them'. I think you should get out. It won't be long before they start intercepting mail. Master 'S' is already working silently through the Undernet."/>
+    <property name="Body 3" value="If Master 'S' is already making a move, that should give you a hint that this is way too big. I'd drop it..."/>
+
+    <property name="Mug Texture Path" value="ranked-navi-bn3"/>
+    <!-- Mug Animation Path omitted on purpose; defaults to mug.animation -->
+
+    <property name="Notify Delay" value="1.5"/>
+    <property name="Notify Message" value="Looks like you got an e-mail."/>
+  </properties>
+  <point/>
+</object>
+  <object id="180" name="Zary_DefaultGreeting" type="Dialogue" x="1380" y="800">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="160"/>
+    <property name="Text 1" value="Hey kid...Got some bugfrags?"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="181" name="EP_Zary_RadiatingHint" type="Dialogue" x="1420" y="800">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="180"/>
+    <property name="Text 1" value="That chip... Oh, I've seen that type of energy around here. Some shady Navis were messing with it not too long ago... Anyway..."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="182" name="EP_Zary_Suppressed_1" type="Dialogue" x="1460" y="800">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="185"/>
+    <property name="Text 1" value="Oh that's not a DarkChip, trust me I should know. I can't tell you more about it here. Meet me in the surface, I have a hiding place somewhere. I think it's safer to discuss it there than in here at this point..."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="185" name="EP_Zary_QuestEvent" type="Dialogue" x="1580" y="800">
+   <properties>
+    <property name="Dialogue Type" value="quest_event"/>
+    <property name="Event Value" value="zary_meet_surface"/>
+    <property name="Quest Name" value="EchoProgram"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="187" name="EP_Zary_PostRouter" type="Dialogue" x="1400" y="840">
+   <properties>
+    <property name="Dialogue Type" value="questcheck"/>
+    <property name="Flag Name" value="need_darknavi"/>
+    <property name="Next 1" type="object" value="181"/>
+    <property name="Next 2" type="object" value="180"/>
+    <property name="Quest Name" value="EchoProgram"/>
+   </properties>
+   <point/>
   </object>
  </objectgroup>
 </map>

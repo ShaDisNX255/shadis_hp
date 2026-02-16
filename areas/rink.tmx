@@ -613,10 +613,12 @@
   <object id="158" name="Zarymura" type="NPC" x="719.5" y="1492.5">
    <properties>
     <property name="Asset Name" value="zarymura"/>
-    <property name="Dialogue Type" value="first"/>
+    <property name="Dialogue Type" value="questcheck"/>
+    <property name="Quest Name" value="EchoProgram"/>
+    <property name="Flag Name" value="need_zary_surface"/>
+    <property name="Next 1" type="object" value="167"/>
+    <property name="Next 2" type="object" value="180"/>
     <property name="Direction" value="Up Left"/>
-    <property name="Next 1" type="object" value="162"/>
-    <property name="Text 1" value="Hey kid... want some BugBait?"/>
    </properties>
    <point/>
   </object>
@@ -659,6 +661,156 @@
    <properties>
     <property name="Dialogue Type" value="first"/>
     <property name="Text 1" value="Aight kid, you'll be back..."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="164" name="SuppresChp" type="Item" x="740" y="1460">
+   <properties>
+    <property name="Description" value="Its energy has been contained. Someone familiar with bugs may know more."/>
+    <property name="Name" value="SuppresChp"/>
+    <property name="Price" value="0"/>
+    <property name="Type" value="keyitem"/>
+   </properties>
+   <point/>
+  </object>
+
+  <object id="165" name="OffclChip" type="Item" x="770" y="1460">
+   <properties>
+    <property name="Description" value="A blank-crest NaviChip stamped by the Officials. It doesn't function."/>
+    <property name="Name" value="OffclChip"/>
+    <property name="Price" value="0"/>
+    <property name="Type" value="keyitem"/>
+   </properties>
+   <point/>
+  </object>
+
+  <object id="166" name="Zary_DefaultGreeting" type="Dialogue" x="740" y="1510">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="162"/>
+    <property name="Text 1" value="Hey kid... want some BugBait?"/>
+   </properties>
+   <point/>
+  </object>
+
+  <object id="179" name="EP_Zary_AfterOfficial" type="Dialogue" x="740" y="1550">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Text 1" value="That chip sure is mysterious. Why would the NetBattler Officials stamp it?"/>
+   </properties>
+   <point/>
+  </object>
+
+  <object id="180" name="Zary_PostRouter" type="Dialogue" x="700" y="1550">
+   <properties>
+    <property name="Dialogue Type" value="questcheck"/>
+    <property name="Quest Name" value="EchoProgram"/>
+    <property name="Flag Name" value="need_protoman"/>
+    <property name="Next 1" type="object" value="179"/>
+    <property name="Next 2" type="object" value="166"/>
+   </properties>
+   <point/>
+  </object>
+
+  <!-- Zarymura story -->
+  <object id="167" name="EP_Zary_Surface_1" type="Dialogue" x="780" y="1510">
+    <properties>
+      <property name="Dialogue Type" value="first"/>
+      <property name="Next 1" type="object" value="169"/>
+      <property name="Text 1" value="That battlechip isn't a DarkChip. It's an official battle chip for sure but it's incomplete. It has the programming of a Navi in there for sure. Here, let me help you out a bit."/>
+    </properties>
+    <point/>
+  </object>
+
+  <object id="169" name="EP_Zary_NarrHand" type="Dialogue" x="860" y="1510">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Mugshot" value="Blank"/>
+    <property name="Next 1" type="object" value="170"/>
+    <property name="Text 1" value="*You hand over the SuppresChp*"/>
+   </properties>
+   <point/>
+  </object>
+
+  <object id="170" name="EP_Zary_TakeSuppressed" type="Dialogue" x="900" y="1510">
+   <properties>
+    <property name="Dialogue Type" value="itemcheck"/>
+    <property name="Item 1" type="object" value="164"/>
+    <property name="Take Item" value="true"/>
+    <property name="Next 1" type="object" value="171"/>
+    <property name="Next 2" type="object" value="178"/>
+   </properties>
+   <point/>
+  </object>
+
+  <object id="178" name="EP_Zary_Missing" type="Dialogue" x="900" y="1550">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Text 1" value="Bring me the chip if you want me to take a look."/>
+   </properties>
+   <point/>
+  </object>
+
+  <object id="171" name="EP_Zary_Surface_3" type="Dialogue" x="940" y="1510">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="172"/>
+    <property name="Text 1" value="All it needs is a bit of bugfrags to reveal the Navi crest... I just know it"/>
+   </properties>
+   <point/>
+  </object>
+
+  <object id="172" name="EP_Zary_Surface_4" type="Dialogue" x="980" y="1510">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="173"/>
+    <property name="Text 1" value="..."/>
+   </properties>
+   <point/>
+  </object>
+
+  <object id="173" name="EP_Zary_Surface_5" type="Dialogue" x="1020" y="1510">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="174"/>
+    <property name="Text 1" value="Yep, there it is. This is a blank Navi crest though... and it has an Official stamp on it... interesting. Why would this be stamped by the NetBattler Officials?"/>
+   </properties>
+   <point/>
+  </object>
+
+  <object id="174" name="EP_Zary_GiveOfficial" type="Dialogue" x="1060" y="1510">
+   <properties>
+    <property name="Dialogue Type" value="item"/>
+    <property name="Item 1" type="object" value="165"/>
+    <property name="Next 1" type="object" value="176"/>
+   </properties>
+   <point/>
+  </object>
+
+  <object id="175" name="EP_Zary_YouGotOfficial" type="Dialogue" x="1100" y="1510">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Mugshot" value="Blank"/>
+    <property name="Next 1" type="object" value="176"/>
+    <property name="Text 1" value="You got: OffclChip"/>
+   </properties>
+   <point/>
+  </object>
+
+  <object id="176" name="EP_Zary_Surface_6" type="Dialogue" x="1140" y="1510">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="177"/>
+    <property name="Text 1" value="I've done all I can. I think you should show this to a NetBattler Official, maybe they know more about it"/>
+   </properties>
+   <point/>
+  </object>
+
+  <object id="177" name="EP_Zary_QuestEvent" type="Dialogue" x="1180" y="1510">
+   <properties>
+    <property name="Dialogue Type" value="quest_event"/>
+    <property name="Quest Name" value="EchoProgram"/>
+    <property name="Event Value" value="zary_reveal_official"/>
    </properties>
    <point/>
   </object>
