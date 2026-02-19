@@ -7,6 +7,8 @@ local NEW_MAIL_MESSAGE_DELAY = 1.5        -- seconds: wait after ring before mes
 local ENABLE_TEST_EMAIL_ON_JOIN = false    -- set false after you finish tuning
 local TEST_EMAIL_DELAY = 2.0              -- seconds (start same as NEW_MAIL_MESSAGE_DELAY)
 local EZEMAIL_DEBUG = true -- set false after verified
+local ANNOUNCEMENTS_FEED_MODULE = 'scripts/ezlibs-scripts/announcements_feed'
+
 
 local function _preload_email_assets(player_id, mail)
   if not (Net and Net.provide_asset_for_player) then return end
@@ -41,6 +43,38 @@ local function _percent_decode(s)
     return (s:gsub("%%(%x%x)", function(h)
         return string.char(tonumber(h, 16))
     end))
+end
+
+local function _get_tombstone_set()
+  local ok, feed = pcall(require, ANNOUNCEMENTS_FEED_MODULE)
+  if not ok or type(feed) ~= "table" then
+    return {}
+  end
+
+  local t = feed.tombstones
+  if type(t) ~= "table" then
+    return {}
+  end
+
+  local set = {}
+
+  -- supports list-style: { "ID1", "ID2" }
+  for _, id in ipairs(t) do
+    id = tostring(id)
+    set[id] = true
+    set[_percent_decode(id)] = true
+  end
+
+  -- also supports map-style: { ID1=true, ID2=true }
+  for k, v in pairs(t) do
+    if v == true then
+      k = tostring(k)
+      set[k] = true
+      set[_percent_decode(k)] = true
+    end
+  end
+
+  return set
 end
 
 local function _find_mail_in_bucket(bucket, email_id)
@@ -131,12 +165,49 @@ function ezemail.resend_all(player_id)
         return
     end
 
+    local dirty = false
+    local tombstones = _get_tombstone_set()
+
+    -- Remove tombstoned emails from memory so they will no longer be restored
+    if tombstones and next(tombstones) ~= nil then
+      local to_delete = {}
+
+      for key, stored in pairs(bucket) do
+        local id = tostring((stored and stored.id) or key)
+        if tombstones[id] or tombstones[key] or tombstones[_percent_decode(id)] or tombstones[_percent_decode(key)] then
+          to_delete[#to_delete + 1] = key
+        end
+      end
+
+      if #to_delete > 0 then
+        for _, key in ipairs(to_delete) do
+          bucket[key] = nil
+        end
+        dirty = true
+        _dbg("pruned tombstoned mails:", #to_delete)
+      end
+    end
+
     for _, stored in pairs(bucket) do
-        local mail = helpers.deep_copy(stored)
-        if mail.read == nil then mail.read = false end
-        pcall(function()
-            Net.send_player_email(player_id, mail)
-        end)
+      local mail = helpers.deep_copy(stored)
+
+      -- TEMP: treat restored mail as already read
+      mail.read = true
+
+      -- Optional: migrate memory so old mail stays read even after engine fixes email_read
+      if stored.read ~= true then
+        stored.read = true
+        dirty = true
+      end
+
+      pcall(function()
+        _preload_email_assets(player_id, mail)
+        Net.send_player_email(player_id, mail)
+      end)
+    end
+
+    if dirty then
+      ezmemory.save_player_memory(safe_secret)
     end
 end
 
@@ -146,6 +217,11 @@ function ezemail.send_once(player_id, mail, opts)
     opts = opts or {}
     if not mail or not mail.id then
         return
+    end
+    local tombstones = _get_tombstone_set()
+    if tombstones[mail.id] or tombstones[_percent_decode(mail.id)] then
+      _dbg("send_once blocked (tombstoned):", tostring(mail.id))
+      return
     end
     if not Net.send_player_email then
         return
@@ -228,6 +304,10 @@ Net:on("player_join", function(event)
     end
 
     ezemail.resend_all(event.player_id)
+    pcall(function()
+      local ezannounce = require('scripts/ezlibs-scripts/ezannounce')
+      ezannounce.send_missing(event.player_id)
+    end)
     if ENABLE_TEST_EMAIL_ON_JOIN then
         ezemail.send_test_email(event.player_id, TEST_EMAIL_DELAY)
     end
