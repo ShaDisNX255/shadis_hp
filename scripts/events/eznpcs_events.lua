@@ -19,6 +19,48 @@ local ezquests = require('scripts/ezlibs-scripts/ezquests')
 
 local COSMETIC_SHOP_COLOR = { r = 245, g = 210, b = 70 } -- same yellow as decorshop
 
+local JUKEBOX_TRACKS_MEM_KEY = "jukebox_tracks_v1"
+local JUKEBOX_DIR_DISK       = "./assets/jukebox"
+local JUKEBOX_SONG_PREFIX    = "/server/assets/jukebox/"
+
+local function _list_jukebox_songs()
+  local files = {}
+  local is_windows = package.config:sub(1,1) == "\\"
+  local cmd = is_windows
+    and ('dir /b /a-d "'..JUKEBOX_DIR_DISK..'"')
+    or  ('ls -1 "'..JUKEBOX_DIR_DISK..'"')
+
+  local p = io.popen(cmd)
+  if not p then return files end
+  for f in p:lines() do
+    if type(f) == "string" and f:lower():sub(-4) == ".ogg" then
+      table.insert(files, f)
+    end
+  end
+  p:close()
+
+  table.sort(files, function(a,b) return a:lower() < b:lower() end)
+  return files
+end
+
+local function _songshop_is_owned(secret, file)
+  local pmem = ezmemory.get_player_memory(secret) or {}
+  pmem[JUKEBOX_TRACKS_MEM_KEY] = pmem[JUKEBOX_TRACKS_MEM_KEY] or {}
+  local v = pmem[JUKEBOX_TRACKS_MEM_KEY][file]
+  return v == true or (tonumber(v or 0) or 0) > 0
+end
+
+local function _songshop_set_owned(secret, file)
+  local pmem = ezmemory.get_player_memory(secret) or {}
+  pmem[JUKEBOX_TRACKS_MEM_KEY] = pmem[JUKEBOX_TRACKS_MEM_KEY] or {}
+  pmem[JUKEBOX_TRACKS_MEM_KEY][file] = 1
+  if ezmemory.save_player_memory then
+    ezmemory.save_player_memory(secret)
+  elseif ezmemory.set_player_memory then
+    ezmemory.set_player_memory(secret, pmem)
+  end
+end
+
 local sfx = {
     hurt = '/server/assets/ezlibs-assets/sfx/hurt.ogg',
     item_get = '/server/assets/ezlibs-assets/sfx/item_get.ogg',
@@ -2327,6 +2369,83 @@ local EchoProgram_GameOver = {
     end
 }
 eznpcs.add_event(EchoProgram_GameOver)
+
+eznpcs.add_event({
+  name = "songshop",
+  action = function(npc, player_id, dialogue, relay_object)
+    return async(function()
+      local mug = eznpcs.get_dialogue_mugshot(npc, player_id, dialogue)
+
+      local price = tonumber((dialogue.custom_properties and dialogue.custom_properties["Song Price"]) or "") or 200000
+      local do_preview = tostring((dialogue.custom_properties and dialogue.custom_properties["Preview"]) or "true") ~= "false"
+      local title = tostring((dialogue.custom_properties and dialogue.custom_properties["Shop Title"]) or "Song Shop")
+
+      local songs = _list_jukebox_songs()
+      if #songs == 0 then
+        await(Async.message_player(player_id, "No songs found in /server/assets/jukebox.", mug.texture_path, mug.animation_path))
+        return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+      end
+
+      local secret = helpers.get_safe_player_secret(player_id)
+
+      while true do
+        local posts, index = {}, {}
+
+        for _, file in ipairs(songs) do
+          local base = file:gsub("%.ogg$", "")
+          local owned = _songshop_is_owned(secret, file)
+          local label = owned and ("(Owned)" .. base) or base
+          table.insert(posts, helpers.create_bbs_option(label))
+          index[#posts] = { file = file, base = base, owned = owned }
+        end
+
+        local board = ezmenus.open_menu(player_id, title, COSMETIC_SHOP_COLOR, posts)
+        local sel = await(board.selection_once())
+        Net.close_bbs(player_id)
+
+        if not sel then break end
+
+        local chosen
+        for i, post in ipairs(posts) do
+          local pid = post.id or post.title or ""
+          if sel == pid then chosen = index[i]; break end
+        end
+        if not chosen then break end
+
+        if chosen.owned then
+          await(Async.message_player(player_id, "Are you dense? You already bought that.", mug.texture_path, mug.animation_path))
+          goto continue
+        end
+
+        if do_preview then
+          local area_id = Net.get_player_area(player_id)
+          pcall(Net.set_song, area_id, JUKEBOX_SONG_PREFIX .. chosen.file)
+        end
+
+        local confirm = await(Async.question_player(
+          player_id,
+          ("Buy \"%s\" for %sz?"):format(chosen.base, tostring(price)),
+          mug.texture_path, mug.animation_path
+        ))
+
+        if confirm == 1 then
+          if not ezmemory.spend_player_money(player_id, price) then
+            await(Async.message_player(player_id, "You can't afford that go get a job or something", mug.texture_path, mug.animation_path))
+            goto continue
+          end
+
+          _songshop_set_owned(secret, chosen.file)
+          if sfx and sfx.item_get then pcall(Net.play_sound_for_player, player_id, sfx.item_get) end
+          await(Async.message_player(player_id, "Well at least you're smart enough to purchase that.", mug.texture_path, mug.animation_path))
+        end
+
+        ::continue::
+      end
+
+      return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+    end)
+  end
+})
 
 
 -- Repaint any already-revealed paths when players appear in an area

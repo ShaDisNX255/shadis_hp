@@ -22,6 +22,7 @@ local ezmenus  = require('scripts/ezlibs-scripts/ezmenus')
 local ezweather = require('scripts/ezlibs-scripts/ezweather')
 local custom   = require('scripts/ezlibs-custom/custom')
 local pets = require('scripts/ezlibs-custom/pets')
+local jukebox = require('scripts/ezlibs-custom/jukebox')
 
 -- ====================== Text Defaults ======================
 local DEFAULTS = {
@@ -120,6 +121,7 @@ local ONCEHUB_CATALOG = {
   { id = "poke_ball",  name = "Small Poke Ball",  ts_source = "../assets/objects/pokemon_small_32x32_32x32.tsx", gid = 2147484056, layer = "Object Layer 2" },
   { id = "pokedesk_brown",  name = "Medium Poke Desk Brown",  ts_source = "../assets/objects/pokemon_pairs_128x96_128x96.tsx", gid = 428, layer = "Object Layer 2" },
   { id = "poketable_silver",  name = "Medium Poke Table",  ts_source = "../assets/objects/pokemon_pairs_128x96_128x96.tsx", gid = 430, layer = "Object Layer 2" },
+  { id = "jukebox",  name = "Jukebox",  ts_source = "../assets/objects/jukebox.tsx", gid = 2147484084, layer = "Object Layer 2" },
   { id = "card_frame", name = "Card Frame" },
   { id = "pet_mettaur", name = "Pet: Mettaur" },
   { id = "pet_meddy",  name = "Pet: Meddy" },
@@ -1498,6 +1500,21 @@ local function _lease_rec_for_key(bucket_area_id, key)
   return (m and m.onceitems) and m.onceitems[key] or nil
 end
 
+local JUKEBOX_SONG_PREFIX = "/server/assets/jukebox/"
+
+local function _apply_jukebox_song(area_id, bucket_area_id, once_key)
+  local rec = _lease_rec_for_key(bucket_area_id, once_key)
+  local song = rec and rec.jukebox_song
+  song = tostring(song or ""):gsub("^%s+",""):gsub("%s+$","")
+  if song == "" then return end
+
+  if song:lower():sub(-4) ~= ".ogg" then
+    song = song .. ".ogg"
+  end
+
+  pcall(Net.set_song, area_id, JUKEBOX_SONG_PREFIX .. song)
+end
+
 -- ====================== Auto-rehydrate on area enter/transfer ======================
 local function rehydrate_all_for_area(area_id)
   local tried = {}
@@ -1546,10 +1563,11 @@ local function rehydrate_all_for_area(area_id)
         if do_cleanup and type(_cleanup_expired_hp) == "function" then
           pcall(_cleanup_expired_hp, area_id, bucket_area_id, key)
           tried[key] = true
-        elseif allow then
-          rehydrate_placements(area_id, bucket_area_id, key)
-          tried[key] = true
-        end
+          elseif allow then
+            rehydrate_placements(area_id, bucket_area_id, key)
+            pcall(_apply_jukebox_song, area_id, bucket_area_id, key)
+            tried[key] = true
+          end
         -- If neither allow nor cleanup, we didn't act; leave it untried so the other pass can handle it.
       end
     end
@@ -1845,6 +1863,7 @@ local function place_current(player_id)
         cf_bot_id       = tostring(bid),
         cf_item_id      = item_id,
         cf_owner_secret = placer_secret,
+        oncehub_bucket = tostring(s.bucket_area_id or ""),
       }
     }
     Net.create_object(s.area_id, anchor)
@@ -1861,6 +1880,7 @@ local function place_current(player_id)
     oncehub_name      = tostring(s.object_name or "Object"),
     oncehub_id        = tostring(s.object_id   or "object"),
     oncehub_key       = tostring(s.once_key    or ""),
+    oncehub_bucket = tostring(s.bucket_area_id or ""),
     visitor_secret    = s.is_visitor and s.visitor_secret or nil,
     owner_secret      = (not s.is_visitor) and (s.owner_secret or nil) or nil,
   }
@@ -3271,6 +3291,7 @@ eznpcs.add_event({
         price_paid   = price,
         owned_at     = start_ts,
         expires_at   = end_ts,
+        jukebox_song = nil,
         password     = nil
       }
       save_record(new_rec)
