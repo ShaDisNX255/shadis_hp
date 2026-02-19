@@ -10,6 +10,7 @@ scripts/octo-ranking/player_id_ranks_open.json
 scripts/octo-ranking/player_id_ranks_open.txt
 scripts/octo-ranking/player_id_ranks_wcity.json
 scripts/octo-ranking/player_id_ranks_wcity.txt
+scripts/ezlibs-scripts/announcements_feed.lua
 logs.txt
 assets/displayer/*
 assets/net-games/*
