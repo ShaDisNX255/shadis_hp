@@ -27,6 +27,19 @@ local sfx = {
 }
 
 Net:on("handle_player_join", function(event)
+    local player_id = event.player_id
+    local player_name = Net.get_player_name(player_id)
+    local secret = Net.get_player_secret(player_id)
+    local short_secret = secret and secret:sub(2, 32) or nil
+
+    print(string.format(
+        "[ezmemory] handle_player_join name=%s player_id=%s secret=%s short_secret=%s",
+        tostring(player_name),
+        tostring(player_id),
+        tostring(secret),
+        tostring(short_secret)
+    ))
+
     --Load sound effects for give_item_with_message
     for name, path in pairs(sfx) do
         Net.provide_asset_for_player(event.player_id, path)
@@ -66,7 +79,7 @@ end
 
 local function ezmemory_save_file(file_path,value)
     return async(function ()
-        local json = json.encode(value)
+        local json = json.encode(value, true)
         await(Async.write_file(file_path.."_backup.json",json))
         await(Async.write_file(file_path..".json",json))
     end)
@@ -782,6 +795,14 @@ function ezmemory.handle_player_join(player_id)
     --record player to list of players that have joined
     local safe_secret = helpers.get_safe_player_secret(player_id)
     local player_name = Net.get_player_name(player_id)
+	local secret = Net.get_player_secret(player_id)
+    printd("JOIN",
+        "name=" .. tostring(player_name),
+        "pid=" .. tostring(player_id),
+        "secret=" .. tostring(secret),
+        "short_secret=" .. tostring(short_secret),
+        "safe_secret=" .. tostring(safe_secret)
+    )
     --assumes that player memory has already been read from disk
     local player_memory = ezmemory.get_player_memory(safe_secret)
     ezmemory.update_player_list(safe_secret,player_name)

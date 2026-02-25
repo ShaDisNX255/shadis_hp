@@ -58,7 +58,7 @@ function add_landing(area_id, incoming_data, x, y, z, direction, warp_in, arriva
     }
     landings[incoming_data] = new_landing
 
-    log('added landing for '..incoming_data.." = "..json.encode(new_landing))
+    log('added landing for '..incoming_data.." = "..json.encode(new_landing, true))
 end
 
 function doAnimationForWarp(player_id,animation_name,is_leave_animation,warp_object)
