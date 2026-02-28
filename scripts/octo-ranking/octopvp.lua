@@ -8,7 +8,7 @@
 
 --dependencies
 local sha = require('scripts/octo-ranking/sha256')
-local json = require('scripts/octo-ranking/json')
+local json = require('scripts/libs/json')
 
 --defaults
 local ranks_open  = {}
@@ -52,7 +52,7 @@ end
 
 
 local function save_file(file_path, ranks)
-    local encoded = json.encode(ranks)
+    local encoded = json.encode(ranks, true)
 --	local json = json.encode(player_id_ranks)
 --	table.sort(player_id_ranks,function(a,b)
 --		return a.Points > b.Points
@@ -317,6 +317,58 @@ local function start_ranked_battle(p1, p2, mode)
 end
 
 -- ---------------------------------------------------------------------------
+-- Lobby integration (OpenPVP only)
+-- ---------------------------------------------------------------------------
+local Lobby
+do
+  local ok, mod = pcall(require, "scripts/ezlibs-custom/lobby")
+  if ok then Lobby = mod end
+end
+
+if Lobby and Lobby.register_activity then
+  -- OpenPVP Unranked
+  Lobby.register_activity("bn_openpvp_unranked", {
+    max_players = 2,
+    minimizable = true,
+    start = function(players)
+      local p1, p2 = players[1], players[2]
+      if Net.is_player_battling(p1) or Net.is_player_battling(p2) then return false end
+      Net.initiate_pvp(p1, p2)
+      players_in_battle[p1] = p2
+      players_in_battle[p2] = p1
+      return true
+    end
+  })
+
+  -- OpenPVP Ranked
+  Lobby.register_activity("bn_openpvp_ranked", {
+    max_players = 2,
+    minimizable = true,
+
+    -- pick closest ELO among candidates (optional but nice)
+    pick_random_partner = function(pid, candidates)
+      local r1 = (ranks_open[pid] and ranks_open[pid].Points) or 25000
+      local best, best_diff = candidates[1], math.huge
+      for _, other in ipairs(candidates) do
+        local r2 = (ranks_open[other] and ranks_open[other].Points) or 25000
+        local d = math.abs(r2 - r1)
+        if d < best_diff then
+          best, best_diff = other, d
+        end
+      end
+      return best
+    end,
+
+    start = function(players)
+      local p1, p2 = players[1], players[2]
+      if Net.is_player_battling(p1) or Net.is_player_battling(p2) then return false end
+      start_ranked_battle(p1, p2, "open")
+      return true
+    end
+  })
+end
+
+-- ---------------------------------------------------------------------------
 -- Menu open helpers (used by PVP Board and by LMenu OpenPVP button)
 -- ---------------------------------------------------------------------------
 
@@ -364,6 +416,20 @@ _G.OctoPVP.open_openpvp_menu = function(pid)
     Net.message_player(pid, "OpenPVP isn't available in this area.")
     return
   end
+
+  -- If player already has a minimizable OpenPVP lobby session (usually minimized), restore it
+  if Lobby and Lobby.has_session and Lobby.open_activity then
+    if Lobby.has_session(pid, "bn_openpvp_unranked") then
+      Lobby.open_activity(pid, "bn_openpvp_unranked")
+      return
+    end
+    if Lobby.has_session(pid, "bn_openpvp_ranked") then
+      Lobby.open_activity(pid, "bn_openpvp_ranked")
+      return
+    end
+  end
+
+  -- otherwise show the old board menu (Free/Rank/Leaderboard/About)
   open_matchmaking_menu(pid, "open")
 end
 
@@ -572,9 +638,14 @@ Net:on("post_selection", function(event)
 				end
 			end)
 		end)
-	elseif post_id == "Ranked" and (not is_in_any_matchmaking(player_id)) then
+    elseif post_id == "Ranked" and (not is_in_any_matchmaking(player_id)) then
 		pcall(function() Net.close_bbs(player_id) end)
 
+		-- OpenPVP uses Lobby system
+		if mode == "open" and Lobby and Lobby.open_activity then
+		  Lobby.open_activity(player_id, "bn_openpvp_ranked")
+		  return
+		end
 		local pool = (mode == "wcity") and players_in_wcity_ranked_matchmaking or players_in_open_ranked_matchmaking
 		local msg = (mode == "wcity") and "Started WCity ranked matchmaking... open WCity PVP to cancel." or "Started ranked matchmaking... open Open PVP to cancel."
 
@@ -601,35 +672,11 @@ Net:on("post_selection", function(event)
 				end)
 			end
 		end)
-	elseif post_id == "Unranked" and mode == "open" and (not is_in_any_matchmaking(player_id)) then
-		pcall(function() Net.close_bbs(player_id) end)
-		Async.message_player(player_id, "Started free battle matchmaking... open Open PVP to cancel.").and_then(function()
-			table.insert(players_in_open_unranked_matchmaking, player_id)
+    elseif post_id == "Unranked" and mode == "open" then
+      pcall(function() Net.close_bbs(player_id) end)
 
-			if #players_in_open_unranked_matchmaking >= 2 then
-				Async.sleep(4.9).and_then(function()
-					if #players_in_open_unranked_matchmaking < 2 then
-						while #players_in_open_unranked_matchmaking > 0 do
-							local pid = table.remove(players_in_open_unranked_matchmaking, 1)
-							Net.message_player(pid, "No other players in matchmaking!")
-						end
-						return
-					end
-
-					local p1 = table.remove(players_in_open_unranked_matchmaking, 1)
-					local p2 = table.remove(players_in_open_unranked_matchmaking, 1)
-
-					if Net.is_player_battling(p1) or Net.is_player_battling(p2) then
-						return
-					end
-
-					Async.sleep(0.1).and_then(function()
-						Net.initiate_pvp(p1, p2)
-						players_in_battle[p1] = p2
-						players_in_battle[p2] = p1
-					end)
-				end)
-			end
-		end)
-	end
+      if Lobby and Lobby.open_activity then
+        Lobby.open_activity(player_id, "bn_openpvp_unranked")
+      end
+    end
 end)

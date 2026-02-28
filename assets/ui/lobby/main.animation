@@ -1,0 +1,101 @@
+animation state="main"
+frame duration="0.1" x="6" y="222" w="240" h="160" originx="0" originy="0"
+
+animation state="random-unselected"
+frame duration="0.1" x="323" y="293" w="38" h="12" originx="0" originy="0"
+
+animation state="random-selected"
+frame duration="0.1" x="320" y="307" w="44" h="18" originx="3" originy="3"
+
+animation state="lobby-unselected"
+frame duration="0.1" x="285" y="84" w="207" h="21" originx="0" originy="0"
+
+animation state="lobby-selected"
+frame duration="0.1" x="282" y="106" w="212" h="25" originx="3" originy="2"
+
+animation state="lobby-loading"
+frame duration="0.03" x="282" y="106" w="212" h="25" originx="3" originy="2"
+frame duration="0.03" x="282" y="132" w="212" h="25" originx="3" originy="2"
+frame duration="0.03" x="59" y="82" w="212" h="25" originx="3" originy="2"
+frame duration="0.03" x="282" y="158" w="212" h="25" originx="3" originy="2"
+frame duration="0.03" x="59" y="108" w="212" h="25" originx="3" originy="2"
+frame duration="0.03" x="282" y="132" w="212" h="25" originx="3" originy="2"
+frame duration="0.03" x="282" y="186" w="212" h="25" originx="3" originy="2"
+frame duration="0.03" x="282" y="132" w="212" h="25" originx="3" originy="2"
+frame duration="0.03" x="59" y="108" w="212" h="25" originx="3" originy="2"
+frame duration="0.03" x="282" y="158" w="212" h="25" originx="3" originy="2"
+frame duration="0.03" x="59" y="82" w="212" h="25" originx="3" originy="2"
+frame duration="0.03" x="282" y="132" w="212" h="25" originx="3" originy="2"
+frame duration="10.0" x="282" y="106" w="212" h="25" originx="3" originy="2"
+
+animation state="wait-idle"
+frame duration="0.1" x="285" y="228" w="118" h="14" originx="0" originy="0"
+
+animation state="wait-loading"
+frame duration="0.2" x="285" y="243" w="118" h="14" originx="0" originy="0"
+frame duration="0.2" x="285" y="258" w="118" h="14" originx="0" originy="0"
+frame duration="0.2" x="285" y="273" w="118" h="14" originx="0" originy="0"
+
+animation state="name-cursor"
+frame duration="0.1" x="15" y="15" w="223" h="23" originx="0" originy="0"
+
+animation state="lobby-owner"
+frame duration="0.1" x="62" y="133" w="207" h="21" originx="0" originy="0"
+
+animation state="start-selected"
+frame duration="0.1" x="2" y="66" w="33" h="15" originx="4" originy="4"
+
+animation state="start-unselected"
+frame duration="0.1" x="6" y="82" w="25" h="7" originx="0" originy="0"
+
+animation state="kick-selected"
+frame duration="0.1" x="2" y="90" w="24" h="15" originx="4" originy="4"
+
+animation state="kick-unselected"
+frame duration="0.1" x="6" y="106" w="16" h="7" originx="0" originy="0"
+
+animation state="cancel-selected"
+frame duration="0.1" x="2" y="114" w="34" h="15" originx="4" originy="4"
+
+animation state="cancel-unselected"
+frame duration="0.1" x="6" y="130" w="26" h="7" originx="0" originy="0"
+
+animation state="ready-selected"
+frame duration="0.1" x="2" y="138" w="33" h="15" originx="4" originy="4"
+
+animation state="ready-unselected"
+frame duration="0.1" x="6" y="154" w="25" h="8" originx="0" originy="0"
+
+animation state="leave-selected"
+frame duration="0.1" x="2" y="162" w="33" h="15" originx="4" originy="4"
+
+animation state="leave-unselected"
+frame duration="0.1" x="6" y="178" w="25" h="7" originx="0" originy="0"
+
+animation state="lobby-main"
+frame duration="0.1" x="409" y="222" w="240" h="160" originx="0" originy="0"
+
+
+animation state="IDLE_DR"
+
+animation state="IDLE_DL"
+
+animation state="IDLE_UR"
+
+animation state="IDLE_UL"
+
+animation state="WALK_DR"
+
+animation state="WALK_DL"
+
+animation state="WALK_UR"
+
+animation state="WALK_UL"
+
+animation state="RUN_DR"
+
+animation state="RUN_DL"
+
+animation state="RUN_UR"
+
+animation state="RUN_UL"

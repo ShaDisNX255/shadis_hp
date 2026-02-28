@@ -65,8 +65,24 @@ local function is_blackjack_open(pid)
   return false
 end
 
+local function is_lobby_open(pid)
+  local Lobby = rawget(_G, "Lobby")
+  if type(Lobby) == "table" and type(Lobby.is_open_for) == "function" then
+    local ok, open = pcall(Lobby.is_open_for, pid)
+    if ok and open then return true end
+  end
+
+  local f = rawget(_G, "lobby_ui_is_open")
+  if type(f) == "function" then
+    local ok, open = pcall(f, pid)
+    if ok and open then return true end
+  end
+
+  return false
+end
+
 local function is_modal_open(pid)
-  return is_slots_open(pid) or is_blackjack_open(pid) or is_duel_open(pid)
+  return is_slots_open(pid) or is_blackjack_open(pid) or is_duel_open(pid) or is_lobby_open(pid)
 end
 
 
@@ -301,6 +317,7 @@ UI_SFX.paths = UI_SFX.paths or {}
 UI_SFX.paths.choose      = UI_SFX.paths.choose      or "/server/assets/sfx/card_choose.ogg"
 UI_SFX.paths.select      = UI_SFX.paths.select      or "/server/assets/sfx/card_select.ogg"
 UI_SFX.paths.cancel      = UI_SFX.paths.cancel      or "/server/assets/sfx/card_cancel.ogg"
+UI_SFX.paths.error      = UI_SFX.paths.error      or "/server/assets/sfx/card_error.ogg"
 UI_SFX.paths.screen_open = UI_SFX.paths.screen_open or "/server/assets/sfx/card_screen_open.ogg"
 
 if type(UI_SFX.play) ~= "function" then

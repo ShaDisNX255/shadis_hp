@@ -23,6 +23,28 @@ local function dlogf(fmt, ...) if YGO_PVP_DEBUG then print("[ygo_pvp] " .. strin
 local start_pvp_fn = nil
 local starter_locked = false
 
+local LobbyOK, Lobby = pcall(require, "scripts/ezlibs-custom/lobby")
+if LobbyOK and Lobby and Lobby.register_activity then
+  Lobby.register_activity("ygo_pvp", {
+    max_players = 2,
+    minimizable = false,
+    start = function(players, lobby)
+      if not start_pvp_fn then return false end
+
+      -- duels_pvp expects table_id for match_id; lobby_id isn't used there
+      local ok = start_pvp_fn(players[1], players[2], { table_id = lobby and lobby.id or "pvp" })
+      if ok and duels_pvp and duels_pvp.handle_board_close then
+        -- duels_pvp queues pending open and normally waits for board_close;
+        -- lobby flow has no board, so trigger it directly.
+        pcall(duels_pvp.handle_board_close, { player_id = players[1] })
+        pcall(duels_pvp.handle_board_close, { player_id = players[2] })
+      end
+
+      return ok
+    end
+  })
+end
+
 function M.set_start_fn(fn, lock)
   if starter_locked then
     dlog("set_start_fn ignored: starter locked")
@@ -316,7 +338,11 @@ Net:on("object_interaction", function(event)
   if (obj.class ~= "Duel Table" and obj.type ~= "Duel Table") then return end
 
   -- Open the board for this table
-  _open_table_board(pid, area_id, event.object_id)
+  if Lobby and Lobby.open_activity then
+    Lobby.open_activity(pid, "ygo_pvp")
+  else
+    _open_table_board(pid, area_id, event.object_id)
+  end
 end)
 
 -- Expose a handler your main router can call
