@@ -15,7 +15,7 @@ return {
       LEADERBOARD           = {
         ENABLED  = true,
         MEM_AREA = "fisharea",
-        KEY      = "fish_top10_v4",
+        KEY      = "fish_top10_v5",
         MAX      = 10,
         UNIQUE_PER = "secret",
       },
@@ -31,7 +31,7 @@ return {
       LEADERBOARD           = {
         ENABLED  = true,
         MEM_AREA = "rink",
-        KEY      = "rink_top5",
+        KEY      = "rink_top5_v2",
         MAX      = 5,
         UNIQUE_PER = "secret",
       },
@@ -172,7 +172,7 @@ return {
       LEADERBOARD           = {
         ENABLED  = true,
         MEM_AREA = "rink3",
-        KEY      = "rink3_top5",
+        KEY      = "rink3_top5_v2",
         MAX      = 5,
         UNIQUE_PER = "secret",
       },
