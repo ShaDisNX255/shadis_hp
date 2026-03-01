@@ -840,6 +840,31 @@ local cosmetics = {
     menu_preview_offset_y   = 12,
     menu_preview_scale          = 1.0,
   },
+  {
+    id              = "Shiny1",
+    key             = "Shiny1",
+    name            = "Shiny1",
+    texture         = "/server/assets/cosmetics/Shiny1.png",
+    animation       = "/server/assets/cosmetics/Shiny1.animation",
+    anim_state      = "idle_shiny1",
+    preview_sprite_id = "preview_Shiny1",
+    rarity          = "RED_5",
+    loop_duration = 2.18,
+
+    xforced         = 37,
+    yforced         = 0,
+
+    preview_start_x = -18,
+    preview_start_y = -45,
+
+    menu_preview_texture    = "/server/assets/cosmetics/Shiny1_preview.png",
+    menu_preview_animation  = "/server/assets/cosmetics/Shiny1_preview.animation",
+    menu_preview_anim_state = "idle_shiny1",
+    menu_preview_sprite_id  = "menu_preview_Shiny1",
+    menu_preview_offset_x   = 5,
+    menu_preview_offset_y   = 8,
+    menu_preview_scale      = 1.0,
+  },
 }
 
 return {

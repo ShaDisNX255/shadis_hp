@@ -34,6 +34,7 @@ local TEAM_NAMES_BY_MONTH = {
   ["2025-12"] = { [1] = "Team Protoman", [2] = "Team Colonel" },
   ["2026-01"] = { [1] = "Team Megaman",  [2] = "Team Bass"    },
   ["2026-02"] = { [1] = "Team Red Sun",  [2] = "Team Blue Moon"    },
+  ["2026-03"] = { [1] = "Team Falzar",  [2] = "Team Gregar"    },
 }
 
 -- Object types for map objects (press A to open)
@@ -64,6 +65,10 @@ local TEAM_COLORS_BY_MONTH = {
    ["2026-02"] = {
      [1] = { r=220,  g=70, b=70 },
      [2] = { r=70, g=90,  b=170 },
+   },
+   ["2026-03"] = {
+     [1] = { r=0,  g=170, b=238 },
+     [2] = { r=255, g=148,  b=29 },
    },
 }
 

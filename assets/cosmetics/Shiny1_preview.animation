@@ -1,0 +1,37 @@
+animation state="idle_shiny1"
+frame duration="0.08" x="220" y="60" w="35" h="42" originx="0" originy="0"
+frame duration="0.08" x="12" y="12" w="35" h="42" originx="0" originy="0"
+frame duration="0.08" x="53" y="12" w="35" h="42" originx="0" originy="0"
+frame duration="0.08" x="94" y="12" w="35" h="42" originx="0" originy="0"
+frame duration="0.08" x="135" y="12" w="35" h="42" originx="0" originy="0"
+frame duration="0.08" x="176" y="12" w="35" h="42" originx="0" originy="0"
+frame duration="0.08" x="12" y="60" w="35" h="42" originx="0" originy="0"
+frame duration="0.08" x="53" y="60" w="35" h="42" originx="0" originy="0"
+frame duration="0.08" x="94" y="60" w="35" h="42" originx="0" originy="0"
+frame duration="0.08" x="135" y="60" w="35" h="42" originx="0" originy="0"
+frame duration="0.08" x="176" y="60" w="35" h="42" originx="0" originy="0"
+frame duration="0.08" x="220" y="60" w="35" h="42" originx="0" originy="0"  
+
+animation state="IDLE_DR"
+
+animation state="IDLE_DL"
+
+animation state="IDLE_UR"
+
+animation state="IDLE_UL"
+
+animation state="WALK_DR"
+
+animation state="WALK_DL"
+
+animation state="WALK_UR"
+
+animation state="WALK_UL"
+
+animation state="RUN_DR"
+
+animation state="RUN_DL"
+
+animation state="RUN_UR"
+
+animation state="RUN_UL"
