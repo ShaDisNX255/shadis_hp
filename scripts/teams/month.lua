@@ -135,7 +135,7 @@ Month.MONTHS = {
     },
     team_win = {
        cosmetics = {
-         { id = "Lightning1", label = "Lightning1" },
+         { id = "Shiny1", label = "Shiny1" },
        },
     },
     losing_team = {
