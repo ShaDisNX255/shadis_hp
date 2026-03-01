@@ -1299,18 +1299,19 @@ local function _handle_team_action(pid, post_id)
         return true
       end
 
-      -- Balance guard: cannot join into the team that already leads by >= 2 members
+      -- Balance guard (post-join): joining must not create a 2+ member gap
       local slot1 = (t_mem.month and t_mem.month[1]) or { roster = {} }
       local slot2 = (t_mem.month and t_mem.month[2]) or { roster = {} }
       local n1    = _count_keys(slot1.roster)
       local n2    = _count_keys(slot2.roster)
-      local cand_size  = (team == 1) and n1 or n2
-      local other_size = (team == 1) and n2 or n1
-      if cand_size >= (other_size + 2) then
+
+      local n1_after, n2_after = n1, n2
+      if team == 1 then n1_after = n1_after + 1 else n2_after = n2_after + 1 end
+
+      if math.abs(n1_after - n2_after) >= 2 then
         Net.message_player(pid,
-          ("That team has %d members vs %d on the other team. " ..
-           "To keep things balanced, you can only join the underdog right now.")
-           :format(cand_size, other_size))
+          ("That would make teams unbalanced (%d vs %d). You can only join the underdog right now.")
+            :format(n1_after, n2_after))
         return true
       end
 
@@ -1331,18 +1332,24 @@ local function _handle_team_action(pid, post_id)
         return true
       end
 
-      -- Balance guard: cannot switch into the team that already leads by >= 2 members
+      -- Balance guard (post-switch): switching must not create a 2+ member gap
       local slot1 = (t_mem.month and t_mem.month[1]) or { roster = {} }
       local slot2 = (t_mem.month and t_mem.month[2]) or { roster = {} }
       local n1    = _count_keys(slot1.roster)
       local n2    = _count_keys(slot2.roster)
-      local cand_size  = (team == 1) and n1 or n2
-      local other_size = (team == 1) and n2 or n1
-      if cand_size >= (other_size + 2) then
+
+      -- If our roster entry is missing for any reason, count ourselves correctly.
+      if cur.team == 1 and not slot1.roster[secret] then n1 = n1 + 1 end
+      if cur.team == 2 and not slot2.roster[secret] then n2 = n2 + 1 end
+
+      local n1_after, n2_after = n1, n2
+      if cur.team == 1 then n1_after = n1_after - 1 else n2_after = n2_after - 1 end
+      if team == 1 then n1_after = n1_after + 1 else n2_after = n2_after + 1 end
+
+      if math.abs(n1_after - n2_after) >= 2 then
         Net.message_player(pid,
-          ("That team has %d members vs %d on the other team. " ..
-           "To keep things balanced, you can only switch to the underdog right now.")
-           :format(cand_size, other_size))
+          ("That switch would leave teams unbalanced (%d vs %d). You can only switch to the underdog right now.")
+            :format(n1_after, n2_after))
         return true
       end
 
