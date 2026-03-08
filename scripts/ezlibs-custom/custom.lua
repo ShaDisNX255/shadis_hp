@@ -377,6 +377,14 @@ local function truthy(v)
   return v == true or v == 1 or v == "1" or (type(v) == "string" and v:lower() == "true")
 end
 
+local function _split_area_id(raw_id)
+  -- Accept "area,id" or plain id; default area "default"
+  local s = tostring(raw_id or "")
+  local a, i = s:match("^([^,]+),(.+)$")
+  if a and i then return a, i end
+  return "default", s
+end
+
 -- Try to read "Description" custom property, then fall back to item info description
 local function read_item_meta_flexible(pid, raw_id)
   local area, iid = _split_area_id(raw_id)
