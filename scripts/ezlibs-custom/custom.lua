@@ -377,6 +377,22 @@ local function truthy(v)
   return v == true or v == 1 or v == "1" or (type(v) == "string" and v:lower() == "true")
 end
 
+-- Try to read "Description" custom property, then fall back to item info description
+local function read_item_meta_flexible(pid, raw_id)
+  local area, iid = _split_area_id(raw_id)
+  -- custom property "Description"
+  local ok1, desc_prop = pcall(ezmemory.get_item_custom_property, area, iid, "Description")
+  if ok1 and desc_prop and desc_prop ~= "" then
+    return { description = desc_prop }
+  end
+  -- fallback: info.description
+  local info = ezmemory.get_item_info(iid)
+  if info and info.description and info.description ~= "" then
+    return { description = info.description, name = info.name }
+  end
+  return { description = "" }
+end
+
 -- is this item a card AND allowed to trade?
 local function is_tradable_card(pid, item_id, info)
   if not info or not info.name then return false end
