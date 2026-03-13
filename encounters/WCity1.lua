@@ -232,6 +232,7 @@ local Encounter1 = {
     name="Encounter1",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     weight=10,
+    pet_exp=6,
     enemies={
         {name="Boomer",rank=1},
         {name="WindBox",rank=1},
@@ -309,6 +310,7 @@ local Encounter3 = {
     name="Encounter3",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     weight=10,
+    pet_exp=6,
     enemies={
         {name="Swordy",rank=1},
         {name="Boomer",rank=1},
@@ -467,6 +469,7 @@ local Encounter7 = {
     name="Encounter7",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     weight=10,
+    pet_exp=6,
     enemies={
         {name="Quaker",rank=2},
         {name="Yort",rank=1},
@@ -580,6 +583,7 @@ local Encounter10 = {
     name="Encounter10",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     weight=10,
+    pet_exp=6,
     enemies={
         {name="Quaker",rank=2},
         {name="Champy",rank=1},

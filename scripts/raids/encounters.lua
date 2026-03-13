@@ -23,6 +23,7 @@ local E1 = {
     name="E1",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     weight=10,
+    pet_exp=1,
     enemies={
         {name="Mettaur",rank=3},
         {name="Mettaur",rank=2},
@@ -65,6 +66,7 @@ local E2 = {
     name="E2",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     weight=10,
+    pet_exp=1,
     enemies={
         {name="Mettaur",rank=3},
         {name="Mettaur",rank=1},
@@ -108,6 +110,7 @@ local E3 = {
     name="E3",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     weight=10,
+    pet_exp=1,
     enemies={
         {name="Mettaur",rank=3},
         {name="Mettaur",rank=2},
@@ -149,6 +152,7 @@ local E4 = {
     name="E4",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     weight=10,
+    pet_exp=4,
     enemies={
         {name="Mettaur",rank=3},
         {name="Mettaur",rank=4},
@@ -188,6 +192,7 @@ local E5 = {
     name="E5",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     weight=10,
+    pet_exp=4,
     enemies={
         {name="Mettaur",rank=4},
         {name="Mettaur",rank=2},
@@ -229,6 +234,7 @@ local E6 = {
     name="E6",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     weight=10,
+    pet_exp=4,
     enemies={
         {name="Mettaur",rank=4},
         {name="Mettaur",rank=7},
@@ -268,6 +274,7 @@ local E6 = {
 local boss = {
     name="boss",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    pet_exp=7,
     weight=10,
     enemies={
         {name="Mettaur",rank=7},
@@ -306,6 +313,7 @@ local boss = {
 local S1 = {
     name="S1",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    pet_exp=7,
     weight=10,
     enemies={
         {name="Swordy",rank=1},
@@ -343,6 +351,7 @@ local S1 = {
 local S2 = {
     name="S2",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    pet_exp=7,
     weight=10,
     enemies={
         {name="Swordy",rank=2},
@@ -379,6 +388,7 @@ local S2 = {
 local S3 = {
     name="S3",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    pet_exp=7,
     weight=10,
     enemies={
         {name="Swordy",rank=2},
@@ -417,6 +427,7 @@ local S3 = {
 local S4 = {
     name="S4",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    pet_exp=8,
     weight=10,
     enemies={
         {name="Dominerd",rank=1},
@@ -455,6 +466,7 @@ local S4 = {
 local S5 = {
     name="S5",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    pet_exp=8,
     weight=10,
     enemies={
         {name="Doomer",rank=1},
@@ -493,6 +505,7 @@ local S5 = {
 local S6 = {
     name="S6",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    pet_exp=8,
     weight=10,
     enemies={
         {name="Bladia5",rank=1},
@@ -531,6 +544,7 @@ local S6 = {
 local boss2 = {
     name="boss2",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    pet_exp=12,
     weight=10,
     enemies={
         {name="QuickMan",rank=1},

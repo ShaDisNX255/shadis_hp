@@ -23,6 +23,15 @@ local helpers  = require('scripts/ezlibs-scripts/helpers')
 local ezmenus  = require('scripts/ezlibs-scripts/ezmenus')
 local ezmemory = require('scripts/ezlibs-scripts/ezmemory')
 
+-- ==== Forward Declare ==== ---
+local clamp_pet_battle_rank
+local _clear_companion_runtime
+local companion_live_entries
+local _get_owned_pet
+local _get_player_pets_store
+local save_bucket
+local _sync_live_companion_from_owned
+
 -- Teams is optional; we only call it if available.
 local Teams = (function()
   local ok, M = pcall(require, 'scripts/teams/teams')
@@ -155,6 +164,1213 @@ local PET_DEFS = {
   kabutank  = { name = "Kabutank",  texture = "kabutank.png",  animation = "kabutank.animation"  },
 }
 
+-- ====================== Battle Pet (Take With You) ======================
+-- overworld kind -> battle enemy name (resolved by ezencounters.zip enemy_packages)
+-- You already have this mapping in (ezencounterszip)entry.lua:
+--   MettaurPet = "com.OFC.char.EXE6-001-MetallPet"
+-- Chip List --
+-- 1  = Recovery30
+-- 2  = Recovery50
+-- 3  = PanelSteal
+-- 4  = AreaSteal
+-- 5  = HolyPanel
+-- 6  = Sanctuary
+-- 7  = Invisible
+-- 8  = Shadow
+-- 9  = Barrier
+-- 10 = Barrier100
+local BATTLE_PETS = {
+  mettaur = {
+    enemy_name = "MettaurPet",
+    rank = 1,
+    default_starting_hp = 40,
+    test_pet_chip_id = nil,
+    test_pet_chip_amount = 1,
+  },
+  ratty = {
+    enemy_name = "RattyPet",
+    rank = 1,
+    default_starting_hp = 40,
+    test_pet_chip_id = nil,
+    test_pet_chip_amount = 1,
+  },
+  swordy = {
+    enemy_name = "SwordyPet",
+    rank = 1,
+    default_starting_hp = 40,
+    test_pet_chip_id = nil,
+    test_pet_chip_amount = 1,
+  },
+  powie = {
+    enemy_name = "PowiePet",
+    rank = 1,
+    default_starting_hp = 40,
+    test_pet_chip_id = nil,
+    test_pet_chip_amount = 1,
+  },
+}
+
+local PET_CHIPS = {
+  [1]  = { display_name = "Recovery30", item_name = "PetChip: Recovery30", description = "Pet battle chip: Recovery30" },
+  [2]  = { display_name = "Recovery50", item_name = "PetChip: Recovery50", description = "Pet battle chip: Recovery50" },
+  [3]  = { display_name = "PanelSteal", item_name = "PetChip: PanelSteal", description = "Pet battle chip: PanelSteal" },
+  [4]  = { display_name = "AreaSteal", item_name = "PetChip: AreaSteal", description = "Pet battle chip: AreaSteal" },
+  [5]  = { display_name = "HolyPanel", description = "Pet battle chip: HolyPanel", item_name = "PetChip: HolyPanel" },
+  [6]  = { display_name = "Sanctuary", item_name = "PetChip: Sanctuary", description = "Pet battle chip: Sanctuary" },
+  [7]  = { display_name = "Invisible", item_name = "PetChip: Invisible", description = "Pet battle chip: Invisible" },
+  [8]  = { display_name = "Shadow", item_name = "PetChip: Shadow", description = "Pet battle chip: Shadow" },
+  [9]  = { display_name = "Barrier", item_name = "PetChip: Barrier", description = "Pet battle chip: Barrier" },
+  [10] = { display_name = "Barrier100", item_name = "PetChip: Barrier100", description = "Pet battle chip: Barrier100" },
+}
+
+local function _pet_chip_def(chip_id)
+  return PET_CHIPS[tonumber(chip_id)]
+end
+
+local function _pet_chip_name(chip_id)
+  local def = _pet_chip_def(chip_id)
+  return def and def.display_name or nil
+end
+
+local function _pet_chip_item_name(chip_id)
+  local def = _pet_chip_def(chip_id)
+  return def and def.item_name or nil
+end
+
+local function _pet_chip_id_from_item_name(item_name)
+  item_name = tostring(item_name or "")
+  for chip_id, def in pairs(PET_CHIPS) do
+    if tostring(def.item_name) == item_name then
+      return tonumber(chip_id)
+    end
+  end
+  return nil
+end
+
+-- Stored in PLAYER memory (we clear it on disconnect/join)
+local PLAYER_ARMED_PET_KEY = "armed_pet_v1"
+local OWNED_PETS_MEM_KEY   = "owned_pet_instances_v1"
+local LEGACY_PET_COUNT_KEYS = { "oncehub_decor_inventory_v1", "decor_inventory" }
+
+local function _safe_get_player_memory(secret)
+  secret = tostring(secret or "")
+  if secret == "" then return nil end
+
+  local ok, pmem = pcall(ezmemory.get_player_memory, secret)
+  if ok then
+    if type(pmem) ~= "table" then
+      pmem = {}
+    end
+    return pmem
+  end
+
+  local err = tostring(pmem or "")
+  if not err:find("still loading area_memory", 1, true) then
+    dbg("pets: get_player_memory failed secret=", secret, " err=", err)
+  end
+  return nil
+end
+
+local function _safe_save_player_memory(secret, pmem)
+  secret = tostring(secret or "")
+  if secret == "" then return false end
+
+  if ezmemory.set_player_memory then
+    local ok = pcall(ezmemory.set_player_memory, secret, pmem)
+    if ok then return true end
+  end
+
+  if ezmemory.save_player_memory then
+    local ok = pcall(ezmemory.save_player_memory, secret, pmem)
+    if ok then return true end
+  end
+
+  return false
+end
+
+local function _resolve_pet_owner_secret(owner_or_pid)
+  if owner_or_pid == nil then
+    return ""
+  end
+
+  if helpers and type(helpers.get_safe_player_secret) == "function" then
+    local ok, secret = pcall(helpers.get_safe_player_secret, owner_or_pid)
+    if ok and secret and secret ~= "" then
+      return tostring(secret)
+    end
+  end
+
+  return tostring(owner_or_pid or "")
+end
+
+local function pet_item_id_from_kind(kind)
+  kind = tostring(kind or ""):lower()
+  if kind == "" then kind = "mettaur" end
+  return "pet_" .. kind
+end
+
+local function _default_pet_level()
+  return 1
+end
+
+local function _default_pet_hp(kind)
+  local battle = BATTLE_PETS[tostring(kind or ""):lower()]
+  return math.max(1, math.floor(tonumber(battle and battle.default_starting_hp or 40) or 40))
+end
+
+local function _default_pet_attack(kind)
+  return 1
+end
+
+local function _default_pet_xp()
+  return 0
+end
+
+local PET_BATTLE_XP_DEFAULT    = 5
+local PET_EXPEDITION_XP        = PET_BATTLE_XP_DEFAULT * 15
+local PET_XP_PER_SKILL_POINT   = PET_BATTLE_XP_DEFAULT * 50 -- 250 XP = 50 normal wins
+local PLAYER_PET_XP_NOTIFY_KEY = "pet_xp_notify_v1"
+local PET_BATTLES_PER_FATIGUE  = 15
+local PET_HAPPY_XP_BONUS       = 1
+local PET_SAD_XP_PENALTY       = -1
+
+local function _coerce_skill_counter(n)
+  return math.max(0, math.floor(tonumber(n) or 0))
+end
+
+local function _pet_attack_points_from_stat(kind, stat_attack)
+  local base = _default_pet_attack(kind)
+  return math.max(0, math.floor((tonumber(stat_attack) or base) - base))
+end
+
+local function _pet_hp_points_from_stat(kind, stat_hp)
+  local base = _default_pet_hp(kind)
+  return math.max(0, math.floor(((tonumber(stat_hp) or base) - base) / 5))
+end
+
+local function _pet_total_skill_points_from_xp(xp)
+  return math.max(0, math.floor((tonumber(xp) or 0) / PET_XP_PER_SKILL_POINT))
+end
+
+local function _pet_free_skill_points_for_pet(p)
+  if type(p) ~= "table" then return 0 end
+
+  local atk = _coerce_skill_counter(p.attack_points or _pet_attack_points_from_stat(p.kind, p.stat_attack))
+  local hp  = _coerce_skill_counter(p.hp_points or _pet_hp_points_from_stat(p.kind, p.stat_hp))
+
+  return math.max(0, _pet_total_skill_points_from_xp(p.xp) - atk - hp)
+end
+
+local function _pet_xp_to_next_skill_point(xp)
+  local cur = math.max(0, math.floor(tonumber(xp) or 0))
+  local rem = cur % PET_XP_PER_SKILL_POINT
+
+  if rem == 0 then
+    return PET_XP_PER_SKILL_POINT
+  end
+
+  return PET_XP_PER_SKILL_POINT - rem
+end
+
+local function _pet_xp_notifications_enabled_from_pmem(pmem)
+  if type(pmem) ~= "table" then
+    return true
+  end
+
+  local v = pmem[PLAYER_PET_XP_NOTIFY_KEY]
+  if v == nil then
+    return true
+  end
+
+  return v == true
+end
+
+local function _default_pet_fatigue()
+  return 0
+end
+
+local function _pet_mood_from_fatigue(fatigue)
+  fatigue = tonumber(fatigue) or 0
+  if fatigue >= EXPEDITION.neutral_to_sad then
+    return "sad"
+  elseif fatigue >= EXPEDITION.happy_to_neutral then
+    return "neutral"
+  end
+  return "happy"
+end
+
+local function _pet_mood_xp_delta(mood)
+  mood = tostring(mood or ""):lower()
+
+  if mood == "happy" then
+    return PET_HAPPY_XP_BONUS
+  elseif mood == "sad" then
+    return PET_SAD_XP_PENALTY
+  end
+
+  return 0
+end
+
+local function _feed_like_fatigue_relief(fatigue)
+  local mood = _pet_mood_from_fatigue(fatigue)
+  fatigue = math.max(0, math.floor(tonumber(fatigue) or 0))
+
+  if mood == "sad" then
+    return math.max(0, fatigue - (EXPEDITION.neutral_to_sad - EXPEDITION.happy_to_neutral)), true
+  elseif mood == "neutral" then
+    return math.max(0, fatigue - EXPEDITION.happy_to_neutral), true
+  end
+
+  return fatigue, false
+end
+
+local function _reduce_battle_fatigue_from_companion_petting(e, bucket_area_id)
+  if type(e) ~= "table" then
+    return false
+  end
+
+  if e.companion_summoned ~= true then
+    return false
+  end
+
+  local owner_secret = tostring(e.owner_secret or "")
+  local uid = tostring(e.uid or "")
+  if owner_secret == "" or uid == "" then
+    return false
+  end
+
+  local owned = _get_owned_pet(owner_secret, uid)
+  if not owned then
+    return false
+  end
+
+  owned.fatigue = math.max(0, math.floor(tonumber(owned.fatigue) or 0))
+  owned.battle_fatigue_progress = math.max(0, math.floor(tonumber(owned.battle_fatigue_progress) or 0))
+
+  -- Reduce by exactly 1 "battle fatigue step".
+  -- If progress is already 0, borrow from regular fatigue and wrap progress to 14.
+  if owned.battle_fatigue_progress > 0 then
+    owned.battle_fatigue_progress = owned.battle_fatigue_progress - 1
+  elseif owned.fatigue > 0 then
+    owned.fatigue = owned.fatigue - 1
+    owned.battle_fatigue_progress = PET_BATTLES_PER_FATIGUE - 1
+  else
+    return false
+  end
+
+  e.fatigue = owned.fatigue
+  e.battle_fatigue_progress = owned.battle_fatigue_progress
+
+  local store = select(1, _get_player_pets_store(owner_secret))
+  if not store or type(store.pets) ~= "table" then
+    return false
+  end
+
+  store.pets[uid] = owned
+  ezmemory.save_player_memory(owner_secret)
+
+  if bucket_area_id and bucket_area_id ~= "" then
+    save_bucket(bucket_area_id)
+  end
+
+  _sync_live_companion_from_owned(owned)
+  return true
+end
+
+function _get_player_pets_store(owner_secret)
+  owner_secret = tostring(owner_secret or "")
+  if owner_secret == "" then return nil, nil end
+
+  local pmem = _safe_get_player_memory(owner_secret)
+  if type(pmem) ~= "table" then
+    return nil, nil
+  end
+
+  local store = pmem[OWNED_PETS_MEM_KEY]
+
+  if type(store) ~= "table" then
+    store = { next_num = 1, pets = {} }
+    pmem[OWNED_PETS_MEM_KEY] = store
+    _safe_save_player_memory(owner_secret, pmem)
+  end
+
+  if type(store.pets) ~= "table" then
+    store.pets = {}
+  end
+
+  store.next_num = math.max(1, math.floor(tonumber(store.next_num) or 1))
+  return store, pmem
+end
+
+local function _alloc_owned_pet_uid(owner_secret)
+  local store = select(1, _get_player_pets_store(owner_secret))
+  if not store then
+    return tostring(os.time()) .. "-" .. tostring(math.random(100000, 999999))
+  end
+
+  local n = store.next_num or 1
+  store.next_num = n + 1
+  ezmemory.save_player_memory(owner_secret)
+
+  return string.format("pet-%d-%06d-%d", os.time(), math.random(100000, 999999), n)
+end
+
+local function _normalize_owned_pet(p)
+  if type(p) ~= "table" then return nil end
+
+  p.uid = tostring(p.uid or "")
+  p.kind = tostring(p.kind or "mettaur"):lower()
+  if p.kind == "" then p.kind = "mettaur" end
+
+  p.item_id = tostring(p.item_id or pet_item_id_from_kind(p.kind))
+  p.level = math.max(1, math.floor(tonumber(p.level) or _default_pet_level()))
+  p.stat_hp = math.max(1, math.floor(tonumber(p.stat_hp) or _default_pet_hp(p.kind)))
+  p.stat_attack = math.max(1, math.floor(tonumber(p.stat_attack) or _default_pet_attack(p.kind)))
+  p.attack_points = _coerce_skill_counter(p.attack_points or _pet_attack_points_from_stat(p.kind, p.stat_attack))
+  p.hp_points = _coerce_skill_counter(p.hp_points or _pet_hp_points_from_stat(p.kind, p.stat_hp))
+  p.xp = math.max(0, math.floor(tonumber(p.xp) or _default_pet_xp()))
+  p.fatigue = math.max(0, math.floor(tonumber(p.fatigue) or _default_pet_fatigue()))
+  p.battle_fatigue_progress = math.max(0, math.floor(tonumber(p.battle_fatigue_progress) or 0))
+  p.nickname = tostring(p.nickname or "")
+  p.pet_chip_id = tonumber(p.pet_chip_id)
+  if p.pet_chip_id and not PET_CHIPS[p.pet_chip_id] then
+    p.pet_chip_id = nil
+  end
+
+  p.pet_chip_amount = math.max(1, math.floor(tonumber(p.pet_chip_amount or 1) or 1))
+  if not p.pet_chip_id then
+    p.pet_chip_amount = 1
+  end
+
+  if type(p.placement) ~= "table" then
+    p.placement = nil
+  else
+    p.placement.bucket_area_id = tostring(p.placement.bucket_area_id or "")
+    p.placement.oncehub_key    = tostring(p.placement.oncehub_key or "")
+    p.placement.area_id        = tostring(p.placement.area_id or "")
+    p.placement.x              = tonumber(p.placement.x or 0) or 0
+    p.placement.y              = tonumber(p.placement.y or 0) or 0
+    p.placement.z              = tonumber(p.placement.z or 0) or 0
+  end
+
+  return p
+end
+
+local function _award_owned_pet_xp_for_secret(secret, uid, amount)
+  secret = tostring(secret or "")
+  uid = tostring(uid or "")
+  amount = math.max(0, math.floor(tonumber(amount) or 0))
+
+  if secret == "" or uid == "" or amount <= 0 then
+    return false, 0, 0
+  end
+
+  local pmem = _safe_get_player_memory(secret)
+  if type(pmem) ~= "table" then
+    return false, 0, 0
+  end
+
+  local store = pmem[OWNED_PETS_MEM_KEY]
+  if type(store) ~= "table" or type(store.pets) ~= "table" then
+    return false, 0, 0
+  end
+
+  local p = _normalize_owned_pet(store.pets[uid])
+  if type(p) ~= "table" then
+    return false, 0, 0
+  end
+
+  local old_total = _pet_total_skill_points_from_xp(p.xp)
+
+  p.xp = math.max(0, math.floor(tonumber(p.xp or 0) or 0) + amount)
+
+  local new_total = _pet_total_skill_points_from_xp(p.xp)
+
+  store.pets[uid] = p
+  pmem[OWNED_PETS_MEM_KEY] = store
+  _safe_save_player_memory(secret, pmem)
+
+  return true, p.xp, math.max(0, new_total - old_total)
+end
+
+function _get_owned_pet(owner_secret, uid)
+  local store = select(1, _get_player_pets_store(owner_secret))
+  if not store then return nil end
+
+  uid = tostring(uid or "")
+  local p = store.pets and store.pets[uid] or nil
+  if type(p) ~= "table" then return nil end
+
+  p = _normalize_owned_pet(p)
+  store.pets[uid] = p
+  return p
+end
+
+function _sync_live_companion_from_owned(p)
+  if type(p) ~= "table" then return end
+
+  local uid = tostring(p.uid or "")
+  if uid == "" then return end
+
+  local live = companion_live_entries and companion_live_entries[uid]
+  if type(live) ~= "table" then
+    return
+  end
+
+  live.stat_hp = p.stat_hp
+  live.stat_attack = p.stat_attack
+  live.attack_points = p.attack_points
+  live.hp_points = p.hp_points
+  live.xp = p.xp
+  live.fatigue = p.fatigue
+  live.battle_fatigue_progress = p.battle_fatigue_progress
+  live.nickname = tostring(p.nickname or live.nickname or "")
+end
+
+local function _count_owned_pet_instances(owner_secret, kind)
+  local store = select(1, _get_player_pets_store(owner_secret))
+  if not store then return 0 end
+
+  kind = tostring(kind or ""):lower()
+  local n = 0
+
+  for uid, raw in pairs(store.pets or {}) do
+    local p = _normalize_owned_pet(raw)
+    store.pets[uid] = p
+    if kind == "" or p.kind == kind then
+      n = n + 1
+    end
+  end
+
+  return n
+end
+
+local function _legacy_owned_pet_count(owner_secret, item_id)
+  local pmem = _safe_get_player_memory(owner_secret)
+  if type(pmem) ~= "table" then
+    return 0
+  end
+
+  local best = 0
+
+  for _, key in ipairs(LEGACY_PET_COUNT_KEYS) do
+    local inv = pmem[key]
+    if type(inv) == "table" then
+      best = math.max(best, tonumber(inv[item_id] or 0) or 0)
+    end
+  end
+
+  return math.max(0, best)
+end
+
+local function _find_first_unplaced_owned_pet(owner_secret, kind, preferred_uid)
+  owner_secret = tostring(owner_secret or "")
+  kind = tostring(kind or ""):lower()
+  preferred_uid = tostring(preferred_uid or "")
+
+  if preferred_uid ~= "" then
+    local p = _get_owned_pet(owner_secret, preferred_uid)
+    if p and p.kind == kind and p.placement == nil then
+      return p
+    end
+    return nil
+  end
+
+  local store = select(1, _get_player_pets_store(owner_secret))
+  if not store then return nil end
+
+  local best = nil
+  for uid, raw in pairs(store.pets or {}) do
+    local p = _normalize_owned_pet(raw)
+    store.pets[uid] = p
+
+    if p.kind == kind and p.placement == nil then
+      if not best or tostring(p.uid) < tostring(best.uid) then
+        best = p
+      end
+    end
+  end
+
+  return best
+end
+
+local function _attach_owned_pet_to_entry(e, bucket_area_id, oncehub_key)
+  local owner_secret = tostring(e.owner_secret or "")
+  if owner_secret == "" then return end
+
+  local store = select(1, _get_player_pets_store(owner_secret))
+  if not store then return end
+
+  local uid = tostring(e.uid or "")
+  local dirty = false
+
+  if uid == "" then
+    uid = _alloc_owned_pet_uid(owner_secret)
+    e.uid = uid
+    dirty = true
+  end
+
+  local p = store.pets[uid]
+  if type(p) ~= "table" then
+    p = {
+      uid = uid,
+      kind = e.kind,
+      item_id = pet_item_id_from_kind(e.kind),
+      level = e.level,
+      stat_hp = e.stat_hp,
+      xp = e.xp,
+      stat_attack = e.stat_attack,
+      fatigue = e.fatigue,
+      battle_fatigue_progress = e.battle_fatigue_progress,
+      nickname = e.nickname,
+      attack_points = e.attack_points,
+      hp_points = e.hp_points,
+      placement = {
+        bucket_area_id = tostring(bucket_area_id or e.bucket_area_id or ""),
+        oncehub_key    = tostring(oncehub_key or e.oncehub_key or ""),
+        area_id        = tostring(e.home_area_id or e.area_id or ""),
+        x = tonumber(e.home_x or e.x or 0) or 0,
+        y = tonumber(e.home_y or e.y or 0) or 0,
+        z = tonumber(e.home_z or e.z or 0) or 0,
+      }
+    }
+    p = _normalize_owned_pet(p)
+    store.pets[uid] = p
+    dirty = true
+  else
+    p = _normalize_owned_pet(p)
+    store.pets[uid] = p
+
+    if type(p.placement) ~= "table"
+      or tostring(p.placement.bucket_area_id or "") ~= tostring(bucket_area_id or e.bucket_area_id or "")
+      or tostring(p.placement.oncehub_key or "") ~= tostring(oncehub_key or e.oncehub_key or "")
+    then
+      p.placement = {
+        bucket_area_id = tostring(bucket_area_id or e.bucket_area_id or ""),
+        oncehub_key    = tostring(oncehub_key or e.oncehub_key or ""),
+        area_id        = tostring(e.home_area_id or e.area_id or ""),
+        x = tonumber(e.home_x or e.x or 0) or 0,
+        y = tonumber(e.home_y or e.y or 0) or 0,
+        z = tonumber(e.home_z or e.z or 0) or 0,
+      }
+      store.pets[uid] = p
+      dirty = true
+    end
+  end
+
+  -- owned record is authoritative for persistent stats
+  e.kind        = p.kind
+  e.level       = p.level
+  e.stat_hp     = p.stat_hp
+  e.stat_attack = p.stat_attack
+  e.attack_points = p.attack_points
+  e.hp_points     = p.hp_points
+  e.xp          = p.xp
+  e.fatigue     = p.fatigue
+  e.battle_fatigue_progress = p.battle_fatigue_progress
+  e.nickname    = tostring(p.nickname or "")
+  e.pet_chip_id     = p.pet_chip_id
+  e.pet_chip_amount = p.pet_chip_amount
+
+  if dirty then
+    ezmemory.save_player_memory(owner_secret)
+  end
+end
+
+local function _save_owned_pet_from_entry(e, clear_placement)
+  local owner_secret = tostring(e.owner_secret or "")
+  if owner_secret == "" then return end
+
+  local store = select(1, _get_player_pets_store(owner_secret))
+  if not store then return end
+
+  local uid = tostring(e.uid or "")
+  if uid == "" then
+    uid = _alloc_owned_pet_uid(owner_secret)
+    e.uid = uid
+  end
+
+  local p = store.pets[uid] or {}
+  p.uid         = uid
+  p.kind        = tostring(e.kind or p.kind or "mettaur"):lower()
+  p.item_id     = tostring(p.item_id or pet_item_id_from_kind(p.kind))
+  p.level       = math.max(1, math.floor(tonumber(e.level or p.level or _default_pet_level())))
+  p.stat_hp     = math.max(1, math.floor(tonumber(e.stat_hp or p.stat_hp or _default_pet_hp(p.kind))))
+  p.stat_attack = math.max(1, math.floor(tonumber(e.stat_attack or p.stat_attack or _default_pet_attack(p.kind))))
+  p.attack_points = _coerce_skill_counter(e.attack_points or p.attack_points or _pet_attack_points_from_stat(p.kind, e.stat_attack))
+  p.hp_points     = _coerce_skill_counter(e.hp_points or p.hp_points or _pet_hp_points_from_stat(p.kind, e.stat_hp))
+  p.xp          = math.max(0, math.floor(tonumber(e.xp or p.xp or _default_pet_xp())))
+  p.fatigue     = math.max(0, math.floor(tonumber(e.fatigue or p.fatigue or _default_pet_fatigue())))
+  p.battle_fatigue_progress = math.max(0, math.floor(tonumber(e.battle_fatigue_progress or p.battle_fatigue_progress or 0)))
+  p.nickname    = tostring(e.nickname or p.nickname or "")
+  p.pet_chip_id = tonumber(e.pet_chip_id)
+  if p.pet_chip_id and not PET_CHIPS[p.pet_chip_id] then
+    p.pet_chip_id = nil
+  end
+
+  p.pet_chip_amount = math.max(1, math.floor(tonumber(e.pet_chip_amount or p.pet_chip_amount or 1) or 1))
+  if not p.pet_chip_id then
+    p.pet_chip_amount = 1
+  end
+
+  if clear_placement then
+    p.placement = nil
+  else
+    p.placement = {
+      bucket_area_id = tostring(e.bucket_area_id or ""),
+      oncehub_key    = tostring(e.oncehub_key or ""),
+      area_id        = tostring(e.home_area_id or e.area_id or ""),
+      x = tonumber(e.home_x or e.x or 0) or 0,
+      y = tonumber(e.home_y or e.y or 0) or 0,
+      z = tonumber(e.home_z or e.z or 0) or 0,
+    }
+  end
+
+  store.pets[uid] = _normalize_owned_pet(p)
+  ezmemory.save_player_memory(owner_secret)
+end
+
+function pets.ensure_player_pet_ids(owner_or_pid)
+  local owner_secret = _resolve_pet_owner_secret(owner_or_pid)
+  if owner_secret == "" then return false end
+
+  local store = select(1, _get_player_pets_store(owner_secret))
+  if not store then return false end
+
+  local dirty = false
+
+  for kind, _ in pairs(PET_DEFS) do
+    local want = _legacy_owned_pet_count(owner_secret, pet_item_id_from_kind(kind))
+    local have = _count_owned_pet_instances(owner_secret, kind)
+
+    while have < want do
+      local uid = _alloc_owned_pet_uid(owner_secret)
+      store.pets[uid] = _normalize_owned_pet({
+        uid = uid,
+        kind = kind,
+        item_id = pet_item_id_from_kind(kind),
+      })
+      have = have + 1
+      dirty = true
+    end
+  end
+
+  if dirty then
+    ezmemory.save_player_memory(owner_secret)
+  end
+
+  return true
+end
+
+function pets.list_owned_pets(owner_or_pid, opts)
+  local owner_secret = _resolve_pet_owner_secret(owner_or_pid)
+  local store = select(1, _get_player_pets_store(owner_secret))
+  local out = {}
+  if not store then return out end
+
+  local want_kind = opts and tostring(opts.kind or ""):lower() or ""
+  local only_unplaced = opts and opts.only_unplaced == true
+
+  for uid, raw in pairs(store.pets or {}) do
+    local p = _normalize_owned_pet(raw)
+    store.pets[uid] = p
+
+    local include = true
+    if want_kind ~= "" and p.kind ~= want_kind then include = false end
+    if only_unplaced and p.placement ~= nil then include = false end
+
+    if include then
+      out[#out+1] = {
+        uid = p.uid,
+        kind = p.kind,
+        item_id = p.item_id,
+        level = p.level,
+        stat_hp = p.stat_hp,
+        stat_attack = p.stat_attack,
+        fatigue = p.fatigue,
+        mood = _pet_mood_from_fatigue(p.fatigue),
+        nickname = tostring(p.nickname or ""),
+        placed = p.placement ~= nil,
+        placement = p.placement,
+        pet_chip_id = p.pet_chip_id,
+        pet_chip_amount = p.pet_chip_amount,
+        xp = p.xp,
+        attack_points = p.attack_points,
+        hp_points = p.hp_points,
+      }
+    end
+  end
+
+  table.sort(out, function(a, b)
+    if a.kind == b.kind then
+      return tostring(a.uid) < tostring(b.uid)
+    end
+    return tostring(a.kind) < tostring(b.kind)
+  end)
+
+  return out
+end
+
+function pets.get_armed_pet_info(owner_or_pid)
+  local owner_secret = _resolve_pet_owner_secret(owner_or_pid)
+  if owner_secret == "" then
+    return nil
+  end
+
+  local pmem = _safe_get_player_memory(owner_secret)
+  if type(pmem) ~= "table" then
+    return nil
+  end
+
+  local armed = pmem[PLAYER_ARMED_PET_KEY]
+  if type(armed) ~= "table" then
+    return nil
+  end
+
+  local uid  = tostring(armed.uid or "")
+  local kind = tostring(armed.kind or "mettaur"):lower()
+  if kind == "" then kind = "mettaur" end
+
+  local battle_def = BATTLE_PETS[kind]
+  local pet_def    = PET_DEFS[kind] or {}
+  local owned      = nil
+
+  if uid ~= "" then
+    owned = _get_owned_pet(owner_secret, uid)
+  end
+
+  local base_name = tostring(pet_def.name or kind:gsub("^%l", string.upper))
+  local nickname  = ""
+
+  if owned and tostring(owned.nickname or "") ~= "" then
+    nickname = tostring(owned.nickname or "")
+  end
+
+  local display_name = (nickname ~= "" and nickname) or base_name
+
+  local fatigue = _default_pet_fatigue()
+  local xp = 0
+  local battle_fatigue_progress = 0
+
+  if owned then
+    fatigue = tonumber(owned.fatigue) or fatigue
+    xp = math.max(0, math.floor(tonumber(owned.xp) or 0))
+    battle_fatigue_progress = math.max(0, math.floor(tonumber(owned.battle_fatigue_progress) or 0))
+  end
+
+  local mood = _pet_mood_from_fatigue(fatigue)
+  local can_fight = battle_def ~= nil
+
+  local hp = math.max(1, math.floor(tonumber(
+    (owned and owned.stat_hp)
+    or armed.starting_hp
+    or (battle_def and battle_def.default_starting_hp)
+    or _default_pet_hp(kind)
+  ) or _default_pet_hp(kind)))
+
+  local rank = clamp_pet_battle_rank(
+    (owned and owned.stat_attack)
+    or armed.rank
+    or (battle_def and battle_def.rank)
+    or _default_pet_attack(kind)
+  )
+
+  local attack = rank * 5
+
+  local chip_id = tonumber(
+    (owned and owned.pet_chip_id)
+    or armed.pet_chip_id
+    or nil
+  )
+
+  local chip_amount = math.max(1, math.floor(tonumber(
+    (owned and owned.pet_chip_amount)
+    or armed.pet_chip_amount
+    or 1
+  ) or 1))
+
+  if not chip_id then
+    chip_amount = 1
+  end
+
+  local attack_points = owned
+    and _coerce_skill_counter(owned.attack_points or _pet_attack_points_from_stat(kind, owned.stat_attack))
+    or _coerce_skill_counter(_pet_attack_points_from_stat(kind, rank))
+
+  local hp_points = owned
+    and _coerce_skill_counter(owned.hp_points or _pet_hp_points_from_stat(kind, owned.stat_hp))
+    or _coerce_skill_counter(_pet_hp_points_from_stat(kind, hp))
+
+  local total_skill_points = _pet_total_skill_points_from_xp(xp)
+  local spent_skill_points = attack_points + hp_points
+  local available_skill_points = math.max(0, total_skill_points - spent_skill_points)
+
+  return {
+    uid = uid,
+    kind = kind,
+    base_name = base_name,
+    nickname = nickname,
+    display_name = display_name,
+    mood = mood,
+    can_fight = can_fight,
+    hp = hp,
+    xp = xp,
+    fatigue = math.max(0, math.floor(tonumber(fatigue) or 0)),
+    battle_fatigue_progress = battle_fatigue_progress,
+    rank = rank,
+    attack = attack,
+    attack_points = attack_points,
+    hp_points = hp_points,
+    total_skill_points = total_skill_points,
+    spent_skill_points = spent_skill_points,
+    available_skill_points = available_skill_points,
+    xp_to_next_skill_point = _pet_xp_to_next_skill_point(xp),
+    xp_per_skill_point = PET_XP_PER_SKILL_POINT,
+    xp_notifications_enabled = _pet_xp_notifications_enabled_from_pmem(pmem),
+    pet_chip_id = chip_id,
+    pet_chip_amount = chip_amount,
+    enemy_name = tostring(armed.enemy_name or (battle_def and battle_def.enemy_name) or ""),
+    bucket_area_id = tostring(armed.bucket_area_id or ""),
+    summoned = armed.summoned == true,
+  }
+end
+
+function pets.set_pet_xp_notifications_enabled(owner_or_pid, enabled)
+  local secret = _resolve_pet_owner_secret(owner_or_pid)
+  if secret == "" then
+    return false, false
+  end
+
+  local pmem = _safe_get_player_memory(secret)
+  if type(pmem) ~= "table" then
+    return false, false
+  end
+
+  pmem[PLAYER_PET_XP_NOTIFY_KEY] = enabled == true
+  _safe_save_player_memory(secret, pmem)
+
+  return true, pmem[PLAYER_PET_XP_NOTIFY_KEY]
+end
+
+function pets.award_owned_pet_xp(owner_or_pid, uid, amount)
+  local secret = _resolve_pet_owner_secret(owner_or_pid)
+  return _award_owned_pet_xp_for_secret(secret, uid, amount)
+end
+
+function pets.award_armed_pet_battle_xp(pid, amount, expected_uid)
+  local secret = helpers.get_safe_player_secret(pid)
+  if not secret or secret == "" then
+    return false, 0, 0, 0, "neutral"
+  end
+
+  amount = math.max(0, math.floor(tonumber(amount) or 0))
+  if amount <= 0 then
+    return false, 0, 0, 0, "neutral"
+  end
+
+  local pmem = _safe_get_player_memory(secret)
+  if type(pmem) ~= "table" then
+    return false, 0, 0, 0, "neutral"
+  end
+
+  local armed = pmem[PLAYER_ARMED_PET_KEY]
+  if type(armed) ~= "table" then
+    return false, 0, 0, 0, "neutral"
+  end
+
+  local kind = tostring(armed.kind or ""):lower()
+  if kind == "" or not BATTLE_PETS[kind] or tostring(armed.enemy_name or "") == "" then
+    return false, 0, 0, 0, "neutral"
+  end
+
+  local uid = tostring(armed.uid or "")
+  if uid == "" then
+    return false, 0, 0, 0, "neutral"
+  end
+
+  expected_uid = tostring(expected_uid or "")
+  if expected_uid ~= "" and expected_uid ~= uid then
+    return false, 0, 0, 0, "neutral"
+  end
+
+  local store = pmem[OWNED_PETS_MEM_KEY]
+  if type(store) ~= "table" or type(store.pets) ~= "table" then
+    return false, 0, 0, 0, "neutral"
+  end
+
+  local p = _normalize_owned_pet(store.pets[uid])
+  if type(p) ~= "table" then
+    return false, 0, 0, 0, "neutral"
+  end
+
+  local mood = _pet_mood_from_fatigue(p.fatigue)
+  local effective_amount = amount
+
+  if amount > 0 then
+    effective_amount = math.max(0, amount + _pet_mood_xp_delta(mood))
+  end
+
+  if effective_amount <= 0 then
+    return true, math.max(0, math.floor(tonumber(p.xp) or 0)), 0, 0, mood
+  end
+
+  local notify = _pet_xp_notifications_enabled_from_pmem(pmem)
+  local old_total = _pet_total_skill_points_from_xp(p.xp)
+
+  p.xp = math.max(0, math.floor(tonumber(p.xp or 0) or 0) + effective_amount)
+
+  local new_total = _pet_total_skill_points_from_xp(p.xp)
+  local skill_gained = math.max(0, new_total - old_total)
+
+  store.pets[uid] = p
+  pmem[OWNED_PETS_MEM_KEY] = store
+  _safe_save_player_memory(secret, pmem)
+  _sync_live_companion_from_owned(p)
+
+  if notify and Net and Net.message_player then
+    local msg = ("Your pet gained %d XP."):format(effective_amount)
+    if skill_gained > 0 then
+      msg = msg .. (" %d skill point%s available."):format(skill_gained, skill_gained == 1 and "" or "s")
+    end
+    pcall(Net.message_player, pid, msg)
+  end
+
+  return true, p.xp, skill_gained, effective_amount, mood
+end
+
+function pets.register_armed_pet_battle_completion(pid, expected_uid)
+  local secret = helpers.get_safe_player_secret(pid)
+  if not secret or secret == "" then
+    return false, 0, 0, 0, "neutral"
+  end
+
+  local pmem = _safe_get_player_memory(secret)
+  if type(pmem) ~= "table" then
+    return false, 0, 0, 0, "neutral"
+  end
+
+  local armed = pmem[PLAYER_ARMED_PET_KEY]
+  if type(armed) ~= "table" then
+    return false, 0, 0, 0, "neutral"
+  end
+
+  local kind = tostring(armed.kind or ""):lower()
+  if kind == "" or not BATTLE_PETS[kind] or tostring(armed.enemy_name or "") == "" then
+    return false, 0, 0, 0, "neutral"
+  end
+
+  local uid = tostring(armed.uid or "")
+  if uid == "" then
+    return false, 0, 0, 0, "neutral"
+  end
+
+  expected_uid = tostring(expected_uid or "")
+  if expected_uid ~= "" and expected_uid ~= uid then
+    return false, 0, 0, 0, "neutral"
+  end
+
+  local store = pmem[OWNED_PETS_MEM_KEY]
+  if type(store) ~= "table" or type(store.pets) ~= "table" then
+    return false, 0, 0, 0, "neutral"
+  end
+
+  local p = _normalize_owned_pet(store.pets[uid])
+  if type(p) ~= "table" then
+    return false, 0, 0, 0, "neutral"
+  end
+
+  p.battle_fatigue_progress = math.max(0, math.floor(tonumber(p.battle_fatigue_progress) or 0)) + 1
+
+  local fatigue_added = 0
+  while p.battle_fatigue_progress >= PET_BATTLES_PER_FATIGUE do
+    p.battle_fatigue_progress = p.battle_fatigue_progress - PET_BATTLES_PER_FATIGUE
+    p.fatigue = math.max(0, math.floor(tonumber(p.fatigue or 0) or 0) + 1)
+    fatigue_added = fatigue_added + 1
+  end
+
+  store.pets[uid] = p
+  pmem[OWNED_PETS_MEM_KEY] = store
+  _safe_save_player_memory(secret, pmem)
+  _sync_live_companion_from_owned(p)
+
+  return true, p.battle_fatigue_progress, fatigue_added, p.fatigue, _pet_mood_from_fatigue(p.fatigue)
+end
+
+function pets.feed_armed_pet(pid)
+  local secret = helpers.get_safe_player_secret(pid)
+  if not secret or secret == "" then
+    return false, "Pet owner not found."
+  end
+
+  local pmem = _safe_get_player_memory(secret)
+  if type(pmem) ~= "table" then
+    return false, "Pet memory isn't ready yet."
+  end
+
+  local armed = pmem[PLAYER_ARMED_PET_KEY]
+  if type(armed) ~= "table" then
+    return false, "No companion pet selected."
+  end
+
+  local uid = tostring(armed.uid or "")
+  if uid == "" then
+    return false, "Missing pet id."
+  end
+
+  local store = pmem[OWNED_PETS_MEM_KEY]
+  if type(store) ~= "table" or type(store.pets) ~= "table" then
+    return false, "Pet data wasn't found."
+  end
+
+  local p = _normalize_owned_pet(store.pets[uid])
+  if type(p) ~= "table" then
+    return false, "Pet not found."
+  end
+
+  local mood = _pet_mood_from_fatigue(p.fatigue)
+  if mood == "happy" then
+    return false, "Your pet is already happy."
+  end
+
+  if not ezmemory.spend_player_fragments then
+    return false, "Fragments support isn't installed in ezmemory yet."
+  end
+
+  local cost = tonumber(EXPEDITION.feed_frag_cost) or 1
+  if not ezmemory.spend_player_fragments(pid, cost) then
+    return false, "Not enough BugFrags."
+  end
+
+  p.fatigue = select(1, _feed_like_fatigue_relief(p.fatigue))
+  store.pets[uid] = p
+  pmem[OWNED_PETS_MEM_KEY] = store
+  _safe_save_player_memory(secret, pmem)
+  _sync_live_companion_from_owned(p)
+
+  return true, "You fed your virus. It seems happier."
+end
+
+function pets.relieve_pet_fatigue_from_petting(pid, uid, owner_secret)
+  local actor_secret = helpers.get_safe_player_secret(pid)
+  owner_secret = tostring(owner_secret or "")
+  uid = tostring(uid or "")
+
+  if actor_secret == "" or owner_secret == "" or uid == "" then
+    return false, false, 0, "neutral"
+  end
+
+  if actor_secret == owner_secret then
+    return true, false, 0, "neutral"
+  end
+
+  local store, pmem = _get_player_pets_store(owner_secret)
+  if not store or type(pmem) ~= "table" then
+    return false, false, 0, "neutral"
+  end
+
+  local p = _normalize_owned_pet(store.pets[uid])
+  if type(p) ~= "table" then
+    return false, false, 0, "neutral"
+  end
+
+  local old_fatigue = math.max(0, math.floor(tonumber(p.fatigue) or 0))
+  p.fatigue = math.max(0, old_fatigue - 1)
+
+  store.pets[uid] = p
+  pmem[OWNED_PETS_MEM_KEY] = store
+  _safe_save_player_memory(owner_secret, pmem)
+  _sync_live_companion_from_owned(p)
+
+  return true, p.fatigue < old_fatigue, p.fatigue, _pet_mood_from_fatigue(p.fatigue)
+end
+
+function pets.consume_armed_pet_battle_chip(pid, expected_uid)
+  local secret = helpers.get_safe_player_secret(pid)
+  if not secret or secret == "" then
+    return false, "no_owner"
+  end
+
+  local pmem = _safe_get_player_memory(secret)
+  if type(pmem) ~= "table" then
+    return false, "no_memory"
+  end
+
+  local armed = pmem[PLAYER_ARMED_PET_KEY]
+  if type(armed) ~= "table" then
+    return false, "no_armed_pet"
+  end
+
+  local uid = tostring(armed.uid or "")
+  if uid == "" then
+    return false, "no_uid"
+  end
+
+  expected_uid = tostring(expected_uid or "")
+  if expected_uid ~= "" and expected_uid ~= uid then
+    return false, "uid_mismatch"
+  end
+
+  local kind = tostring(armed.kind or ""):lower()
+  if kind == "" or not BATTLE_PETS[kind] or tostring(armed.enemy_name or "") == "" then
+    return false, "not_battle_pet"
+  end
+
+  local chip_id = tonumber(armed.pet_chip_id)
+  if not chip_id or chip_id < 1 then
+    return false, "no_chip"
+  end
+
+  local item_name = _pet_chip_item_name(chip_id)
+  if not item_name or item_name == "" then
+    return false, "bad_chip_item"
+  end
+
+  local have_qty = tonumber(ezmemory.count_player_item(pid, item_name) or 0) or 0
+  if have_qty < 1 then
+    pcall(pets.unequip_chip_from_pet, pid, uid)
+    return false, "out_of_stock"
+  end
+
+  local ok_remove, remaining = pcall(ezmemory.remove_player_item, pid, item_name, 1)
+  if not ok_remove then
+    return false, "remove_failed"
+  end
+
+  remaining = tonumber(remaining or 0) or 0
+  if remaining < 1 then
+    pcall(pets.unequip_chip_from_pet, pid, uid)
+  end
+
+  return true, chip_id, remaining
+end
+
+function pets.grant_owned_pet(owner_or_pid, item_id, qty)
+  local owner_secret = _resolve_pet_owner_secret(owner_or_pid)
+  if owner_secret == "" then return {} end
+
+  item_id = tostring(item_id or "")
+  if item_id:sub(1, 4) ~= "pet_" then return {} end
+
+  local kind = item_id:gsub("^pet_", ""):lower()
+  local store = select(1, _get_player_pets_store(owner_secret))
+  local created = {}
+
+  qty = math.max(1, math.floor(tonumber(qty) or 1))
+  for _ = 1, qty do
+    local uid = _alloc_owned_pet_uid(owner_secret)
+    local p = _normalize_owned_pet({
+      uid = uid,
+      kind = kind,
+      item_id = item_id,
+    })
+    store.pets[uid] = p
+    created[#created + 1] = p
+  end
+
+  ezmemory.save_player_memory(owner_secret)
+  return created
+end
+
 local function build_paths(kind)
   local def = PET_DEFS[kind]
   if not def then return nil end
@@ -267,7 +1483,7 @@ local function load_pet_list(bucket_area_id, oncehub_key)
   return t, mem
 end
 
-local function save_bucket(bucket_area_id)
+function save_bucket(bucket_area_id)
   pcall(function() ezmemory.save_area_memory(bucket_area_id) end)
 end
 
@@ -366,6 +1582,15 @@ local function normalize_entry(e, bucket_area_id, oncehub_key)
 
   e.cooldown_ends_at = math.floor(tonumber(e.cooldown_ends_at) or 0)
 
+  e.level = math.max(1, math.floor(tonumber(e.level) or _default_pet_level()))
+  e.stat_hp = math.max(1, math.floor(tonumber(e.stat_hp) or _default_pet_hp(e.kind)))
+  e.stat_attack = math.max(1, math.floor(tonumber(e.stat_attack) or _default_pet_attack(e.kind)))
+  e.xp = math.max(0, math.floor(tonumber(e.xp) or _default_pet_xp()))
+  e.battle_fatigue_progress = math.max(0, math.floor(tonumber(e.battle_fatigue_progress) or 0))
+  e.attack_points = _coerce_skill_counter(e.attack_points or _pet_attack_points_from_stat(e.kind, e.stat_attack))
+  e.hp_points     = _coerce_skill_counter(e.hp_points or _pet_hp_points_from_stat(e.kind, e.stat_hp))
+  e.nickname = tostring(e.nickname or "")
+
   -- Home position (where it must return)
   e.home_area_id = e.home_area_id or e.area_id
   e.home_x = e.home_x or e.x
@@ -389,18 +1614,17 @@ local function normalize_entry(e, bucket_area_id, oncehub_key)
   if type(e.exp.dest) ~= "table" then e.exp.dest = nil end
   if type(e.exp.reward) ~= "table" then e.exp.reward = nil end
   e.exp.reward_pending = e.exp.reward_pending and true or false
+  e.exp.xp_reward = math.max(0, math.floor(tonumber(e.exp.xp_reward) or 0))
+  e.exp.skill_points_gained = math.max(0, math.floor(tonumber(e.exp.skill_points_gained) or 0))
 
+  -- If true, pet is currently "with" a player and should not spawn in overworld
+  e.with_owner = e.with_owner and true or false
+  _attach_owned_pet_to_entry(e, bucket_area_id, oncehub_key)
   return e
 end
 
 local function mood_from_fatigue(fatigue)
-  fatigue = tonumber(fatigue) or 0
-  if fatigue >= EXPEDITION.neutral_to_sad then
-    return "sad"
-  elseif fatigue >= EXPEDITION.happy_to_neutral then
-    return "neutral"
-  end
-  return "happy"
+  return _pet_mood_from_fatigue(fatigue)
 end
 
 -- ====================== Nickname + "Pet it" lines ======================
@@ -506,6 +1730,7 @@ local records = {}
 local by_area = {}
 -- bot_id(string) -> uid
 local bot_to_uid = {}
+companion_live_entries = {} -- uid -> live entry for summoned companion pets
 
 local world_time = 0
 local next_area_scan_time = 0
@@ -739,6 +1964,178 @@ local function find_entry(bucket_area_id, uid)
   return nil
 end
 
+local function return_armed_pet_for_replacement(secret)
+  if not secret or secret == "" then return false end
+
+  local pmem = _safe_get_player_memory(secret)
+  if type(pmem) ~= "table" then
+    return false
+  end
+
+  local armed = pmem and pmem[PLAYER_ARMED_PET_KEY]
+  if type(armed) ~= "table" then
+    return true
+  end
+
+  local uid = tostring(armed.uid or "")
+  local bucket_area_id = tostring(armed.bucket_area_id or "")
+
+  -- Always clear any live summoned runtime first.
+  if uid ~= "" then
+    _clear_companion_runtime(uid, false)
+  end
+
+  -- Inventory-only pet: just clear the armed state.
+  if uid == "" or bucket_area_id == "" then
+    pmem[PLAYER_ARMED_PET_KEY] = nil
+    _safe_save_player_memory(secret, pmem)
+    return true
+  end
+
+  -- HP-based pet: return it home and respawn it at the HP.
+  local e = find_entry(bucket_area_id, uid)
+  if e then
+    e.companion_summoned = nil
+    e.with_owner = false
+    e.area_id = e.home_area_id
+    e.x, e.y, e.z = e.home_x, e.home_y, e.home_z or 0
+    e.bot_id = nil
+
+    local spawn_rec = {
+      uid = uid,
+      kind = tostring(e.kind or ""):lower(),
+      area_id = e.area_id,
+      x = e.x, y = e.y, z = e.z or 0,
+      direction = "Down Left",
+      next_move_time = world_time + 1.0,
+      blocked_for = 0,
+      owner_secret = e.owner_secret,
+      owner_name = e.owner_name,
+    }
+
+    local bot_id = spawn_pet_bot(spawn_rec)
+    if bot_id then
+      spawn_rec.bot_id = bot_id
+      index_record(spawn_rec)
+      e.bot_id = bot_id
+    end
+
+    save_bucket(bucket_area_id)
+  end
+
+  pmem[PLAYER_ARMED_PET_KEY] = nil
+  _safe_save_player_memory(secret, pmem)
+  return true
+end
+
+local function _entry_display_name(e)
+  local kind = tostring(e and e.kind or "mettaur"):lower()
+  local def = PET_DEFS[kind] or {}
+  local base = tostring(def.name or kind:gsub("^%l", string.upper))
+
+  local nick = _sanitize_nickname(e and e.nickname or "")
+  if e and nick ~= tostring(e.nickname or "") then
+    e.nickname = nick
+  end
+
+  return (nick ~= "" and nick) or base
+end
+
+function _clear_companion_runtime(uid, warp_out)
+  uid = tostring(uid or "")
+  if uid == "" then return end
+
+  local rec = records[uid]
+  if rec then
+    rec.companion_summoned = nil
+    despawn_pet_bot(rec, warp_out == true)
+    unindex_record(rec)
+  end
+
+  local live = companion_live_entries[uid]
+  if live then
+    live.bot_id = nil
+    live.companion_summoned = nil
+  end
+
+  companion_live_entries[uid] = nil
+end
+
+local function _entry_display_name(e)
+  local kind = tostring(e and e.kind or "mettaur"):lower()
+  local def = PET_DEFS[kind] or {}
+  local base = tostring(def.name or kind:gsub("^%l", string.upper))
+
+  local nick = _sanitize_nickname(e and e.nickname or "")
+  if e and nick ~= tostring(e.nickname or "") then
+    e.nickname = nick
+  end
+
+  return (nick ~= "" and nick) or base
+end
+
+local function _companion_owner_name(pid, secret)
+  local name = ""
+
+  if pid and Net.get_player_name then
+    local ok, result = pcall(Net.get_player_name, pid)
+    if ok and result and result ~= "" then
+      name = tostring(result)
+    end
+  end
+
+  if name == "" then
+    name = tostring(_owner_name_from_secret(secret) or "")
+  end
+
+  return name
+end
+
+local function _get_companion_spawn_target(pid)
+  local area_id = Net.get_player_area(pid)
+  local pos = Net.get_player_position(pid) or { x = 0, y = 0, z = 0 }
+  local dir = tostring(Net.get_player_direction(pid) or "Down Left")
+
+  local px = nearest_tile(pos.x or pos[1] or 0)
+  local py = nearest_tile(pos.y or pos[2] or 0)
+  local pz = tonumber(pos.z or pos[3] or 0) or 0
+
+  local dx, dy = dir_to_vec(dir)
+
+  local tries = {
+    { x = px + dx, y = py + dy, dir = dir },
+    { x = px - dx, y = py - dy, dir = dir },
+  }
+
+  for _, alt in ipairs(CONFIG.directions or {}) do
+    local ax, ay = dir_to_vec(alt)
+    tries[#tries + 1] = { x = px + ax, y = py + ay, dir = alt }
+  end
+
+  for _, t in ipairs(tries) do
+    if not blocked(area_id, t.x, t.y, pz, CONFIG.size) then
+      return area_id, t.x, t.y, pz, t.dir
+    end
+  end
+
+  return area_id, px, py, pz, dir
+end
+
+local function clear_armed_pet_for_player(pid)
+  local secret = helpers.get_safe_player_secret(pid)
+  if not secret or secret == "" then return end
+  return_armed_pet_for_replacement(secret)
+end
+
+local function _on_disconnect_or_join(event)
+  local pid = (type(event) == "table") and event.player_id or event
+  if pid then clear_armed_pet_for_player(pid) end
+end
+
+Net:on("player_disconnect", _on_disconnect_or_join)
+Net:on("handle_player_disconnect", _on_disconnect_or_join)
+Net:on("handle_player_join", _on_disconnect_or_join) -- cleanup if server crashed while armed
+
 local function update_entry_runtime_fields(e, rec)
   if not e or not rec then return end
   e.area_id = rec.area_id
@@ -750,7 +2147,7 @@ end
 
 local function _owner_name_from_secret(secret)
   if not secret or secret == "" then return "" end
-  local pm = ezmemory.get_player_memory(secret)
+  local pm = _safe_get_player_memory(secret)
   local n = (pm and (pm.last_name or (pm.teams and pm.teams.last_name))) or nil
   if n and n ~= "" then return n end
   return ""
@@ -942,7 +2339,7 @@ end
 
 local function owner_on_team(pid)
   local secret = helpers.get_safe_player_secret(pid)
-  local pm = ezmemory.get_player_memory(secret) or {}
+  local pm = _safe_get_player_memory(secret) or {}
   local cur = pm.teams and pm.teams.current
   return (cur and cur.team) ~= nil
 end
@@ -983,6 +2380,20 @@ end
   -- If reward is gp but owner is offline, we still store gp and fallback on claim if needed.
   e.exp.reward = reward
   e.exp.reward_pending = true
+  e.exp.xp_reward = 0
+  e.exp.skill_points_gained = 0
+
+  local xp_ok, new_xp, skill_gained = _award_owned_pet_xp_for_secret(
+    tostring(e.owner_secret or ""),
+    tostring(e.uid or ""),
+    PET_EXPEDITION_XP
+  )
+
+  if xp_ok then
+    e.xp = new_xp
+    e.exp.xp_reward = PET_EXPEDITION_XP
+    e.exp.skill_points_gained = math.max(0, tonumber(skill_gained) or 0)
+  end
 
   -- End expedition, return to home position
   e.exp.active = false
@@ -1077,7 +2488,7 @@ local function start_expedition_for_player(pid, e, bucket_area_id)
 
   -- Fatigue increases when you send it out
   e.fatigue = math.max(0, math.floor(tonumber(e.fatigue) or 0) + 1)
-  _set_saved_fatigue(bucket_area_id, e.owner_secret, e.kind, e.fatigue)
+  _save_owned_pet_from_entry(e, false)
 
   -- Mark expedition
   e.exp.active = true
@@ -1088,6 +2499,8 @@ local function start_expedition_for_player(pid, e, bucket_area_id)
   e.exp.lease_expires_at = tonumber(expires_at or 0) or 0
   e.exp.reward = nil
   e.exp.reward_pending = false
+  e.exp.xp_reward = 0
+  e.exp.skill_points_gained = 0
 
   dbg("Starting expedition uid=", e.uid, "owner=", e.owner_name, "dest=", dest.area_id, dest.x, dest.y, dest.z or 0)
 
@@ -1138,6 +2551,757 @@ local function start_expedition_for_player(pid, e, bucket_area_id)
   return true, ("Sent out for %d minute%s."):format(mins, mins == 1 and "" or "s", mood_snapshot)
 end
 
+function clamp_pet_battle_rank(rank)
+  rank = math.floor(tonumber(rank) or 1)
+  if rank < 1 then rank = 1 end
+  if rank > 20 then rank = 20 end
+  return rank
+end
+
+-- Arm a pet so it joins the owner's battles (despawns from overworld; cleared on disconnect)
+local function take_pet_with_you(pid, e, bucket_area_id, allow_replace, skip_home_area_check)
+  local secret = helpers.get_safe_player_secret(pid)
+  if secret ~= (e.owner_secret or "") then
+    return false, "Only the owner can take this pet with them."
+  end
+
+  local kind = tostring(e.kind or ""):lower()
+  local battle_def = BATTLE_PETS[kind]
+
+  -- Keep the HP-side restriction unless explicitly bypassed
+  if not skip_home_area_check then
+    local cur_area = Net.get_player_area(pid)
+    if tostring(cur_area or "") ~= tostring(e.home_area_id or "") then
+      return false, "This pet can only be taken from its home HP."
+    end
+  end
+
+  -- Only 1 pet armed at a time, unless we're explicitly replacing it
+  local pmem = _safe_get_player_memory(secret)
+  if type(pmem) ~= "table" then
+    return false, "Pet memory isn't ready yet."
+  end
+
+  if pmem[PLAYER_ARMED_PET_KEY] then
+    if not allow_replace then
+      return false, "You already have a pet with you."
+    end
+
+    local ok = return_armed_pet_for_replacement(secret)
+    if not ok then
+      return false, "Couldn't return your current pet."
+    end
+
+    pmem = _safe_get_player_memory(secret)
+    if type(pmem) ~= "table" then
+      return false, "Pet memory isn't ready yet."
+    end
+  end
+
+  -- Despawn + unindex current runtime record
+  local uid = tostring(e.uid)
+  local rec = records[uid]
+  if rec then
+    despawn_pet_bot(rec, true)
+    unindex_record(rec)
+  else
+    if e.bot_id and Net.is_bot(e.bot_id) then
+      pcall(Net.remove_bot, e.bot_id, true)
+      bot_to_uid[tostring(e.bot_id)] = nil
+    end
+  end
+
+  e.bot_id = nil
+  e.with_owner = true
+
+  local owned = _get_owned_pet(secret, uid)
+
+  local equipped_chip_id = nil
+  local equipped_chip_amount = 1
+
+  if battle_def then
+    equipped_chip_id = tonumber(
+      (owned and owned.pet_chip_id)
+      or e.pet_chip_id
+      or battle_def.test_pet_chip_id
+      or nil
+    )
+
+    equipped_chip_amount = math.max(1, math.floor(tonumber(
+      (owned and owned.pet_chip_amount)
+      or e.pet_chip_amount
+      or battle_def.test_pet_chip_amount
+      or 1
+    ) or 1))
+  end
+
+  pmem[PLAYER_ARMED_PET_KEY] = {
+    uid = uid,
+    kind = kind,
+    enemy_name = tostring((battle_def and battle_def.enemy_name) or ""),
+    rank = clamp_pet_battle_rank((owned and owned.stat_attack) or e.stat_attack or (battle_def and battle_def.rank) or 1),
+    starting_hp = math.max(1, math.floor(tonumber(e.stat_hp or (battle_def and battle_def.default_starting_hp) or 40) or 40)),
+    pet_chip_id = equipped_chip_id,
+    pet_chip_amount = equipped_chip_amount,
+    bucket_area_id = tostring(bucket_area_id or ""),
+    source = "hp",
+    summoned = false,
+    summoned_area_id = "",
+  }
+
+  print("[PET ARM SAVE]",
+    tostring(pmem[PLAYER_ARMED_PET_KEY].enemy_name or ""),
+    "hp=" .. tostring(pmem[PLAYER_ARMED_PET_KEY].starting_hp),
+    "chip=" .. tostring(pmem[PLAYER_ARMED_PET_KEY].pet_chip_id or 0)
+  )
+
+  _safe_save_player_memory(secret, pmem)
+  save_bucket(bucket_area_id)
+
+  return true, "Companion pet selected."
+end
+
+local function _companion_base_name(kind)
+  kind = tostring(kind or "mettaur"):lower()
+  local def = PET_DEFS[kind] or {}
+  return tostring(def.name or kind:gsub("^%l", string.upper))
+end
+
+function pets.list_companion_candidates(owner_or_pid)
+  local owner_secret = _resolve_pet_owner_secret(owner_or_pid)
+  if owner_secret == "" then
+    return {}
+  end
+
+  pets.ensure_player_pet_ids(owner_secret)
+
+  local owned = pets.list_owned_pets(owner_secret)
+  local out = {}
+
+  for _, p in ipairs(owned) do
+    local base_name = _companion_base_name(p.kind)
+    local nickname = tostring(p.nickname or "")
+    local display_name = (nickname ~= "" and nickname) or base_name
+
+    local on_expedition = false
+
+    if type(p.placement) == "table" then
+      local bucket_area_id = tostring(p.placement.bucket_area_id or "")
+      if bucket_area_id ~= "" then
+        local e = find_entry(bucket_area_id, p.uid)
+        if e and expedition_active(e) then
+          on_expedition = true
+        end
+      end
+    end
+
+    if not on_expedition then
+      out[#out + 1] = {
+        uid = tostring(p.uid or ""),
+        kind = tostring(p.kind or "mettaur"),
+        base_name = base_name,
+        nickname = nickname,
+        display_name = display_name,
+        mood = tostring(p.mood or "neutral"),
+        placed = p.placed == true,
+        placement = p.placement,
+        can_fight = BATTLE_PETS[tostring(p.kind or ""):lower()] ~= nil,
+      }
+    end
+  end
+
+  table.sort(out, function(a, b)
+    local an = tostring(a.display_name or a.base_name or a.kind or ""):lower()
+    local bn = tostring(b.display_name or b.base_name or b.kind or ""):lower()
+    if an == bn then
+      return tostring(a.uid or "") < tostring(b.uid or "")
+    end
+    return an < bn
+  end)
+
+  return out
+end
+
+function pets.arm_owned_pet(pid, uid, allow_replace)
+  local secret = helpers.get_safe_player_secret(pid)
+  if not secret or secret == "" then
+    return false, "Pet owner not found."
+  end
+
+  uid = tostring(uid or "")
+  if uid == "" then
+    return false, "Missing pet id."
+  end
+
+  pets.ensure_player_pet_ids(secret)
+
+  local owned = _get_owned_pet(secret, uid)
+  if not owned then
+    return false, "Pet not found."
+  end
+
+  -- If the pet is currently placed in an HP, use the real live entry so it gets
+  -- despawned from the HP correctly and can later return there.
+  if type(owned.placement) == "table" then
+    local bucket_area_id = tostring(owned.placement.bucket_area_id or "")
+    if bucket_area_id ~= "" then
+      local e = find_entry(bucket_area_id, uid)
+      if e then
+        if expedition_active(e) then
+          local left = expedition_left(e)
+          local where = (e.exp and e.exp.dest and e.exp.dest.label)
+                     or (e.exp and e.exp.dest and e.exp.dest.area_id)
+                     or "somewhere"
+          return false, ("That pet is on an expedition (%s). Returns in %s."):format(tostring(where), _fmt_time_left(left))
+        end
+
+        return take_pet_with_you(pid, e, bucket_area_id, allow_replace, true)
+      end
+    end
+  end
+
+  -- Inventory-only pet
+  local pmem = _safe_get_player_memory(secret)
+  if type(pmem) ~= "table" then
+    return false, "Pet memory isn't ready yet."
+  end
+
+  local kind = tostring(owned.kind or "mettaur"):lower()
+  local battle_def = BATTLE_PETS[kind]
+
+  local equipped_chip_id = nil
+  local equipped_chip_amount = 1
+
+  if battle_def then
+    equipped_chip_id = tonumber(owned.pet_chip_id or battle_def.test_pet_chip_id or nil)
+    equipped_chip_amount = math.max(1, math.floor(tonumber(
+      owned.pet_chip_amount or battle_def.test_pet_chip_amount or 1
+    ) or 1))
+  end
+
+  if pmem[PLAYER_ARMED_PET_KEY] then
+    if not allow_replace then
+      return false, "You already have a pet with you."
+    end
+
+    local ok = return_armed_pet_for_replacement(secret)
+    if not ok then
+      return false, "Couldn't return your current pet."
+    end
+
+    pmem = _safe_get_player_memory(secret)
+    if type(pmem) ~= "table" then
+      return false, "Pet memory isn't ready yet."
+    end
+  end
+
+  pmem[PLAYER_ARMED_PET_KEY] = {
+    uid = uid,
+    kind = kind,
+    enemy_name = tostring((battle_def and battle_def.enemy_name) or ""),
+    rank = clamp_pet_battle_rank(owned.stat_attack or (battle_def and battle_def.rank) or 1),
+    starting_hp = math.max(1, math.floor(tonumber(owned.stat_hp or (battle_def and battle_def.default_starting_hp) or 40) or 40)),
+    pet_chip_id = equipped_chip_id,
+    pet_chip_amount = equipped_chip_amount,
+    bucket_area_id = "",
+    source = "inventory",
+    summoned = false,
+    summoned_area_id = "",
+  }
+
+  _safe_save_player_memory(secret, pmem)
+  return true, "Companion pet selected."
+end
+
+function pets.invest_armed_pet_stat(pid, stat_name)
+  local secret = helpers.get_safe_player_secret(pid)
+  if not secret or secret == "" then
+    return false, "Pet owner not found."
+  end
+
+  local pmem = _safe_get_player_memory(secret)
+  if type(pmem) ~= "table" then
+    return false, "Pet memory isn't ready yet."
+  end
+
+  local armed = pmem[PLAYER_ARMED_PET_KEY]
+  if type(armed) ~= "table" then
+    return false, "No companion pet selected."
+  end
+
+  local uid = tostring(armed.uid or "")
+  if uid == "" then
+    return false, "Missing pet id."
+  end
+
+  local store = pmem[OWNED_PETS_MEM_KEY]
+  if type(store) ~= "table" or type(store.pets) ~= "table" then
+    return false, "Pet data wasn't found."
+  end
+
+  local p = _normalize_owned_pet(store.pets[uid])
+  if type(p) ~= "table" then
+    return false, "Pet not found."
+  end
+
+  p.attack_points = _coerce_skill_counter(p.attack_points or _pet_attack_points_from_stat(p.kind, p.stat_attack))
+  p.hp_points     = _coerce_skill_counter(p.hp_points or _pet_hp_points_from_stat(p.kind, p.stat_hp))
+
+  local free = _pet_free_skill_points_for_pet(p)
+  if free < 1 then
+    return false, "No skill points available."
+  end
+
+  stat_name = tostring(stat_name or ""):lower()
+
+  if stat_name == "hp" then
+    p.hp_points = p.hp_points + 1
+    p.stat_hp = math.max(1, math.floor(tonumber(p.stat_hp or _default_pet_hp(p.kind)) or _default_pet_hp(p.kind)) + 5)
+
+  elseif stat_name == "attack" then
+    local current_rank = clamp_pet_battle_rank(p.stat_attack or _default_pet_attack(p.kind))
+
+    if current_rank >= 20 then
+      return false, "Attack is already maxed."
+    end
+
+    if current_rank >= 19 and p.hp_points < 19 then
+      return false, "Raise HP 19 times before pushing Attack to Rank 20."
+    end
+
+    if current_rank >= 10 and p.hp_points < 10 then
+      return false, "Raise HP 10 times before pushing Attack past Rank 10."
+    end
+
+    p.attack_points = p.attack_points + 1
+    p.stat_attack = clamp_pet_battle_rank(current_rank + 1)
+
+  else
+    return false, "Unknown stat."
+  end
+
+  store.pets[uid] = p
+  pmem[OWNED_PETS_MEM_KEY] = store
+
+  local battle_def = BATTLE_PETS[tostring(p.kind or ""):lower()]
+  armed.rank = clamp_pet_battle_rank(p.stat_attack)
+  armed.starting_hp = math.max(1, math.floor(tonumber(
+    p.stat_hp
+    or (battle_def and battle_def.default_starting_hp)
+    or _default_pet_hp(p.kind)
+  ) or _default_pet_hp(p.kind)))
+  pmem[PLAYER_ARMED_PET_KEY] = armed
+
+  _safe_save_player_memory(secret, pmem)
+
+  if type(p.placement) == "table" then
+    local bucket_area_id = tostring(p.placement.bucket_area_id or "")
+    if bucket_area_id ~= "" then
+      local e = find_entry(bucket_area_id, uid)
+      if e then
+        e.stat_hp = p.stat_hp
+        e.stat_attack = p.stat_attack
+        e.attack_points = p.attack_points
+        e.hp_points = p.hp_points
+        e.xp = p.xp
+        save_bucket(bucket_area_id)
+      end
+    end
+  end
+
+  local live = companion_live_entries[tostring(uid)]
+  if type(live) == "table" then
+    live.stat_hp = p.stat_hp
+    live.stat_attack = p.stat_attack
+    live.xp = p.xp
+  end
+
+  if stat_name == "hp" then
+    return true, ("HP increased to %d."):format(p.stat_hp)
+  end
+
+  return true, ("Attack increased to %d (Rank %d)."):format(clamp_pet_battle_rank(p.stat_attack) * 5, clamp_pet_battle_rank(p.stat_attack))
+end
+
+function pets.unarm_pet(pid)
+  local secret = helpers.get_safe_player_secret(pid)
+  if not secret or secret == "" then
+    return false, "Pet owner not found."
+  end
+
+  local ok = return_armed_pet_for_replacement(secret)
+  if not ok then
+    return false, "Couldn't unselect your companion pet."
+  end
+
+  return true, "Companion pet unselected."
+end
+
+function pets.ensure_pet_chip_items()
+  for _, def in pairs(PET_CHIPS) do
+    pcall(ezmemory.create_or_update_item, def.item_name, def.description, false)
+  end
+end
+
+function pets.get_pet_chip_name(chip_id)
+  return _pet_chip_name(chip_id)
+end
+
+function pets.list_player_pet_chip_inventory(pid)
+  pets.ensure_pet_chip_items()
+
+  local secret = helpers.get_safe_player_secret(pid)
+  if not secret or secret == "" then
+    return {}
+  end
+
+  local pmem = _safe_get_player_memory(secret)
+  local items = (type(pmem) == "table" and pmem.items) or {}
+  local rows = {}
+
+  for chip_id, def in pairs(PET_CHIPS) do
+    local item_id = ezmemory.get_item_id_by_name(def.item_name)
+    local qty = 0
+
+    if item_id then
+      qty = tonumber(items[item_id] or 0) or 0
+    end
+
+    if qty > 0 then
+      rows[#rows + 1] = {
+        chip_id = tonumber(chip_id),
+        name = def.display_name,
+        item_name = def.item_name,
+        qty = qty,
+      }
+    end
+  end
+
+  table.sort(rows, function(a, b)
+    return tonumber(a.chip_id or 0) < tonumber(b.chip_id or 0)
+  end)
+
+  return rows
+end
+
+function pets.give_player_pet_chip(pid, chip_id, amount)
+  pets.ensure_pet_chip_items()
+
+  local def = _pet_chip_def(chip_id)
+  if not def then
+    return false, "Unknown pet chip."
+  end
+
+  amount = math.max(1, math.floor(tonumber(amount) or 1))
+
+  local ok = pcall(ezmemory.give_player_item, pid, def.item_name, amount)
+  if not ok then
+    return false, "Couldn't give that pet chip."
+  end
+
+  return true, ("Gave %s x%d."):format(def.display_name, amount)
+end
+
+function pets.equip_chip_on_pet(pid, uid, chip_id)
+  local secret = helpers.get_safe_player_secret(pid)
+  if not secret or secret == "" then
+    return false, "Pet owner not found."
+  end
+
+  uid = tostring(uid or "")
+  if uid == "" then
+    return false, "Missing pet id."
+  end
+
+  local chip_def = _pet_chip_def(chip_id)
+  if not chip_def then
+    return false, "Unknown pet chip."
+  end
+
+  local owned = _get_owned_pet(secret, uid)
+  if not owned then
+    return false, "Pet not found."
+  end
+
+  if not BATTLE_PETS[tostring(owned.kind or ""):lower()] then
+    return false, "That pet family doesn't use battle chips."
+  end
+
+  local inventory = pets.list_player_pet_chip_inventory(pid)
+  local have_qty = 0
+  for _, row in ipairs(inventory) do
+    if tonumber(row.chip_id) == tonumber(chip_id) then
+      have_qty = tonumber(row.qty or 0) or 0
+      break
+    end
+  end
+
+  if have_qty < 1 then
+    return false, "You don't own that pet chip."
+  end
+
+  owned.pet_chip_id = tonumber(chip_id)
+  owned.pet_chip_amount = 1
+
+  -- Sync any placed HP entry
+  if type(owned.placement) == "table" then
+    local bucket_area_id = tostring(owned.placement.bucket_area_id or "")
+    if bucket_area_id ~= "" then
+      local e = find_entry(bucket_area_id, uid)
+      if e then
+        e.pet_chip_id = owned.pet_chip_id
+        e.pet_chip_amount = owned.pet_chip_amount
+        save_bucket(bucket_area_id)
+      end
+    end
+  end
+
+  -- Sync active armed state if this pet is currently selected
+  local pmem = _safe_get_player_memory(secret)
+  if type(pmem) == "table" then
+    local armed = pmem[PLAYER_ARMED_PET_KEY]
+    if type(armed) == "table" and tostring(armed.uid or "") == uid then
+      armed.pet_chip_id = owned.pet_chip_id
+      armed.pet_chip_amount = owned.pet_chip_amount
+      pmem[PLAYER_ARMED_PET_KEY] = armed
+    end
+    _safe_save_player_memory(secret, pmem)
+  end
+
+  ezmemory.save_player_memory(secret)
+  return true, ("%s equipped."):format(chip_def.display_name)
+end
+
+function pets.unequip_chip_from_pet(pid, uid)
+  local secret = helpers.get_safe_player_secret(pid)
+  if not secret or secret == "" then
+    return false, "Pet owner not found."
+  end
+
+  uid = tostring(uid or "")
+  if uid == "" then
+    return false, "Missing pet id."
+  end
+
+  local owned = _get_owned_pet(secret, uid)
+  if not owned then
+    return false, "Pet not found."
+  end
+
+  owned.pet_chip_id = nil
+  owned.pet_chip_amount = 1
+
+  -- Sync any placed HP entry
+  if type(owned.placement) == "table" then
+    local bucket_area_id = tostring(owned.placement.bucket_area_id or "")
+    if bucket_area_id ~= "" then
+      local e = find_entry(bucket_area_id, uid)
+      if e then
+        e.pet_chip_id = nil
+        e.pet_chip_amount = 1
+        save_bucket(bucket_area_id)
+      end
+    end
+  end
+
+  -- Sync active armed state if this pet is currently selected
+  local pmem = _safe_get_player_memory(secret)
+  if type(pmem) == "table" then
+    local armed = pmem[PLAYER_ARMED_PET_KEY]
+    if type(armed) == "table" and tostring(armed.uid or "") == uid then
+      armed.pet_chip_id = nil
+      armed.pet_chip_amount = 1
+      pmem[PLAYER_ARMED_PET_KEY] = armed
+    end
+    _safe_save_player_memory(secret, pmem)
+  end
+
+  ezmemory.save_player_memory(secret)
+  return true, "Pet chip unequipped."
+end
+
+function pets.is_companion_summoned(pid)
+  local secret = helpers.get_safe_player_secret(pid)
+  if not secret or secret == "" then
+    return false
+  end
+
+  local pmem = _safe_get_player_memory(secret)
+  local armed = pmem and pmem[PLAYER_ARMED_PET_KEY]
+  return type(armed) == "table" and armed.summoned == true
+end
+
+function pets.call_back_companion(pid)
+  local secret = helpers.get_safe_player_secret(pid)
+  if not secret or secret == "" then
+    return false, "Pet owner not found."
+  end
+
+  local pmem = _safe_get_player_memory(secret)
+  if type(pmem) ~= "table" then
+    return false, "Pet memory isn't ready yet."
+  end
+
+  local armed = pmem[PLAYER_ARMED_PET_KEY]
+  if type(armed) ~= "table" then
+    return false, "No companion pet selected."
+  end
+
+  if armed.summoned ~= true then
+    return false, "Your companion pet isn't summoned."
+  end
+
+  local uid = tostring(armed.uid or "")
+  local bucket_area_id = tostring(armed.bucket_area_id or "")
+
+  _clear_companion_runtime(uid, false)
+
+  if bucket_area_id ~= "" then
+    local e = find_entry(bucket_area_id, uid)
+    if e then
+      e.companion_summoned = nil
+      e.with_owner = true
+      e.area_id = e.home_area_id
+      e.x, e.y, e.z = e.home_x, e.home_y, e.home_z or 0
+      e.bot_id = nil
+      save_bucket(bucket_area_id)
+    end
+  end
+
+  armed.summoned = false
+  armed.summoned_area_id = ""
+  pmem[PLAYER_ARMED_PET_KEY] = armed
+  _safe_save_player_memory(secret, pmem)
+
+  return true, "Companion pet called back."
+end
+
+function pets.summon_companion(pid)
+  local secret = helpers.get_safe_player_secret(pid)
+  if not secret or secret == "" then
+    return false, "Pet owner not found."
+  end
+
+  local pmem = _safe_get_player_memory(secret)
+  if type(pmem) ~= "table" then
+    return false, "Pet memory isn't ready yet."
+  end
+
+  local armed = pmem[PLAYER_ARMED_PET_KEY]
+  if type(armed) ~= "table" then
+    return false, "No companion pet selected."
+  end
+
+  if armed.summoned == true then
+    return false, "Your companion pet is already summoned."
+  end
+
+  local uid = tostring(armed.uid or "")
+  local kind = tostring(armed.kind or "mettaur"):lower()
+  local bucket_area_id = tostring(armed.bucket_area_id or "")
+
+  if uid == "" then
+    return false, "Missing pet id."
+  end
+
+  local area_id, sx, sy, sz, dir = _get_companion_spawn_target(pid)
+  local owner_name = _companion_owner_name(pid, secret)
+
+  _clear_companion_runtime(uid, true)
+
+  local e = nil
+
+  if bucket_area_id ~= "" then
+    e = find_entry(bucket_area_id, uid)
+    if not e then
+      return false, "Couldn't find that companion pet."
+    end
+
+    e.owner_name = owner_name ~= "" and owner_name or e.owner_name
+    e.area_id = area_id
+    e.x, e.y, e.z = sx, sy, sz
+    e.direction = dir
+    e.next_move_time = world_time + 1.0
+    e.blocked_for = 0
+    e.bot_id = nil
+    e.with_owner = false
+    e.companion_summoned = true
+
+    local bot_id = spawn_pet_bot(e)
+    if not bot_id then
+      e.companion_summoned = nil
+      e.with_owner = true
+      return false, "Couldn't summon that companion pet."
+    end
+
+    e.bot_id = bot_id
+    index_record(e)
+    companion_live_entries[uid] = e
+    save_bucket(bucket_area_id)
+  else
+    local owned = _get_owned_pet(secret, uid)
+    if not owned then
+      return false, "Couldn't find that companion pet."
+    end
+
+    e = {
+      uid = uid,
+      kind = kind,
+      level = tonumber(owned.level or 1) or 1,
+      stat_hp = tonumber(owned.stat_hp or 40) or 40,
+      stat_attack = tonumber(owned.stat_attack or 1) or 1,
+      nickname = tostring(owned.nickname or ""),
+      fatigue = tonumber(owned.fatigue or _default_pet_fatigue()) or _default_pet_fatigue(),
+      cooldown_ends_at = 0,
+      owner_secret = secret,
+      owner_name = owner_name,
+      bucket_area_id = "",
+      oncehub_key = "",
+      home_area_id = area_id,
+      home_x = sx,
+      home_y = sy,
+      home_z = sz,
+      area_id = area_id,
+      x = sx, y = sy, z = sz,
+      direction = dir,
+      next_move_time = world_time + 1.0,
+      blocked_for = 0,
+      bot_id = nil,
+      with_owner = false,
+      companion_summoned = true,
+      companion_transient = true,
+      exp = {
+        active = false,
+        started_at = 0,
+        ends_at = 0,
+        mood = "",
+        dest = nil,
+        lease_expires_at = 0,
+        reward = nil,
+        reward_pending = false,
+        xp_reward = 0,
+        skill_points_gained = 0,
+      }
+    }
+
+    local bot_id = spawn_pet_bot(e)
+    if not bot_id then
+      return false, "Couldn't summon that companion pet."
+    end
+
+    e.bot_id = bot_id
+    index_record(e)
+    companion_live_entries[uid] = e
+  end
+
+  armed.summoned = true
+  armed.summoned_area_id = tostring(area_id or "")
+  pmem[PLAYER_ARMED_PET_KEY] = armed
+  _safe_save_player_memory(secret, pmem)
+
+  return true, "Companion pet summoned."
+end
+
 local function feed_pet(pid, e, bucket_area_id)
   local secret = helpers.get_safe_player_secret(pid)
   if secret ~= (e.owner_secret or "") then
@@ -1148,7 +3312,7 @@ local function feed_pet(pid, e, bucket_area_id)
     e.owner_name = Net.get_player_name(pid)
   end
 
-  local mood = mood_from_fatigue(e.fatigue)
+  local mood = _pet_mood_from_fatigue(e.fatigue)
   if mood == "happy" then
     return false, "Your pet is already happy."
   end
@@ -1164,15 +3328,11 @@ local function feed_pet(pid, e, bucket_area_id)
   end
   _dbg_frags(pid, "feed:after_spend")
 
-  -- Replace the "set to threshold-1" logic with:
-  if mood == "sad" then
-    e.fatigue = math.max(0, e.fatigue - (EXPEDITION.neutral_to_sad - EXPEDITION.happy_to_neutral)) -- 20
-  elseif mood == "neutral" then
-    e.fatigue = math.max(0, e.fatigue - EXPEDITION.happy_to_neutral) -- 15
-  end
+  e.fatigue = select(1, _feed_like_fatigue_relief(e.fatigue))
 
-  _set_saved_fatigue(bucket_area_id, e.owner_secret, e.kind, e.fatigue)
+  _save_owned_pet_from_entry(e, false)
   save_bucket(bucket_area_id)
+  _sync_live_companion_from_owned(_get_owned_pet(secret, tostring(e.uid or "")) or {})
   return true, "You fed your virus. It seems happier."
 end
 
@@ -1180,8 +3340,10 @@ end
 function pets.list_pets(bucket_area_id, oncehub_key)
   local list = load_pet_list(bucket_area_id, oncehub_key)
   local out = {}
+
   for i, e in ipairs(list) do
     normalize_entry(e, bucket_area_id, oncehub_key)
+
     out[i] = {
       uid = e.uid,
       kind = e.kind,
@@ -1189,47 +3351,53 @@ function pets.list_pets(bucket_area_id, oncehub_key)
       x = e.x, y = e.y, z = e.z,
       mood = mood_from_fatigue(e.fatigue),
       fatigue = e.fatigue,
+      level = e.level,
+      stat_hp = e.stat_hp,
+      stat_attack = e.stat_attack,
+      nickname = tostring(e.nickname or ""),
       bot_id = e.bot_id,
       expedition_active = expedition_active(e),
       cooldown_ends_at = e.cooldown_ends_at,
     }
   end
+
   return out
 end
 
-function pets.summon_pet(area_id, bucket_area_id, oncehub_key, kind, x, y, z, owner_secret)
+function pets.summon_pet(area_id, bucket_area_id, oncehub_key, kind, x, y, z, owner_secret, preferred_uid)
   kind = tostring(kind or "mettaur"):lower()
   if kind == "" then kind = "mettaur" end
 
+  owner_secret = tostring(owner_secret or "")
+  if owner_secret == "" then
+    return nil, "missing_owner"
+  end
+
+  pets.ensure_player_pet_ids(owner_secret)
+
+  local owned = _find_first_unplaced_owned_pet(owner_secret, kind, preferred_uid)
+  if not owned then
+    return nil, "no_available_pet"
+  end
+
   local list = load_pet_list(bucket_area_id, oncehub_key)
-  local uid = alloc_uid()
-
-  local owner_name = ""
-  if owner_secret and owner_secret ~= "" then
-    owner_name = _owner_name_from_secret(owner_secret)
-  end
-
-  local saved_fatigue = _get_saved_fatigue(bucket_area_id, owner_secret, kind)
-  if saved_fatigue == nil then
-    fatigue = math.max(0, math.floor(tonumber(EXPEDITION.happy_to_neutral) or 15))
-  else
-    fatigue = math.max(0, math.floor(tonumber(saved_fatigue) or 0))
-  end
-
-  -- Ensure there's a stats record so mood persists across remove/re-summon.
-  _set_saved_fatigue(bucket_area_id, owner_secret, kind, fatigue)
+  local owner_name = _owner_name_from_secret(owner_secret)
 
   local e = {
-    uid = uid,
+    uid = tostring(owned.uid),
     kind = kind,
+    level = owned.level,
+    stat_hp = owned.stat_hp,
+    stat_attack = owned.stat_attack,
+    nickname = tostring(owned.nickname or ""),
     home_area_id = area_id,
     bucket_area_id = bucket_area_id,
     oncehub_key = oncehub_key,
     area_id = area_id,
     x = x, y = y, z = z or 0,
-    owner_secret = owner_secret or "",
+    owner_secret = owner_secret,
     owner_name = owner_name or "",
-    fatigue = fatigue,
+    fatigue = owned.fatigue,
     cooldown_ends_at = 0,
     bot_id = "",
     exp = {
@@ -1241,24 +3409,27 @@ function pets.summon_pet(area_id, bucket_area_id, oncehub_key, kind, x, y, z, ow
       lease_expires_at = 0,
       reward = nil,
       reward_pending = false,
+      xp_reward = 0,
+      skill_points_gained = 0,
     }
   }
 
   table.insert(list, e)
+  _save_owned_pet_from_entry(e, false)
   save_bucket(bucket_area_id)
 
-  -- spawn_pet_bot returns bot_id (or nil). It also sets e.bot_id internally.
   local bot_id = spawn_pet_bot(e)
   if not bot_id then
-    dbg("summon_pet spawn failed uid=", uid, "kind=", kind, "area_id=", area_id)
+    dbg("summon_pet spawn failed uid=", e.uid, "kind=", kind, "area_id=", area_id)
     return nil, "spawn_failed"
   end
 
   e.bot_id = bot_id
   index_record(e)
+  _save_owned_pet_from_entry(e, false)
   save_bucket(bucket_area_id)
 
-  return uid
+  return e.uid
 end
 
 local function _remove_pet_internal(bucket_area_id, uid, force)
@@ -1290,6 +3461,7 @@ local function _remove_pet_internal(bucket_area_id, uid, force)
     unindex_record(rec)
   end
 
+  _save_owned_pet_from_entry(e, true)
   -- remove from storage list
   local list = load_pet_list(bucket_area_id, e.oncehub_key)
   for i = #list, 1, -1 do
@@ -1334,6 +3506,7 @@ function pets.remove_all(area_id, bucket_area_id, oncehub_key)
     if e and (expedition_active(e) or is_on_cooldown(e)) then
       skipped = skipped + 1
     else
+      _save_owned_pet_from_entry(e, true)
       local uid = tostring(list[i].uid or "")
 
       -- despawn runtime record
@@ -1370,7 +3543,7 @@ function pets.rehydrate_for_hp(area_id, bucket_area_id, oncehub_key)
     end
 
     -- spawn bot only if this entry lives in this area
-    if e.area_id == area_id then
+    if e.area_id == area_id and not e.with_owner then
       local uid = tostring(e.uid)
       local rec = records[uid]
       if not rec then
@@ -1407,7 +3580,7 @@ function pets.rehydrate_all_for_area(area_id, bucket_area_id)
     if type(list) == "table" then
       for _, e in ipairs(list) do
         normalize_entry(e, bucket_area_id, oncehub_key)
-        if e.area_id == area_id then
+        if e.area_id == area_id and not e.with_owner then
           pets.rehydrate_for_hp(area_id, bucket_area_id, oncehub_key)
           break
         end
@@ -1434,6 +3607,34 @@ end
 
 local function open_pet_action_menu(pid, e, bucket_area_id)
   local mood = mood_from_fatigue(e.fatigue)
+  local secret = helpers.get_safe_player_secret(pid)
+  local is_owner = (secret == (e.owner_secret or ""))
+
+  if e.companion_summoned then
+    local display = _entry_display_name(e)
+    local owner = tostring(e.owner_name or "")
+    if owner == "" then owner = "someone" end
+
+    if is_owner then
+      local res = await(Async.question_player(pid, ("Do you want to call back %s?"):format(display)))
+      if res == 1 then
+        local ok, msg = pets.call_back_companion(pid)
+        if msg and msg ~= "" then
+          Net.message_player(pid, msg)
+        elseif not ok then
+          Net.message_player(pid, "Couldn't call back that companion pet.")
+        end
+      end
+    else
+      local res = await(Async.question_player(pid, ("You see %s (%s's pet). Do you want to pet it?"):format(display, owner)))
+      if res == 1 then
+        _reduce_battle_fatigue_from_companion_petting(e, bucket_area_id)
+        Net.message_player(pid, _pet_it_text(mood))
+      end
+    end
+
+    return
+  end
 
   -- If pet is currently roaming, just show a flavor line.
   if expedition_active(e) then
@@ -1468,7 +3669,6 @@ local function open_pet_action_menu(pid, e, bucket_area_id)
 
   -- If reward is pending, claim it now (owner only).
   if e.exp and e.exp.reward_pending and e.exp.reward then
-    local secret = helpers.get_safe_player_secret(pid)
     if secret ~= (e.owner_secret or "") then
       Net.message_player(pid, "This pet doesn't seem interested in showing you anything.")
       return
@@ -1494,6 +3694,19 @@ local function open_pet_action_menu(pid, e, bucket_area_id)
       return
     end
 
+    local xp_reward = math.max(0, math.floor(tonumber(e.exp.xp_reward) or 0))
+    local skill_points_gained = math.max(0, math.floor(tonumber(e.exp.skill_points_gained) or 0))
+
+    if xp_reward > 0 and _pet_xp_notifications_enabled_from_pmem(_safe_get_player_memory(secret)) then
+      local xp_msg = ("%s gained %d XP."):format(_entry_display_name(e), xp_reward)
+      if skill_points_gained > 0 then
+        xp_msg = xp_msg .. (" %d skill point%s available."):format(skill_points_gained, skill_points_gained == 1 and "" or "s")
+      end
+      Net.message_player(pid, xp_msg)
+    end
+
+    e.exp.xp_reward = 0
+    e.exp.skill_points_gained = 0
     e.exp.reward_pending = false
     e.exp.reward = nil
     save_bucket(bucket_area_id)
@@ -1501,8 +3714,8 @@ local function open_pet_action_menu(pid, e, bucket_area_id)
     return
   end
 
-  local secret = helpers.get_safe_player_secret(pid)
-  local is_owner = (secret == (e.owner_secret or ""))
+  local kind_key = tostring(e.kind or ""):lower()
+  local battle_def = BATTLE_PETS[kind_key]
 
   -- Sanitize nickname on read (so title never gets weird)
   local nick = _sanitize_nickname(e.nickname)
@@ -1516,8 +3729,35 @@ local function open_pet_action_menu(pid, e, bucket_area_id)
   local frags = _get_player_bugfrags(pid)
   local title = ("%s - %d BugFrags"):format(display, frags)
 
+  local can_take, take_disabled_msg = true, nil
+  local has_armed_pet = false
+
   -- Build menu options
   local opts = {}
+
+  if not is_owner then
+    can_take = false
+    take_disabled_msg = "Only the owner can take this pet with them."
+  end
+
+  if can_take then
+    local cur_area = Net.get_player_area(pid)
+    if tostring(cur_area or "") ~= tostring(e.home_area_id or "") then
+      can_take = false
+      take_disabled_msg = "Only available from this pet's home HP."
+    end
+  end
+
+  if can_take then
+    local pmem = _safe_get_player_memory(secret)
+    has_armed_pet = pmem and pmem[PLAYER_ARMED_PET_KEY] ~= nil
+  end
+
+  if can_take then
+    table.insert(opts, helpers.create_bbs_option("Take With You"))
+  else
+    table.insert(opts, helpers.create_bbs_option("Take With You ("..tostring(take_disabled_msg or "unavailable")..")"))
+  end
   local can_send, send_disabled_msg = true, nil
 
   if is_on_cooldown(e) then
@@ -1559,6 +3799,31 @@ local function open_pet_action_menu(pid, e, bucket_area_id)
   pcall(Net.close_bbs, pid)
 
   if not sel or sel == "Nevermind" then
+    return
+  end
+
+  if sel:find("^Take With You") == 1 then
+    if not can_take then
+      Net.message_player(pid, take_disabled_msg or "Couldn't take pet.")
+      return
+    end
+
+    local replace_existing = false
+
+    if has_armed_pet then
+      local res = await(Async.question_player(pid, "Do you want to replace your current pet?"))
+
+      -- Assumes 1 = Yes. If your build returns the opposite, flip this check.
+      if res ~= 1 then
+        Net.message_player(pid, "Keeping your current pet.")
+        return
+      end
+
+      replace_existing = true
+    end
+
+    local ok, msg = take_pet_with_you(pid, e, bucket_area_id, replace_existing)
+    Net.message_player(pid, msg or (ok and "Done." or "Couldn't take pet."))
     return
   end
 
@@ -1620,6 +3885,7 @@ local function open_pet_action_menu(pid, e, bucket_area_id)
 
     local new_nick = _sanitize_nickname(input)
     e.nickname = new_nick
+    _save_owned_pet_from_entry(e, false)
     save_bucket(bucket_area_id)
 
     if new_nick == "" then
@@ -1639,9 +3905,15 @@ Net:on("actor_interaction", function(event)
   local uid = bot_to_uid[tostring(actor_id)]
   if not uid then return end
 
-  -- Find the entry for this uid by searching all areas for oncehub_pets_v1.
+  -- Find the live entry for this uid.
   with_interaction_lock(player_id, function()
-    -- We'll scan all net areas as potential buckets (safe for small scale).
+    local live = companion_live_entries[tostring(uid)]
+    if live then
+      open_pet_action_menu(player_id, live, tostring(live.bucket_area_id or ""))
+      return
+    end
+
+    -- Fallback: scan persisted HP pet entries.
     for _, bucket_area_id in ipairs(Net.list_areas() or {}) do
       local e = find_entry(bucket_area_id, uid)
       if e then
@@ -1649,6 +3921,7 @@ Net:on("actor_interaction", function(event)
         return
       end
     end
+
     Net.message_player(player_id, "This pet seems confused (missing memory entry).")
   end)
 end)

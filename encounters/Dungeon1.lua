@@ -393,6 +393,7 @@ local Dungeon1 = {
     name="Dungeon1",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     weight=10,
+    pet_exp=8,
     enemies={
         {name="Volcano",rank=2},
         {name="Yort",rank=3},
@@ -431,6 +432,7 @@ local Dungeon2 = {
     name="Dungeon2",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     weight=10,
+    pet_exp=8,
     enemies={
         {name="Yort",rank=3},
     },
@@ -468,6 +470,7 @@ local Dungeon3 = {
     name="Dungeon3",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     weight=10,
+    pet_exp=8,
     enemies={
         {name="Spikey",rank=3},
         {name="Spikey",rank=2},
@@ -510,6 +513,7 @@ local Dungeon4 = {
     name="Dungeon4",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     weight=10,
+    pet_exp=8,
     enemies={
         {name="Metrid",rank=2},
         {name="Yort",rank=3},
@@ -549,6 +553,7 @@ local Dungeon5 = {
     name="Dungeon5",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     weight=10,
+    pet_exp=8,
     enemies={
         {name="Swordy",rank=3},
         {name="Powie3",rank=1},
@@ -587,6 +592,7 @@ local Dungeon6 = {
     name="Dungeon6",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     weight=10,
+    pet_exp=8,
     enemies={
         {name="Volcano",rank=1},
         {name="Volcano",rank=3},
@@ -626,6 +632,7 @@ local Dungeon7 = {
     name="Dungeon7",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     weight=10,
+    pet_exp=8,
     enemies={
         {name="Beetank",rank=3},
         {name="Fishy",rank=3},
@@ -664,6 +671,7 @@ local Dungeon8 = {
     name="Dungeon8",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     weight=10,
+    pet_exp=8,
     enemies={
         {name="Sniper",rank=1},
         {name="Gloomer",rank=1},
@@ -702,6 +710,7 @@ local Dungeon9 = {
     name="Dungeon9",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     weight=10,
+    pet_exp=8,
     enemies={
         {name="Mettaur",rank=4},
         {name="Yort",rank=3},
@@ -740,6 +749,7 @@ local Dungeon10 = {
     name="Dungeon10",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     weight=10,
+    pet_exp=8,
     enemies={
         {name="Beetank",rank=2},
         {name="Chumpy",rank=1},
@@ -779,6 +789,7 @@ local MiniBoss1 = {
     name="MiniBoss1",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     weight=0,
+    pet_exp=10,
     enemies={
         {name="HeelNavi",rank=4},
         {name="Swordy",rank=3},
@@ -817,6 +828,7 @@ local MiniBoss2 = {
     name="MiniBoss2",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     weight=0,
+    pet_exp=10,
     enemies={
         {name="Noir",rank=1},
         {name="Metrid",rank=2},
@@ -856,6 +868,7 @@ local MiniBoss3 = {
     name="MiniBoss3",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     weight=0,
+    pet_exp=10,
     enemies={
         {name="ElementMan",rank=4},
         {name="JokerEye",rank=1},
@@ -895,6 +908,7 @@ local MainBoss = {
     name="MainBoss",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     weight=0,
+    pet_exp=12,
     enemies={
         {name="MegaBunny",rank=1},
         {name="ShadeMan",rank=1},

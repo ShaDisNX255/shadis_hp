@@ -107,6 +107,15 @@ if not FriendsOK then
 end
 
 -- ---------------------------------------------------------------------------
+-- Pets API helper (opens Pet Menu placeholder BBS)
+-- ---------------------------------------------------------------------------
+
+local LPetsOK, LPets = pcall(require, "scripts/ezlibs-custom/lpets")
+if not LPetsOK then
+  LPets = nil
+end
+
+-- ---------------------------------------------------------------------------
 -- Cosmetics submenu (new module handles all cosmetic logic)
 -- ---------------------------------------------------------------------------
 
@@ -167,8 +176,8 @@ end
 
 local cfg = {
   -- Logical UI coordinates (0..240 x, 0..160 y); framework doubles them internally.
-  base_x      = 13,   -- default X for rows (used if row_x_* is nil)
-  base_y      = 26,   -- move menu up/down
+  base_x      = 8,   -- default X for rows (used if row_x_* is nil)
+  base_y      = 21,   -- move menu up/down
   row_spacing = 18,   -- vertical distance between rows
   z           = 6,    -- UI Z-depth
   scale       = 2,    -- change if tabs feel too big/small
@@ -178,9 +187,10 @@ local cfg = {
   row_x_cards     = nil,
   row_x_summon    = nil,
   row_x_friends   = nil,
-  row_x_cosmetics = 12,
+  row_x_cosmetics = 7,
   row_x_jobs      = nil,
   row_x_pvp       = nil,
+  row_x_pets      = 6,
 
   -- Cards row (always present)
   cards_texture   = "/server/assets/ui/lmenu/lcards.png",
@@ -205,12 +215,16 @@ local cfg = {
   pvp_texture     = "/server/assets/ui/lmenu/lpvp.png",
   pvp_anim        = "/server/assets/ui/lmenu/lpvp.animation",
 
+  -- Pet row button
+  pets_texture    = "/server/assets/ui/lmenu/lpets.png",
+  pets_anim       = "/server/assets/ui/lmenu/lpets.animation",
+
   -- Decorative line at the bottom
   line_texture    = "/server/assets/ui/lmenu/lline.png",
-  line_x          = 8,     -- around center for 225px wide line at scale 1
-  line_y          = 140,   -- near bottom (0..160)
+  line_x          = 35,     -- around center for 225px wide line at scale 1
+  line_y          = 144,   -- near bottom (0..160)
   line_z          = 5,     -- slightly behind/under tabs if you want
-  line_sx         = 2.0,   -- X scale
+  line_sx         = 1.5,   -- X scale
   line_sy         = 1.0,   -- Y scale
 
   -- "Players Online" tab (drawn on the right side)
@@ -268,6 +282,7 @@ local SPRITE_ID_PVP        = "lmenu_pvp"
 local SPRITE_ID_LINE       = "lmenu_line"
 local SPRITE_ID_ONLINE_TAB = "lmenu_online_tab"
 local ONLINE_TEXT_ID       = "lmenu_online_count"
+local SPRITE_ID_PETS       = "lmenu_pets"
 
 -- ---------------------------------------------------------------------------
 -- Logging (safe even if helpers module isn't present)
@@ -509,6 +524,9 @@ local function build_rows_for_player(pid)
   -- Friends is always available
   rows[#rows+1] = { id = "friends" }
 
+  -- Pets is always available
+  rows[#rows+1] = { id = "pets" }
+
   -- Cosmetics: always show the row
   rows[#rows+1] = { id = "cosmetics" }
 
@@ -614,6 +632,38 @@ local function ensure_friends_ui(pid, y, selected)
   end
   if frame.update_ui_element then
     frame.update_ui_element(SPRITE_ID_FRIENDS, pid, { opacity = 255 })
+  end
+end
+
+local function ensure_pets_ui(pid, y, selected)
+  if not cfg.pets_texture or cfg.pets_texture == "" then
+    return
+  end
+
+  local anim = selected and "PETS_SELECTED" or "PETS_UNSELECTED"
+  local x    = cfg.row_x_pets or cfg.base_x
+
+  frame.add_ui_element(
+    SPRITE_ID_PETS,
+    pid,
+    cfg.pets_texture,
+    cfg.pets_anim,
+    anim,
+    x,
+    y,
+    cfg.z,
+    cfg.scale,
+    cfg.scale
+  )
+
+  if frame.update_ui_position then
+    frame.update_ui_position(SPRITE_ID_PETS, pid, x, y, cfg.z)
+  end
+  if frame.set_ui_animation then
+    frame.set_ui_animation(SPRITE_ID_PETS, pid, anim)
+  end
+  if frame.update_ui_element then
+    frame.update_ui_element(SPRITE_ID_PETS, pid, { opacity = 255 })
   end
 end
 
@@ -799,6 +849,7 @@ local function clear_all_ui(pid)
     pcall(frame.remove_ui_element, SPRITE_ID_COSMETICS,  pid)
     pcall(frame.remove_ui_element, SPRITE_ID_JOBS,       pid)
     pcall(frame.remove_ui_element, SPRITE_ID_PVP,        pid)
+    pcall(frame.remove_ui_element, SPRITE_ID_PETS,       pid)
   end
 
   if Displayer and Displayer.Font and Displayer.Font.eraseTextDisplay then
@@ -840,6 +891,8 @@ local function rebuild_and_redraw(pid)
       ensure_summon_ui(pid, y, row.id, selected)
     elseif row.id == "friends" then
       ensure_friends_ui(pid, y, selected)
+    elseif row.id == "pets" then
+      ensure_pets_ui(pid, y, selected)
     elseif row.id == "cosmetics" then
       ensure_cosmetics_ui(pid, y, selected)
     elseif row.id == "jobs" then
@@ -1128,6 +1181,21 @@ local function handle_lmenu_button(pid, btn)
         end
       else
         Net.message_player(pid, "(Friends menu not available.)")
+      end
+      return
+    end
+
+    -- Pets board
+    if row.id == "pets" then
+      LMenu.close(pid)
+
+      if LPets and type(LPets.open_pets_board) == "function" then
+        local okp, errp = pcall(LPets.open_pets_board, pid)
+        if not okp then
+          warn("LPets.open_pets_board failed:", tostring(errp))
+        end
+      else
+        Net.message_player(pid, "(Pet menu not available.)")
       end
       return
     end

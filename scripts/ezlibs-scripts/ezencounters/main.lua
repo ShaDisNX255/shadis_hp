@@ -2,6 +2,10 @@ local ezwarps = require('scripts/ezlibs-scripts/ezwarps/main')
 local ezmemory = require('scripts/ezlibs-scripts/ezmemory')
 local helpers = require('scripts/ezlibs-scripts/helpers')
 local eztriggers = require('scripts/ezlibs-scripts/eztriggers')
+local PetsOK, Pets = pcall(require, "scripts/ezlibs-custom/pets")
+if not PetsOK then
+    Pets = nil
+end
 
 local ezencounters = {}
 local players_in_encounters = {}
@@ -10,6 +14,159 @@ local player_steps_since_encounter = {}
 local named_encounters = {}
 local provided_encounter_assets = {}
 local encounter_finished_callbacks = {}
+
+-- ====================== Battle Pet Injection ======================
+local PET_ENCOUNTER_PATH = "/server/assets/ezlibs-assets/ezencounters/ezencounters.zip"
+local PLAYER_ARMED_PET_KEY = "armed_pet_v1"
+
+local function clamp_pet_attack_rank(rank)
+    rank = math.floor(tonumber(rank) or 1)
+    if rank < 1 then rank = 1 end
+    if rank > 20 then rank = 20 end
+    return rank
+end
+
+local function build_pet_bridge_name(pet_chip_id, pet_attack_rank)
+    local rank = clamp_pet_attack_rank(pet_attack_rank)
+    local chip_id = tonumber(pet_chip_id)
+
+    if chip_id and chip_id > 0 then
+        return "__PETC"..tostring(chip_id).."R"..tostring(rank)
+    end
+
+    return "__PETR"..tostring(rank)
+end
+
+local function _inject_armed_pet(player_id, encounter_info)
+    if type(encounter_info) ~= "table" then
+        print("[PET INJECT SKIP] encounter_info not table")
+        return encounter_info
+    end
+
+    local enc_path = tostring(encounter_info.path or "")
+    if enc_path ~= PET_ENCOUNTER_PATH then
+        print("[PET INJECT SKIP] path mismatch:", enc_path)
+        return encounter_info
+    end
+
+    local secret = helpers.get_safe_player_secret(player_id)
+    if not secret or secret == "" then
+        print("[PET INJECT SKIP] no secret")
+        return encounter_info
+    end
+
+    local ok_mem, pmem = pcall(ezmemory.get_player_memory, secret)
+    if not ok_mem or type(pmem) ~= "table" then
+        print("[PET INJECT SKIP] no player memory")
+        return encounter_info
+    end
+
+    local armed = pmem[PLAYER_ARMED_PET_KEY]
+    if type(armed) ~= "table" then
+        print("[PET INJECT SKIP] no armed pet")
+        return encounter_info
+    end
+
+    if armed.summoned == true then
+        print("[PET INJECT SKIP] companion pet is currently summoned in overworld")
+        return encounter_info
+    end
+
+    local enemy_name = tostring(armed.enemy_name or "")
+    if enemy_name == "" then
+        print("[PET INJECT SKIP] armed pet is not battle-capable")
+        return encounter_info
+    end
+
+    if type(encounter_info.enemies) ~= "table" or type(encounter_info.positions) ~= "table" then
+        print("[PET INJECT SKIP] encounter missing enemies/positions")
+        return encounter_info
+    end
+
+    print("[PET INJECT ARMED]",
+        tostring(armed.enemy_name),
+        "rank="..tostring(armed.rank),
+        "hp="..tostring(armed.starting_hp),
+        "chip="..tostring(armed.pet_chip_id or 0)
+    )
+
+    local ei = helpers.deep_copy(encounter_info)
+
+    for _, en in ipairs(ei.enemies) do
+        if type(en) == "table" and tostring(en.name or "") == enemy_name and tonumber(en.team or 0) == 2 then
+            ei.__armed_pet_joined = true
+            ei.__armed_pet_uid = tostring(armed.uid or "")
+            ei.__armed_pet_kind = tostring(armed.kind or "")
+            return ei
+        end
+    end
+
+    local pet_attack_rank = clamp_pet_attack_rank(armed.rank or 1)
+    local starting_hp = tonumber(armed.starting_hp or 40) or 40
+
+    local pet_chip_id = tonumber(armed.pet_chip_id)
+    local pet_chip_amount = tonumber(armed.pet_chip_amount or 1) or 1
+    local bridge_chip_id = nil
+
+    local pet_enemy = {
+        name = enemy_name,
+        rank = 1, -- always spawn pet packages on base V1 logic
+        team = 2,
+        starting_hp = starting_hp,
+    }
+
+    if pet_chip_id and pet_chip_id > 0 and pet_chip_amount > 0 then
+        pet_enemy.pet_chip_id = pet_chip_id
+        pet_enemy.pet_chip_amount = 1
+        bridge_chip_id = pet_chip_id
+    end
+
+    pet_enemy.pet_bridge_name = build_pet_bridge_name(bridge_chip_id, pet_attack_rank)
+
+print("[PET INJECT OK]",
+    tostring(pet_enemy.name),
+    "rank="..tostring(pet_enemy.rank),
+    "hp="..tostring(pet_enemy.starting_hp),
+    "chip="..tostring(pet_enemy.pet_chip_id or 0)
+)
+    table.insert(ei.enemies, pet_enemy)
+    local pet_id = #ei.enemies
+
+    local function can_place(r, c)
+        if type(ei.positions[r]) ~= "table" then return false end
+        if tonumber(ei.positions[r][c] or 0) ~= 0 then return false end
+        if type(ei.obstacle_positions) == "table" and type(ei.obstacle_positions[r]) == "table" then
+            if tonumber(ei.obstacle_positions[r][c] or 0) ~= 0 then return false end
+        end
+        if type(ei.teams) == "table" and type(ei.teams[r]) == "table" then
+            if tonumber(ei.teams[r][c] or 0) ~= 2 then return false end
+        end
+        return true
+    end
+
+    -- Requested spawn: (1,1). Fallback inside blue side if occupied.
+    local candidates = {
+        {1,1},
+        {2,1},{3,1},
+        {1,2},{2,2},{3,2},
+        {1,3},{2,3},{3,3},
+    }
+
+    for _, rc in ipairs(candidates) do
+        local r, c = rc[1], rc[2]
+        if can_place(r, c) then
+            ei.__armed_pet_joined = true
+            ei.__armed_pet_uid = tostring(armed.uid or "")
+            ei.__armed_pet_kind = tostring(armed.kind or "")
+            ei.positions[r][c] = pet_id
+            return ei
+        end
+    end
+
+    -- If we can't place it, undo the injection
+    table.remove(ei.enemies, pet_id)
+    return encounter_info
+end
 
 local load_encounters_for_areas = function ()
     local areas = Net.list_areas()
@@ -129,12 +286,40 @@ ezencounters.begin_encounter_by_name = function(player_id,encounter_name,trigger
     end)
 end
 
+local function _resolve_pet_xp_award(encounter_info)
+    if type(encounter_info) ~= "table" then
+        return 5
+    end
+
+    local v = encounter_info.pet_exp
+
+    if type(v) == "table" then
+        v = v[1] or v.amount or v.value
+    end
+
+    if v == nil then
+        return 5
+    end
+
+    return math.max(0, math.floor(tonumber(v) or 0))
+end
+
 ezencounters.begin_encounter = function (player_id,encounter_info,trigger_object)
     return async(function ()
         --print('[ezencounters] beginning encounter for',player_id)
-        players_in_encounters[player_id] = {encounter_info=encounter_info}
         ezencounters.clear_tiles_since_encounter(player_id)
-        local stats = await(Async.initiate_encounter(player_id,encounter_info.path,encounter_info))
+
+        local final_encounter_info = _inject_armed_pet(player_id, encounter_info)
+
+        players_in_encounters[player_id] = {
+            encounter_info = encounter_info,
+            final_encounter_info = final_encounter_info,
+            armed_pet_joined = type(final_encounter_info) == "table" and final_encounter_info.__armed_pet_joined == true,
+            armed_pet_uid = type(final_encounter_info) == "table" and tostring(final_encounter_info.__armed_pet_uid or "") or "",
+            pet_xp_award = _resolve_pet_xp_award(final_encounter_info),
+        }
+
+        local stats = await(Async.initiate_encounter(player_id, final_encounter_info.path, final_encounter_info))
         return stats
     end)
 end
@@ -150,17 +335,135 @@ ezencounters.clear_last_position = function (player_id)
     players_in_encounters[player_id] = nil
 end
 
+local function _result_flags(stats)
+    local reason = tonumber(stats and stats.reason or 0) or 0
+    local hp = tonumber(stats and (stats.health or stats.player_hp or stats.hp) or 0) or 0
+
+    local ran, dev_escape, won, lost = false, false, false, false
+
+    if reason == 1 then
+        won = true
+    elseif reason == 2 then
+        lost = true
+    elseif reason == 3 then
+        ran = true
+    elseif reason == 4 then
+        ran = true
+        dev_escape = true
+    else
+        ran = stats and (stats.ran or stats.fled or stats.escape) or false
+        if not ran then
+            if hp > 0 then
+                won = true
+            elseif hp <= 0 then
+                lost = true
+            end
+        end
+    end
+
+    return {
+        reason     = reason,
+        hp         = hp,
+        ran        = ran,
+        dev_escape = dev_escape,
+        won        = won,
+        lost       = lost,
+    }
+end
+
 Net:on("battle_results", function(event)
     local player_id = event.player_id
     if players_in_encounters[player_id] then
         local player_encounter = players_in_encounters[player_id]
+
         if encounter_finished_callbacks[player_id] then
             encounter_finished_callbacks[player_id](event)
             encounter_finished_callbacks[player_id] = nil
         end
-        if player_encounter.encounter_info.results_callback then
-            player_encounter.encounter_info.results_callback(player_id,player_encounter.encounter_info,event)
+
+        local flags = _result_flags(event)
+        if Pets
+            and type(Pets.consume_armed_pet_battle_chip) == "function"
+            and player_encounter.armed_pet_joined
+            and player_encounter.armed_pet_uid ~= ""
+            and (flags.won or flags.lost)
+        then
+            local ok, consumed, chip_id, remaining = pcall(
+                Pets.consume_armed_pet_battle_chip,
+                player_id,
+                player_encounter.armed_pet_uid
+            )
+
+            if ok and consumed then
+                print("[PET CHIP]",
+                    "pid=" .. tostring(player_id),
+                    "uid=" .. tostring(player_encounter.armed_pet_uid),
+                    "chip=" .. tostring(chip_id),
+                    "remaining=" .. tostring(remaining)
+                )
+            elseif not ok then
+                print("[PET CHIP] consume failed: " .. tostring(consumed))
+            end
         end
+        local pet_xp_award = math.max(0, math.floor(tonumber(player_encounter.pet_xp_award) or 5))
+
+        if Pets
+            and player_encounter.armed_pet_joined
+            and player_encounter.armed_pet_uid ~= ""
+            and flags.won
+            and pet_xp_award > 0
+        then
+            local ok, awarded, new_total, skill_gained, effective_amount, mood = pcall(
+                Pets.award_armed_pet_battle_xp,
+                player_id,
+                pet_xp_award,
+                player_encounter.armed_pet_uid
+            )
+
+            if ok and awarded then
+                print("[PET XP]",
+                    "pid=" .. tostring(player_id),
+                    "uid=" .. tostring(player_encounter.armed_pet_uid),
+                    "+" .. tostring(effective_amount or pet_xp_award),
+                    "mood=" .. tostring(mood or "neutral"),
+                    "total=" .. tostring(new_total),
+                    "skill_gained=" .. tostring(skill_gained or 0)
+                )
+            elseif not ok then
+                print("[PET XP] award failed: " .. tostring(awarded))
+            end
+        end
+
+        if Pets
+            and type(Pets.register_armed_pet_battle_completion) == "function"
+            and player_encounter.armed_pet_joined
+            and player_encounter.armed_pet_uid ~= ""
+            and (flags.won or flags.lost)
+        then
+            local ok, recorded, progress, fatigue_added, new_fatigue, new_mood = pcall(
+                Pets.register_armed_pet_battle_completion,
+                player_id,
+                player_encounter.armed_pet_uid
+            )
+
+            if ok and recorded and (tonumber(fatigue_added) or 0) > 0 then
+                print("[PET FATIGUE]",
+                    "pid=" .. tostring(player_id),
+                    "uid=" .. tostring(player_encounter.armed_pet_uid),
+                    "fatigue_added=" .. tostring(fatigue_added),
+                    "fatigue=" .. tostring(new_fatigue),
+                    "mood=" .. tostring(new_mood),
+                    "progress=" .. tostring(progress)
+                )
+            elseif not ok then
+                print("[PET FATIGUE] record failed: " .. tostring(recorded))
+            end
+        end
+
+        if player_encounter.encounter_info.results_callback then
+            player_encounter.encounter_info.results_callback(player_id, player_encounter.encounter_info, event)
+        end
+
         players_in_encounters[player_id] = nil
     end
     -- stats = { health: number, score: number, time: number, ran: bool, emotion: number, turns: number, npcs: { id: String, health: number }[] }

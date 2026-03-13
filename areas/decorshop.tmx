@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="30" height="30" tilewidth="64" tileheight="32" infinite="0" nextlayerid="3" nextobjectid="56">
+<map version="1.10" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="30" height="30" tilewidth="64" tileheight="32" infinite="0" nextlayerid="3" nextobjectid="76">
  <properties>
   <property name="Background" value="custom"/>
   <property name="Background Animation" value="/server/assets/custom/backgrounds/wcity/01-generic1.animation"/>
@@ -88,7 +88,7 @@
    </properties>
    <point/>
   </object>
-  <object id="4" name="Decorshop" type="Dialogue" x="451.5" y="404.5">
+  <object id="4" name="Decorshop" type="Dialogue" x="447.5" y="404.5">
    <properties>
     <property name="Dialogue Type" value="decorshop"/>
     <property name="Price 1" type="int" value="30000"/>
@@ -111,16 +111,11 @@
     <property name="Price 25" type="int" value="500000"/>
     <property name="Price 26" type="int" value="500000"/>
     <property name="Price 27" type="int" value="500000"/>
-    <property name="Price 28" type="int" value="1000000"/>
-    <property name="Price 29" type="int" value="1000000"/>
+    <property name="Price 28" type="int" value="400000"/>
+    <property name="Price 29" type="int" value="400000"/>
     <property name="Price 3" type="int" value="50000"/>
-    <property name="Price 30" type="int" value="1000000"/>
+    <property name="Price 30" type="int" value="500000"/>
     <property name="Price 31" type="int" value="1000000"/>
-    <property name="Price 32" type="int" value="1000000"/>
-    <property name="Price 33" type="int" value="400000"/>
-    <property name="Price 34" type="int" value="400000"/>
-    <property name="Price 35" type="int" value="500000"/>
-    <property name="Price 36" type="int" value="1000000"/>
     <property name="Price 4" type="int" value="50000"/>
     <property name="Price 5" type="int" value="60000"/>
     <property name="Price 6" type="int" value="50000"/>
@@ -147,16 +142,11 @@
     <property name="Sell 25" value="fish_shortcut"/>
     <property name="Sell 26" value="teams_shortcut"/>
     <property name="Sell 27" value="wcity3_shortcut"/>
-    <property name="Sell 28" value="pet_mettaur"/>
-    <property name="Sell 29" value="pet_ratty"/>
+    <property name="Sell 28" value="django_doll"/>
+    <property name="Sell 29" value="sabata_doll"/>
     <property name="Sell 3" value="green_tree"/>
-    <property name="Sell 30" value="pet_powie"/>
-    <property name="Sell 31" value="pet_swordy"/>
-    <property name="Sell 32" value="pet_moloko"/>
-    <property name="Sell 33" value="django_doll"/>
-    <property name="Sell 34" value="sabata_doll"/>
-    <property name="Sell 35" value="casino_shortcut"/>
-    <property name="Sell 36" value="jukebox"/>
+    <property name="Sell 30" value="casino_shortcut"/>
+    <property name="Sell 31" value="jukebox"/>
     <property name="Sell 4" value="blue_tree"/>
     <property name="Sell 5" value="stuffed_bear"/>
     <property name="Sell 6" value="lan_tile"/>
@@ -334,17 +324,177 @@
     <property name="Flavor" value="You see a Sabata doll"/>
    </properties>
   </object>
-  <object id="54" name="Casino" type="Custom Warp" gid="348" x="312" y="468" width="64" height="40">
+  <object id="54" name="Casino" gid="348" x="312" y="468" width="64" height="40">
    <properties>
-    <property name="Direction" value="Up Right"/>
-    <property name="Target Area" value="casino"/>
-    <property name="Target Object" value="43"/>
+    <property name="Flavor" value="You see a shortcut tile"/>
    </properties>
   </object>
   <object id="55" gid="2147484010" x="432" y="328" width="64" height="72">
    <properties>
     <property name="Flavor" value="You see a Jukebox, go to the music store to buy some tracks"/>
    </properties>
+  </object>
+  <object id="58" gid="2147483889" x="299.5" y="338" width="35" height="45">
+   <properties>
+    <property name="Interact Relay" type="object" value="60"/>
+   </properties>
+  </object>
+  <object id="59" gid="2147483891" x="294" y="367.5" width="35" height="45">
+   <properties>
+    <property name="Interact Relay" type="object" value="60"/>
+   </properties>
+  </object>
+  <object id="60" name="Merchant Kel" type="NPC" x="291.5" y="338.5">
+   <properties>
+    <property name="Asset Name" value="heel-navi-exe4_black"/>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Direction" value="Down Right"/>
+    <property name="Next 1" type="object" value="61"/>
+    <property name="Text 1" value="Welcome, I sell Pets"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="61" name="Pet Shop" type="Dialogue" x="243.5" y="320.5">
+   <properties>
+    <property name="Dialogue Type" value="decorshop"/>
+    <property name="Price 1" type="int" value="1000000"/>
+    <property name="Price 2" type="int" value="1000000"/>
+    <property name="Price 3" type="int" value="1000000"/>
+    <property name="Price 4" type="int" value="1000000"/>
+    <property name="Price 5" type="int" value="1000000"/>
+    <property name="Sell 1" value="pet_mettaur"/>
+    <property name="Sell 2" value="pet_ratty"/>
+    <property name="Sell 3" value="pet_powie"/>
+    <property name="Sell 4" value="pet_swordy"/>
+    <property name="Sell 5" value="pet_moloko"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="62" gid="2147483889" x="299.5" y="278.5" width="35" height="45">
+   <properties>
+    <property name="Interact Relay" type="object" value="64"/>
+   </properties>
+  </object>
+  <object id="63" gid="2147483891" x="294" y="308" width="35" height="45">
+   <properties>
+    <property name="Interact Relay" type="object" value="64"/>
+   </properties>
+  </object>
+  <object id="64" name="Merchant Tel" type="NPC" x="291.5" y="279">
+   <properties>
+    <property name="Asset Name" value="heel-navi-exe4_black"/>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Direction" value="Down Right"/>
+    <property name="Next 1" type="object" value="65"/>
+    <property name="Text 1" value="Welcome, I sell chips for pets"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="65" name="Chip Shop" type="Dialogue" x="245" y="259">
+   <properties>
+    <property name="Dialogue Type" value="itemshopbbs"/>
+    <property name="Item 1" type="object" value="66"/>
+    <property name="Item 10" type="object" value="75"/>
+    <property name="Item 2" type="object" value="67"/>
+    <property name="Item 3" type="object" value="68"/>
+    <property name="Item 4" type="object" value="69"/>
+    <property name="Item 5" type="object" value="70"/>
+    <property name="Item 6" type="object" value="71"/>
+    <property name="Item 7" type="object" value="72"/>
+    <property name="Item 8" type="object" value="73"/>
+    <property name="Item 9" type="object" value="74"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="66" name="Recovery30" type="Item" x="124" y="210.5">
+   <properties>
+    <property name="Description" value="Pet battle chip: Recovery30"/>
+    <property name="Name" value="PetChip: Recovery30"/>
+    <property name="Price" value="10000"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="67" name="Recovery50" type="Item" x="131" y="203">
+   <properties>
+    <property name="Description" value="Pet battle chip: Recovery50"/>
+    <property name="Name" value="PetChip: Recovery50"/>
+    <property name="Price" value="20000"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="68" name="PanelSteal" type="Item" x="139.5" y="194.5">
+   <properties>
+    <property name="Description" value="Pet battle chip: PanelSteal"/>
+    <property name="Name" value="PetChip: PanelSteal"/>
+    <property name="Price" value="10000"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="69" name="AreaSteal" type="Item" x="146" y="186">
+   <properties>
+    <property name="Description" value="Pet battle chip: AreaSteal"/>
+    <property name="Name" value="PetChip: AreaSteal"/>
+    <property name="Price" value="40000"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="70" name="HolyPanel" type="Item" x="155" y="179">
+   <properties>
+    <property name="Description" value="Pet battle chip: HolyPanel"/>
+    <property name="Name" value="PetChip: HolyPanel"/>
+    <property name="Price" value="35000"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="71" name="Sanctuary" type="Item" x="162.5" y="171.5">
+   <properties>
+    <property name="Description" value="Pet battle chip: Sanctuary"/>
+    <property name="Name" value="PetChip: Sanctuary"/>
+    <property name="Price" value="50000"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="72" name="Invisible" type="Item" x="172" y="166">
+   <properties>
+    <property name="Description" value="Pet battle chip: Invisible"/>
+    <property name="Name" value="PetChip: Invisible"/>
+    <property name="Price" value="30000"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="73" name="Shadow" type="Item" x="178" y="158">
+   <properties>
+    <property name="Description" value="Pet battle chip: Shadow"/>
+    <property name="Name" value="PetChip: Shadow"/>
+    <property name="Price" value="25000"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="74" name="Barrier" type="Item" x="186" y="150">
+   <properties>
+    <property name="Description" value="Pet battle chip: Barrier"/>
+    <property name="Name" value="PetChip: Barrier"/>
+    <property name="Price" value="25000"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="75" name="Barrier100" type="Item" x="193.5" y="142.5">
+   <properties>
+    <property name="Description" value="Pet battle chip: Barrier100"/>
+    <property name="Name" value="PetChip: Barrier100"/>
+    <property name="Price" value="70000"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
   </object>
  </objectgroup>
 </map>

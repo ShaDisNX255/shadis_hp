@@ -324,6 +324,7 @@ eznpcs.add_event(event1)
 local boss2 = {
     name="boss2",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    pet_exp=9,
     enemies={
         {name="HeelNavi",rank=2},
     },
@@ -402,6 +403,7 @@ eznpcs.add_event(Win_Gamble)
 local boss4 = {
     name="boss4",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    pet_exp=10,
     enemies={
         {name="ProtomanPoN",rank=2},
     },
@@ -455,6 +457,7 @@ eznpcs.add_event(event4)
 local boss5 = {
     name="boss5",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    pet_exp=8,
     enemies={
         {name="Roll",rank=2},
     },
@@ -508,6 +511,7 @@ eznpcs.add_event(event5)
 local boss6 = {
     name="boss6",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    pet_exp=8,
     enemies={
         {name="GutsManPoN",rank=2},
     },
@@ -561,6 +565,7 @@ eznpcs.add_event(event6)
 local boss7 = {
     name="boss7",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    pet_exp=9,
     enemies={
         {name="GutsManPoN",rank=3},
     },
@@ -614,6 +619,7 @@ eznpcs.add_event(event7)
 local boss8 = {
     name="boss8",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    pet_exp=11,
     enemies={
         {name="GregarBeast",rank=1},
     },
@@ -2369,6 +2375,172 @@ local EchoProgram_GameOver = {
     end
 }
 eznpcs.add_event(EchoProgram_GameOver)
+
+----------------------------------------------------------------
+-- BBS Item Shop (sells normal items for Moneyz)
+-- Dialogue Type: "itemshopbbs"
+--
+-- Configure per-NPC via custom properties:
+--   Item 1   = <object id>
+--   Price 1  = <money price override, optional>
+--   Item 2   = <object id>
+--   Price 2  = <money price override, optional>
+--   ...
+--
+-- Optional:
+--   Shop Title      = Item Shop
+--   Not Enough Msg  = You don't have enough money.
+--
+-- Notes:
+-- - Item N should point to a normal item object in the same area.
+-- - The object's own Name/Amount/Description/Type are used for granting.
+-- - Price N overrides the object's own Price property if provided.
+----------------------------------------------------------------
+
+local ITEM_SHOP_BBS_COLOR = { r = 245, g = 210, b = 70 }
+
+eznpcs.add_event{
+  name = "itemshopbbs",
+  action = function(npc, player_id, dialogue, relay_object)
+    return async(function()
+      local area_id = Net.get_player_area(player_id)
+      local mug = eznpcs.get_dialogue_mugshot(npc, player_id, dialogue)
+      local ci  = build_ci_props(dialogue)
+
+      local title = tostring(get_ci(ci, "shop title") or "Item Shop")
+      local not_enough_msg = tostring(get_ci(ci, "not enough msg") or "You don't have enough money.")
+
+      -- Build offers from Item N (+ optional Price N override)
+      local offers = {}
+      local i = 1
+      while true do
+        local raw_item_id = get_ci(ci, "item " .. i)
+        if not raw_item_id then break end
+
+        local object_id = tonumber(raw_item_id)
+        if object_id then
+          local info = helpers.read_item_information(area_id, object_id)
+
+          -- Only allow normal items / keyitems here
+          if info and (info.type == "item" or info.type == "keyitem") then
+            local price = tonumber(get_ci(ci, "price " .. i) or get_ci(ci, "cost " .. i) or info.price or 0) or 0
+            if price < 0 then price = 0 end
+
+            table.insert(offers, {
+              object_id = object_id,
+              unit_price = price,
+              info = info,
+            })
+          end
+        end
+
+        i = i + 1
+      end
+
+      if #offers == 0 then
+        await(Async.message_player(
+          player_id,
+          "Sorry, I'm not selling any items right now.",
+          mug.texture_path, mug.animation_path
+        ))
+        return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+      end
+
+      while true do
+        local posts = {}
+        local chosen_by_post_id = {}
+
+        for idx, offer in ipairs(offers) do
+          local base_amount = math.max(1, math.floor(tonumber(offer.info.amount or 1) or 1))
+          local name = tostring(offer.info.name or ("Item " .. idx))
+
+          local label
+          if base_amount > 1 then
+            label = string.format("%s x%d (%s)", name, base_amount, short_money(offer.unit_price))
+          else
+            label = string.format("%s (%s)", name, short_money(offer.unit_price))
+          end
+
+          local post = helpers.create_bbs_option(label)
+          post.id = "__itemshopbbs:" .. tostring(idx)
+          table.insert(posts, post)
+          chosen_by_post_id[post.id] = offer
+        end
+
+        local board = ezmenus.open_menu(player_id, title, ITEM_SHOP_BBS_COLOR, posts)
+        local sel = await(board.selection_once())
+        Net.close_bbs(player_id)
+
+        if not sel then break end
+
+        local chosen = chosen_by_post_id[tostring(sel)]
+        if not chosen then break end
+
+        local opt1 = string.format("Buy 1  (%s)", short_money(chosen.unit_price * 1))
+        local opt2 = string.format("Buy 3  (%s)", short_money(chosen.unit_price * 3))
+        local opt3 = "Cancel"
+
+        local res = await(Async.quiz_player(
+          player_id,
+          opt1,
+          opt2,
+          opt3,
+          mug.texture_path,
+          mug.animation_path
+        ))
+
+        -- 0 = Buy 1, 1 = Buy 3, 2/nil = Cancel
+        local qty = (res == 0 and 1) or (res == 1 and 3) or nil
+        if not qty then
+          goto continue
+        end
+
+        local total_cost = chosen.unit_price * qty
+        if total_cost > 0 and not ezmemory.spend_player_money(player_id, total_cost) then
+          await(Async.message_player(
+            player_id,
+            not_enough_msg,
+            mug.texture_path,
+            mug.animation_path
+          ))
+          goto continue
+        end
+
+        local base_amount = math.max(1, math.floor(tonumber(chosen.info.amount or 1) or 1))
+        local grant_info = {
+          name = chosen.info.name,
+          description = chosen.info.description,
+          type = chosen.info.type,
+          amount = base_amount * qty,
+          price = chosen.info.price,
+        }
+
+        await(ezmemory.give_item_with_optional_notify(
+          player_id,
+          area_id,
+          chosen.object_id,
+          grant_info,
+          false
+        ))
+
+        if sfx and sfx.item_get then
+          pcall(Net.play_sound_for_player, player_id, sfx.item_get)
+        end
+
+        await(Async.message_player(
+          player_id,
+          string.format("Purchased x%d %s.", qty, tostring(chosen.info.name or "item")),
+          mug.texture_path,
+          mug.animation_path
+        ))
+
+        ::continue::
+      end
+
+      return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+    end)
+  end
+}
 
 eznpcs.add_event({
   name = "songshop",

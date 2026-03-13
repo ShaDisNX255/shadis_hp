@@ -269,6 +269,7 @@ local Encounter1 = {
     name="Encounter1",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     weight=10,
+    pet_exp=6,
     enemies={
         {name="Ratty",rank=2},
     },
@@ -306,6 +307,7 @@ local Encounter2 = {
     name="Encounter2",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     weight=10,
+    pet_exp=6,
     enemies={
         {name="Swordy",rank=2},
         {name="Fishy",rank=3},
@@ -344,6 +346,7 @@ local Encounter3 = {
     name="Encounter3",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     weight=10,
+    pet_exp=6,
     enemies={
         {name="Quaker",rank=2},
         {name="Quaker",rank=3},
@@ -382,6 +385,7 @@ local Encounter4 = {
     name="Encounter4",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     weight=10,
+    pet_exp=6,
     enemies={
         {name="Chumpy",rank=1},
         {name="MegaCorn",rank=1},
@@ -420,6 +424,7 @@ local Encounter5 = {
     name="Encounter5",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     weight=10,
+    pet_exp=6,
     enemies={
         {name="Powie3",rank=1},
         {name="ColdHead",rank=1},
@@ -459,6 +464,7 @@ local Encounter6 = {
     name="Encounter6",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     weight=10,
+    pet_exp=6,
     enemies={
         {name="Yort",rank=2},
         {name="Doomer",rank=1},
@@ -497,6 +503,7 @@ local Encounter7 = {
     name="Encounter7",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     weight=10,
+    pet_exp=6,
     enemies={
         {name="ColdHead",rank=1},
         {name="Piranha",rank=3},
@@ -536,6 +543,7 @@ local Encounter8 = {
     name="Encounter8",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     weight=10,
+    pet_exp=6,
     enemies={
         {name="Cactroll",rank=1},
         {name="Cacter",rank=1},
@@ -575,6 +583,7 @@ local Encounter9 = {
     name="Encounter9",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     weight=10,
+    pet_exp=7,
     enemies={
         {name="Metrid",rank=2},
         {name="Metrid",rank=3},
@@ -616,6 +625,7 @@ local Encounter10 = {
     name="Encounter10",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     weight=10,
+    pet_exp=7,
     enemies={
         {name="Metrid",rank=4},
         {name="HotHead",rank=1},
@@ -655,6 +665,7 @@ local boss1 = {
     name="boss1",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     weight=5,
+    pet_exp=10,
     enemies={
         {name="GutsManPoN",rank=2},
     },

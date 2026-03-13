@@ -2519,7 +2519,7 @@ local function _pets_auth_renter(player_id, dialogue)
   }
 end
 
-local function start_pet_place_session(player_id, dialogue, pet_id, pet_name)
+local function start_pet_place_session(player_id, dialogue, pet_id, pet_name, pet_uid)
   if not _pets_require() then
     Async.message_player(player_id, "pets.lua is missing required functions (summon/list/remove).")
     return false
@@ -2551,6 +2551,7 @@ local function start_pet_place_session(player_id, dialogue, pet_id, pet_name)
 
     -- pet info
     pet_id = pet_id,
+    pet_uid = pet_uid,
     pet_kind = pet_kind_from_item_id(pet_id),
     owner_secret = auth.owner_secret,
 
@@ -2584,53 +2585,37 @@ local function start_pet_place_session(player_id, dialogue, pet_id, pet_name)
 end
 
 local function place_pet_current(player_id)
-  local s = ONCEHUB.sessions[player_id]; if not (s and s.active and s.mode == 'pet_place') then return end
+  local s = ONCEHUB.sessions[player_id]
+  if not (s and s.active and s.mode == 'pet_place') then return end
   if not s.preview_id then return end
+
   local preview = Net.get_object_by_id(s.area_id, s.preview_id)
   if not preview then return end
 
-  local kind = s.pet_kind
-  if not kind or kind == "" then kind = "mettaur" end
-  kind = tostring(kind):lower()
+  local kind = tostring(s.pet_kind or "mettaur"):lower()
+  if kind == "" then kind = "mettaur" end
 
-  -- Enforce: can't place more than owned
-  local owned = 0
-  if s.pet_id and s.pet_id ~= "" then
-    owned = tonumber(decor_count_owned(player_id, s.pet_id) or 0) or 0
-  end
-
-  -- Count currently summoned pets of this kind in this HP
-  local placed = 0
-  if pets and pets.list_pets then
-    local cur = pets.list_pets(s.bucket_area_id, s.once_key) or {}
-    for _, p in ipairs(cur) do
-      if tostring(p.kind or ""):lower() == kind then
-        placed = placed + 1
-      end
-    end
-  end
-
-  if owned <= 0 then
-    Net.message_player(player_id, "You don't own this pet.")
-    stop_session(player_id, "Summon cancelled.")
-    return
-  end
-
-  if placed >= owned then
-    Net.message_player(player_id, ("No free slots: %d/%d %s already placed. Remove one first.")
-      :format(placed, owned, tostring(s.object_name or "pet")))
-    stop_session(player_id, "Summon cancelled.")
-    return
-  end
-
-  -- snap to nearest tile
   local x = math.floor((preview.x or 0) + 0.5)
   local y = math.floor((preview.y or 0) + 0.5)
   local z = preview.z or 0
 
-  local uid, perr = pets.summon_pet(s.area_id, s.bucket_area_id, s.once_key, kind, x, y, z, s.owner_secret)
+  local uid, perr = pets.summon_pet(
+    s.area_id,
+    s.bucket_area_id,
+    s.once_key,
+    kind,
+    x, y, z,
+    s.owner_secret,
+    s.pet_uid
+  )
+
   if not uid then
-    Net.message_player(player_id, "Couldn't summon pet: "..tostring(perr or "unknown")) -- no await
+    local msg = tostring(perr or "unknown")
+    if msg == "no_available_pet" then
+      Net.message_player(player_id, "That pet is already placed somewhere else or no longer exists.")
+    else
+      Net.message_player(player_id, "Couldn't summon pet: " .. msg)
+    end
     return
   end
 
@@ -2645,50 +2630,48 @@ local function open_pets_summon_menu(player_id, npc, dialogue)
       return
     end
 
-    -- best-effort: ensure any existing pet records are normalized for this HP
+    -- First bind already-placed pets in this HP to the permanent registry
     if pets and pets.rehydrate_for_hp then
       pcall(pets.rehydrate_for_hp, auth.area_id, auth.bucket_area_id, auth.once_key)
     end
 
-    -- Count currently summoned pets in this HP, by kind
-    local placed_by_kind = {}
-    if pets and pets.list_pets then
-      local cur = pets.list_pets(auth.bucket_area_id, auth.once_key) or {}
-      for _, p in ipairs(cur) do
-        local k = tostring(p.kind or ""):lower()
-        if k ~= "" then
-          placed_by_kind[k] = (placed_by_kind[k] or 0) + 1
-        end
-      end
+    -- Then create any missing inventory-only pet instances from legacy counts
+    if pets and pets.ensure_player_pet_ids then
+      pcall(pets.ensure_player_pet_ids, player_id)
+    end
+
+    local owned = {}
+    if pets and pets.list_owned_pets then
+      owned = pets.list_owned_pets(player_id, { only_unplaced = true }) or {}
     end
 
     local posts, index = {}, {}
-    for _, e in ipairs(ONCEHUB_CATALOG) do
-      if is_pet_item_id(e.id) then
-        local owned = decor_count_owned(player_id, e.id)
-        if owned > 0 then
-          local kind = pet_kind_from_item_id(e.id)
-          local placed = placed_by_kind[kind] or 0
-          local free = owned - placed
 
-          local label = string.format("%s (owned %d, placed %d, free %d)",
-            e.name, owned, placed, math.max(0, free))
+    for _, p in ipairs(owned) do
+      local base_name = tostring(p.kind or "pet"):gsub("^%l", string.upper)
+      local display_name = (tostring(p.nickname or "") ~= "" and p.nickname) or base_name
 
-          table.insert(posts, helpers.create_bbs_option(label))
-          index[#posts] = {
-            id = e.id,
-            name = e.name,
-            kind = kind,
-            owned = owned,
-            placed = placed,
-            free = free,
-          }
-        end
-      end
+      local label = string.format(
+        "%s [%s] (uid %s, %s, HP %d, ATK %d)",
+        display_name,
+        base_name,
+        tostring(p.uid),
+        tostring(p.mood or "happy"),
+        tonumber(p.stat_hp or 0) or 0,
+        tonumber(p.stat_attack or 0) or 0
+      )
+
+      table.insert(posts, helpers.create_bbs_option(label))
+      index[#posts] = {
+        uid = p.uid,
+        id = p.item_id or ("pet_" .. tostring(p.kind or "mettaur")),
+        name = display_name,
+        kind = p.kind,
+      }
     end
 
     if #posts == 0 then
-      table.insert(posts, helpers.create_bbs_option("(No pets owned)"))
+      table.insert(posts, helpers.create_bbs_option("(No unplaced pets available)"))
     end
 
     table.insert(posts, helpers.create_bbs_option("Back"))
@@ -2698,22 +2681,17 @@ local function open_pets_summon_menu(player_id, npc, dialogue)
     _oh_log(player_id, "pets summon selection: "..tostring(sel))
     menu_closed_now(player_id, 0.5)
     fast_close_board(player_id)
-    if not sel or sel == "Back" then return end
 
-    -- match selection to an entry
+    if not sel or sel == "Back" or sel == "(No unplaced pets available)" then
+      return
+    end
+
     for i, post in ipairs(posts) do
       local title = post.title or post.id or ""
       if sel == title then
         local chosen = index[i]
         if chosen then
-          if (chosen.free or 0) <= 0 then
-            await(Async.message_player(player_id,
-              ("You already have all of your %s placed. Remove one first."):format(tostring(chosen.name or "pet"))
-            ))
-            return
-          end
-
-          start_pet_place_session(player_id, dialogue, chosen.id, chosen.name)
+          start_pet_place_session(player_id, dialogue, chosen.id, chosen.name, chosen.uid)
           return
         end
       end
@@ -2734,6 +2712,10 @@ local function open_pets_remove_menu(player_id, npc, dialogue)
       pcall(pets.rehydrate_for_hp, auth.area_id, auth.bucket_area_id, auth.once_key)
     end
 
+    if pets and pets.ensure_player_pet_ids then
+      pcall(pets.ensure_player_pet_ids, player_id)
+    end
+
     local list = pets.list_pets(auth.bucket_area_id, auth.once_key) or {}
     local posts, index = {}, {}
 
@@ -2741,7 +2723,16 @@ local function open_pets_remove_menu(player_id, npc, dialogue)
       for _, e in ipairs(list) do
         local kind = tostring(e.kind or "pet")
         local name = kind:gsub("^%l", string.upper)
-        local label = string.format("%s (uid %s)", name, tostring(e.uid))
+        local display_name = (tostring(e.nickname or "") ~= "" and e.nickname) or name
+        local label = string.format(
+          "%s [%s] (uid %s, %s, HP %d, ATK %d)",
+          display_name,
+          name,
+          tostring(e.uid),
+          tostring(e.mood or "happy"),
+          tonumber(e.stat_hp or 0) or 0,
+          tonumber(e.stat_attack or 0) or 0
+        )
         table.insert(posts, helpers.create_bbs_option(label))
         index[#posts] = e
       end
@@ -3463,6 +3454,9 @@ eznpcs.add_event{
         end
 
         decor_add_owned(player_id, chosen.id, qty)  -- persistent add (ONCEHUB_CATALOG-only)
+        if is_pet_item_id(chosen.id) and pets and pets.grant_owned_pet then
+          pcall(pets.grant_owned_pet, player_id, chosen.id, qty)
+        end
         if sfx and sfx.item_get then Net.play_sound_for_player(player_id, sfx.item_get) end
         await(Async.message_player(
           player_id,
