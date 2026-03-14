@@ -396,7 +396,7 @@ local event2 = {
     name="Heel Navi1",
     action=function (npc,player_id,dialogue,relay_object)
         return async(function()
-          local stats = await(ezencounters.begin_encounter(player_id, bossX))
+          local stats = await(ezencounters.begin_encounter(player_id, boss2))
           local flags = _encounter_result_flags(stats)
 
           if flags.ran or flags.lost then
@@ -472,7 +472,9 @@ local boss4 = {
         {2,2,2,1,1,1},
     },
     music={
-        path="bn3_boss.mid"
+        path="exe3-boss.ogg",
+        loop_start = 7535,
+        loop_end = 39259,
     },
 }
 
@@ -480,7 +482,7 @@ local event4 = {
     name="Proto Battle",
     action=function (npc,player_id,dialogue,relay_object)
         return async(function()
-          local stats = await(ezencounters.begin_encounter(player_id, bossX))
+          local stats = await(ezencounters.begin_encounter(player_id, boss4))
           local flags = _encounter_result_flags(stats)
 
           if flags.ran or flags.lost then
@@ -528,7 +530,9 @@ local boss5 = {
         {2,2,2,1,1,1},
     },
     music={
-        path="bn3_boss.mid"
+        path="exe3-boss.ogg",
+        loop_start = 7535,
+        loop_end = 39259,
     },
 }
 
@@ -536,7 +540,7 @@ local event5 = {
     name="Roll Battle",
     action=function (npc,player_id,dialogue,relay_object)
         return async(function()
-          local stats = await(ezencounters.begin_encounter(player_id, bossX))
+          local stats = await(ezencounters.begin_encounter(player_id, boss5))
           local flags = _encounter_result_flags(stats)
 
           if flags.ran or flags.lost then
@@ -584,7 +588,9 @@ local boss6 = {
         {2,2,2,1,1,1},
     },
     music={
-        path="bn3_boss.mid"
+        path="exe3-boss.ogg",
+        loop_start = 7535,
+        loop_end = 39259,
     },
 }
 
@@ -592,7 +598,7 @@ local event6 = {
     name="Guts Battle",
     action=function (npc,player_id,dialogue,relay_object)
         return async(function()
-          local stats = await(ezencounters.begin_encounter(player_id, bossX))
+          local stats = await(ezencounters.begin_encounter(player_id, boss6))
           local flags = _encounter_result_flags(stats)
 
           if flags.ran or flags.lost then
@@ -640,7 +646,9 @@ local boss7 = {
         {2,2,2,1,1,1},
     },
     music={
-        path="bn3_boss.mid"
+        path="exe3-boss.ogg",
+        loop_start = 7535,
+        loop_end = 39259,
     },
 }
 
@@ -648,7 +656,7 @@ local event7 = {
     name="Guts3 Battle",
     action=function (npc,player_id,dialogue,relay_object)
         return async(function()
-          local stats = await(ezencounters.begin_encounter(player_id, bossX))
+          local stats = await(ezencounters.begin_encounter(player_id, boss7))
           local flags = _encounter_result_flags(stats)
 
           if flags.ran or flags.lost then
@@ -696,7 +704,9 @@ local boss8 = {
         {2,2,2,1,1,1},
     },
     music={
-        path="bn3_boss.mid"
+        path="exe3-boss.ogg",
+        loop_start = 7535,
+        loop_end = 39259,
     },
 }
 
@@ -704,7 +714,7 @@ local event8 = {
     name="GregarB Battle",
     action=function (npc,player_id,dialogue,relay_object)
         return async(function()
-          local stats = await(ezencounters.begin_encounter(player_id, bossX))
+          local stats = await(ezencounters.begin_encounter(player_id, boss8))
           local flags = _encounter_result_flags(stats)
 
           if flags.ran or flags.lost then
@@ -2398,7 +2408,7 @@ local EchoProgram_Battle = {
     name="EchoProgram Battle",
     action=function(npc, player_id, dialogue, relay_object)
         return async(function()
-          local stats = await(ezencounters.begin_encounter(player_id, bossX))
+          local stats = await(ezencounters.begin_encounter(player_id, echo_boss))
           local flags = _encounter_result_flags(stats)
 
           if flags.ran or flags.lost then
