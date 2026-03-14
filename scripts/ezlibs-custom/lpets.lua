@@ -192,7 +192,7 @@ local function open_companion_picker(pid, allow_replace)
   log("lpets picker selection = " .. sel)
 
   close_menu(pid, board, "lpets:pick_close")
-  await(Async.sleep(0.05))
+  await(Async.sleep(0.25))
 
   if sel == "" or sel == "__lpets:back" or sel == "Back" then
     LPets.open_pets_board(pid)
@@ -265,7 +265,7 @@ local function open_pet_chip_picker(pid, info)
   log("lpets chip selection = " .. sel)
 
   close_menu(pid, board, "lpets:chip_pick_close")
-  await(Async.sleep(0.05))
+  await(Async.sleep(0.25))
 
   if sel == "" or sel == "__lpets:back" or sel == "Back" then
     LPets.open_pets_board(pid)
@@ -366,7 +366,7 @@ local function open_pet_xp_board(pid, info)
   log("lpets xp selection = " .. sel)
 
   close_menu(pid, board, "lpets:xp_close")
-  await(Async.sleep(0.05))
+  await(Async.sleep(0.25))
 
   if sel == "" or sel == "__lpets:back" or sel == "Back" then
     LPets.open_pets_board(pid)
@@ -460,7 +460,7 @@ local function open_pets_board_async(pid)
     log("lpets empty selection = " .. sel)
 
     close_menu(pid, board, "lpets:main_empty_close")
-    await(Async.sleep(0.05))
+    await(Async.sleep(0.25))
 
     if sel == "__lpets:choose" or sel == "(No pet selected)" then
       open_companion_picker(pid, false)
@@ -515,7 +515,7 @@ local function open_pets_board_async(pid)
   log("lpets full selection = " .. sel)
 
   close_menu(pid, board, "lpets:main_full_close")
-  await(Async.sleep(0.05))
+  await(Async.sleep(0.25))
 
   if sel == "" or sel == "__lpets:back" or sel == "Back" then
     return
