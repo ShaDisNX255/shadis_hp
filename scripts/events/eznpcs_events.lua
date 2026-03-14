@@ -321,6 +321,41 @@ local event1 = {
 }
 eznpcs.add_event(event1)
 
+local function _encounter_result_flags(stats)
+    local reason = tonumber(stats and stats.reason or 0) or 0
+    local hp = tonumber(stats and (stats.health or stats.player_hp or stats.hp) or 0) or 0
+
+    local ran, won, lost = false, false, false
+
+    if reason == 1 then        -- battle won
+        won = true
+    elseif reason == 2 then    -- battle lost
+        lost = true
+    elseif reason == 3 then    -- ran with L
+        ran = true
+    elseif reason == 4 then    -- ESC / dev escape
+        ran = true
+    else
+        -- backwards compatibility with older builds
+        ran = stats and (stats.ran or stats.fled or stats.escape) or false
+        if not ran then
+            if hp > 0 then
+                won = true
+            else
+                lost = true
+            end
+        end
+    end
+
+    return {
+        reason = reason,
+        hp = hp,
+        ran = ran,
+        won = won,
+        lost = lost,
+    }
+end
+
 local boss2 = {
     name="boss2",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
@@ -361,12 +396,14 @@ local event2 = {
     name="Heel Navi1",
     action=function (npc,player_id,dialogue,relay_object)
         return async(function()
-        local stats = await(ezencounters.begin_encounter(player_id, boss2))
-            if stats.ran or stats.health == 0 then
-                return dialogue.custom_properties["Battle Lost"]
-            else
-                return dialogue.custom_properties["Battle Won"]
-            end
+          local stats = await(ezencounters.begin_encounter(player_id, bossX))
+          local flags = _encounter_result_flags(stats)
+
+          if flags.ran or flags.lost then
+              return dialogue.custom_properties["Battle Lost"]
+          else
+              return dialogue.custom_properties["Battle Won"]
+          end
         end)
     end
 }
@@ -443,12 +480,14 @@ local event4 = {
     name="Proto Battle",
     action=function (npc,player_id,dialogue,relay_object)
         return async(function()
-        local stats = await(ezencounters.begin_encounter(player_id, boss4))
-            if stats.ran or stats.health == 0 then
-                return dialogue.custom_properties["Battle Lost"]
-            else
-                return dialogue.custom_properties["Battle Won"]
-            end
+          local stats = await(ezencounters.begin_encounter(player_id, bossX))
+          local flags = _encounter_result_flags(stats)
+
+          if flags.ran or flags.lost then
+              return dialogue.custom_properties["Battle Lost"]
+          else
+              return dialogue.custom_properties["Battle Won"]
+          end
         end)
     end
 }
@@ -497,12 +536,14 @@ local event5 = {
     name="Roll Battle",
     action=function (npc,player_id,dialogue,relay_object)
         return async(function()
-        local stats = await(ezencounters.begin_encounter(player_id, boss5))
-            if stats.ran or stats.health == 0 then
-                return dialogue.custom_properties["Battle Lost"]
-            else
-                return dialogue.custom_properties["Battle Won"]
-            end
+          local stats = await(ezencounters.begin_encounter(player_id, bossX))
+          local flags = _encounter_result_flags(stats)
+
+          if flags.ran or flags.lost then
+              return dialogue.custom_properties["Battle Lost"]
+          else
+              return dialogue.custom_properties["Battle Won"]
+          end
         end)
     end
 }
@@ -551,12 +592,14 @@ local event6 = {
     name="Guts Battle",
     action=function (npc,player_id,dialogue,relay_object)
         return async(function()
-        local stats = await(ezencounters.begin_encounter(player_id, boss6))
-            if stats.ran or stats.health == 0 then
-                return dialogue.custom_properties["Battle Lost"]
-            else
-                return dialogue.custom_properties["Battle Won"]
-            end
+          local stats = await(ezencounters.begin_encounter(player_id, bossX))
+          local flags = _encounter_result_flags(stats)
+
+          if flags.ran or flags.lost then
+              return dialogue.custom_properties["Battle Lost"]
+          else
+              return dialogue.custom_properties["Battle Won"]
+          end
         end)
     end
 }
@@ -605,12 +648,14 @@ local event7 = {
     name="Guts3 Battle",
     action=function (npc,player_id,dialogue,relay_object)
         return async(function()
-        local stats = await(ezencounters.begin_encounter(player_id, boss7))
-            if stats.ran or stats.health == 0 then
-                return dialogue.custom_properties["Battle Lost"]
-            else
-                return dialogue.custom_properties["Battle Won"]
-            end
+          local stats = await(ezencounters.begin_encounter(player_id, bossX))
+          local flags = _encounter_result_flags(stats)
+
+          if flags.ran or flags.lost then
+              return dialogue.custom_properties["Battle Lost"]
+          else
+              return dialogue.custom_properties["Battle Won"]
+          end
         end)
     end
 }
@@ -659,12 +704,14 @@ local event8 = {
     name="GregarB Battle",
     action=function (npc,player_id,dialogue,relay_object)
         return async(function()
-        local stats = await(ezencounters.begin_encounter(player_id, boss8))
-            if stats.ran or stats.health == 0 then
-                return dialogue.custom_properties["Battle Lost"]
-            else
-                return dialogue.custom_properties["Battle Won"]
-            end
+          local stats = await(ezencounters.begin_encounter(player_id, bossX))
+          local flags = _encounter_result_flags(stats)
+
+          if flags.ran or flags.lost then
+              return dialogue.custom_properties["Battle Lost"]
+          else
+              return dialogue.custom_properties["Battle Won"]
+          end
         end)
     end
 }
@@ -2351,12 +2398,14 @@ local EchoProgram_Battle = {
     name="EchoProgram Battle",
     action=function(npc, player_id, dialogue, relay_object)
         return async(function()
-            local stats = await(ezencounters.begin_encounter(player_id, echo_boss))
-            if stats.ran or stats.health == 0 then
-                return dialogue.custom_properties["Battle Lost"]
-            else
-                return dialogue.custom_properties["Battle Won"]
-            end
+          local stats = await(ezencounters.begin_encounter(player_id, bossX))
+          local flags = _encounter_result_flags(stats)
+
+          if flags.ran or flags.lost then
+              return dialogue.custom_properties["Battle Lost"]
+          else
+              return dialogue.custom_properties["Battle Won"]
+          end
         end)
     end
 }
