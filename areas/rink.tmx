@@ -35,26 +35,27 @@
  <tileset firstgid="420" source="../assets/fishing/timer/5.tsx"/>
  <tileset firstgid="421" source="../assets/fishing/ex.tsx"/>
  <tileset firstgid="422" source="../assets/fishing/icy-normal/0.tsx"/>
- <tileset firstgid="423" source="../assets/fishing/icy-normal/1.tsx"/>
- <tileset firstgid="424" source="../assets/fishing/icy-normal/2.tsx"/>
- <tileset firstgid="425" source="../assets/fishing/icy-normal/3.tsx"/>
- <tileset firstgid="426" source="../assets/fishing/icy-normal/4.tsx"/>
- <tileset firstgid="427" source="../assets/fishing/icy-normal/5.tsx"/>
- <tileset firstgid="428" source="../assets/fishing/icy-normal/6.tsx"/>
- <tileset firstgid="429" source="../assets/fishing/icy-normal/7.tsx"/>
- <tileset firstgid="430" source="../assets/fishing/icy-normal/8.tsx"/>
- <tileset firstgid="431" source="../assets/fishing/icy-normal/9.tsx"/>
- <tileset firstgid="432" source="../assets/fishing/icy-normal/10.tsx"/>
- <tileset firstgid="433" source="../assets/fishing/icy-sweet/0.tsx"/>
- <tileset firstgid="434" source="../assets/fishing/icy-sweet/1.tsx"/>
- <tileset firstgid="435" source="../assets/fishing/icy-sweet/2.tsx"/>
- <tileset firstgid="436" source="../assets/fishing/icy-sweet/3.tsx"/>
- <tileset firstgid="437" source="../assets/fishing/icy-sweet/4.tsx"/>
- <tileset firstgid="438" source="../assets/fishing/icy-sweet/5.tsx"/>
- <tileset firstgid="439" source="../assets/fishing/icy-sweet/6.tsx"/>
- <tileset firstgid="440" source="../assets/fishing/icy-sweet/7.tsx"/>
- <tileset firstgid="441" source="../assets/fishing/icy-sweet/8.tsx"/>
- <tileset firstgid="442" source="../assets/fishing/icy-sweet/9.tsx"/>
+ <tileset firstgid="422" source="../assets/fishing/icy-normal/1.tsx"/>
+ <tileset firstgid="422" source="../assets/fishing/icy-normal/2.tsx"/>
+ <tileset firstgid="422" source="../assets/fishing/icy-normal/3.tsx"/>
+ <tileset firstgid="422" source="../assets/fishing/icy-normal/4.tsx"/>
+ <tileset firstgid="422" source="../assets/fishing/icy-normal/5.tsx"/>
+ <tileset firstgid="422" source="../assets/fishing/icy-normal/6.tsx"/>
+ <tileset firstgid="422" source="../assets/fishing/icy-normal/7.tsx"/>
+ <tileset firstgid="422" source="../assets/fishing/icy-normal/8.tsx"/>
+ <tileset firstgid="422" source="../assets/fishing/icy-normal/9.tsx"/>
+ <tileset firstgid="422" source="../assets/fishing/icy-normal/10.tsx"/>
+ <tileset firstgid="422" source="../assets/fishing/icy-sweet/0.tsx"/>
+ <tileset firstgid="422" source="../assets/fishing/icy-sweet/1.tsx"/>
+ <tileset firstgid="422" source="../assets/fishing/icy-sweet/2.tsx"/>
+ <tileset firstgid="422" source="../assets/fishing/icy-sweet/3.tsx"/>
+ <tileset firstgid="422" source="../assets/fishing/icy-sweet/4.tsx"/>
+ <tileset firstgid="422" source="../assets/fishing/icy-sweet/5.tsx"/>
+ <tileset firstgid="422" source="../assets/fishing/icy-sweet/6.tsx"/>
+ <tileset firstgid="422" source="../assets/fishing/icy-sweet/7.tsx"/>
+ <tileset firstgid="422" source="../assets/fishing/icy-sweet/8.tsx"/>
+ <tileset firstgid="422" source="../assets/fishing/icy-sweet/9.tsx"/>
+ <tileset firstgid="422" source="../assets/tiles/ice-clean-darker.tsx"/>
  <layer id="1" name="Tile Layer 1" width="50" height="50">
   <data encoding="csv">
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -78,22 +79,22 @@
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,8,8,8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,391,391,391,8,7,8,391,7,7,391,8,391,391,391,8,8,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,391,356,356,356,356,356,356,356,356,356,356,356,356,356,356,356,356,391,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,391,356,7,356,356,356,356,356,356,356,8,356,356,356,356,356,356,391,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,391,7,356,356,356,356,356,356,356,356,356,356,356,356,356,356,356,391,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,391,356,356,356,356,356,356,356,8,8,356,356,8,8,356,356,356,391,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,391,7,356,356,8,356,356,356,356,356,8,356,356,356,356,356,356,391,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,356,356,356,8,356,356,356,356,356,7,356,356,356,356,356,356,391,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,391,356,356,7,356,356,356,356,356,356,356,356,356,356,356,356,356,391,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,391,356,356,356,356,356,356,356,356,356,356,356,356,356,356,356,356,391,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,279,7,391,391,356,356,356,356,356,7,356,356,356,356,356,356,356,356,356,7,391,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,278,8,7,391,8,356,356,356,356,7,356,356,356,356,356,356,356,356,356,356,391,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,277,7,391,391,7,356,356,356,356,356,8,356,356,356,356,356,8,356,8,8,391,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,391,356,8,8,8,8,356,356,356,356,356,356,356,7,7,356,8,391,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,391,356,8,356,356,356,356,356,356,356,8,356,356,356,356,356,356,391,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,391,356,356,356,356,356,356,356,356,356,8,356,356,356,356,8,356,391,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,391,391,391,391,391,391,391,391,391,391,391,391,391,391,391,391,391,391,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,380,380,380,8,7,8,380,7,7,380,8,380,380,380,8,8,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,380,380,380,380,380,380,380,380,380,380,380,380,380,380,380,380,380,380,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,380,380,7,380,380,380,380,380,380,380,8,380,380,380,380,380,380,380,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,380,7,380,380,380,380,380,380,380,380,380,380,380,380,380,380,380,380,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,380,380,380,380,380,380,380,380,8,8,380,380,8,8,380,380,380,380,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,380,7,380,380,8,380,380,380,380,380,8,380,380,380,380,380,380,380,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,380,380,380,8,380,380,380,380,380,7,380,380,380,380,380,380,380,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,380,380,380,7,380,380,380,380,380,380,380,380,380,380,380,380,380,380,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,380,380,380,380,380,380,380,380,380,380,380,380,380,380,380,380,380,380,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,279,7,380,380,380,380,380,380,380,7,380,380,380,380,380,380,380,380,380,7,380,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,278,8,7,380,8,380,380,380,380,7,380,380,380,380,380,380,380,380,380,380,380,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,277,7,380,380,7,380,380,380,380,380,8,380,380,380,380,380,8,380,8,8,380,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,380,380,8,8,8,8,380,380,380,380,380,380,380,7,7,380,8,380,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,380,380,8,380,380,380,380,380,380,380,8,380,380,380,380,380,380,380,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,380,380,380,380,380,380,380,380,380,380,8,380,380,380,380,8,380,380,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,380,380,380,380,380,380,380,380,380,380,380,380,380,380,380,380,380,380,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,3,5,7,1,3,5,7,1,3,5,7,1,3,5,7,1,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8,6,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -614,11 +615,11 @@
    <properties>
     <property name="Asset Name" value="zarymura"/>
     <property name="Dialogue Type" value="questcheck"/>
-    <property name="Quest Name" value="EchoProgram"/>
+    <property name="Direction" value="Up Left"/>
     <property name="Flag Name" value="need_zary_surface"/>
     <property name="Next 1" type="object" value="167"/>
     <property name="Next 2" type="object" value="180"/>
-    <property name="Direction" value="Up Left"/>
+    <property name="Quest Name" value="EchoProgram"/>
    </properties>
    <point/>
   </object>
@@ -673,7 +674,6 @@
    </properties>
    <point/>
   </object>
-
   <object id="165" name="OffclChip" type="Item" x="770" y="1460">
    <properties>
     <property name="Description" value="A blank-crest NaviChip stamped by the Officials. It doesn't function."/>
@@ -683,7 +683,6 @@
    </properties>
    <point/>
   </object>
-
   <object id="166" name="Zary_DefaultGreeting" type="Dialogue" x="740" y="1510">
    <properties>
     <property name="Dialogue Type" value="first"/>
@@ -692,7 +691,6 @@
    </properties>
    <point/>
   </object>
-
   <object id="179" name="EP_Zary_AfterOfficial" type="Dialogue" x="740" y="1550">
    <properties>
     <property name="Dialogue Type" value="first"/>
@@ -700,28 +698,24 @@
    </properties>
    <point/>
   </object>
-
   <object id="180" name="Zary_PostRouter" type="Dialogue" x="700" y="1550">
    <properties>
     <property name="Dialogue Type" value="questcheck"/>
-    <property name="Quest Name" value="EchoProgram"/>
     <property name="Flag Name" value="need_protoman"/>
     <property name="Next 1" type="object" value="179"/>
     <property name="Next 2" type="object" value="166"/>
+    <property name="Quest Name" value="EchoProgram"/>
    </properties>
    <point/>
   </object>
-
-  <!-- Zarymura story -->
   <object id="167" name="EP_Zary_Surface_1" type="Dialogue" x="780" y="1510">
-    <properties>
-      <property name="Dialogue Type" value="first"/>
-      <property name="Next 1" type="object" value="169"/>
-      <property name="Text 1" value="That battlechip isn't a DarkChip. It's an official battle chip for sure but it's incomplete. It has the programming of a Navi in there for sure. Here, let me help you out a bit."/>
-    </properties>
-    <point/>
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="169"/>
+    <property name="Text 1" value="That battlechip isn't a DarkChip. It's an official battle chip for sure but it's incomplete. It has the programming of a Navi in there for sure. Here, let me help you out a bit."/>
+   </properties>
+   <point/>
   </object>
-
   <object id="169" name="EP_Zary_NarrHand" type="Dialogue" x="860" y="1510">
    <properties>
     <property name="Dialogue Type" value="first"/>
@@ -731,18 +725,16 @@
    </properties>
    <point/>
   </object>
-
   <object id="170" name="EP_Zary_TakeSuppressed" type="Dialogue" x="900" y="1510">
    <properties>
     <property name="Dialogue Type" value="itemcheck"/>
     <property name="Item 1" type="object" value="164"/>
-    <property name="Take Item" value="true"/>
     <property name="Next 1" type="object" value="171"/>
     <property name="Next 2" type="object" value="178"/>
+    <property name="Take Item" value="true"/>
    </properties>
    <point/>
   </object>
-
   <object id="178" name="EP_Zary_Missing" type="Dialogue" x="900" y="1550">
    <properties>
     <property name="Dialogue Type" value="first"/>
@@ -750,7 +742,6 @@
    </properties>
    <point/>
   </object>
-
   <object id="171" name="EP_Zary_Surface_3" type="Dialogue" x="940" y="1510">
    <properties>
     <property name="Dialogue Type" value="first"/>
@@ -759,7 +750,6 @@
    </properties>
    <point/>
   </object>
-
   <object id="172" name="EP_Zary_Surface_4" type="Dialogue" x="980" y="1510">
    <properties>
     <property name="Dialogue Type" value="first"/>
@@ -768,7 +758,6 @@
    </properties>
    <point/>
   </object>
-
   <object id="173" name="EP_Zary_Surface_5" type="Dialogue" x="1020" y="1510">
    <properties>
     <property name="Dialogue Type" value="first"/>
@@ -777,7 +766,6 @@
    </properties>
    <point/>
   </object>
-
   <object id="174" name="EP_Zary_GiveOfficial" type="Dialogue" x="1060" y="1510">
    <properties>
     <property name="Dialogue Type" value="item"/>
@@ -786,7 +774,6 @@
    </properties>
    <point/>
   </object>
-
   <object id="175" name="EP_Zary_YouGotOfficial" type="Dialogue" x="1100" y="1510">
    <properties>
     <property name="Dialogue Type" value="first"/>
@@ -796,7 +783,6 @@
    </properties>
    <point/>
   </object>
-
   <object id="176" name="EP_Zary_Surface_6" type="Dialogue" x="1140" y="1510">
    <properties>
     <property name="Dialogue Type" value="first"/>
@@ -805,12 +791,11 @@
    </properties>
    <point/>
   </object>
-
   <object id="177" name="EP_Zary_QuestEvent" type="Dialogue" x="1180" y="1510">
    <properties>
     <property name="Dialogue Type" value="quest_event"/>
-    <property name="Quest Name" value="EchoProgram"/>
     <property name="Event Value" value="zary_reveal_official"/>
+    <property name="Quest Name" value="EchoProgram"/>
    </properties>
    <point/>
   </object>
