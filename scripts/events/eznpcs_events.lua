@@ -616,7 +616,7 @@ local boss7 = {
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     pet_exp=9,
     enemies={
-        {name="GutsManPoN",rank=3},
+        {name="GutsManEXE3",rank=3},
     },
     obstacles={
     },
