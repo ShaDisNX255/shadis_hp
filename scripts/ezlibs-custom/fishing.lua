@@ -8,7 +8,7 @@ local ezmemory     = require('scripts/ezlibs-scripts/ezmemory')
 local ezencounters = require('scripts/ezlibs-scripts/ezencounters/main')
 local config = require('scripts/fishing-config/main')
 local Constants = config.CONSTANTS
-local NetGames     = require('scripts/net-games/framework')
+local NetGames     = require('scripts/net-games/main')
 
 -- Per-area resolvers (fallback to defaults if not defined)
 local function _C_for(area_id)

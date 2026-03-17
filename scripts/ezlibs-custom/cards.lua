@@ -10,9 +10,9 @@ _G.Cards = Cards
 -- net-games framework (sprites-api wrapper)
 -- ---------------------------------------------------------------------------
 
-local frame_ok, frame = pcall(require, "scripts/net-games/framework")
+local frame_ok, frame = pcall(require, "scripts/net-games/main")
 if not frame_ok or not frame then
-  print("[Cards] ERROR: failed to require scripts/net-games/framework; Cards disabled.")
+  print("[Cards] ERROR: failed to require scripts/net-games/main; Cards disabled.")
   return Cards
 end
 
@@ -836,17 +836,34 @@ local function safe_add(sprite_id, pid, texture, anim, state, x, y, z, sx, sy)
   frame.add_ui_element(sprite_id, pid, texture, anim, state, x, y, z, sx, sy)
 end
 
+local function safe_move(sprite_id, pid, x, y, z)
+  if not (frame and sprite_id) then return false end
+
+  if type(frame.update_ui_position) == "function" then
+    return pcall(frame.update_ui_position, sprite_id, pid, x, y, z)
+  end
+
+  if type(frame.update_ui_element) == "function" then
+    local props = { x = x, y = y }
+    if z ~= nil then props.z = z end
+    return pcall(frame.update_ui_element, sprite_id, pid, props)
+  end
+
+  return false
+end
+
 local function safe_set_state(sprite_id, pid, state)
   if not (frame and sprite_id and state) then return false end
 
   -- Different net-games forks name this slightly differently.
-  local fns = {
-    "update_ui_state",
-    "update_ui_animation_state",
-    "update_ui_anim_state",
-    "set_ui_state",
-    "set_ui_animation_state",
-  }
+local fns = {
+  "update_ui_state",
+  "update_ui_animation_state",
+  "update_ui_anim_state",
+  "set_ui_state",
+  "set_ui_animation_state",
+  "set_ui_animation",
+}
 
   for _, fn in ipairs(fns) do
     local f = frame[fn]
@@ -984,8 +1001,6 @@ end
 
 local function draw_scrollwheel(pid, y)
   safe_remove(cfg.scroll_sprite_id, pid)
-  safe_remove(cfg.rarity_icon_sprite_id, pid)
-  safe_remove(cfg.rarity_sparkle_sprite_id, pid)
   safe_add(
     cfg.scroll_sprite_id,
     pid,
@@ -1582,12 +1597,21 @@ local function update_cursor_position(pid)
   local x = cfg.cursor_x
   local y = cfg.list_y + (line - 1) * cfg.list_row_advance + cfg.cursor_y_offset
 
-  if frame.update_ui_position then
-    pcall(frame.update_ui_position, cfg.cursor_sprite_id, pid, x, y, cfg.cursor_z)
-  else
-    -- Fallback: rebuild cursor
-    draw_cursor(pid)
-    pcall(frame.update_ui_position, cfg.cursor_sprite_id, pid, x, y, cfg.cursor_z)
+  local ok = safe_move(cfg.cursor_sprite_id, pid, x, y, cfg.cursor_z)
+  if not ok then
+    safe_remove(cfg.cursor_sprite_id, pid)
+    safe_add(
+      cfg.cursor_sprite_id,
+      pid,
+      cfg.cursor_texture,
+      cfg.cursor_anim,
+      cfg.cursor_state,
+      x,
+      y,
+      cfg.cursor_z,
+      cfg.cursor_scale,
+      cfg.cursor_scale
+    )
   end
 end
 
@@ -1613,12 +1637,11 @@ end
 
 local function update_scrollwheel(pid)
   local y = compute_scrollwheel_y(pid)
-  if frame.update_ui_position then
-    local ok = pcall(frame.update_ui_position, cfg.scroll_sprite_id, pid, cfg.scroll_x, y, cfg.scroll_z)
-    if ok then return end
+
+  local ok = safe_move(cfg.scroll_sprite_id, pid, cfg.scroll_x, y, cfg.scroll_z)
+  if not ok then
+    draw_scrollwheel(pid, y)
   end
-  -- fallback: rebuild
-  draw_scrollwheel(pid, y)
 end
 
 local function list_rarity_ids(line_index)
@@ -1785,9 +1808,7 @@ local function update_rarity_sparkle(pid, rarity_state)
   end
 
   local x, y = rarity_sparkle_xy()
-  if frame.update_ui_position then
-    pcall(frame.update_ui_position, cfg.rarity_sparkle_sprite_id, pid, x, y, cfg.rarity_sparkle_z)
-  end
+  safe_move(cfg.rarity_sparkle_sprite_id, pid, x, y, cfg.rarity_sparkle_z)
 end
 
 local function clear_rarity_icon(pid)
@@ -1842,9 +1863,7 @@ local function update_rarity_icon(pid, raw_tag)
 
   -- Same state: just keep it positioned (in case knobs changed)
   if st.current_rarity_state == state then
-    if frame.update_ui_position then
-      pcall(frame.update_ui_position, cfg.rarity_icon_sprite_id, pid, x, y, cfg.rarity_icon_z)
-    end
+    safe_move(cfg.rarity_icon_sprite_id, pid, x, y, cfg.rarity_icon_z)
     update_rarity_sparkle(pid, state)
     return
   end
@@ -1852,9 +1871,7 @@ local function update_rarity_icon(pid, raw_tag)
   -- Try to swap animation state without rebuilding, else rebuild.
   if safe_set_state(cfg.rarity_icon_sprite_id, pid, state) then
     st.current_rarity_state = state
-    if frame.update_ui_position then
-      pcall(frame.update_ui_position, cfg.rarity_icon_sprite_id, pid, x, y, cfg.rarity_icon_z)
-    end
+    safe_move(cfg.rarity_icon_sprite_id, pid, x, y, cfg.rarity_icon_z)
     update_rarity_sparkle(pid, state)
     return
   end

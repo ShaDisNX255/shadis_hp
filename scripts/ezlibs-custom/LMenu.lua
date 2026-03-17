@@ -91,9 +91,9 @@ end
 -- net-games framework
 -- ---------------------------------------------------------------------------
 
-local frame_ok, frame = pcall(require, "scripts/net-games/framework")
+local frame_ok, frame = pcall(require, "scripts/net-games/main")
 if not frame_ok or not frame then
-  print("[LMenu] ERROR: failed to require scripts/net-games/framework; LMenu disabled.")
+  print("[LMenu] ERROR: failed to require scripts/net-games/main; LMenu disabled.")
   return LMenu
 end
 
@@ -1248,6 +1248,27 @@ local function handle_lmenu_button(pid, btn)
   end
 end
 
+-- Legacy compatibility for older UIs/scripts that still listen for button_press
+local function emit_legacy_button_press(player_id, button)
+    if not player_id then return end
+
+    if button == 0 then
+        Net:emit("button_press", { player_id = player_id, button = "A" })
+    elseif button == 1 then
+        Net:emit("button_press", { player_id = player_id, button = "LS" })
+    end
+end
+
+Net:on("actor_interaction", function(event)
+    if not event then return end
+    emit_legacy_button_press(event.player_id, event.button)
+end)
+
+Net:on("tile_interaction", function(event)
+    if not event then return end
+    emit_legacy_button_press(event.player_id, event.button)
+end)
+
 -- ---------------------------------------------------------------------------
 -- Button handling: opener via Net:on("button_press"),
 -- navigation via Net:on("virtual_input")
@@ -1536,7 +1557,7 @@ if Net and Net.on then
     end
   end)
 
-  Net:on("area_transfer", function(e)
+  Net:on("player_area_transfer", function(e)
     if e and e.player_id then
       -- Area change: close UIs so states don't leak between maps
       if Cards and type(Cards.close) == "function" then

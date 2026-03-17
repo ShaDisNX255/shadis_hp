@@ -8,9 +8,9 @@ _G.Cosmetics = Cosmetics -- optional global convenience
 -- net-games framework
 -- ---------------------------------------------------------------------------
 
-local frame_ok, frame = pcall(require, "scripts/net-games/framework")
+local frame_ok, frame = pcall(require, "scripts/net-games/main")
 if not frame_ok or not frame then
-  print("[Cosmetics] ERROR: failed to require scripts/net-games/framework; cosmetics submenu disabled.")
+  print("[Cosmetics] ERROR: failed to require scripts/net-games/main; cosmetics submenu disabled.")
   return Cosmetics
 end
 

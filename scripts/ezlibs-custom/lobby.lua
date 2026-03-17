@@ -9,9 +9,9 @@ _G.Lobby = Lobby
 -- ---------------------------------------------------------------------------
 -- net-games framework (UI sprite wrapper)
 -- ---------------------------------------------------------------------------
-local frame_ok, frame = pcall(require, "scripts/net-games/framework")
+local frame_ok, frame = pcall(require, "scripts/net-games/main")
 if not frame_ok or not frame then
-  print("[lobby] ERROR: failed to require scripts/net-games/framework; lobby UI disabled.")
+  print("[lobby] ERROR: failed to require scripts/net-games/main; lobby UI disabled.")
   return Lobby
 end
 
