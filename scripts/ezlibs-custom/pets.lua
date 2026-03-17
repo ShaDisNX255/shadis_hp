@@ -154,14 +154,14 @@ EXPEDITION.duration_sec = math.max(1, math.floor((tonumber(EXPEDITION.duration_m
 
 -- ====================== Pet Definitions ======================
 local PET_DEFS = {
-  mettaur = { name = "Mettaur", texture = "mettaur.png", animation = "mettaur.animation" },
-  meddy  = { name = "Meddy",  texture = "meddy.png",  animation = "meddy.animation"  },
-  ratty  = { name = "Ratty",  texture = "ratty.png",  animation = "ratty.animation"  },
-  spooky  = { name = "Spooky",  texture = "spooky.png",  animation = "spooky.animation"  },
-  swordy  = { name = "Swordy",  texture = "Swordy.png",  animation = "Swordy.animation"  },
-  moloko  = { name = "Moloko",  texture = "Moloko.png",  animation = "Moloko.animation"  },
-  powie  = { name = "Powie",  texture = "Powie.png",  animation = "Powie.animation"  },
-  kabutank  = { name = "Kabutank",  texture = "kabutank.png",  animation = "kabutank.animation"  },
+  mettaur  = { name = "Mettaur",  texture = "mettaur.png",  animation = "mettaur.animation",  texture_r2 = "mettaur-r2.png",  texture_r3 = "mettaur-r3.png"  },
+  meddy    = { name = "Meddy",    texture = "meddy.png",    animation = "meddy.animation",    texture_r2 = "meddy-r2.png",    texture_r3 = "meddy-r3.png"    },
+  ratty    = { name = "Ratty",    texture = "ratty.png",    animation = "ratty.animation",    texture_r2 = "ratty-r2.png",    texture_r3 = "ratty-r3.png"    },
+  spooky   = { name = "Spooky",   texture = "spooky.png",   animation = "spooky.animation",   texture_r2 = "spooky-r2.png",   texture_r3 = "spooky-r3.png"   },
+  swordy   = { name = "Swordy",   texture = "swordy.png",   animation = "swordy.animation",   texture_r2 = "swordy-r2.png",   texture_r3 = "swordy-r3.png"   },
+  moloko   = { name = "Moloko",   texture = "moloko.png",   animation = "moloko.animation",   texture_r2 = "moloko-r2.png",   texture_r3 = "moloko-r3.png"   },
+  powie    = { name = "Powie",    texture = "powie.png",    animation = "powie.animation",    texture_r2 = "mowie-r2.png",    texture_r3 = "powie-r3.png"    },
+  kabutank = { name = "Kabutank", texture = "kabutank.png", animation = "kabutank.animation", texture_r2 = "kabutank-r2.png", texture_r3 = "kabutank-r3.png" },
 }
 
 -- ====================== Battle Pet (Take With You) ======================
@@ -328,7 +328,7 @@ end
 
 local PET_BATTLE_XP_DEFAULT    = 5
 local PET_EXPEDITION_XP        = PET_BATTLE_XP_DEFAULT * 15
-local PET_XP_PER_SKILL_POINT   = PET_BATTLE_XP_DEFAULT * 50 -- 250 XP = 50 normal wins
+local PET_XP_PER_SKILL_POINT   = PET_BATTLE_XP_DEFAULT * 35 -- 175 XP = 35 normal wins
 local PLAYER_PET_XP_NOTIFY_KEY = "pet_xp_notify_v1"
 local PET_BATTLES_PER_FATIGUE  = 15
 local PET_HAPPY_XP_BONUS       = 1
@@ -1371,11 +1371,18 @@ function pets.grant_owned_pet(owner_or_pid, item_id, qty)
   return created
 end
 
-local function build_paths(kind)
+local function build_paths(kind, stat_attack)
   local def = PET_DEFS[kind]
   if not def then return nil end
+  local rank = math.floor(tonumber(stat_attack) or 1)
+  local tex = def.texture
+  if rank >= 20 and def.texture_r3 then
+    tex = def.texture_r3
+  elseif rank >= 11 and def.texture_r2 then
+    tex = def.texture_r2
+  end
   return def,
-    ("/server/assets/pets/" .. def.texture),
+    ("/server/assets/pets/" .. tex),
     ("/server/assets/pets/" .. def.animation)
 end
 
@@ -1817,7 +1824,7 @@ end
 
 -- ====================== Bot spawn / despawn ======================
 local function spawn_pet_bot(rec)
-  local def, tex, anim = build_paths(rec.kind)
+  local def, tex, anim = build_paths(rec.kind, rec.stat_attack)
   if not def then
     print("[pets] Unknown pet kind:", tostring(rec.kind))
     return nil
@@ -2011,6 +2018,7 @@ local function return_armed_pet_for_replacement(secret)
       blocked_for = 0,
       owner_secret = e.owner_secret,
       owner_name = e.owner_name,
+      stat_attack = e.stat_attack,
     }
 
     local bot_id = spawn_pet_bot(spawn_rec)
@@ -2429,6 +2437,7 @@ local home_rec = {
   blocked_for = 0,
   owner_secret = e.owner_secret,
   owner_name = e.owner_name,
+  stat_attack = e.stat_attack,
 }
 spawn_pet_bot(home_rec)
 index_record(home_rec)
@@ -2854,7 +2863,10 @@ function pets.invest_armed_pet_stat(pid, stat_name)
 
   stat_name = tostring(stat_name or ""):lower()
 
-  if stat_name == "hp" then
+if stat_name == "hp" then
+    if p.stat_hp >= 100 then
+      return false, "HP is already at the maximum of 100."
+    end
     p.hp_points = p.hp_points + 1
     p.stat_hp = math.max(1, math.floor(tonumber(p.stat_hp or _default_pet_hp(p.kind)) or _default_pet_hp(p.kind)) + 5)
 
@@ -2865,12 +2877,12 @@ function pets.invest_armed_pet_stat(pid, stat_name)
       return false, "Attack is already maxed."
     end
 
-    if current_rank >= 19 and p.hp_points < 19 then
-      return false, "Raise HP 19 times before pushing Attack to Rank 20."
+    if current_rank >= 19 and p.stat_hp < 100 then
+      return false, "Raise HP to 100 before pushing Attack to Rank 20."
     end
 
-    if current_rank >= 10 and p.hp_points < 10 then
-      return false, "Raise HP 10 times before pushing Attack past Rank 10."
+    if current_rank >= 10 and p.stat_hp < 70 then
+      return false, "Raise HP to 70 before pushing Attack past Rank 10."
     end
 
     p.attack_points = p.attack_points + 1
@@ -3557,6 +3569,7 @@ function pets.rehydrate_for_hp(area_id, bucket_area_id, oncehub_key)
           blocked_for = 0,
           owner_secret = e.owner_secret,
           owner_name = e.owner_name,
+          stat_attack = e.stat_attack,
         }
         spawn_pet_bot(rec)
         index_record(rec)

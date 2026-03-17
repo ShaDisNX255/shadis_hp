@@ -618,8 +618,15 @@ function FontSystem:drawTextEx(player_id, text, opts)
 
                     -- Determine default anim state
                     local prefix = anim_prefix_for_font(font_name)
-                    -- State names are always uppercase for letters, and exact for punctuation/digits
-                    local state = prefix .. "_" .. glyph:upper()
+                    local state
+
+                    if glyph:match("%l") then
+                        state = prefix .. "_LOWER_" .. glyph
+                    elseif glyph == '"' then
+                        state = prefix .. "_QUOTE"
+                    else
+                        state = prefix .. "_" .. glyph:upper()
+                    end
 
                     -- Default sprite properties
                     local props = {

@@ -233,7 +233,7 @@ end
 -- ===========================================================
 
 -- Purpose: Show a texture as a cosmetic on a player's avatar
-function frame.set_cosmetic(cosmetic_id, player_id, texture, animation, state, x, y, visible, player_xoffset, player_yoffset)
+function frame.set_cosmetic(cosmetic_id, player_id, texture, animation, state, x, y, visible, player_xoffset, player_yoffset, anim_duration, scale, bot_scale)
     return async(function()
         -- Safety checks
         if not cosmetic_id or not animation or not state or not player_id or not texture or not x or not y then
@@ -262,13 +262,16 @@ function frame.set_cosmetic(cosmetic_id, player_id, texture, animation, state, x
         
         local p_xoffset = player_xoffset or 0
         local p_yoffset = player_yoffset or 0
+        local sprite_scale = scale or 2
+        local world_bot_scale = bot_scale or 1.0
         
         Net.player_draw_sprite(player_id, cosmetic_id, {
             id = cosmetic_id .. "_obj",
             x = (x + 120 + p_xoffset) * 2,
             y = (y + 80 + p_yoffset) * 2,
-            sx = 2,
-            sy = 2,
+            z = -110,
+            sx = sprite_scale,
+            sy = sprite_scale,
             ox = 0,
             oy = 0,
             ro = 0,
@@ -300,7 +303,10 @@ function frame.set_cosmetic(cosmetic_id, player_id, texture, animation, state, x
             animation = animation,
             state = state,
             spritex = (x + 120 + p_xoffset) * 2,
-            spritey = (y + 80 + p_yoffset) * 2
+            spritey = (y + 80 + p_yoffset) * 2,
+            scale = sprite_scale,
+            duration = anim_duration or 0,
+            elapsed = 0
         }
         
         Net.create_bot(cosmetic_id .. "_" .. player_id, {
@@ -314,6 +320,18 @@ function frame.set_cosmetic(cosmetic_id, player_id, texture, animation, state, x
             z = position.z + 3,
             solid = false
         })
+        
+        -- Apply overworld bot scale if provided
+        if bot_scale ~= nil then
+            local keyframes = {{
+                properties = {
+                    { property = "ScaleX", ease = "Linear", value = world_bot_scale },
+                    { property = "ScaleY", ease = "Linear", value = world_bot_scale },
+                },
+                duration = 0
+            }}
+            Net.animate_bot_properties(cosmetic_id .. "_" .. player_id, keyframes)
+        end
         
         -- Hide bot from player (since we show it the cosmetic with a sprite)
         Net.exclude_actor_for_player(player_id, cosmetic_id .. "_" .. player_id)
@@ -2373,7 +2391,37 @@ end)
 -- Tick event
 Net:on("tick", function(event)
     AnimationEngine.tick(event.delta_time)
-    
+
+    -- Restart looping cosmeti    -- Restart looping cosmetic sprite animations
+    if next(cosmetic_cache) ~= nil then
+        for player_id, cosmetics in pairs(cosmetic_cache) do
+            for cosmetic_id, cosmetic_data in pairs(cosmetics) do
+                if cosmetic_data["duration"] ~= 0 then
+                    cosmetic_data["elapsed"] = (cosmetic_data["elapsed"] or 0) + event.delta_time
+
+                    if cosmetic_data["elapsed"] >= cosmetic_data["duration"] then
+                        Net.player_erase_sprite(player_id, cosmetic_id .. "_obj")
+
+                        local sprite_scale = cosmetic_data["scale"] or 2
+                        local state = cosmetic_data["state"] or "SNOWFLAKE_PARTICLE"
+
+                        Net.player_draw_sprite(player_id, cosmetic_id, {
+                            id = cosmetic_id .. "_obj",
+                            x = cosmetic_data["spritex"],
+                            y = cosmetic_data["spritey"],
+                            z = -110,
+                            sx = sprite_scale,
+                            sy = sprite_scale,
+                            anim_state = state,
+                        })
+
+                        cosmetic_data["elapsed"] = 0
+                    end
+                end
+            end
+        end
+    end
+
     -- Manage emitting state = 4 if player is using a button to scroll
     for player_id, buttons in pairs(button_states) do
         if not tracking_state[player_id] then

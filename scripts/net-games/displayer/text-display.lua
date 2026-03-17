@@ -223,7 +223,7 @@ local function anim_state_for_char(font_name, raw)
 
   -- lowercase naming scheme (matches your font states)
   if c:match("%l") then
-    return prefix .. "_LOWER_" .. c:upper()
+    return prefix .. "_LOWER_" .. c
   end
 
   -- double quote naming scheme
@@ -304,7 +304,7 @@ function TextDisplay:init()
     -- If a project wants one, set this.texture_path externally or in a fork.
     self.backdrop_sprite = {
         sprite_id = 5000,
-        texture_path = nil, -- was: "/server/assets/net-games/displayer/marquee-backdrop.png"
+        texture_path = "/server/assets/net-games/displayer/marquee-backdrop.png",
         anim_path = nil
     }
 
