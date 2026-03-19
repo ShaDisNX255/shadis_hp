@@ -865,6 +865,31 @@ local cosmetics = {
     menu_preview_offset_y   = 8,
     menu_preview_scale      = 1.0,
   },
+  {
+    id              = "FullShiny",
+    key             = "FullShiny",
+    name            = "FullShiny",
+    texture         = "/server/assets/cosmetics/FullShiny.png",
+    animation       = "/server/assets/cosmetics/FullShiny.animation",
+    anim_state      = "idle_fullshiny",
+    preview_sprite_id = "preview_FullShiny",
+    rarity          = "GOLD_5",
+    loop_duration = 2.18,
+
+    xforced         = 48,
+    yforced         = 0,
+
+    preview_start_x = -24,
+    preview_start_y = -47,
+
+    menu_preview_texture    = "/server/assets/cosmetics/FullShiny.png",
+    menu_preview_animation  = "/server/assets/cosmetics/FullShiny.animation",
+    menu_preview_anim_state = "idle_fullshiny",
+    menu_preview_sprite_id  = "menu_preview_FullShiny",
+    menu_preview_offset_x   = 2,
+    menu_preview_offset_y   = 8,
+    menu_preview_scale      = 1.0,
+  },
 }
 
 return {
