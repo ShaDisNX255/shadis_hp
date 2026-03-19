@@ -3610,7 +3610,7 @@ function pets.rehydrate_for_hp(area_id, bucket_area_id, oncehub_key)
     end
 
     -- spawn bot only if this entry lives in this area
-    if e.area_id == area_id and not e.with_owner then
+    if e.area_id == area_id and not e.with_owner and not e.in_training then
       local uid = tostring(e.uid)
       local rec = records[uid]
       if not rec then
@@ -3648,7 +3648,7 @@ function pets.rehydrate_all_for_area(area_id, bucket_area_id)
     if type(list) == "table" then
       for _, e in ipairs(list) do
         normalize_entry(e, bucket_area_id, oncehub_key)
-        if e.area_id == area_id and not e.with_owner then
+        if e.area_id == area_id and not e.with_owner and not e.in_training then
           pets.rehydrate_for_hp(area_id, bucket_area_id, oncehub_key)
           break
         end
