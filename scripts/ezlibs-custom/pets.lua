@@ -2045,6 +2045,43 @@ local function return_armed_pet_for_replacement(secret)
   return true
 end
 
+local function _detach_armed_pet_for_training(secret)
+  if not secret or secret == "" then return false, "" end
+
+  local pmem = _safe_get_player_memory(secret)
+  if type(pmem) ~= "table" then return false, "" end
+
+  local armed = pmem[PLAYER_ARMED_PET_KEY]
+  if type(armed) ~= "table" then return true, "" end
+
+  local uid            = tostring(armed.uid or "")
+  local bucket_area_id = tostring(armed.bucket_area_id or "")
+
+  -- Clear any live summoned companion runtime (no warp-out effect)
+  if uid ~= "" then
+    _clear_companion_runtime(uid, false)
+  end
+
+  -- For HP-based pets: mark as in_training and reset position, but do NOT re-spawn the bot
+  if uid ~= "" and bucket_area_id ~= "" then
+    local e = find_entry(bucket_area_id, uid)
+    if e then
+      e.companion_summoned = nil
+      e.with_owner         = false
+      e.in_training        = true
+      e.area_id            = e.home_area_id
+      e.x, e.y, e.z       = e.home_x, e.home_y, e.home_z or 0
+      e.bot_id             = nil
+      save_bucket(bucket_area_id)
+    end
+  end
+
+  pmem[PLAYER_ARMED_PET_KEY] = nil
+  _safe_save_player_memory(secret, pmem)
+
+  return true, bucket_area_id
+end
+
 local function _entry_display_name(e)
   local kind = tostring(e and e.kind or "mettaur"):lower()
   local def = PET_DEFS[kind] or {}
@@ -3801,6 +3838,14 @@ local function open_pet_action_menu(pid, e, bucket_area_id)
     send_disabled_msg = "Only the owner can send expeditions."
   end
 
+  -- Block all owner actions if the pet is currently in a training session
+  if e.in_training then
+    can_take = false
+    take_disabled_msg = "This pet is in training."
+    can_send = false
+    send_disabled_msg = "This pet is in training."
+  end
+
   if can_send then
     table.insert(opts, helpers.create_bbs_option("Send on expedition"))
   else
@@ -4099,8 +4144,9 @@ function pets.start_training(pid, cost, duration_sec, cooldown_sec)
     return false, "Call your pet back before sending them to training."
   end
 
-  local uid  = tostring(armed.uid  or "")
-  local kind = tostring(armed.kind or "mettaur"):lower()
+  local uid            = tostring(armed.uid  or "")
+  local kind           = tostring(armed.kind or "mettaur"):lower()
+  local bucket_area_id = tostring(armed.bucket_area_id or "")
   if uid == "" then return false, "Your pet has no ID." end
 
   local owned = _get_owned_pet(secret, uid)
@@ -4121,7 +4167,7 @@ function pets.start_training(pid, cost, duration_sec, cooldown_sec)
   local nickname     = owned and tostring(owned.nickname or "") or ""
   local display_name = (nickname ~= "" and nickname) or base_name
 
-  local ok = return_armed_pet_for_replacement(secret)
+  local ok = _detach_armed_pet_for_training(secret)
   if not ok then
     ezmemory.spend_player_money(pid, -cost)
     return false, "Couldn't take your pet for training."
@@ -4134,11 +4180,12 @@ function pets.start_training(pid, cost, duration_sec, cooldown_sec)
   end
 
   pmem[PET_TRAINING_MEM_KEY] = {
-    uid          = uid,
-    kind         = kind,
-    display_name = display_name,
-    ends_at      = _now() + duration_sec,
-    cooldown_sec = cooldown_sec,
+    uid            = uid,
+    kind           = kind,
+    display_name   = display_name,
+    ends_at        = _now() + duration_sec,
+    cooldown_sec   = cooldown_sec,
+    bucket_area_id = bucket_area_id,
   }
   _safe_save_player_memory(secret, pmem)
 
@@ -4190,6 +4237,16 @@ function pets.claim_trained_pet(pid)
         pmem2[OWNED_PETS_MEM_KEY] = store
         _safe_save_player_memory(secret, pmem2)
       end
+    end
+  end
+
+  -- Clear the in_training flag on the HP entry so the pet can be interacted with again
+  local t_bucket = tostring(t.bucket_area_id or "")
+  if uid ~= "" and t_bucket ~= "" then
+    local entry = find_entry(t_bucket, uid)
+    if entry then
+      entry.in_training = nil
+      save_bucket(t_bucket)
     end
   end
 
