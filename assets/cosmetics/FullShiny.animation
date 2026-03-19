@@ -1,0 +1,45 @@
+animation state="idle_fullshiny"
+frame duration="0.5" x="62" y="61" w="47" h="48" originx="0" originy="0"
+frame duration="0.083" x="115" y="61" w="47" h="48" originx="0" originy="0"
+frame duration="0.083" x="168" y="61" w="47" h="48" originx="0" originy="0"
+frame duration="0.083" x="221" y="61" w="47" h="48" originx="0" originy="0"
+frame duration="0.083" x="274" y="61" w="47" h="48" originx="0" originy="0"
+frame duration="0.083" x="327" y="61" w="47" h="48" originx="0" originy="0"
+frame duration="0.083" x="9" y="115" w="47" h="48" originx="0" originy="0"
+frame duration="0.083" x="62" y="115" w="47" h="48" originx="0" originy="0"
+frame duration="0.083" x="115" y="115" w="47" h="48" originx="0" originy="0"
+frame duration="0.083" x="168" y="115" w="47" h="48" originx="0" originy="0"
+frame duration="0.083" x="221" y="115" w="47" h="48" originx="0" originy="0"
+frame duration="0.25" x="9" y="7" w="47" h="48" originx="0" originy="0"  
+frame duration="0.083" x="62" y="7" w="47" h="48" originx="0" originy="0"
+frame duration="0.083" x="115" y="7" w="47" h="48" originx="0" originy="0"
+frame duration="0.083" x="168" y="7" w="47" h="48" originx="0" originy="0"
+frame duration="0.083" x="221" y="7" w="47" h="48" originx="0" originy="0"
+frame duration="0.083" x="274" y="7" w="47" h="48" originx="0" originy="0"
+frame duration="0.083" x="327" y="7" w="47" h="48" originx="0" originy="0"
+frame duration="0.083" x="9" y="61" w="47" h="48" originx="0" originy="0"
+frame duration="2.5" x="9" y="7" w="47" h="48" originx="0" originy="0"
+
+animation state="IDLE_DR"
+
+animation state="IDLE_DL"
+
+animation state="IDLE_UR"
+
+animation state="IDLE_UL"
+
+animation state="WALK_DR"
+
+animation state="WALK_DL"
+
+animation state="WALK_UR"
+
+animation state="WALK_UL"
+
+animation state="RUN_DR"
+
+animation state="RUN_DL"
+
+animation state="RUN_UR"
+
+animation state="RUN_UL"
