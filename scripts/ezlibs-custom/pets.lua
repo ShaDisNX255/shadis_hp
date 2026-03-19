@@ -333,6 +333,10 @@ local PLAYER_PET_XP_NOTIFY_KEY = "pet_xp_notify_v1"
 local PET_BATTLES_PER_FATIGUE  = 15
 local PET_HAPPY_XP_BONUS       = 1
 local PET_SAD_XP_PENALTY       = -1
+local PET_MAX_SKILL_POINTS = 31  -- 12 for HP (40->100) + 19 for Attack (5->100)
+local PET_MAX_XP = PET_MAX_SKILL_POINTS * PET_XP_PER_SKILL_POINT  -- 7750
+local PET_TRAINING_XP      = 75
+local PET_TRAINING_MEM_KEY = "pet_training_v1"
 
 local function _coerce_skill_counter(n)
   return math.max(0, math.floor(tonumber(n) or 0))
@@ -582,7 +586,7 @@ local function _award_owned_pet_xp_for_secret(secret, uid, amount)
 
   local old_total = _pet_total_skill_points_from_xp(p.xp)
 
-  p.xp = math.max(0, math.floor(tonumber(p.xp or 0) or 0) + amount)
+  p.xp = math.min(PET_MAX_XP, math.max(0, math.floor(tonumber(p.xp or 0) or 0) + amount))
 
   local new_total = _pet_total_skill_points_from_xp(p.xp)
 
@@ -1110,6 +1114,11 @@ function pets.award_armed_pet_battle_xp(pid, amount, expected_uid)
     effective_amount = math.max(0, amount + _pet_mood_xp_delta(mood))
   end
 
+  local current_xp = math.max(0, math.floor(tonumber(p.xp) or 0))
+  if current_xp >= PET_MAX_XP then
+    return true, current_xp, 0, 0, mood
+  end
+
   if effective_amount <= 0 then
     return true, math.max(0, math.floor(tonumber(p.xp) or 0)), 0, 0, mood
   end
@@ -1117,7 +1126,7 @@ function pets.award_armed_pet_battle_xp(pid, amount, expected_uid)
   local notify = _pet_xp_notifications_enabled_from_pmem(pmem)
   local old_total = _pet_total_skill_points_from_xp(p.xp)
 
-  p.xp = math.max(0, math.floor(tonumber(p.xp or 0) or 0) + effective_amount)
+  p.xp = math.min(PET_MAX_XP, math.max(0, math.floor(tonumber(p.xp or 0) or 0) + effective_amount))
 
   local new_total = _pet_total_skill_points_from_xp(p.xp)
   local skill_gained = math.max(0, new_total - old_total)
@@ -2704,7 +2713,16 @@ function pets.list_companion_candidates(owner_or_pid)
       end
     end
 
-    if not on_expedition then
+    local in_training = false
+    local pmem = _safe_get_player_memory(owner_secret)
+    if type(pmem) == "table" then
+      local t = pmem[PET_TRAINING_MEM_KEY]
+      if type(t) == "table" and tostring(t.uid or "") == tostring(p.uid or "") then
+        in_training = true
+      end
+    end
+
+    if not on_expedition and not in_training then
       out[#out + 1] = {
         uid = tostring(p.uid or ""),
         kind = tostring(p.kind or "mettaur"),
@@ -4007,6 +4025,200 @@ Net:on("tick", function(event)
     end
   end
 end)
+
+-- Public: returns the player's current bugfrag count
+function pets.get_player_bugfrags(pid)
+  return _get_player_bugfrags(pid)
+end
+
+-- Public: returns info about the pet currently on expedition for this player, or nil if none.
+-- Returns: { display_name, secs_left } or nil
+function pets.get_expedition_pet_info(owner_or_pid)
+  local owner_secret = _resolve_pet_owner_secret(owner_or_pid)
+  if owner_secret == "" then return nil end
+
+  pets.ensure_player_pet_ids(owner_secret)
+  local owned = pets.list_owned_pets(owner_secret)
+
+  for _, p in ipairs(owned) do
+    if type(p.placement) == "table" then
+      local bucket_area_id = tostring(p.placement.bucket_area_id or "")
+      if bucket_area_id ~= "" then
+        local e = find_entry(bucket_area_id, p.uid)
+        if e and expedition_active(e) then
+          local base_name = _companion_base_name(p.kind)
+          local nickname = tostring(p.nickname or "")
+          local display_name = (nickname ~= "" and nickname) or base_name
+          return {
+            display_name = display_name,
+            secs_left = expedition_left(e),
+          }
+        end
+      end
+    end
+  end
+
+  return nil
+end
+
+pets.TRAINING_XP = PET_TRAINING_XP
+
+function pets.get_training_info(owner_or_pid)
+  local secret = _resolve_pet_owner_secret(owner_or_pid)
+  if secret == "" then return nil end
+  local pmem = _safe_get_player_memory(secret)
+  if type(pmem) ~= "table" then return nil end
+  local t = pmem[PET_TRAINING_MEM_KEY]
+  if type(t) ~= "table" then return nil end
+  return t
+end
+
+function pets.start_training(pid, cost, duration_sec, cooldown_sec)
+  cost         = math.max(0,  math.floor(tonumber(cost)         or 90000))
+  duration_sec = math.max(60, math.floor(tonumber(duration_sec) or 3600))
+  cooldown_sec = math.max(0,  math.floor(tonumber(cooldown_sec) or 3600))
+
+  local secret = helpers.get_safe_player_secret(pid)
+  if not secret or secret == "" then
+    return false, "Couldn't find your data."
+  end
+
+  local pmem = _safe_get_player_memory(secret)
+  if type(pmem) ~= "table" then return false, "Data not ready." end
+
+  if type(pmem[PET_TRAINING_MEM_KEY]) == "table" then
+    return false, "A pet is already in training!"
+  end
+
+  local armed = pmem[PLAYER_ARMED_PET_KEY]
+  if type(armed) ~= "table" then
+    return false, "You don't have a companion pet with you."
+  end
+
+  if armed.summoned == true then
+    return false, "Call your pet back before sending them to training."
+  end
+
+  local uid  = tostring(armed.uid  or "")
+  local kind = tostring(armed.kind or "mettaur"):lower()
+  if uid == "" then return false, "Your pet has no ID." end
+
+  local owned = _get_owned_pet(secret, uid)
+  if owned then
+    local cd = tonumber(owned.training_cooldown_ends_at or 0) or 0
+    if cd > _now() then
+      local left = math.ceil((cd - _now()) / 60)
+      return false, ("That pet needs %d more minute(s) of rest before training again."):format(left)
+    end
+  end
+
+  if not ezmemory.spend_player_money(pid, cost) then
+    return false, ("You need %dz for a training session."):format(cost)
+  end
+
+  local def          = PET_DEFS[kind] or {}
+  local base_name    = tostring(def.name or kind:gsub("^%l", string.upper))
+  local nickname     = owned and tostring(owned.nickname or "") or ""
+  local display_name = (nickname ~= "" and nickname) or base_name
+
+  local ok = return_armed_pet_for_replacement(secret)
+  if not ok then
+    ezmemory.spend_player_money(pid, -cost)
+    return false, "Couldn't take your pet for training."
+  end
+
+  pmem = _safe_get_player_memory(secret)
+  if type(pmem) ~= "table" then
+    ezmemory.spend_player_money(pid, -cost)
+    return false, "Data error, please try again."
+  end
+
+  pmem[PET_TRAINING_MEM_KEY] = {
+    uid          = uid,
+    kind         = kind,
+    display_name = display_name,
+    ends_at      = _now() + duration_sec,
+    cooldown_sec = cooldown_sec,
+  }
+  _safe_save_player_memory(secret, pmem)
+
+  return true, display_name .. " has been taken in for training!"
+end
+
+function pets.claim_trained_pet(pid)
+  local secret = helpers.get_safe_player_secret(pid)
+  if not secret or secret == "" then
+    return false, "Couldn't find your data."
+  end
+
+  local pmem = _safe_get_player_memory(secret)
+  if type(pmem) ~= "table" then return false, "Data not ready." end
+
+  local t = pmem[PET_TRAINING_MEM_KEY]
+  if type(t) ~= "table" then
+    return false, "No pet currently in training."
+  end
+
+  local ends_at = tonumber(t.ends_at or 0) or 0
+  local now     = _now()
+
+  if now < ends_at then
+    local left = math.ceil((ends_at - now) / 60)
+    return false, ("%s isn't done yet! %d minute(s) remaining."):format(tostring(t.display_name or "Your pet"), left)
+  end
+
+  local uid          = tostring(t.uid or "")
+  local display_name = tostring(t.display_name or "Your pet")
+
+  if uid == "" then
+    pmem[PET_TRAINING_MEM_KEY] = nil
+    _safe_save_player_memory(secret, pmem)
+    return false, "Training record was corrupted, sorry about that."
+  end
+
+  _award_owned_pet_xp_for_secret(secret, uid, PET_TRAINING_XP)
+
+  local pmem2 = _safe_get_player_memory(secret)
+  if type(pmem2) == "table" then
+    local store = pmem2[OWNED_PETS_MEM_KEY]
+    if type(store) == "table" and type(store.pets) == "table" then
+      local p = _normalize_owned_pet(store.pets[uid])
+      if type(p) == "table" then
+        local saved_cooldown = math.max(0, math.floor(tonumber(t.cooldown_sec or 3600) or 3600))
+        p.training_cooldown_ends_at = _now() + saved_cooldown
+        store.pets[uid] = p
+        pmem2[OWNED_PETS_MEM_KEY] = store
+        _safe_save_player_memory(secret, pmem2)
+      end
+    end
+  end
+
+  local pmem3 = _safe_get_player_memory(secret)
+  if type(pmem3) == "table" then
+    pmem3[PET_TRAINING_MEM_KEY] = nil
+    _safe_save_player_memory(secret, pmem3)
+  end
+
+  local arm_ok, arm_success = pcall(pets.arm_owned_pet, pid, uid, true)
+  if not arm_ok or not arm_success then
+    return true, (display_name .. " completed training and gained " .. PET_TRAINING_XP .. " XP! (Returned to your inventory)")
+  end
+
+  return true, (display_name .. " completed training and gained " .. PET_TRAINING_XP .. " XP!")
+end
+
+function pets.get_training_pet_info(owner_or_pid)
+  local secret = _resolve_pet_owner_secret(owner_or_pid)
+  if secret == "" then return nil end
+  local pmem = _safe_get_player_memory(secret)
+  if type(pmem) ~= "table" then return nil end
+  local t = pmem[PET_TRAINING_MEM_KEY]
+  if type(t) ~= "table" then return nil end
+  return {
+    display_name = tostring(t.display_name or "Pet"),
+    secs_left    = math.max(0, (tonumber(t.ends_at) or 0) - _now()),
+  }
+end
 
 now_seed_rng()
 _validate_reward_tables()

@@ -56,6 +56,8 @@ local MAIN_INFO_ROWS = {
   ["__lpets:attack"] = true,
   ["__lpets:uid_label"] = true,
   ["__lpets:uid_value"] = true,
+  ["__lpets:bugfrags"] = true,
+  ["__lpets:exp_header"] = true,
 }
 
 local function add_line(posts, id, text, is_read)
@@ -166,9 +168,8 @@ local function open_companion_picker(pid, allow_replace)
 
   add_line(posts, "__lpets:pick_header", "--- Your Pets ---")
 
-  if #candidates == 0 then
+if #candidates == 0 then
     add_line(posts, "__lpets:none_ready", "(No pets ready)")
-    add_option(posts, "__lpets:back", "Back")
   else
     local totals = {}
     local seen = {}
@@ -183,9 +184,38 @@ local function open_companion_picker(pid, allow_replace)
       local uid = tostring(p.uid or "")
       add_option(posts, "__lpets:pet:" .. uid, label)
     end
-
-    add_option(posts, "__lpets:back", "Back")
   end
+
+  -- Expedition section
+  local exp_info = nil
+  if Pets and type(Pets.get_expedition_pet_info) == "function" then
+    local ok, result = pcall(Pets.get_expedition_pet_info, pid)
+    if ok and type(result) == "table" then
+      exp_info = result
+    end
+  end
+
+  if exp_info then
+    local mins_left = math.ceil((tonumber(exp_info.secs_left) or 0) / 60)
+    add_line(posts, "__lpets:exp_header", "--- On Expedition ---")
+    add_line(posts, "__lpets:exp_pet", tostring(exp_info.display_name) .. " (" .. tostring(mins_left) .. " min)")
+  end
+
+  local train_info = nil
+  if Pets and type(Pets.get_training_pet_info) == "function" then
+    local ok, result = pcall(Pets.get_training_pet_info, pid)
+    if ok and type(result) == "table" then
+      train_info = result
+    end
+  end
+
+  if train_info then
+    local mins_left = math.ceil((tonumber(train_info.secs_left) or 0) / 60)
+    add_line(posts, "__lpets:train_header", "--- Training ---")
+    add_line(posts, "__lpets:train_pet", tostring(train_info.display_name) .. " (" .. tostring(mins_left) .. " min)")
+  end
+
+  add_option(posts, "__lpets:back", "Back")
 
   local board = open_menu_ignoring_custom(pid, title, color, posts, "lpets:pick")
   local sel = tostring(await(board.selection_once()) or "")
@@ -196,6 +226,16 @@ local function open_companion_picker(pid, allow_replace)
 
   if sel == "" or sel == "__lpets:back" or sel == "Back" then
     LPets.open_pets_board(pid)
+    return
+  end
+
+  if sel == "__lpets:exp_pet" then
+    Net.message_player(pid, "That pet is out on an expedition, it can't join you at the moment.")
+    return
+  end
+
+  if sel == "__lpets:train_pet" then
+    Net.message_player(pid, "That pet is in training, it can't join you at the moment.")
     return
   end
 
@@ -495,6 +535,13 @@ local function open_pets_board_async(pid)
 
   add_line(posts, "__lpets:uid_label", "Unique ID:")
   add_line(posts, "__lpets:uid_value", tostring(info.uid or ""))
+
+  local bugfrags = 0
+  if Pets and type(Pets.get_player_bugfrags) == "function" then
+    local ok, n = pcall(Pets.get_player_bugfrags, pid)
+    if ok then bugfrags = tonumber(n) or 0 end
+  end
+  add_line(posts, "__lpets:bugfrags", "Bugfrags: " .. tostring(bugfrags))
 
   if not info.summoned then
     add_option(posts, "__lpets:summon", "Summon")

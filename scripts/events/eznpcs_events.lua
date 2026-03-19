@@ -17,6 +17,12 @@ local duels  = require('scripts/ezlibs-custom/duels')
 local card_sleeves = require('scripts/ezlibs-custom/card_sleeves')
 local ezquests = require('scripts/ezlibs-scripts/ezquests')
 
+local Pets = (function()
+  local ok, M = pcall(require, 'scripts/ezlibs-custom/pets')
+  if ok and M then return M end
+  return nil
+end)()
+
 local COSMETIC_SHOP_COLOR = { r = 245, g = 210, b = 70 } -- same yellow as decorshop
 
 local JUKEBOX_TRACKS_MEM_KEY = "jukebox_tracks_v1"
@@ -2678,6 +2684,95 @@ eznpcs.add_event({
   end
 })
 
+eznpcs.add_event{
+  name = "PetTrainer",
+  action = function(npc, player_id, dialogue, relay_object)
+    return async(function()
+      local mug = eznpcs.get_dialogue_mugshot(npc, player_id, dialogue)
+
+      if not Pets then
+        await(Async.message_player(player_id, "The training system isn't available right now.", mug.texture_path, mug.animation_path))
+        return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+      end
+
+      local training = Pets.get_training_info(player_id)
+
+      if training then
+        local ends_at = tonumber(training.ends_at or 0) or 0
+        local now     = os.time()
+        local name    = tostring(training.display_name or "Your pet")
+
+        if now >= ends_at then
+          local res = await(Async.question_player(
+            player_id,
+            name .. " has finished training! Ready to take them back?",
+            mug.texture_path, mug.animation_path
+          ))
+          if res == 1 then
+            local ok, msg = Pets.claim_trained_pet(player_id)
+            await(Async.message_player(player_id, msg, mug.texture_path, mug.animation_path))
+          else
+            await(Async.message_player(player_id, "Alright, I'll hold onto them a little longer.", mug.texture_path, mug.animation_path))
+          end
+        else
+          local mins = math.ceil((ends_at - now) / 60)
+          await(Async.message_player(
+            player_id,
+            name .. " is still in training! " .. mins .. " minute(s) remaining.",
+            mug.texture_path, mug.animation_path
+          ))
+        end
+
+        return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+      end
+
+      local info = Pets.get_armed_pet_info(player_id)
+
+      if not info then
+        await(Async.message_player(
+          player_id,
+          "Bring a companion pet with you and I'll put them through a training session!",
+          mug.texture_path, mug.animation_path
+        ))
+        return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+      end
+
+      if info.summoned then
+        await(Async.message_player(
+          player_id,
+          "Call your companion back before dropping them off for training.",
+          mug.texture_path, mug.animation_path
+        ))
+        return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+      end
+
+      local cp           = dialogue.custom_properties or {}
+      local cost         = math.max(0,  math.floor(tonumber(cp["Cost"])     or 90000))
+      local duration_min = math.max(1,  math.floor(tonumber(cp["Duration"]) or 60))
+      local cooldown_min = math.max(0,  math.floor(tonumber(cp["Cooldown"]) or 60))
+      local duration_sec = duration_min * 60
+      local cooldown_sec = cooldown_min * 60
+      local xp           = Pets.TRAINING_XP or 75
+
+      local pet_name = tostring(info.display_name or "your pet")
+
+      local res = await(Async.question_player(
+        player_id,
+        ("Send " .. pet_name .. " for a " .. duration_min .. "-min training session for " .. cost .. "z? (+" .. xp .. " XP on return)"),
+        mug.texture_path, mug.animation_path
+      ))
+
+      if res == 1 then
+        local ok, msg = Pets.start_training(player_id, cost, duration_sec, cooldown_sec)
+        await(Async.message_player(player_id, msg, mug.texture_path, mug.animation_path))
+      else
+        await(Async.message_player(player_id, "Please come again!", mug.texture_path, mug.animation_path))
+      end
+
+      return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+    end)
+  end
+}
 
 -- Repaint any already-revealed paths when players appear in an area
 Net:on("player_join", function(ev)
