@@ -544,7 +544,7 @@ local S6 = {
 local boss2 = {
     name="boss2",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
-    pet_exp=12,
+    pet_exp=14,
     weight=10,
     enemies={
         {name="QuickMan",rank=1},

@@ -614,7 +614,7 @@ eznpcs.add_event(event6)
 local boss7 = {
     name="boss7",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
-    pet_exp=9,
+    pet_exp=11,
     enemies={
         {name="GutsManEXE3",rank=3},
     },
