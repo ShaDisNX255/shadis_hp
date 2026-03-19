@@ -2761,7 +2761,7 @@ local function open_pets_remove_menu(player_id, npc, dialogue)
 
       if skipped > 0 then
         await(Async.message_player(player_id,
-          ("Removed %d pets. Skipped %d (cooldown/expedition)."):format(removed, skipped)))
+          ("Removed %d pets. Skipped %d (busy/expedition/training)."):format(removed, skipped)))
       else
         await(Async.message_player(player_id, ("Removed %d pets."):format(removed)))
       end

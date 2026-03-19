@@ -903,6 +903,8 @@
     <property name="Price 21" type="int" value="1500000"/>
     <property name="Price 22" type="int" value="1500000"/>
     <property name="Price 23" type="int" value="1700000"/>
+    <property name="Price 24" type="int" value="1700000"/>
+    <property name="Price 25" type="int" value="1700000"/>
     <property name="Price 3" type="int" value="700000"/>
     <property name="Price 4" type="int" value="800000"/>
     <property name="Price 5" value="800000"/>
@@ -926,6 +928,8 @@
     <property name="Sell 21" value="bugfragdealer"/>
     <property name="Sell 22" value="GigFreez"/>
     <property name="Sell 23" value="Ready"/>
+    <property name="Sell 24" value="FullShiny"/>
+    <property name="Sell 25" value="Lightning1"/>
     <property name="Sell 3" value="ProtomanB"/>
     <property name="Sell 4" value="BugFrag"/>
     <property name="Sell 5" value="MMBadge"/>

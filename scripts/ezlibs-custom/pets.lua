@@ -139,6 +139,7 @@ local EXPEDITION = {
     { name="[UR]S.Skull", description="URare: Summoned Skull - A: 2500 / D: 1200"},
     { name="[UR]B.L.S.", description="URare: Black Luster Soldier - A: 3000 / D: 2500"},
     { name="[UR]Seiyaryu", description="URare: Seiyaryu - A: 2500 / D: 2300"},
+    { name="[UR]F.A.REBD", description="FullArt: Red Eyes Black Dragon - A: 2400 / D: 2000"},
     { name="[GR]DMGirl", description="GRare: Dark Magician Girl - A: 2000 / D: 1700"},
     { name="[GR]DMag", description="GRare: Dark Magician - A: 2500 / D: 2100"},
     { name="[GR]B.Sk.D.", description="GRare: Black Skull Dragon - A: 3200 / D: 2500"},
@@ -3513,6 +3514,9 @@ local function _remove_pet_internal(bucket_area_id, uid, force)
     if is_on_cooldown(e) then
       return false, "That pet is resting. Cooldown: ".._fmt_time_left(cooldown_left(e)).."."
     end
+    if e.in_training then
+      return false, "That pet is currently in a training session."
+    end
   end
 
   -- despawn runtime bot if present
@@ -3570,7 +3574,7 @@ function pets.remove_all(area_id, bucket_area_id, oncehub_key)
 
   for i = #list, 1, -1 do
     local e = normalize_entry(list[i], bucket_area_id, oncehub_key)
-    if e and (expedition_active(e) or is_on_cooldown(e)) then
+    if e and (expedition_active(e) or is_on_cooldown(e) or e.in_training) then
       skipped = skipped + 1
     else
       _save_owned_pet_from_entry(e, true)
