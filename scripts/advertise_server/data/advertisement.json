@@ -4,9 +4,9 @@
     },
     "advertisements":[
         {
-            "unique_server_id":"wcityserver",
+            "unique_server_id":"WCityOnline",
             "name":"WCity",
-            "description":"Formerly known as ShaDisHP. ONB 2.1.4 minimum required. A great place to sit back and relax. We have events, a guild system, customization, a HP decoration system, fishing and more. Striving to become a great MMO!",
+            "description":"WIP. ONB 2.1.4 minimum required. A great place to sit back and relax. We have events, a guild system, customization, a HP decoration system, fishing and more. Striving to become a great MMO!",
             "tags":[],
             "address":"64.23.226.84:3000",
             "data":"",
