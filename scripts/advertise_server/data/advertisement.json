@@ -1,17 +1,17 @@
 {
     "listservers":{
-        "main":"https://onb.keristero.com/server_list/"
+        "main":"http://onb.keristero.com/server_list/"
     },
     "advertisements":[
         {
             "unique_server_id":"WCityOnline",
-            "name":"WCity",
-            "description":"WIP. ONB 2.1.4 minimum required. A great place to sit back and relax. We have events, a guild system, customization, a HP decoration system, fishing and more. Striving to become a great MMO!",
+            "name":"WCity Online",
+            "description":"Formerly known as ShaDisHP. ONB 2.1.4 minimum required. A great place to sit back and relax. We have events, a guild system, customization, a HP decoration system, fishing, virus pets and more. Striving to become a great MMO!",
             "tags":[],
             "address":"64.23.226.84:3000",
             "data":"",
             "icon":"advertisement.png",
-            "color":"rgb(72,255,0)",
+            "color":"rgb(255,50,0)",
             "advertise_map":true,
             "default_area_id":"default"
         }

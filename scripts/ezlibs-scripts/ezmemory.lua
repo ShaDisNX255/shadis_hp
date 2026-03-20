@@ -125,7 +125,7 @@ end
 
 local function load_all_memory()
     return async(function ()
-        --Load items
+        --Load items (still sequential, needed first)
         items = await(ezmemory_load_file(items_path))
         for item_id, item_data in pairs(items) do
             if item_data.key_item then
@@ -140,18 +140,30 @@ local function load_all_memory()
         end
         memory_loaded_flags.items = true
 
-        --Load player memory
+        --Load player list first (single file, still sequential)
         player_list = await(ezmemory_load_file(players_path))
+
+        -- START all player file reads at the same time, store them
+        local player_promises = {}
         for safe_secret, name in pairs(player_list) do
-            player_memory[safe_secret] = await(ezmemory_load_file(player_path_prefix..safe_secret))
-            printd('loaded memory for '..name)
+            player_promises[safe_secret] = ezmemory_load_file(player_path_prefix..safe_secret)
+        end
+        -- NOW collect the results (they've been loading in parallel this whole time)
+        for safe_secret, promise in pairs(player_promises) do
+            player_memory[safe_secret] = await(promise)
+            printd('loaded memory for '..player_list[safe_secret])
         end
         memory_loaded_flags.player_memory = true
 
-        --Load area memory for every area
+        -- Same trick for areas: start all reads first
         local net_areas = Net.list_areas()
+        local area_promises = {}
         for i, area_id in ipairs(net_areas) do
-            local mem = await(ezmemory_load_file(area_path_prefix..area_id))
+            area_promises[area_id] = ezmemory_load_file(area_path_prefix..area_id)
+        end
+        -- Collect area results
+        for area_id, promise in pairs(area_promises) do
+            local mem = await(area_promises[area_id])
             if mem.hidden_objects then
                 area_memory[area_id] = mem
             else

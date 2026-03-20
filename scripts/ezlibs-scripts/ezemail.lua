@@ -14,7 +14,6 @@ local function _preload_email_assets(player_id, mail)
   if not (Net and Net.provide_asset_for_player) then return end
   if not mail then return end
 
-  -- Email system requires mug paths anyway; but keep these checks safe.
   if mail.mug_texture_path and mail.mug_texture_path ~= "" then
     pcall(Net.provide_asset_for_player, player_id, mail.mug_texture_path)
   end
@@ -58,14 +57,12 @@ local function _get_tombstone_set()
 
   local set = {}
 
-  -- supports list-style: { "ID1", "ID2" }
   for _, id in ipairs(t) do
     id = tostring(id)
     set[id] = true
     set[_percent_decode(id)] = true
   end
 
-  -- also supports map-style: { ID1=true, ID2=true }
   for k, v in pairs(t) do
     if v == true then
       k = tostring(k)
@@ -81,10 +78,8 @@ local function _find_mail_in_bucket(bucket, email_id)
     if not bucket or not email_id then return nil, nil end
     email_id = tostring(email_id)
 
-    -- 1) direct
     if bucket[email_id] then return bucket[email_id], email_id end
 
-    -- 2) decoded comparisons (handles %XX mismatch)
     local want = _percent_decode(email_id)
 
     for k, v in pairs(bucket) do
@@ -122,8 +117,9 @@ local function _mark_email_read(player_id, email_id)
     end
 end
 
-local function _notify_new_mail(player_id, msg, delay_seconds)
-    msg = msg or "Looks like you got an e-mail."
+-- ring_only = true means just ring the HUD, skip the popup message
+-- This is used when re-notifying about unread mail on re-login
+local function _notify_new_mail(player_id, msg, delay_seconds, ring_only)
     delay_seconds = delay_seconds or NEW_MAIL_MESSAGE_DELAY
 
     pcall(function()
@@ -131,6 +127,11 @@ local function _notify_new_mail(player_id, msg, delay_seconds)
             Net.ring_player_hud(player_id)
         end
     end)
+
+    -- If ring_only, stop here — don't send the popup message
+    if ring_only then return end
+
+    msg = msg or "Looks like you got an e-mail."
 
     if not Net.message_player then
         return
@@ -143,7 +144,6 @@ local function _notify_new_mail(player_id, msg, delay_seconds)
         end)
     end
 
-    -- Delay so ring isn't interrupted
     if Async and Async.sleep and delay_seconds and delay_seconds > 0 then
         Async.sleep(delay_seconds).and_then(send_msg)
     else
@@ -168,7 +168,7 @@ function ezemail.resend_all(player_id)
     local dirty = false
     local tombstones = _get_tombstone_set()
 
-    -- Remove tombstoned emails from memory so they will no longer be restored
+    -- Remove tombstoned emails from memory so they won't be restored
     if tombstones and next(tombstones) ~= nil then
       local to_delete = {}
 
@@ -188,22 +188,28 @@ function ezemail.resend_all(player_id)
       end
     end
 
+    local has_unread = false
+
     for _, stored in pairs(bucket) do
       local mail = helpers.deep_copy(stored)
 
-      -- TEMP: treat restored mail as already read
-      mail.read = true
-
-      -- Optional: migrate memory so old mail stays read even after engine fixes email_read
-      if stored.read ~= true then
-        stored.read = true
-        dirty = true
-      end
+      -- Send the email with its actual read status (don't force it to read)
+      -- mail.read is already set correctly from stored
 
       pcall(function()
         _preload_email_assets(player_id, mail)
         Net.send_player_email(player_id, mail)
       end)
+
+      -- Track if there are any unread emails so we can ring once at the end
+      if stored.read ~= true then
+        has_unread = true
+      end
+    end
+
+    -- If any emails are still unread, ring the HUD (but no popup message this time)
+    if has_unread then
+      _notify_new_mail(player_id, nil, nil, true) -- ring only
     end
 
     if dirty then
@@ -231,29 +237,29 @@ function ezemail.send_once(player_id, mail, opts)
     local first_time = (bucket[mail.id] == nil)
 
     if first_time then
+        -- Save the email as unread
         bucket[mail.id] = mail
-        if bucket[mail.id].read == nil then
-            bucket[mail.id].read = false
-        end
+        bucket[mail.id].read = false
         ezmemory.save_player_memory(safe_secret)
     end
 
     -- Always send to current session (mailbox is session-only)
+    -- Send with the current read status from memory
+    local mail_to_send = helpers.deep_copy(bucket[mail.id])
     pcall(function()
-        _preload_email_assets(player_id, mail)
-        Net.send_player_email(player_id, mail)
+        _preload_email_assets(player_id, mail_to_send)
+        Net.send_player_email(player_id, mail_to_send)
     end)
 
-    -- Notify only the first time (ring -> wait -> message)
+    -- Notify only the first time: ring + popup message
     if first_time and opts.notify ~= false then
         local msg = opts.notify_message or "Looks like you got an e-mail."
         local delay = opts.notify_delay or NEW_MAIL_MESSAGE_DELAY
-        _notify_new_mail(player_id, msg, delay)
+        _notify_new_mail(player_id, msg, delay, false) -- full notification
     end
 end
 
 -- Sends an email WITHOUT saving it (session-only).
--- Still supports notify timing (ring -> wait -> message).
 function ezemail.send_temp(player_id, mail, opts)
     opts = opts or {}
     if not mail or not mail.id then return end
@@ -267,7 +273,7 @@ function ezemail.send_temp(player_id, mail, opts)
     if opts.notify ~= false then
         local msg = opts.notify_message or "Looks like you got an e-mail."
         local delay = opts.notify_delay or NEW_MAIL_MESSAGE_DELAY
-        _notify_new_mail(player_id, msg, delay)
+        _notify_new_mail(player_id, msg, delay, false)
     end
 end
 
@@ -294,11 +300,10 @@ function ezemail.send_test_email(player_id, delay_seconds)
 
 end
 
--- Silent restore on login (no ring/message)
+-- Silent restore on login (no ring/message for read mail; ring only for unread)
 Net:on("player_join", function(event)
     if not event or not event.player_id then return end
 
-    -- If ezmemory isn't loaded yet, the player will be kicked by ezmemory anyway.
     if ezmemory and ezmemory.is_loaded and not ezmemory.is_loaded() then
         return
     end
@@ -313,21 +318,13 @@ Net:on("player_join", function(event)
     end
 end)
 
-print("[ezemail] email_read test listener registered")
-
+-- Now that email_read is fixed, we use it to actually mark emails as read in memory
 Net:on("email_read", function(event)
   local player_id = event.player_id
   local email_id = event.email_id
 
-  print("[ezemail] email_read fired:", tostring(player_id), tostring(email_id))
-
-  -- show in-game too (no mugshot)
-  if player_id and Net.message_player then
-    Net.message_player(
-      player_id,
-      "email_read fired for: " .. tostring(email_id)
-    )
-  end
+  _dbg("email_read fired:", tostring(player_id), tostring(email_id))
+  _mark_email_read(player_id, email_id)
 end)
 
 return ezemail
