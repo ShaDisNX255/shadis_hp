@@ -2655,8 +2655,7 @@ eznpcs.add_event({
         end
 
         if do_preview then
-          local area_id = Net.get_player_area(player_id)
-          pcall(Net.set_song, area_id, JUKEBOX_SONG_PREFIX .. chosen.file)
+          pcall(Net.set_song_for_player, player_id, JUKEBOX_SONG_PREFIX .. chosen.file)
         end
 
         local confirm = await(Async.question_player(
@@ -2664,6 +2663,10 @@ eznpcs.add_event({
           ("Buy \"%s\" for %sz?"):format(chosen.base, tostring(price)),
           mug.texture_path, mug.animation_path
         ))
+
+        if do_preview then
+          pcall(Net.stop_song_for_player, player_id)
+        end
 
         if confirm == 1 then
           if not ezmemory.spend_player_money(player_id, price) then
