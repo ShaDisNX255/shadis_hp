@@ -33,11 +33,12 @@ start_server() {
   # Detach fully, record the *server's* PID.
   # If 'setsid' exists, put it in its own session so we can kill the whole group later.
   if command -v setsid >/dev/null 2>&1; then
-    nohup setsid "${CMD[@]}" >>"$LOG" 2>&1 &
+    nohup setsid "${CMD[@]}" 2>&1 | sed -u 's/\x1b\[[0-9;]*m//g' >> "$LOG" &
   else
-    nohup "${CMD[@]}" >>"$LOG" 2>&1 &
+    nohup "${CMD[@]}" 2>&1 | sed -u 's/\x1b\[[0-9;]*m//g' >> "$LOG" &
   fi
   echo $! > "$PIDFILE"
+
   echo "Server started (pid $(cat "$PIDFILE"))."
   echo "Logs → $LOG"
 }
