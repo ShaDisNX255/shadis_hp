@@ -6,7 +6,7 @@
   <property name="Background Texture" value="/server/assets/custom/backgrounds/home/kottouhinyanodennou.png"/>
   <property name="Background Vel X" type="float" value="0.35"/>
   <property name="Background Vel Y" type="float" value="0.2"/>
-  <property name="Name" value="ShaDis_Home"/>
+  <property name="Name" value="WCityHP"/>
   <property name="Song" value="/server/assets/ChillCafe.ogg"/>
  </properties>
  <tileset firstgid="1" source="../assets/tiles/home_warp.tsx"/>

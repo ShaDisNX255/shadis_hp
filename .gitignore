@@ -10,6 +10,8 @@ scripts/octo-ranking/player_id_ranks_open.json
 scripts/octo-ranking/player_id_ranks_open.txt
 scripts/octo-ranking/player_id_ranks_wcity.json
 scripts/octo-ranking/player_id_ranks_wcity.txt
+scripts/octo-ranking/player_id_ranks.json
+scripts/octo-ranking/player_id_ranks.txt
 scripts/ezlibs-scripts/announcements_feed.lua
 logs.txt
 assets/displayer/*
@@ -22,4 +24,3 @@ watch.sh
 watcher.log
 watcher.pid
 scripts/bbs/admin_pass_seed.lua
-
