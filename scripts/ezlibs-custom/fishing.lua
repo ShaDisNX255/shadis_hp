@@ -2017,25 +2017,53 @@ Net:on("player_transfer", function(ev)
   _clear_start_guard(pid)
 end)
 
-Net:on("player_join_area", function(ev)
+Net:on("player_join", function(ev)
   local pid = ev.player_id
-  local aid = ev.area_id or Net.get_player_area(pid)
-  if not pid or not aid then return end
-  PLAYER_AREA[pid] = aid
-  AREA_PLAYERS[aid] = AREA_PLAYERS[aid] or {}
-  AREA_PLAYERS[aid][pid] = true
 
-  -- Pre-send fishing meter assets so they're in the client cache
-  -- before the player ever starts fishing (avoids first-login blank meter)
-  local png_path, anim_path = _meter_sheet_paths(aid)
-  if png_path then pcall(Net.provide_asset_for_player, pid, png_path) end
-  if anim_path then pcall(Net.provide_asset_for_player, pid, anim_path) end
+  -- Collect ALL unique (png, anim) pairs from every configured area + the defaults
+  local seen = {}
+  local all_sheets = {}
 
-  -- keep your existing orphan cleanup
-  _cleanup_fishing_meters(aid, pid)
+  local function _collect(png, anim)
+    if not png or not anim or png == "" or anim == "" then return end
+    local key = png .. "|" .. anim
+    if seen[key] then return end
+    seen[key] = true
+    table.insert(all_sheets, { png = png, anim = anim })
+  end
 
-  -- and hide existing meters they do not own
-  _hide_existing_meters_for_joiner(ev)
+  -- Default assets
+  _collect(Constants.ASSET_FISH_PNG, Constants.ASSET_FISH_ANIM)
+
+  -- Per-area overrides
+  if config.AREAS then
+    for area_id, area_data in pairs(config.AREAS) do
+      local C = area_data.CONSTANTS
+      if C then
+        _collect(C.ASSET_FISH_PNG, C.ASSET_FISH_ANIM)
+      end
+    end
+  end
+
+  -- Provide all assets immediately
+  for _, sheet in ipairs(all_sheets) do
+    pcall(Net.provide_asset_for_player, pid, sheet.png)
+    pcall(Net.provide_asset_for_player, pid, sheet.anim)
+  end
+
+  -- Pre-allocate all sprites after a delay (so assets have time to download)
+  async(function()
+    await(Async.sleep(1.0))
+    local s = SESS[pid]
+    if s and s.active and s.phase == "reeling" then return end
+    for _, sheet in ipairs(all_sheets) do
+      local sprite_id = _meter_sprite_id_for_sheet(sheet.png)
+      pcall(NetGames.add_ui_element,
+        sprite_id, pid, sheet.png, sheet.anim, "NORMAL_0",
+        -1000, -1000, 0, 2.0, 2.0
+      )
+    end
+  end)
 end)
 
 
