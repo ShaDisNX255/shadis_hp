@@ -103,6 +103,7 @@ f15ac4cd199c10be25fb48ef7ad316f2 Areagrab.Unified.Library.162
 
 ............................class BlockPackageManager............................
 2e6bd07f5f9614f8fce403bdea369392 com.OFC.block.EXE6-013-UnderShirt
+f7fdaa7ff00df8719942580daf4c7581 com.shadishp.block.duov2.blue
 
 ...........................class PlayerPackageManager............................
 926948c190aed4bd4b8320d981dec325 com.Loui.player.Elecman.basic
@@ -123,4 +124,5 @@ de941c9687c565e7b710a7e29e5346fe com.RaitoADV.player.PurpleNormalNavi
 e06b7158a8cc52fd19a783240586c1ee com.RaitoADV.player.RedNormalNavi
 c1a9de2a38537874eb47c565a445ca1f com.RaitoADV.player.WhiteNormalNavi
 cc35c5d13c826691e606e4f77e40f260 com.RaitoADV.player.YellowNormalNavi
+f0204ef3d0c1ab0437ac4da8c4754d39 com.drawcie.navi.darkmegaPVP
 
