@@ -2025,6 +2025,12 @@ Net:on("player_join_area", function(ev)
   AREA_PLAYERS[aid] = AREA_PLAYERS[aid] or {}
   AREA_PLAYERS[aid][pid] = true
 
+  -- Pre-send fishing meter assets so they're in the client cache
+  -- before the player ever starts fishing (avoids first-login blank meter)
+  local png_path, anim_path = _meter_sheet_paths(aid)
+  if png_path then pcall(Net.provide_asset_for_player, pid, png_path) end
+  if anim_path then pcall(Net.provide_asset_for_player, pid, anim_path) end
+
   -- keep your existing orphan cleanup
   _cleanup_fishing_meters(aid, pid)
 
