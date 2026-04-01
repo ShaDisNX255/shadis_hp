@@ -84,6 +84,7 @@ ffeb363545e65eed959dfded67286730 com.OFC.card.EXEPoN-088-CrackOut
 cfdea7976c7a00c32e6338db5ab51e6c com.OFC.card.EXEPoN-090-TripleCrack
 89f93437ac2efae265d9767a7316254e com.OFC.card.EXEPoN-112-Barrier
 61828f6dbb99d6a41df4085f6278ce13 com.OFC.card.EXEPoN-112-Barrier
+a931a07dcdbd86aba89565313476f14f com.alrysc.card.barrier
 494b80fe2f92432fab3607374a8d37e9 com.k1rbyat1na.card.EXE6-222-Roll
 e44c324c365a21dcd38697b66afd4dc4 com.k1rbyat1na.card.EXE6-222-Roll
 b45ba712c91161f3b0aba2f8ff41da74 com.rune.k1rbyat1na.card.EXE6-060-EnergyBomb
