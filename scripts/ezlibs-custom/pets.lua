@@ -216,7 +216,7 @@ local PET_CHIPS = {
   [2]  = { display_name = "Recovery50", item_name = "PetChip: Recovery50", description = "Pet battle chip: Recovery50" },
   [3]  = { display_name = "PanelSteal", item_name = "PetChip: PanelSteal", description = "Pet battle chip: PanelSteal" },
   [4]  = { display_name = "AreaSteal", item_name = "PetChip: AreaSteal", description = "Pet battle chip: AreaSteal" },
-  [5]  = { display_name = "HolyPanel", description = "Pet battle chip: HolyPanel", item_name = "PetChip: HolyPanel" },
+  [5]  = { display_name = "HolyPanel", description = "PetChip: HolyPanel", item_name = "Pet battle chip: HolyPanel" },
   [6]  = { display_name = "Sanctuary", item_name = "PetChip: Sanctuary", description = "Pet battle chip: Sanctuary" },
   [7]  = { display_name = "Invisible", item_name = "PetChip: Invisible", description = "Pet battle chip: Invisible" },
   [8]  = { display_name = "Shadow", item_name = "PetChip: Shadow", description = "Pet battle chip: Shadow" },
