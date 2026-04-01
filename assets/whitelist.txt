@@ -125,4 +125,6 @@ e06b7158a8cc52fd19a783240586c1ee com.RaitoADV.player.RedNormalNavi
 c1a9de2a38537874eb47c565a445ca1f com.RaitoADV.player.WhiteNormalNavi
 cc35c5d13c826691e606e4f77e40f260 com.RaitoADV.player.YellowNormalNavi
 f0204ef3d0c1ab0437ac4da8c4754d39 com.drawcie.navi.darkmegaPVP
+e61232ec917b32226f6b217b4c1b8da9 com.discord.caseofthematts#8907.player.howler
+2588cd287d4202cb62907e20def5d70f BlueNavi_made_by_IPC_and_Pyroja_and_Jamesking
 
