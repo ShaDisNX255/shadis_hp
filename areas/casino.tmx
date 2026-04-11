@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="30" height="30" tilewidth="64" tileheight="32" infinite="0" nextlayerid="3" nextobjectid="110">
+<map version="1.10" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="30" height="30" tilewidth="64" tileheight="32" infinite="0" nextlayerid="3" nextobjectid="111">
  <properties>
   <property name="Background" value="custom"/>
   <property name="Background Animation" value="/server/assets/custom/backgrounds/wcity/01-generic1.animation"/>
@@ -276,5 +276,14 @@
   <object id="107" gid="424" x="81" y="419" width="128" height="96"/>
   <object id="108" gid="365" x="113" y="317" width="128" height="96"/>
   <object id="109" gid="428" x="137" y="229" width="64" height="49"/>
+  <object id="110" name="HeelNavi" type="NPC" x="547" y="229">
+   <properties>
+    <property name="Asset Name" value="heel-navi-exe4_black"/>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Direction" value="Down Left"/>
+    <property name="Text 1" value="Hehe I hacked the slot machines to give you one free spin per day. Don't tell anyone hehe..."/>
+   </properties>
+   <point/>
+  </object>
  </objectgroup>
 </map>
