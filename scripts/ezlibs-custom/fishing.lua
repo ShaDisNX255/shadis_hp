@@ -9,6 +9,7 @@ local ezencounters = require('scripts/ezlibs-scripts/ezencounters/main')
 local config = require('scripts/fishing-config/main')
 local Constants = config.CONSTANTS
 local NetGames     = require('scripts/net-games/main')
+local pets         = require('scripts/ezlibs-custom/pets')
 
 -- Per-area resolvers (fallback to defaults if not defined)
 local function _C_for(area_id)
@@ -145,6 +146,11 @@ local FISHING      = {
   VIRUS_ENCOUNTERS       = config.FISHING_VIRUS,
   -- Money per pound for normal fish (not viruses)
   FISH_REWARD_PER_LB     = Constants.FISH_REWARD_PER_LB, -- edit to taste
+
+  PET_REWARDS           = Constants.PET_REWARDS or {
+    jelly   = 0.03,
+    piranha = 0.03,
+  },
 
   -- Waiting phase: bite indicator (public, visible to everyone)
   BITE                   = {
@@ -1486,6 +1492,34 @@ local function _bugfrag_for(area_id)
   }
 end
 
+local function _pet_rewards_for(area_id)
+  local C = _C_for(area_id)
+  local base = FISHING.PET_REWARDS or {}
+
+  return {
+    jelly   = (C.PET_REWARDS and tonumber(C.PET_REWARDS.jelly))   or tonumber(base.jelly)   or 0.03,
+    piranha = (C.PET_REWARDS and tonumber(C.PET_REWARDS.piranha)) or tonumber(base.piranha) or 0.03,
+  }
+end
+
+local function _roll_pet_reward(area_id)
+  local chances = _pet_rewards_for(area_id)
+  local jelly   = math.max(0, tonumber(chances.jelly) or 0)
+  local piranha = math.max(0, tonumber(chances.piranha) or 0)
+
+  local roll = math.random()
+
+  if roll < jelly then
+    return "jelly"
+  end
+
+  if roll < (jelly + piranha) then
+    return "piranha"
+  end
+
+  return nil
+end
+
 local function _consume_item(pid, name, qty)
   pcall(ezmemory.remove_player_item, pid, name, qty or 1)
 end
@@ -1715,11 +1749,55 @@ local function _begin_reeling(pid)
       _spawn_or_update_timer(pid)
 
       -- success
+      -- success
       if cur.hold_accum >= cur.hold_req then
         local tier = tostring(cur.heaviness or "")
         local excluded = (C and C.VIRUS_EXCLUDED) or FISHING.VIRUS_EXCLUDED or {}
         local eligible = not excluded[tier]
         local chance = tonumber(cur.virus_chance or FISHING.VIRUS_CHANCE or 0) or 0
+
+        -- Roll the bonus pet first.
+        -- If no pet is awarded, the remaining chance continues into the normal fish/virus outcome.
+        local pet_kind = _roll_pet_reward(cur.area_id)
+        if pet_kind then
+          local mug = Net.get_player_mugshot(pid)
+          local mug_tex = mug and mug.texture_path or nil
+          local mug_anim = mug and mug.animation_path or nil
+          local pet_name = (pet_kind == "jelly" and "Jelly")
+                        or (pet_kind == "piranha" and "Piranha")
+                        or tostring(pet_kind):gsub("^%l", string.upper)
+          local pet_item_id = "pet_" .. pet_kind
+
+          _stop(pid, nil, nil)
+
+          await(Async.message_player(
+            pid,
+            "Oh, what's this",
+            mug_tex,
+            mug_anim
+          ))
+
+          local ok = false
+          if pets and pets.grant_owned_pet then
+            ok = pcall(pets.grant_owned_pet, pid, pet_item_id, 1)
+          end
+
+          if not ok then
+            await(Async.message_player(pid, "It slipped away before you could secure it..."))
+            return
+          end
+
+          if FISHING.SFX and FISHING.SFX.catch then
+            pcall(Net.play_sound_for_player, pid, FISHING.SFX.catch)
+          end
+
+          await(Async.message_player(
+            pid,
+            ("You got a %s!"):format(pet_name)
+          ))
+          return
+        end
+
         local roll = math.random()
 
         if eligible and roll < chance then

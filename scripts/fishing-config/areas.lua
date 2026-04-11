@@ -28,6 +28,10 @@ return {
   },
   rink = {
     CONSTANTS = {
+      PET_REWARDS = {
+        jelly   = 0.04,
+        piranha = 0.04,
+      },
       LEADERBOARD           = {
         ENABLED  = true,
         MEM_AREA = "rink",
@@ -102,6 +106,10 @@ return {
   },
   rink2 = {
     CONSTANTS = {
+      PET_REWARDS = {
+        jelly   = 0.04,
+        piranha = 0.04,
+      },
       VIRUS_CHANCE           = 0.26,
       ASSET_FISH_PNG         = "/server/assets/fishing/icy-fish.png",
       ASSET_FISH_ANIM        = "/server/assets/fishing/icy-fish.animation",
@@ -169,6 +177,10 @@ return {
   },
   rink3 = {
     CONSTANTS = {
+      PET_REWARDS = {
+        jelly   = 0.05,
+        piranha = 0.05,
+      },
       LEADERBOARD           = {
         ENABLED  = true,
         MEM_AREA = "rink3",

@@ -163,6 +163,13 @@ local PET_DEFS = {
   moloko   = { name = "Moloko",   texture = "moloko.png",   animation = "moloko.animation",   texture_r2 = "moloko-r2.png",   texture_r3 = "moloko-r3.png"   },
   powie    = { name = "Powie",    texture = "powie.png",    animation = "powie.animation",    texture_r2 = "mowie-r2.png",    texture_r3 = "powie-r3.png"    },
   kabutank = { name = "Kabutank", texture = "kabutank.png", animation = "kabutank.animation", texture_r2 = "kabutank-r2.png", texture_r3 = "kabutank-r3.png" },
+  jelly    = { name = "Jelly",    texture = "jelly.png",    animation = "jelly.animation",    texture_r2 = "jelly.png",       texture_r3 = "jelly.png"       },
+  volgear  = { name = "Volgear",  texture = "volgear.png",  animation = "volgear.animation",  texture_r2 = "volgear.png",     texture_r3 = "volgear.png"     },
+  magtect  = { name = "Magtect",  texture = "magtect.png",  animation = "magtect.animation",  texture_r2 = "magtect.png",     texture_r3 = "magtect.png"     },
+  fishy    = { name = "Fishy",    texture = "fishy.png",    animation = "fishy.animation",    texture_r2 = "fishy-r2.png",    texture_r3 = "jelly-r3.png"    },
+  piranha  = { name = "Piranha",  texture = "piranha.png",  animation = "piranha.animation",  texture_r2 = "piranha-r2.png",  texture_r3 = "piranha-r3.png"  },
+  brushman = { name = "Brushman", texture = "brushman.png", animation = "brushman.animation", texture_r2 = "brushman-r2.png", texture_r3 = "brushman-r3.png" },
+  bunny    = { name = "Bunny",    texture = "bunny.png",    animation = "bunny.animation",    texture_r2 = "bunny-r2.png",    texture_r3 = "bunny-r3.png"    },
 }
 
 -- ====================== Battle Pet (Take With You) ======================

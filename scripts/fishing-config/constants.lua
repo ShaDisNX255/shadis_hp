@@ -54,6 +54,12 @@ local CONSTANTS = {
   EX_SCREEN_SHIFT        = { x = -1.0, y = -1.0, z = 0.0 },
   -- Catch/Reward Values
   FISH_REWARD_PER_LB     = 700,
+
+  PET_REWARDS = {
+    jelly   = 0.03,
+    piranha = 0.03,
+  },
+
   MONEY_MULTIPLYER       = 500,
   -- Odds for each heaviness tier (percent-like weights; they don't need to sum to 100)
   HEAVINESS_CHANCES = {

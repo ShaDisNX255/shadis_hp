@@ -131,6 +131,13 @@ local ONCEHUB_CATALOG = {
   { id = "pet_powie",  name = "Pet: Powie" },
   { id = "pet_kabutank",  name = "Pet: Kabutank" },
   { id = "pet_spooky",  name = "Pet: Spooky" },
+  { id = "pet_jelly",  name = "Pet: Jelly" },
+  { id = "pet_volgear",  name = "Pet: Volgear" },
+  { id = "pet_magtect",  name = "Pet: Magtect" },
+  { id = "pet_fishy",  name = "Pet: Fishy" },
+  { id = "pet_piranha",  name = "Pet: Piranha" },
+  { id = "pet_bunny",  name = "Pet: Bunny" },
+  { id = "pet_brushman",  name = "Pet: Brushman" },
 }
 
 
