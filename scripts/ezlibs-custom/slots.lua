@@ -21,6 +21,7 @@ if not ezmemory then
   if ok then ezmemory = mod end
 end
 
+local helpers = require("scripts/ezlibs-scripts/helpers")
 
 -- Shared currency UI assets (NOT per-skin)
 local CURRENCY_TEX  = "/server/assets/slots/currency.png"
@@ -49,6 +50,8 @@ local CURRENCY_TEXT = {
 -- ======================
 local MAX_DISPLAY = 9999 -- 4-digit display clamp
 local FALLBACK_STARTING_TOKENS = 10 -- used only when ezmemory token API isn't available
+local DAILY_FREE_SPIN_MEM_KEY = "slots_daily_free_spin_day_v1"
+local DAILY_FREE_SPIN_WAGER = 3
 
 -- ======================
 -- Payout tables (tokens)  ✅ FINALIZED
@@ -489,6 +492,41 @@ local function _has_ez_tokens_api()
   return type(em.get_player_tokens) == "function"
      and type(em.add_player_tokens) == "function"
      and type(em.spend_player_tokens) == "function"
+end
+
+local function _today_key()
+  return os.date("%Y-%m-%d")
+end
+
+local function _get_player_mem_and_secret(pid)
+  local em = ezmemory or rawget(_G, "ezmemory")
+  if type(em) ~= "table" then return nil, nil, nil end
+  if type(em.get_player_memory) ~= "function" or type(em.save_player_memory) ~= "function" then
+    return nil, nil, em
+  end
+
+  local safe_secret = helpers.get_safe_player_secret(pid)
+  if not safe_secret or safe_secret == "" then return nil, nil, em end
+
+  local ok, pm = pcall(em.get_player_memory, safe_secret)
+  if not ok or type(pm) ~= "table" then return nil, safe_secret, em end
+
+  return pm, safe_secret, em
+end
+
+local function _has_daily_free_spin(pid)
+  local pm = _get_player_mem_and_secret(pid)
+  if type(pm) ~= "table" then return false end
+  return tostring(pm[DAILY_FREE_SPIN_MEM_KEY] or "") ~= _today_key()
+end
+
+local function _mark_daily_free_spin_used(pid)
+  local pm, safe_secret, em = _get_player_mem_and_secret(pid)
+  if type(pm) ~= "table" or not safe_secret or safe_secret == "" or not em then return false end
+
+  pm[DAILY_FREE_SPIN_MEM_KEY] = _today_key()
+  em.save_player_memory(safe_secret)
+  return true
 end
 
 local function _set_tokens(pid, n)
@@ -976,6 +1014,10 @@ local function _set_wager(pid, new_wager)
   if not st then return end
   if st.busy then return end -- only when not spinning / not flashing / not awaiting claim
 
+  if st.free_spin_locked and new_wager < DAILY_FREE_SPIN_WAGER then
+    new_wager = DAILY_FREE_SPIN_WAGER
+  end
+
   if new_wager < 1 then new_wager = 1 end
   if new_wager > 3 then new_wager = 3 end
   if st.wager == new_wager then return end
@@ -1174,23 +1216,32 @@ local function _start_round(pid)
   local wager = st.wager or 1
   if wager < 1 then wager = 1 elseif wager > 3 then wager = 3 end
 
-  local have = _sync_tokens(pid)
+  local using_daily_free_spin = (st.daily_free_spin_available == true)
+  if using_daily_free_spin then
+    wager = DAILY_FREE_SPIN_WAGER
+    st.wager = DAILY_FREE_SPIN_WAGER
+    st.daily_free_spin_available = false
+    st.free_spin_locked = false
+    _mark_daily_free_spin_used(pid)
+  else
+    local have = _sync_tokens(pid)
 
-  if have < wager then
-    _play_sfx(pid, "lose")
-    return
-  end
-
-  local em = ezmemory or rawget(_G, "ezmemory")
-  if st.use_ez_tokens and em and em.spend_player_tokens then
-    local ok = em.spend_player_tokens(pid, wager)
-    if not ok then
-      _sync_tokens(pid)
+    if have < wager then
       _play_sfx(pid, "lose")
       return
     end
-  else
-    _set_tokens(pid, have - wager)
+
+    local em = ezmemory or rawget(_G, "ezmemory")
+    if st.use_ez_tokens and em and em.spend_player_tokens then
+      local ok = em.spend_player_tokens(pid, wager)
+      if not ok then
+        _sync_tokens(pid)
+        _play_sfx(pid, "lose")
+        return
+      end
+    else
+      _set_tokens(pid, have - wager)
+    end
   end
 
   _sync_tokens(pid)
@@ -1236,6 +1287,10 @@ local function _start_round(pid)
 
     local wins, payout_total = _evaluate_wins(st4)
 
+    if using_daily_free_spin then
+      st4.wager = 1
+    end
+
     if payout_total > 0 then
       st4.await_claim = true
       _set_payout(pid, payout_total)
@@ -1252,6 +1307,10 @@ local function _start_round(pid)
 
     local st5 = st_by_pid[pid]
     if not st5 or st5.round_token ~= token then return end
+
+    if using_daily_free_spin and (st5.payout or 0) <= 0 then
+      _refresh_wager_marks(pid)
+    end
 
     -- Lock until payout is claimed (but Confirm can claim immediately via virtual_input busy-override)
     if (st5.payout or 0) > 0 then
@@ -1281,6 +1340,8 @@ local function _open(pid, folder)
 
   local x, y = _center_mainui_pos()
 
+  local daily_free_spin_available = _has_daily_free_spin(pid)
+
   st_by_pid[pid] = {
     folder = folder,
     ui_x = x,
@@ -1288,11 +1349,13 @@ local function _open(pid, folder)
     phase = "initial",
     busy = false,
     round_token = 0,
-    wager = 1,
+    wager = daily_free_spin_available and DAILY_FREE_SPIN_WAGER or 1,
     grid = {},
     tokens_real = 0,
     payout = 0,
     use_ez_tokens = false,
+    daily_free_spin_available = daily_free_spin_available,
+    free_spin_locked = daily_free_spin_available,
 
     -- payout-claim gating
     await_claim = false,
