@@ -18,7 +18,7 @@ local GENERATED_WHITELIST_DIR = "/server/assets/generated_whitelists"
 local PLAYER_UNLOCKS_MEM_KEY = "__player_mod_unlocks_v1"
 
 whitelist.PACKAGES = {
-  --undershirt = "com.OFC.block.EXE6-013-UnderShirt",
+  undershirt = "com.OFC.block.EXE6-013-UnderShirt",
 }
 
 whitelist.CARDS = {
