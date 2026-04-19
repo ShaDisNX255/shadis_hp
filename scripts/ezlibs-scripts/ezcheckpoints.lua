@@ -168,32 +168,38 @@ Net:on("object_interaction", function(event)
         local prompt_message = ""
         local cond = nil
 
-        if not skip_prompt then
-            if password then
-                prompt_message = "Please input the password"
-            elseif key_name == "money" then
-                cond = { type = "money", amount = required_keys, consume = consume }
+        if password then
+            prompt_message = "Please input the password"
+        elseif key_name == "money" then
+            cond = { type = "money", amount = required_keys, consume = consume }
+            if not skip_prompt then
                 if consume then
                     prompt_message = "Spend "..required_keys.."$ to Unlock?"
                 else
                     prompt_message = "Show "..required_keys.."$ to Unlock?"
                 end
-            elseif key_name == "fragments" or key_name == "fragment" then
-                cond = { type = "fragments", amount = required_keys, consume = consume }
+            end
+        elseif key_name == "fragments" or key_name == "fragment" then
+            cond = { type = "fragments", amount = required_keys, consume = consume }
+            if not skip_prompt then
                 if consume then
                     prompt_message = "Spend "..required_keys.." Fragments to Unlock?"
                 else
                     prompt_message = "Show "..required_keys.." Fragments to Unlock?"
                 end
-            elseif key_name == "tokens" or key_name == "token" then
-                cond = { type = "tokens", amount = required_keys, consume = consume }
+            end
+        elseif key_name == "tokens" or key_name == "token" then
+            cond = { type = "tokens", amount = required_keys, consume = consume }
+            if not skip_prompt then
                 if consume then
                     prompt_message = "Spend "..required_keys.." Tokens to Unlock?"
                 else
                     prompt_message = "Show "..required_keys.." Tokens to Unlock?"
                 end
-            else
-                cond = { type = "item", name = key_name, amount = required_keys, consume = consume }
+            end
+        else
+            cond = { type = "item", name = key_name, amount = required_keys, consume = consume }
+            if not skip_prompt then
                 if required_keys > 1 then
                     if consume then
                         prompt_message = "Use "..required_keys.." "..key_name.." to Unlock?"

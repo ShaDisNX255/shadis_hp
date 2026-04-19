@@ -16,6 +16,7 @@ local ezmenus   = require('scripts/ezlibs-scripts/ezmenus')
 local duels  = require('scripts/ezlibs-custom/duels')
 local card_sleeves = require('scripts/ezlibs-custom/card_sleeves')
 local ezquests = require('scripts/ezlibs-scripts/ezquests')
+local whitelist = require('scripts/ezlibs-custom/whitelist')
 
 local Pets = (function()
   local ok, M = pcall(require, 'scripts/ezlibs-custom/pets')
@@ -2770,6 +2771,64 @@ eznpcs.add_event{
         await(Async.message_player(player_id, msg, mug.texture_path, mug.animation_path))
       else
         await(Async.message_player(player_id, "Please come again!", mug.texture_path, mug.animation_path))
+      end
+
+      return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+    end)
+  end
+}
+
+eznpcs.add_event{
+  name = "UnlockWhitelistPackage",
+  action = function(npc, player_id, dialogue, relay_object)
+    return async(function()
+      local mug = eznpcs.get_dialogue_mugshot(npc, player_id, dialogue)
+      local ci = build_ci_props(dialogue)
+
+      local package_id = get_ci(ci, "package id") or get_ci(ci, "packageid")
+      local reward_name = tostring(get_ci(ci, "reward name") or get_ci(ci, "reward") or package_id or "that unlock")
+      local already_msg = tostring(get_ci(ci, "already msg") or ("You already unlocked " .. reward_name .. "."))
+      local unlock_msg = tostring(get_ci(ci, "unlock msg") or ("You can now use " .. reward_name .. "!"))
+
+      if not package_id or package_id == "" then
+        await(Async.message_player(
+          player_id,
+          "This NPC is missing a Package ID.",
+          mug.texture_path, mug.animation_path
+        ))
+        return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+      end
+
+      if whitelist.player_has_package_unlocked(player_id, package_id) then
+        await(Async.message_player(
+          player_id,
+          already_msg,
+          mug.texture_path, mug.animation_path
+        ))
+        return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+      end
+
+      local ok, reason = whitelist.unlock_package(player_id, package_id)
+
+      if ok then
+        if sfx and sfx.item_get then
+          Net.play_sound_for_player(player_id, sfx.item_get)
+        end
+
+        await(Async.message_player(
+          player_id,
+          unlock_msg,
+          mug.texture_path, mug.animation_path
+        ))
+      else
+        local fail_msg = (reason == "already_unlocked") and already_msg
+          or "I couldn't unlock that right now."
+
+        await(Async.message_player(
+          player_id,
+          fail_msg,
+          mug.texture_path, mug.animation_path
+        ))
       end
 
       return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
