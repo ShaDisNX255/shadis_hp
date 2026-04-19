@@ -260,6 +260,15 @@ local PLAYER_ARMED_PET_KEY = "armed_pet_v1"
 local OWNED_PETS_MEM_KEY   = "owned_pet_instances_v1"
 local LEGACY_PET_COUNT_KEYS = { "oncehub_decor_inventory_v1", "decor_inventory" }
 
+local function dbg(...)
+  if not EXPEDITION.debug then return end
+  local parts = {}
+  for i = 1, select("#", ...) do
+    parts[#parts+1] = tostring(select(i, ...))
+  end
+  print("[pets][exp] "..table.concat(parts, " "))
+end
+
 local function _safe_get_player_memory(secret)
   secret = tostring(secret or "")
   if secret == "" then return nil end
@@ -1432,15 +1441,6 @@ end
 
 local function now_seed_rng()
   pcall(function() math.randomseed(os.time() % 2147483647) end)
-end
-
-local function dbg(...)
-  if not EXPEDITION.debug then return end
-  local parts = {}
-  for i = 1, select("#", ...) do
-    parts[#parts+1] = tostring(select(i, ...))
-  end
-  print("[pets][exp] "..table.concat(parts, " "))
 end
 
 -- Ask custom.lua to ignore the very next board_close for this player (one-shot)
