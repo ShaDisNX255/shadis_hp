@@ -11,14 +11,20 @@ a262213f7337daee32e1aa38c158f820 com.keristero.card.Vulcan1
 c81aaf22631981e586578c8d9b308e22 com.keristero.k1rbyat1na.card.EXE6-058-MiniBomb
 
 c582e127fcfd88cb1229fbb14244c250 Barr10.Unified.Library.92
+1ea2339e8b3e8ce1d21b0dfb9f4df8ee com.OFC.card.EXE6-009-SpreadGun1
+b48c6e3336815fe7f45dd80c7ee0b79c com.OFC.card.EXE6-010-SpreadGun2
 ee8944d83b41d4d0f010316c3acd0faf com.OFC.card.EXE6-018-YoYo
 102acf1aa109a0931d0a9ced8d21b0bb com.OFC.card.EXE6-019-HellsBurner1
+bb8ee65fffa4796d02537f5f5542f2da com.OFC.card.EXE6-029-ThunderBall
 8958e7c43700cb6dc270c0bc94fbd41f com.OFC.card.EXE6-055-MachineGun1
 2cd140a6d9a19a88ebfce17bd7f691dd com.OFC.card.EXE6-056-MachineGun2
 6d0f7cee9ccddc2e5f63ed42ed44c1a8 com.OFC.card.EXE6-091-ReflecMet1
 98a03e4b7f777907af40ad27625c2554 com.OFC.card.EXE6-116-KillerSensor1
 c2073649b5af70291f2bec3fc7ad9b8b com.OFC.card.EXE6-117-KillerSensor2
 09061357ad2b044e3353586db7ccd9a5 com.OFC.card.EXE6-134-Toppuu
+6458abe25f4154ec89095830176bf3f1 com.OFC.card.EXE6-157-Recovery30
+027eb4c21344cf356f25ad476b68ceea com.OFC.card.EXE6-158-Recovery50
+f7d5197c91b65273fafcf2307aa3e070 com.OFC.card.EXEPoN-014-HeatShot
 2bfa00687231ff7083149c0bbf7145a3 com.OFC.card.EXEPoN-017-RabiRing1
 609a9d32c06b1c11503827763a61b807 com.OFC.card.EXEPoN-018-RabiRing2
 1382f41154e4ebbfd044b68d9154d61c com.OFC.card.EXEPoN-031-Ratton1
@@ -26,6 +32,11 @@ ce1ba77e9d976d0b46aa5a962163d043 com.OFC.card.EXEPoN-032-Ratton2
 0e76f2448c177e50e5af7b4c0760cfe4 com.OFC.card.EXEPoN-040-LongSword
 942e5f1ce21f76c7c4a8b8eb0885fea4 com.OFC.card.EXEPoN-051-ShockWave
 186182b50e49c1abc0f79bc096773fd5 com.OFC.card.EXEPoN-052-SonicWave
+a7776ddc2a0c163c8401f449eaa30fbd com.Thor.card.GrassStg
+494b80fe2f92432fab3607374a8d37e9 com.k1rbyat1na.card.EXE6-222-Roll
+963cbfc457cd9e3e11a6442242424b66 com.keristero.card.Vulcan2
+39847b540674ed8492b2da796f7b7b61 com.keristero.card.Vulcan3
+1a9ddce9c1f95666561bff6bbed7b5a4 com.louise.card.gutsmanv1
 30e091d976b25642482380a7c432682d rune.legacy.bubbler
 
 ............................class BlockPackageManager............................

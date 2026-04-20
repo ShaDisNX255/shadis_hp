@@ -24,103 +24,142 @@ whitelist.PACKAGES = {
 whitelist.CARDS = {
   reflecmet1 = {
     package_id = "com.OFC.card.EXE6-091-ReflecMet1",
-    declared_card_id  = "com.OFC.card.EXE6-091-ReflecMet1",
     asset_path = "/server/assets/chips/EXE6-Reflect.zip",
     code = "*",
   },
 
   shockwave = {
     package_id = "com.OFC.card.EXEPoN-051-ShockWave",
-    declared_card_id  = "com.OFC.card.EXEPoN-051-ShockWave",
     asset_path = "/server/assets/chips/EXEPoN-Shockwave.zip",
     code = "*",
   },
 
   longsword = {
     package_id = "com.OFC.card.EXEPoN-040-LongSword",
-    declared_card_id  = "com.OFC.card.EXEPoN-040-LongSword",
     asset_path = "/server/assets/chips/EXEPoN-LongSword.zip",
     code = "*",
   },
 
   windbox = {
     package_id = "com.OFC.card.EXE6-134-Toppuu",
-    declared_card_id  = "com.OFC.card.EXE6-134-Toppuu",
     asset_path = "/server/assets/chips/EXE6-Windbox.zip",
     code = "*",
   },
 
   ratton1 = {
     package_id = "com.OFC.card.EXEPoN-031-Ratton1",
-    declared_card_id  = "com.OFC.card.EXEPoN-031-Ratton1",
     asset_path = "/server/assets/chips/EXEPoN-Ratton.zip",
     code = "*",
   },
 
   bubbler = {
     package_id = "rune.legacy.bubbler",
-    declared_card_id  = "rune.legacy.bubbler",
     asset_path = "/server/assets/chips/EXE3-Bubbler.zip",
     code = "*",
   },
   yoyo1 = {
     package_id = "com.OFC.card.EXE6-018-YoYo",
-    declared_card_id = "com.OFC.card.EXE6-018-YoYo",
     asset_path = "/server/assets/chips/EXE6-YoYo.zip",
     code = "*",
   },
   HellsBurner1 = {
     package_id = "com.OFC.card.EXE6-019-HellsBurner1",
-    declared_card_id = "com.OFC.card.EXE6-019-HellsBurner1",
     asset_path = "/server/assets/chips/EXE6-HellsBurner1.zip",
     code = "*",
   },
   MachineGun1 = {
     package_id = "com.OFC.card.EXE6-055-MachineGun1",
-    declared_card_id = "com.OFC.card.EXE6-055-MachineGun1",
     asset_path = "/server/assets/chips/EXE6-MachineGun1.zip",
     code = "*",
   },
   MachineGun2 = {
     package_id = "com.OFC.card.EXE6-056-MachineGun2",
-    declared_card_id = "com.OFC.card.EXE6-056-MachineGun2",
     asset_path = "/server/assets/chips/EXE6-MachineGun2.zip",
     code = "*",
   },
   KillerSensor1 = {
     package_id = "com.OFC.card.EXE6-116-KillerSensor1",
-    declared_card_id = "com.OFC.card.EXE6-116-KillerSensor1",
     asset_path = "/server/assets/chips/EXE6-KillerSensor1.zip",
     code = "*",
   },
   KillerSensor2 = {
     package_id = "com.OFC.card.EXE6-117-KillerSensor2",
-    declared_card_id = "com.OFC.card.EXE6-117-KillerSensor2",
     asset_path = "/server/assets/chips/EXE6-KillerSensor2.zip",
     code = "*",
   },
   RabiRing1 = {
     package_id = "com.OFC.card.EXEPoN-017-RabiRing1",
-    declared_card_id = "com.OFC.card.EXEPoN-017-RabiRing1",
     asset_path = "/server/assets/chips/EXEPoN-RabiRing1.zip",
     code = "*",
   },
   RabiRing2 = {
     package_id = "com.OFC.card.EXEPoN-018-RabiRing2",
-    declared_card_id = "com.OFC.card.EXEPoN-018-RabiRing2",
     asset_path = "/server/assets/chips/EXEPoN-RabiRing2.zip",
     code = "*",
   },
   Ratton2 = {
     package_id = "com.OFC.card.EXEPoN-032-Ratton2",
-    declared_card_id = "com.OFC.card.EXEPoN-032-Ratton2",
     asset_path = "/server/assets/chips/EXEPoN-Ratton2.zip",
     code = "*",
   },
   sonicwave = {
     package_id = "com.OFC.card.EXEPoN-052-SonicWave",
-    declared_card_id = "com.OFC.card.EXEPoN-052-SonicWave",
     asset_path = "/server/assets/chips/EXEPoN-SonicWave.zip",
+    code = "*",
+  },
+  spreadgun1 = {
+    package_id = "com.OFC.card.EXE6-009-SpreadGun1",
+    asset_path = "/server/assets/chips/EXE6-SpreadGun1.zip",
+    code = "*",
+  },
+  spreadgun2 = {
+    package_id = "com.OFC.card.EXE6-010-SpreadGun2",
+    asset_path = "/server/assets/chips/EXE6-SpreadGun2.zip",
+    code = "*",
+  },
+  thunderball = {
+    package_id = "com.OFC.card.EXE6-029-ThunderBall",
+    asset_path = "/server/assets/chips/EXE6-ThunderBall.zip",
+    code = "*",
+  },
+  roll1 = {
+    package_id = "com.k1rbyat1na.card.EXE6-222-Roll",
+    asset_path = "/server/assets/chips/EXE6-Roll1zip",
+    code = "*",
+  },
+  gutsman1 = {
+    package_id = "com.louise.card.gutsmanv1",
+    asset_path = "/server/assets/chips/EXE3-Gutsman1.zip",
+    code = "*",
+  },
+  rec30 = {
+    package_id = "com.OFC.card.EXE6-157-Recovery30",
+    asset_path = "/server/assets/chips/EXE6-Rec30.zip",
+    code = "*",
+  },
+  rec50 = {
+    package_id = "com.OFC.card.EXE6-158-Recovery50",
+    asset_path = "/server/assets/chips/EXE6-Rec50.zip",
+    code = "*",
+  },
+  vulcan2 = {
+    package_id = "com.keristero.card.Vulcan2",
+    asset_path = "/server/assets/chips/EXE6-Vulcan2.zip",
+    code = "*",
+  },
+  vulcan3 = {
+    package_id = "com.keristero.card.Vulcan3",
+    asset_path = "/server/assets/chips/EXE6-Vulcan3.zip",
+    code = "*",
+  },
+  heatshot = {
+    package_id = "com.OFC.card.EXEPoN-014-HeatShot",
+    asset_path = "/server/assets/chips/EXEPoN-HeatShot.zip",
+    code = "*",
+  },
+  grassstage = {
+    package_id = "com.Thor.card.GrassStg",
+    asset_path = "/server/assets/chips/EXE3-GrassStage.zip",
     code = "*",
   },
 }
@@ -130,6 +169,52 @@ for _, card_def in pairs(whitelist.CARDS) do
   if card_def.package_id then
     card_by_package_id[card_def.package_id] = card_def
   end
+end
+
+function whitelist.get_card_def(card_key_or_package_id)
+  if not card_key_or_package_id then
+    return nil
+  end
+
+  local key = tostring(card_key_or_package_id)
+  return whitelist.CARDS[key] or card_by_package_id[key]
+end
+
+function whitelist.player_has_card_unlocked(player_id, card_key_or_package_id)
+  local card_def = whitelist.get_card_def(card_key_or_package_id)
+  if not card_def then
+    return false, nil
+  end
+
+  return whitelist.player_has_package_unlocked(player_id, card_def.package_id), card_def
+end
+
+function whitelist.unlock_card(player_id, card_key_or_package_id, code, delay_ticks)
+  local card_def = whitelist.get_card_def(card_key_or_package_id)
+  if not card_def then
+    return false, "missing_card_def", nil
+  end
+
+  if whitelist.player_has_package_unlocked(player_id, card_def.package_id) then
+    return false, "already_unlocked", card_def
+  end
+
+  local ok_asset, asset_err = provide_card_asset_for_player(player_id, card_def)
+  if not ok_asset then
+    return false, asset_err or "provide_failed", card_def
+  end
+
+  local ok_unlock, reason = whitelist.unlock_package(player_id, card_def.package_id)
+  if not ok_unlock and reason ~= "already_unlocked" then
+    return false, reason, card_def
+  end
+
+  local reward = build_card_reward_entry(card_def, code)
+  if reward then
+    queue_join_reward_packet(player_id, { reward }, delay_ticks or POSTWIN_REWARD_DELAY_TICKS)
+  end
+
+  return true, "unlocked", card_def
 end
 
 -- Anything listed here is locked until the player unlocks it.
@@ -150,14 +235,14 @@ local JOIN_RESEND_DELAY_TICKS = 20
 local pending_join_reward_packets = {}
 
 local function build_card_reward_entry(card_def, code)
-  if not card_def.declared_card_id or card_def.declared_card_id == "" then
-    printd("missing declared_card_id for", tostring(card_def.package_id))
+  if not card_def.package_id or card_def.package_id == "" then
+    printd("missing package_id for", tostring(card_def and card_def.asset_path or "unknown_card"))
     return nil
   end
 
   return {
     type = 1,
-    card_id = card_def.declared_card_id,
+    card_id = card_def.package_id,
     code = code or card_def.code or "*",
   }
 end

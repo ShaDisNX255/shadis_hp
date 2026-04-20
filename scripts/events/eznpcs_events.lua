@@ -363,12 +363,19 @@ local function _encounter_result_flags(stats)
     }
 end
 
+local function _normalize_busting_score(score)
+    if type(score) == "string" and string.upper(score) == "S" then
+        return 11
+    end
+    return math.floor(tonumber(score) or 0)
+end
+
 local boss2 = {
     name="boss2",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     pet_exp=9,
     enemies={
-        {name="HeelNavi",rank=2},
+        {name="HeelNavi",rank=1},
     },
     obstacles={
     },
@@ -449,7 +456,7 @@ local boss4 = {
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     pet_exp=10,
     enemies={
-        {name="ProtomanPoN",rank=2},
+        {name="ProtomanPoN",rank=1},
     },
     obstacles={
     },
@@ -502,10 +509,27 @@ local event4 = {
 }
 eznpcs.add_event(event4)
 
+local function reward_roll1_on_win(player_id, encounter_info, stats)
+    local flags = _encounter_result_flags(stats)
+    if not flags.won then
+        return
+    end
+
+    local ok, reason = whitelist.unlock_card(player_id, "roll1", "*")
+    if ok then
+        print("[Roll Battle] awarded Roll1 to", tostring(player_id))
+    elseif reason == "already_unlocked" then
+        print("[Roll Battle] player already owns Roll1:", tostring(player_id))
+    else
+        print("[Roll Battle] failed to award Roll1:", tostring(player_id), tostring(reason))
+    end
+end
+
 local boss5 = {
     name="boss5",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     pet_exp=8,
+    results_callback = reward_roll1_on_win,
     enemies={
         {name="Roll",rank=2},
     },
@@ -618,10 +642,33 @@ local event6 = {
 }
 eznpcs.add_event(event6)
 
+local function reward_gutsman_chip_on_win(player_id, encounter_info, stats)
+    local flags = _encounter_result_flags(stats)
+    if not flags.won then
+        return
+    end
+
+    local score = _normalize_busting_score(stats and stats.score)
+    if score < 6 then
+        print("[Guts3 Battle] no chip reward; score too low:", tostring(player_id), tostring(score))
+        return
+    end
+
+    local ok, reason = whitelist.unlock_card(player_id, "gutsman1", "*")
+    if ok then
+        print("[Guts3 Battle] awarded GutsMan chip to", tostring(player_id), "score=" .. tostring(score))
+    elseif reason == "already_unlocked" then
+        print("[Guts3 Battle] player already owns GutsMan chip:", tostring(player_id), "score=" .. tostring(score))
+    else
+        print("[Guts3 Battle] failed to award GutsMan chip:", tostring(player_id), tostring(reason), "score=" .. tostring(score))
+    end
+end
+
 local boss7 = {
     name="boss7",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     pet_exp=11,
+    results_callback = reward_gutsman_chip_on_win,
     enemies={
         {name="GutsManEXE3",rank=3},
     },
@@ -2835,6 +2882,199 @@ eznpcs.add_event{
     end)
   end
 }
+
+eznpcs.add_event({
+  name = "chipshop",
+  action = function(npc, player_id, dialogue, relay_object)
+    return async(function()
+      local mug = eznpcs.get_dialogue_mugshot(npc, player_id, dialogue)
+      local ci = build_ci_props(dialogue)
+
+      local title = tostring(get_ci(ci, "shop title") or "Chip Shop")
+      local currency = string.lower(tostring(
+        get_ci(ci, "currency")
+        or get_ci(ci, "currency type")
+        or get_ci(ci, "seller type")
+        or "money"
+      ))
+
+      if currency == "bugfrag" or currency == "bugfrags" or currency == "frags" then
+        currency = "bugfrags"
+      else
+        currency = "money"
+      end
+
+      local not_enough_msg = tostring(
+        get_ci(ci, "not enough msg")
+        or ((currency == "bugfrags") and "You don't have enough BugFrags." or "You don't have enough money.")
+      )
+      local owned_msg = tostring(
+        get_ci(ci, "already owned msg")
+        or "You already bought that chip."
+      )
+
+      local offers = {}
+      local i = 1
+      while true do
+        local sell = get_ci(ci, "sell " .. i)
+        if not sell then break end
+
+        local price = math.max(0, math.floor(tonumber(
+          get_ci(ci, "price " .. i)
+          or get_ci(ci, "cost " .. i)
+          or 0
+        ) or 0))
+
+        local code = tostring(get_ci(ci, "code " .. i) or "*")
+        local card_def = whitelist.get_card_def(sell)
+
+        if card_def then
+          local display_name = tostring(
+            get_ci(ci, "name " .. i)
+            or get_ci(ci, "reward name " .. i)
+            or sell
+          )
+
+          table.insert(offers, {
+            lookup = tostring(sell),
+            package_id = card_def.package_id,
+            price = price,
+            code = code,
+            name = display_name,
+          })
+        end
+
+        i = i + 1
+      end
+
+      if #offers == 0 then
+        await(Async.message_player(
+          player_id,
+          "Sorry, I'm not selling any chips right now.",
+          mug.texture_path, mug.animation_path
+        ))
+        return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+      end
+
+      while true do
+        local posts = {}
+        local items = {}
+
+        for idx, offer in ipairs(offers) do
+          local owned = whitelist.player_has_card_unlocked(player_id, offer.package_id)
+          local price_label = (currency == "bugfrags")
+            and (tostring(offer.price) .. " BF")
+            or short_money(offer.price)
+
+          local label = owned
+            and string.format("%s (%s, Owned)", offer.name, price_label)
+            or  string.format("%s (%s)", offer.name, price_label)
+
+          local post = helpers.create_bbs_option(label)
+          post.id = "__chipshop:" .. tostring(idx)
+          table.insert(posts, post)
+          items[post.id] = offer
+        end
+
+        local balance
+        if currency == "bugfrags" then
+          balance = tonumber(ezmemory.get_player_fragments(player_id) or 0) or 0
+        else
+          balance = tonumber(Net.get_player_money(player_id) or 0) or 0
+        end
+
+        local bal_post = helpers.create_bbs_option(
+          (currency == "bugfrags")
+            and ("Your BugFrags: " .. tostring(balance))
+            or ("Your Money: " .. short_money(balance))
+        )
+        bal_post.id = "__chipshop_balance__"
+        table.insert(posts, bal_post)
+
+        local board = ezmenus.open_menu(player_id, title, COSMETIC_SHOP_COLOR, posts)
+        local sel = await(board.selection_once())
+        Net.close_bbs(player_id)
+
+        if not sel then
+          break
+        end
+
+        if sel ~= "__chipshop_balance__" then
+          local chosen = items[tostring(sel)]
+          if chosen then
+            if whitelist.player_has_card_unlocked(player_id, chosen.package_id) then
+              await(Async.message_player(
+                player_id,
+                owned_msg,
+                mug.texture_path, mug.animation_path
+              ))
+            else
+              local price_label = (currency == "bugfrags")
+                and (tostring(chosen.price) .. " BugFrags")
+                or short_money(chosen.price)
+
+              local confirm = await(Async.question_player(
+                player_id,
+                string.format("Buy %s for %s?", chosen.name, price_label),
+                mug.texture_path, mug.animation_path
+              ))
+
+              if confirm == 1 then
+                local paid = true
+
+                if chosen.price > 0 then
+                  if currency == "bugfrags" then
+                    paid = ezmemory.spend_player_fragments(player_id, chosen.price)
+                  else
+                    paid = ezmemory.spend_player_money(player_id, chosen.price)
+                  end
+                end
+
+                if not paid then
+                  await(Async.message_player(
+                    player_id,
+                    not_enough_msg,
+                    mug.texture_path, mug.animation_path
+                  ))
+                else
+                  local ok, reason, card_def = whitelist.unlock_card(
+                    player_id,
+                    chosen.lookup,
+                    chosen.code
+                  )
+
+                  if ok then
+                    if sfx and sfx.item_get then
+                      Net.play_sound_for_player(player_id, sfx.item_get)
+                    end
+
+                    await(Async.message_player(
+                      player_id,
+                      "You bought " .. chosen.name .. "!",
+                      mug.texture_path, mug.animation_path
+                    ))
+                  else
+                    local msg = (reason == "already_unlocked")
+                      and owned_msg
+                      or ("Couldn't unlock that chip (" .. tostring(reason or "error") .. ").")
+
+                    await(Async.message_player(
+                      player_id,
+                      msg,
+                      mug.texture_path, mug.animation_path
+                    ))
+                  end
+                end
+              end
+            end
+          end
+        end
+      end
+
+      return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+    end)
+  end
+})
 
 -- Repaint any already-revealed paths when players appear in an area
 Net:on("player_join", function(ev)

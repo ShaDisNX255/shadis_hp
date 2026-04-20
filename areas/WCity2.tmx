@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="50" height="50" tilewidth="64" tileheight="32" infinite="0" nextlayerid="9" nextobjectid="203">
+<map version="1.10" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="50" height="50" tilewidth="64" tileheight="32" infinite="0" nextlayerid="9" nextobjectid="263">
  <properties>
   <property name="Background" value="custom"/>
   <property name="Background Animation" value="/server/assets/custom/backgrounds/wcity/01-generic1.animation"/>
@@ -798,10 +798,10 @@
     <property name="Asset Name" value="roll"/>
     <property name="Dialogue Type" value="questcheck"/>
     <property name="Direction" value="Up Left"/>
-    <property name="Quest Name" value="EchoProgram"/>
     <property name="Flag Name" value="need_roll"/>
     <property name="Next 1" type="object" value="250"/>
     <property name="Next 2" type="object" value="208"/>
+    <property name="Quest Name" value="EchoProgram"/>
     <property name="Text 1" value=""/>
    </properties>
    <point/>
@@ -930,10 +930,10 @@
     <property name="Asset Name" value="gutsman"/>
     <property name="Dialogue Type" value="questcheck"/>
     <property name="Direction" value="Down Right"/>
-    <property name="Quest Name" value="EchoProgram"/>
     <property name="Flag Name" value="need_gutsman"/>
     <property name="Next 1" type="object" value="220"/>
     <property name="Next 2" type="object" value="209"/>
+    <property name="Quest Name" value="EchoProgram"/>
     <property name="Text 1" value=""/>
    </properties>
    <point/>
@@ -1461,7 +1461,6 @@
    </properties>
    <point/>
   </object>
-
   <object id="204" name="DamagedChp" type="Item" x="960" y="780">
    <properties>
     <property name="Description" value="A damaged NaviChip. A NetNavi skilled in healing might be able to recover it."/>
@@ -1471,7 +1470,6 @@
    </properties>
    <point/>
   </object>
-
   <object id="205" name="RadiateChp" type="Item" x="990" y="780">
    <properties>
     <property name="Description" value="A chip giving off strange energy. It seems like it was developed in secret."/>
@@ -1481,8 +1479,6 @@
    </properties>
    <point/>
   </object>
-
-  <!-- Default routers (preserve existing quests) -->
   <object id="206" name="Roll_DefaultRouter" type="Dialogue" x="1248" y="452">
    <properties>
     <property name="Dialogue Type" value="itemcheck"/>
@@ -1492,7 +1488,6 @@
    </properties>
    <point/>
   </object>
-
   <object id="207" name="GutsMan_DefaultRouter" type="Dialogue" x="1048" y="834">
    <properties>
     <property name="Dialogue Type" value="itemcheck"/>
@@ -1502,30 +1497,26 @@
    </properties>
    <point/>
   </object>
-
-  <!-- Post story routing -->
   <object id="208" name="Roll_PostRouter" type="Dialogue" x="1264" y="452">
    <properties>
     <property name="Dialogue Type" value="questcheck"/>
-    <property name="Quest Name" value="EchoProgram"/>
     <property name="Flag Name" value="need_darknavi"/>
     <property name="Next 1" type="object" value="210"/>
     <property name="Next 2" type="object" value="206"/>
+    <property name="Quest Name" value="EchoProgram"/>
    </properties>
    <point/>
   </object>
-
   <object id="209" name="GutsMan_PostRouter" type="Dialogue" x="1064" y="834">
    <properties>
     <property name="Dialogue Type" value="questcheck"/>
-    <property name="Quest Name" value="EchoProgram"/>
     <property name="Flag Name" value="need_roll"/>
     <property name="Next 1" type="object" value="211"/>
     <property name="Next 2" type="object" value="207"/>
+    <property name="Quest Name" value="EchoProgram"/>
    </properties>
    <point/>
   </object>
-
   <object id="210" name="EP_Roll_AfterRadiating" type="Dialogue" x="1280" y="452">
    <properties>
     <property name="Dialogue Type" value="first"/>
@@ -1533,7 +1524,6 @@
    </properties>
    <point/>
   </object>
-
   <object id="211" name="EP_Guts_AfterDamaged" type="Dialogue" x="1080" y="834">
    <properties>
     <property name="Dialogue Type" value="first"/>
@@ -1541,19 +1531,14 @@
    </properties>
    <point/>
   </object>
-
-  <!-- ===================== -->
-  <!-- GutsMan story branch  -->
-  <!-- ===================== -->
   <object id="220" name="EP_Guts_1" type="Dialogue" x="1034" y="794">
-  <properties>
+   <properties>
     <property name="Dialogue Type" value="first"/>
     <property name="Next 1" type="object" value="223"/>
     <property name="Text 1" value="That's a weird chip you have there, where'd you get it? This is not a normal battle chip... I've fought against all types of battle chips including Dark Chips, this is something else entirely. Let me see that."/>
-  </properties>
+   </properties>
    <point/>
   </object>
-
   <object id="223" name="EP_Guts_Q" type="Dialogue" x="1034" y="734">
    <properties>
     <property name="Dialogue Type" value="question"/>
@@ -1564,7 +1549,6 @@
    </properties>
    <point/>
   </object>
-
   <object id="224" name="EP_Guts_No" type="Dialogue" x="1034" y="714">
    <properties>
     <property name="Dialogue Type" value="first"/>
@@ -1572,7 +1556,6 @@
    </properties>
    <point/>
   </object>
-
   <object id="225" name="EP_Guts_NarrHand" type="Dialogue" x="1034" y="694">
    <properties>
     <property name="Dialogue Type" value="first"/>
@@ -1582,18 +1565,16 @@
    </properties>
    <point/>
   </object>
-
   <object id="226" name="EP_Guts_TakeCorrupt" type="Dialogue" x="1034" y="674">
    <properties>
     <property name="Dialogue Type" value="itemcheck"/>
     <property name="Item 1" type="object" value="203"/>
-    <property name="Take Item" value="true"/>
     <property name="Next 1" type="object" value="227"/>
     <property name="Next 2" type="object" value="234"/>
+    <property name="Take Item" value="true"/>
    </properties>
    <point/>
   </object>
-
   <object id="234" name="EP_Guts_Missing" type="Dialogue" x="1034" y="654">
    <properties>
     <property name="Dialogue Type" value="first"/>
@@ -1601,7 +1582,6 @@
    </properties>
    <point/>
   </object>
-
   <object id="227" name="EP_Guts_Yes1" type="Dialogue" x="1034" y="634">
    <properties>
     <property name="Dialogue Type" value="first"/>
@@ -1610,7 +1590,6 @@
    </properties>
    <point/>
   </object>
-
   <object id="228" name="EP_Guts_Action" type="Dialogue" x="1034" y="614">
    <properties>
     <property name="Dialogue Type" value="first"/>
@@ -1620,16 +1599,14 @@
    </properties>
    <point/>
   </object>
-
   <object id="229" name="EP_Guts_4" type="Dialogue" x="1034" y="594">
-  <properties>
+   <properties>
     <property name="Dialogue Type" value="first"/>
     <property name="Next 1" type="object" value="231"/>
     <property name="Text 1" value="I knew it, this isn't a regular NaviChip. A regular chip can withstand physical attacks, but this one got damaged. I suggest you get rid of it, it won't even work. Here you go."/>
-  </properties>
+   </properties>
    <point/>
   </object>
-
   <object id="231" name="EP_Guts_GiveDamaged" type="Dialogue" x="1034" y="554">
    <properties>
     <property name="Dialogue Type" value="item"/>
@@ -1638,7 +1615,6 @@
    </properties>
    <point/>
   </object>
-
   <object id="232" name="EP_Guts_YouGotDamaged" type="Dialogue" x="1034" y="534">
    <properties>
     <property name="Dialogue Type" value="first"/>
@@ -1648,28 +1624,22 @@
    </properties>
    <point/>
   </object>
-
   <object id="233" name="EP_Guts_QuestEvent" type="Dialogue" x="1034" y="514">
    <properties>
     <property name="Dialogue Type" value="quest_event"/>
-    <property name="Quest Name" value="EchoProgram"/>
     <property name="Event Value" value="gutsman_smash"/>
+    <property name="Quest Name" value="EchoProgram"/>
    </properties>
    <point/>
   </object>
-
-  <!-- ===================== -->
-  <!-- Roll story branch     -->
-  <!-- ===================== -->
   <object id="250" name="EP_Roll_1" type="Dialogue" x="1232" y="412">
-  <properties>
+   <properties>
     <property name="Dialogue Type" value="first"/>
     <property name="Next 1" type="object" value="252"/>
     <property name="Text 1" value="What happened to your battle chip? Haha GutsMan did this? Typical, he attacks first and asks questions later. I can help you get it fixed."/>
-  </properties>
+   </properties>
    <point/>
   </object>
-
   <object id="252" name="EP_Roll_NarrHand" type="Dialogue" x="1232" y="372">
    <properties>
     <property name="Dialogue Type" value="first"/>
@@ -1679,18 +1649,16 @@
    </properties>
    <point/>
   </object>
-
   <object id="253" name="EP_Roll_TakeDamaged" type="Dialogue" x="1232" y="352">
    <properties>
     <property name="Dialogue Type" value="itemcheck"/>
     <property name="Item 1" type="object" value="204"/>
-    <property name="Take Item" value="true"/>
     <property name="Next 1" type="object" value="254"/>
     <property name="Next 2" type="object" value="260"/>
+    <property name="Take Item" value="true"/>
    </properties>
    <point/>
   </object>
-
   <object id="260" name="EP_Roll_Missing" type="Dialogue" x="1232" y="332">
    <properties>
     <property name="Dialogue Type" value="first"/>
@@ -1698,7 +1666,6 @@
    </properties>
    <point/>
   </object>
-
   <object id="254" name="EP_Roll_3" type="Dialogue" x="1232" y="312">
    <properties>
     <property name="Dialogue Type" value="first"/>
@@ -1707,7 +1674,6 @@
    </properties>
    <point/>
   </object>
-
   <object id="255" name="EP_Roll_GiveRadiating" type="Dialogue" x="1232" y="292">
    <properties>
     <property name="Dialogue Type" value="item"/>
@@ -1716,7 +1682,6 @@
    </properties>
    <point/>
   </object>
-
   <object id="256" name="EP_Roll_YouGotRadiating" type="Dialogue" x="1232" y="272">
    <properties>
     <property name="Dialogue Type" value="first"/>
@@ -1726,7 +1691,6 @@
    </properties>
    <point/>
   </object>
-
   <object id="257" name="EP_Roll_4" type="Dialogue" x="1232" y="252">
    <properties>
     <property name="Dialogue Type" value="first"/>
@@ -1735,12 +1699,11 @@
    </properties>
    <point/>
   </object>
-
   <object id="258" name="EP_Roll_QuestEvent" type="Dialogue" x="1232" y="232">
    <properties>
     <property name="Dialogue Type" value="quest_event"/>
-    <property name="Quest Name" value="EchoProgram"/>
     <property name="Event Value" value="roll_fix"/>
+    <property name="Quest Name" value="EchoProgram"/>
    </properties>
    <point/>
   </object>
@@ -1952,5 +1915,35 @@
    <point/>
   </object>
   <object id="190" type="PVP Board" gid="429" x="363" y="607" width="37" height="57"/>
+  <object id="261" name="Chip Seller" type="NPC" x="555.5" y="749">
+   <properties>
+    <property name="Asset Name" value="normal-navi-bn4_red"/>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Direction" value="Up Right"/>
+    <property name="Next 1" type="object" value="262"/>
+    <property name="Text 1" value="Hey there, I see chips!"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="262" name="UnderShrt" type="Dialogue" x="548.5" y="793.5">
+   <properties>
+    <property name="Currency" value="money"/>
+    <property name="Dialogue Type" value="chipshop"/>
+    <property name="Price 1" type="int" value="10000"/>
+    <property name="Price 2" type="int" value="15000"/>
+    <property name="Price 3" type="int" value="20000"/>
+    <property name="Price 4" type="int" value="20000"/>
+    <property name="Price 5" type="int" value="25000"/>
+    <property name="Price 6" type="int" value="30000"/>
+    <property name="Sell 1" value="spreadgun1"/>
+    <property name="Sell 2" value="thunderball"/>
+    <property name="Sell 3" value="roll1"/>
+    <property name="Sell 4" value="rec30"/>
+    <property name="Sell 5" value="vulcan2"/>
+    <property name="Sell 6" value="grassstage"/>
+    <property name="Shop Title" value="WCity2 Shop"/>
+   </properties>
+   <point/>
+  </object>
  </objectgroup>
 </map>
