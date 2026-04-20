@@ -124,7 +124,7 @@ whitelist.CARDS = {
   },
   roll1 = {
     package_id = "com.k1rbyat1na.card.EXE6-222-Roll",
-    asset_path = "/server/assets/chips/EXE6-Roll1zip",
+    asset_path = "/server/assets/chips/EXE6-Roll1.zip",
     code = "*",
   },
   gutsman1 = {
