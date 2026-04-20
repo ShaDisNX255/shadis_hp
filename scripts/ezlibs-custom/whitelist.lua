@@ -171,52 +171,6 @@ for _, card_def in pairs(whitelist.CARDS) do
   end
 end
 
-function whitelist.get_card_def(card_key_or_package_id)
-  if not card_key_or_package_id then
-    return nil
-  end
-
-  local key = tostring(card_key_or_package_id)
-  return whitelist.CARDS[key] or card_by_package_id[key]
-end
-
-function whitelist.player_has_card_unlocked(player_id, card_key_or_package_id)
-  local card_def = whitelist.get_card_def(card_key_or_package_id)
-  if not card_def then
-    return false, nil
-  end
-
-  return whitelist.player_has_package_unlocked(player_id, card_def.package_id), card_def
-end
-
-function whitelist.unlock_card(player_id, card_key_or_package_id, code, delay_ticks)
-  local card_def = whitelist.get_card_def(card_key_or_package_id)
-  if not card_def then
-    return false, "missing_card_def", nil
-  end
-
-  if whitelist.player_has_package_unlocked(player_id, card_def.package_id) then
-    return false, "already_unlocked", card_def
-  end
-
-  local ok_asset, asset_err = provide_card_asset_for_player(player_id, card_def)
-  if not ok_asset then
-    return false, asset_err or "provide_failed", card_def
-  end
-
-  local ok_unlock, reason = whitelist.unlock_package(player_id, card_def.package_id)
-  if not ok_unlock and reason ~= "already_unlocked" then
-    return false, reason, card_def
-  end
-
-  local reward = build_card_reward_entry(card_def, code)
-  if reward then
-    queue_join_reward_packet(player_id, { reward }, delay_ticks or POSTWIN_REWARD_DELAY_TICKS)
-  end
-
-  return true, "unlocked", card_def
-end
-
 -- Anything listed here is locked until the player unlocks it.
 -- Future chips/programs just get added here by package_id.
 local LOCKED_BY_DEFAULT = {
@@ -595,6 +549,52 @@ function whitelist.apply_for_player(player_id)
   Net.set_mod_whitelist_for_player(player_id, asset_path)
   printd("applied whitelist", player_id, asset_path)
   return true
+end
+
+function whitelist.get_card_def(card_key_or_package_id)
+  if not card_key_or_package_id then
+    return nil
+  end
+
+  local key = tostring(card_key_or_package_id)
+  return whitelist.CARDS[key] or card_by_package_id[key]
+end
+
+function whitelist.player_has_card_unlocked(player_id, card_key_or_package_id)
+  local card_def = whitelist.get_card_def(card_key_or_package_id)
+  if not card_def then
+    return false, nil
+  end
+
+  return whitelist.player_has_package_unlocked(player_id, card_def.package_id), card_def
+end
+
+function whitelist.unlock_card(player_id, card_key_or_package_id, code, delay_ticks)
+  local card_def = whitelist.get_card_def(card_key_or_package_id)
+  if not card_def then
+    return false, "missing_card_def", nil
+  end
+
+  if whitelist.player_has_package_unlocked(player_id, card_def.package_id) then
+    return false, "already_unlocked", card_def
+  end
+
+  local ok_asset, asset_err = provide_card_asset_for_player(player_id, card_def)
+  if not ok_asset then
+    return false, asset_err or "provide_failed", card_def
+  end
+
+  local ok_unlock, reason = whitelist.unlock_package(player_id, card_def.package_id)
+  if not ok_unlock and reason ~= "already_unlocked" then
+    return false, reason, card_def
+  end
+
+  local reward = build_card_reward_entry(card_def, code)
+  if reward then
+    queue_join_reward_packet(player_id, { reward }, delay_ticks or POSTWIN_REWARD_DELAY_TICKS)
+  end
+
+  return true, "unlocked", card_def
 end
 
 Net:on("tick", function()
