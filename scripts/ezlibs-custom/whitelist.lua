@@ -176,6 +176,10 @@ for _, card_def in pairs(whitelist.CARDS) do
   end
 end
 
+local join_reward_card_key_by_package_id = {
+  ["com.louise.card.gutsmanv1"] = "gutsman1",
+}
+
 -- Anything listed here is locked until the player unlocks it.
 -- Future chips/programs just get added here by package_id.
 local LOCKED_BY_DEFAULT = {
@@ -313,7 +317,9 @@ function whitelist.queue_unlocked_card_rewards_for_player(player_id)
 
   for package_id, is_unlocked in pairs(unlocks) do
     if is_unlocked then
-      local card_def = card_by_package_id[package_id]
+      local forced_key = join_reward_card_key_by_package_id[package_id]
+      local card_def = forced_key and whitelist.CARDS[forced_key] or card_by_package_id[package_id]
+
       if card_def then
         provide_card_asset_for_player(player_id, card_def)
         rewards[#rewards + 1] = build_card_reward_entry(card_def)
@@ -600,6 +606,26 @@ function whitelist.unlock_card(player_id, card_key_or_package_id, code, delay_ti
   end
 
   return true, "unlocked", card_def
+end
+
+function whitelist.send_card_reward(player_id, card_key_or_package_id, code, delay_ticks)
+  local card_def = whitelist.get_card_def(card_key_or_package_id)
+  if not card_def then
+    return false, "missing_card_def", nil
+  end
+
+  local ok_asset, asset_err = provide_card_asset_for_player(player_id, card_def)
+  if not ok_asset then
+    return false, asset_err or "provide_failed", card_def
+  end
+
+  local reward = build_card_reward_entry(card_def, code)
+  if not reward then
+    return false, "missing_reward", card_def
+  end
+
+  queue_join_reward_packet(player_id, { reward }, delay_ticks or POSTWIN_REWARD_DELAY_TICKS)
+  return true, "queued", card_def
 end
 
 Net:on("tick", function()
