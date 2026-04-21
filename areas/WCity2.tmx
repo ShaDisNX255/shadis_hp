@@ -1921,11 +1921,11 @@
     <property name="Dialogue Type" value="first"/>
     <property name="Direction" value="Up Right"/>
     <property name="Next 1" type="object" value="262"/>
-    <property name="Text 1" value="Hey there, I see chips!"/>
+    <property name="Text 1" value="Hey there, I sell chips!"/>
    </properties>
    <point/>
   </object>
-  <object id="262" name="UnderShrt" type="Dialogue" x="548.5" y="793.5">
+  <object id="262" name="ChipShop" type="Dialogue" x="548.5" y="793.5">
    <properties>
     <property name="Currency" value="money"/>
     <property name="Dialogue Type" value="chipshop"/>

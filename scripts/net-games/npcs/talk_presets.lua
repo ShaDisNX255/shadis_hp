@@ -193,6 +193,24 @@ P.vert_menus = {
   },
   -- Shop skin version: identical layout, plus MONIES label
   prog_prompt_shop = {
+    -- NEW: shop columns (name + price)
+    shop_columns_enabled = true,
+    shop_price_col_x = 75,
+
+    -- character widths (monospace-ish)
+    shop_name_chars  = 8,   -- ex: "[C]C.Gua"
+    shop_gap_chars   = 2,   -- spaces between columns
+    shop_price_chars = 5,   -- ex: "2000$" fits; "100000" fits before scroll
+
+    -- name scroll behavior
+    shop_name_hold_sec     = 2.0,
+    shop_name_cps          = 8.0,
+    shop_name_hold_end_sec = 2.0,
+
+    -- price scroll behavior (faster reset at end)
+    shop_price_hold_sec     = 2.0,
+    shop_price_cps          = 14.0,
+    shop_price_hold_end_sec = 0.15,
     anchor = "textbox",
     offset_x = 1,
     offset_y = -199,

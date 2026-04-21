@@ -2941,6 +2941,7 @@ eznpcs.add_event({
             price = price,
             code = code,
             name = display_name,
+            prop_index = i,
           })
         end
 
@@ -2955,6 +2956,279 @@ eznpcs.add_event({
         ))
         return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
       end
+
+--=====================================================
+-- NEW: net-games powered shop UI (PromptVertical)
+-- (falls back to existing BBS shop if net-games missing)
+--=====================================================
+local ok_menu, TalkVertMenu_or_err = pcall(require, "scripts/net-games/npcs/talk_vert_menu")
+if ok_menu then
+  local TalkVertMenu = TalkVertMenu_or_err
+  local TalkPresets = require("scripts/net-games/npcs/talk_presets")
+
+  -- If selling for bugfrags, ensure API exists (mirrors fragshop’s safety style)
+  if currency == "bugfrags" and (not ezmemory.get_player_fragments or not ezmemory.spend_player_fragments) then
+    await(Async.message_player(
+      player_id,
+      "BugFrag chip shop isn't available on this server build.",
+      mug.texture_path, mug.animation_path
+    ))
+    return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+  end
+
+  -- Build a PROG-style mugshot, but swap texture/anim to match eznpcs Asset Name/Mugshot.
+  local ez_mug = mug
+  local prog_mug = helpers.deep_copy(TalkPresets.mugs.prog or { enabled = true })
+  prog_mug.texture_path = ez_mug.texture_path
+  prog_mug.anim_path = ez_mug.animation_path
+
+  local function normalize_preview_path(p)
+    p = tostring(p or "")
+    if p == "" then return nil end
+
+    -- Add extension if missing
+    if not p:match("%.[%w]+$") then
+      p = p .. ".png"
+    end
+
+    -- Allow full /server/... paths, otherwise treat as relative to /server/assets/
+    if p:sub(1, 7) == "/server/" then
+      return p
+    end
+    if p:sub(1, 1) == "/" then
+      return p -- absolute (leave it)
+    end
+    return "/server/assets/" .. p
+  end
+
+  local preview_dir = tostring(get_ci(ci, "preview dir") or "")
+  local preview_ext = tostring(get_ci(ci, "preview ext") or ".png")
+  if preview_ext ~= "" and preview_ext:sub(1,1) ~= "." then
+    preview_ext = "." .. preview_ext
+  end
+  local preview_template = tostring(get_ci(ci, "preview template") or "")
+
+  local DEFAULT_ICON = "/server/assets/net-games/ui/card_shop_item.png"
+
+  local options = {}
+  local by_choice_id = {}     -- id -> offer
+  local opt_ref_by_id = {}    -- id -> option table (so we can update label to “Owned” after purchase)
+  local icon_by_id = {}       -- id -> texture path
+
+  for idx, offer in ipairs(offers) do
+    local id = tostring(idx)
+    by_choice_id[id] = offer
+
+    local owned = whitelist.player_has_card_unlocked(player_id, offer.package_id)
+    local display_name = owned and (offer.name .. " (Owned)") or offer.name
+
+    options[#options+1] = {
+      id = id,
+      text = display_name,           -- fallback
+      shop_name = display_name,      -- column name (your prompt_vertical column UI)
+      shop_price = tonumber(offer.price) or 0, -- number -> will render as 2k/5m etc in the menu rows
+    }
+    opt_ref_by_id[id] = options[#options]
+
+    -- Resolve preview path:
+    local p = get_ci(ci, "preview " .. tostring(offer.prop_index or idx))
+          or get_ci(ci, "icon " .. tostring(offer.prop_index or idx))
+
+    if (not p or p == "") and preview_template ~= "" then
+      p = preview_template
+        :gsub("{id}",   tostring(offer.lookup))
+        :gsub("{sell}", tostring(offer.lookup))
+        :gsub("{code}", tostring(offer.code or "*"))
+    end
+
+    if (not p or p == "") and preview_dir ~= "" then
+      local dir = preview_dir
+      if dir:sub(-1) ~= "/" then dir = dir .. "/" end
+      p = dir .. tostring(offer.lookup) .. preview_ext
+    end
+
+    p = normalize_preview_path(p)
+
+    -- Avoid engine panic: if asset doesn’t exist, fall back safely.
+    if p and Net and Net.has_asset then
+      local ok, exists = pcall(Net.has_asset, p)
+      if ok and exists == false then
+        p = nil
+      end
+    end
+
+    icon_by_id[id] = p or DEFAULT_ICON
+  end
+
+  options[#options+1] = { id = "exit", text = "Exit" }
+  local exit_index = #options
+
+  -- Pre-provide icons so first-open isn’t blank
+  if Net and Net.provide_asset_for_player then
+    local seen = {}
+    for _, path in pairs(icon_by_id) do
+      if path and not seen[path] then
+        seen[path] = true
+        pcall(Net.provide_asset_for_player, player_id, path)
+      end
+    end
+  end
+
+  -- Slight delay helps first-time icon render on fresh login (same idea as your fishing preload)
+  await(Async.sleep(0.05))
+
+  local layout = TalkPresets.get_vert_menu_layout("prog_prompt_shop") or {}
+  layout.monies_label_text = (currency == "bugfrags") and "FRAGS" or "MONIES"
+
+  local talk_cfg = {
+    preset = "prog_prompt",
+    area_id = Net.get_player_area(player_id),
+    object = "chipshop_" .. tostring(dialogue.id or "shop"),
+    ui = {
+      mugshot = prog_mug,
+      typing_speed = 9999,
+    }
+  }
+
+  local function get_balance(pid)
+    if currency == "bugfrags" then
+      return tonumber(ezmemory.get_player_fragments(pid) or 0) or 0
+    end
+    return tonumber(Net.get_player_money(pid) or 0) or 0
+  end
+
+  -- Make sure input is locked so net-games virtual_input works
+  if Net.lock_player_input then
+    pcall(Net.lock_player_input, player_id)
+  end
+
+  local assets = {
+    menu_bg       = "/server/assets/net-games/ui/prompt_vert_menu_shop_an.png",
+    menu_bg_anim  = "/server/assets/net-games/ui/prompt_vert_menu_an.animation",
+    menu_bg_frame = "/server/assets/net-games/ui/prompt_vert_menu_shop_an_frame.png",
+    highlight     = "/server/assets/net-games/ui/highlight_shop.png",
+  }
+
+  TalkVertMenu.open(player_id, title, talk_cfg, {
+    intro_text = "What would you like?",
+    options = options,
+    exit_index = exit_index,
+    layout = layout,
+    assets = assets,
+
+    monies_amount_fn = function(pid)
+      -- NOTE: no "$" / "M" suffix; your prompt_vertical row formatter does k/m already
+      return tostring(get_balance(pid))
+    end,
+
+    shop_item_texture_fn = function(choice)
+      if not choice or not choice.id then return DEFAULT_ICON end
+      return icon_by_id[tostring(choice.id)] or DEFAULT_ICON
+    end,
+
+    flow = {
+      keep_menu_open = true,
+      after_text = "Anything else?",
+      exit_goodbye_text = "Come again!",
+
+      confirm = {
+        enabled = true,
+        skip_ids = { exit = true },
+        text_fn = function(pid, choice_id)
+          local offer = by_choice_id[tostring(choice_id)]
+          if not offer then return "Buy this?" end
+
+          local have = get_balance(pid)
+          local unit = (currency == "bugfrags") and " BF" or "$"
+          return string.format(
+            "Buy %s for %d%s?\nYou have %d%s",
+            tostring(offer.name),
+            tonumber(offer.price) or 0,
+            unit,
+            have,
+            unit
+          )
+        end,
+      },
+
+      post_select = { enabled = true, skip_ids = { exit = true } },
+    },
+
+    on_confirm_yes = function(pid, choice_id, _choice_text, menu)
+      local offer = by_choice_id[tostring(choice_id)]
+      if not offer then
+        return "Huh? That chip is gone.", "Anything else?"
+      end
+
+      if whitelist.player_has_card_unlocked(pid, offer.package_id) then
+        return owned_msg, "Anything else?"
+      end
+
+      local cost = tonumber(offer.price) or 0
+      if cost < 0 then cost = 0 end
+
+      local paid = true
+      if cost > 0 then
+        if currency == "bugfrags" then
+          paid = ezmemory.spend_player_fragments(pid, cost)
+        else
+          paid = ezmemory.spend_player_money(pid, cost)
+        end
+      end
+
+      if not paid then
+        return not_enough_msg, "Anything else?"
+      end
+
+      local ok, reason = whitelist.unlock_card(pid, offer.lookup, offer.code)
+
+      if not ok then
+        -- refund if unlock failed
+        if cost > 0 then
+          if currency == "bugfrags" then
+            ezmemory.spend_player_fragments(pid, -cost)
+          else
+            ezmemory.spend_player_money(pid, -cost)
+          end
+        end
+
+        local msg = (reason == "already_unlocked")
+          and owned_msg
+          or ("Couldn't unlock that chip (" .. tostring(reason or "error") .. ").")
+
+        return msg, "Anything else?"
+      end
+
+      -- Mark as owned in the menu row immediately
+      local opt = opt_ref_by_id[tostring(choice_id)]
+      if opt then
+        opt.shop_name = tostring(offer.name) .. " (Owned)"
+        opt.text = opt.shop_name
+      end
+
+      -- Force a redraw so the row + balance update immediately
+      if menu and menu.render_menu_contents then
+        pcall(function() menu:render_menu_contents(true) end)
+      end
+
+      if sfx and sfx.item_get then
+        Net.play_sound_for_player(pid, sfx.item_get)
+      end
+
+      return "You bought " .. tostring(offer.name) .. "!", "Anything else?"
+    end,
+  })
+
+  -- IMPORTANT: do not let eznpcs finish the dialogue until the menu is closed,
+  -- otherwise overworld input unlocks and the menu stops receiving inputs.
+  while TalkVertMenu.is_busy and TalkVertMenu.is_busy(player_id) do
+    await(Async.sleep(0.05))
+  end
+
+  return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+else
+  print("[chipshop] failed to load talk_vert_menu:", TalkVertMenu_or_err)
+end
 
       while true do
         local posts = {}

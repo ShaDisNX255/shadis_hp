@@ -47,7 +47,7 @@ local function merge_assets(overrides)
   return out
 end
 
-
+print("[prompt_vertical] loaded: HAS shop icon rebind fix")
 
 -- =====================================================
 -- Prompt vertical menu final size (matches OPEN_IDLE)
@@ -152,6 +152,52 @@ local function alloc_ui_sprites(inst)
 
 end
 
+local function _ng_has_asset(path)
+  if not path or path == "" then return false end
+  if not (Net and Net.has_asset) then return true end
+  local ok, res = pcall(Net.has_asset, path)
+  if ok then return res == true end
+  return true
+end
+
+local function _ng_hash_str(s)
+  local h = 0
+  s = tostring(s or "")
+  for i = 1, #s do
+    h = (h * 31 + s:byte(i)) % 2147483647
+  end
+  return tostring(h)
+end
+
+local function _ng_get_shop_dyn_sprite(inst, texture_path)
+  if not texture_path or texture_path == "" then
+    return inst.spr.SHOP_ITEM
+  end
+
+  -- If it’s the default, just reuse the normal sprite.
+  if texture_path == inst.assets.shop_item then
+    return inst.spr.SHOP_ITEM
+  end
+
+  -- Guard against the ONB panic when providing a missing asset
+  if not _ng_has_asset(texture_path) then
+    return inst.spr.SHOP_ITEM
+  end
+
+  inst._dyn_shop_sprites = inst._dyn_shop_sprites or {}
+  local existing = inst._dyn_shop_sprites[texture_path]
+  if existing then return existing end
+
+  local sid = inst.spr.SHOP_ITEM .. "_dyn_" .. _ng_hash_str(texture_path)
+
+  pcall(Net.provide_asset_for_player, inst.player_id, texture_path)
+  if Net.player_alloc_sprite then
+    pcall(Net.player_alloc_sprite, inst.player_id, sid, { texture_path = texture_path })
+  end
+
+  inst._dyn_shop_sprites[texture_path] = sid
+  return sid
+end
 
 local function draw_sprite(inst, sprite_id, draw_id, x, y, z, s, anim_state)
   alloc_ui_sprites(inst)
@@ -279,6 +325,21 @@ local function normalize_layout(layout)
   -- Default: anchor to textbox and sit above it.
   local o = {
     anchor = layout.anchor or "textbox", -- "textbox" or "absolute"
+
+    -- Shop columns (optional)
+    shop_columns_enabled = (layout.shop_columns_enabled == true),
+    shop_name_chars      = tonumber(layout.shop_name_chars or 9) or 9,
+    shop_gap_chars       = tonumber(layout.shop_gap_chars or 2) or 2,
+    shop_price_chars     = tonumber(layout.shop_price_chars or 6) or 6,
+    shop_price_col_x = tonumber(layout.shop_price_col_x or 92) or 92,
+
+    shop_name_hold_sec     = tonumber(layout.shop_name_hold_sec or 2.0) or 2.0,
+    shop_name_cps          = tonumber(layout.shop_name_cps or 8.0) or 8.0,
+    shop_name_hold_end_sec = tonumber(layout.shop_name_hold_end_sec or 2.0) or 2.0,
+
+    shop_price_hold_sec     = tonumber(layout.shop_price_hold_sec or 2.0) or 2.0,
+    shop_price_cps          = tonumber(layout.shop_price_cps or 14.0) or 14.0,
+    shop_price_hold_end_sec = tonumber(layout.shop_price_hold_end_sec or 0.15) or 0.15,
 
     -- For absolute anchor
     x = layout.x,
@@ -431,6 +492,12 @@ function PromptMenuInstance:new(player_id, opts)
   o.default_index = clamp(tonumber(opts.default_index or 1) or 1, 1, #o.options)
   o.selection_index = o.default_index
   o.scroll_top_index = 1
+  -- Shop column marquee state (selected row only)
+  o._shop_cols_sel = o.selection_index
+  o._shop_name_t = 0
+  o._shop_price_t = 0
+  o._shop_name_off = 0
+  o._shop_price_off = 0
 
   -- Cancel behavior:
   --   "jump_to_exit" (default): B jumps to exit_index; second B selects it
@@ -447,6 +514,12 @@ function PromptMenuInstance:new(player_id, opts)
 
     o.on_select = opts.on_select or function(_choice, _index) end
     o.on_cancel = opts.on_cancel or function() end
+
+    -- Optional: shop UI hooks
+    o.monies_amount_fn = opts.monies_amount_fn
+    o.shop_item_texture_fn = opts.shop_item_texture_fn
+    o._dyn_shop_sprites = {}
+    o._last_shop_item_sprite_id = nil
 
     -- Goal_1_5 additions:
     o.keep_menu_open = (opts.keep_menu_open == true)
@@ -741,6 +814,8 @@ function PromptMenuInstance:clear_menu_text()
 
   for _, id in ipairs(self.menu_text_ids) do
     FontSystem:eraseTextDisplay(self.player_id, id)
+    FontSystem:eraseTextDisplay(self.player_id, id .. "_name")
+    FontSystem:eraseTextDisplay(self.player_id, id .. "_price")
   end
 
   self.menu_text_ids = {}
@@ -868,6 +943,175 @@ function PromptMenuInstance:update_cursor_bob(dt)
 
 end
 
+-- =====================================================
+-- Shop columns marquee helpers (selected row only)
+-- Paste this AFTER update_cursor_bob(), BEFORE render_menu_contents()
+-- =====================================================
+local function _compact_money_num(n)
+  local v = math.floor(tonumber(n) or 0)
+  if v < 0 then v = 0 end
+
+  if v >= 1000000 then
+    local m = v / 1000000
+    local s
+    if m < 10 and (v % 1000000) ~= 0 then
+      s = string.format("%.1f", m):gsub("%.0$", "")
+    else
+      s = tostring(math.floor(m + 0.5))
+    end
+    return s .. "m"
+  end
+
+  if v >= 1000 then
+    local k = v / 1000
+    local s
+    if k < 10 and (v % 1000) ~= 0 then
+      s = string.format("%.1f", k):gsub("%.0$", "")
+    else
+      s = tostring(math.floor(k + 0.5))
+    end
+    return s .. "k"
+  end
+
+  return tostring(v)
+end
+
+-- If monies_amount_fn returns "12345$" (or "12345M"), turn it into "12k" etc.
+local function _compact_money_str(s)
+  s = tostring(s or "")
+  local digits = s:match("^%s*(%d+)%s*[%$Mm]?%s*$")
+  if digits then
+    return _compact_money_num(tonumber(digits))
+  end
+  return (s:gsub("[%$Mm]%s*$", ""))
+end
+
+local function _pad_right(s, w)
+  s = tostring(s or "")
+  local n = #s
+  if n >= w then return s end
+  return s .. string.rep(" ", w - n)
+end
+
+local function _calc_marquee_off(t, len, w, hold_start, cps, hold_end)
+  if len <= w then return 0, false end
+  if t < hold_start then return 0, false end
+
+  local max_off = len - w
+  local scroll_t = t - hold_start
+  local off = math.floor(scroll_t * cps)
+
+  if off <= max_off then
+    return off, false
+  end
+
+  -- reached end: hold, then reset
+  local end_scroll_time = (max_off / math.max(0.001, cps))
+  if scroll_t < (end_scroll_time + hold_end) then
+    return max_off, false
+  end
+
+  return 0, true
+end
+
+function PromptMenuInstance:_shop_columns_active()
+  if not (self.layout and self.layout.shop_columns_enabled) then return false end
+  local opt = self.options and self.options[self.selection_index] or nil
+  return type(opt) == "table" and opt.shop_name ~= nil and opt.shop_price ~= nil
+end
+
+function PromptMenuInstance:_reset_shop_cols_scroll()
+  self._shop_cols_sel = self.selection_index
+  self._shop_name_t = 0
+  self._shop_price_t = 0
+  self._shop_name_off = 0
+  self._shop_price_off = 0
+end
+
+function PromptMenuInstance:_tick_shop_cols_scroll(dt)
+  if not self:_shop_columns_active() then return false end
+  if self.locked then return false end -- pause while confirm/after-text is up
+
+  if self._shop_cols_sel ~= self.selection_index then
+    self:_reset_shop_cols_scroll()
+    return true
+  end
+
+  local L = self.layout
+  local opt = self.options[self.selection_index]
+
+  local name = tostring(opt.shop_name or "")
+  local price = _compact_money_num(opt.shop_price)
+
+  self._shop_name_t = (self._shop_name_t or 0) + dt
+  self._shop_price_t = (self._shop_price_t or 0) + dt
+
+  local name_off, name_reset =
+    _calc_marquee_off(self._shop_name_t, #name, L.shop_name_chars, L.shop_name_hold_sec, L.shop_name_cps, L.shop_name_hold_end_sec)
+
+  local price_off, price_reset =
+    _calc_marquee_off(self._shop_price_t, #price, L.shop_price_chars, L.shop_price_hold_sec, L.shop_price_cps, L.shop_price_hold_end_sec)
+
+  if name_reset then self._shop_name_t = 0; name_off = 0 end
+  if price_reset then self._shop_price_t = 0; price_off = 0 end
+
+  local changed = (name_off ~= (self._shop_name_off or 0)) or (price_off ~= (self._shop_price_off or 0))
+  self._shop_name_off = name_off
+  self._shop_price_off = price_off
+  return changed
+end
+
+function PromptMenuInstance:_shop_row_text(opt, is_selected)
+  local L = self.layout
+  local name = tostring(opt.shop_name or "")
+  local price = _compact_money_num(opt.shop_price)
+
+  local name_w = L.shop_name_chars
+  local gap = L.shop_gap_chars
+  local price_w = L.shop_price_chars
+
+  local noff = (is_selected and (self._shop_name_off or 0)) or 0
+  local poff = (is_selected and (self._shop_price_off or 0)) or 0
+
+  local name_part = _pad_right(name:sub(noff + 1, noff + name_w), name_w)
+  local price_part = _pad_right(price:sub(poff + 1, poff + price_w), price_w)
+
+  return name_part .. string.rep(" ", gap) .. price_part
+end
+
+function PromptMenuInstance:_shop_row_parts(opt, is_selected)
+  local L = self.layout
+  local name  = tostring(opt.shop_name or "")
+  local price = _compact_money_num(opt.shop_price)
+
+  local name_w  = L.shop_name_chars
+  local price_w = L.shop_price_chars
+
+  local noff = (is_selected and (self._shop_name_off or 0)) or 0
+  local poff = (is_selected and (self._shop_price_off or 0)) or 0
+
+  local name_part  = _pad_right(name:sub(noff + 1,  noff + name_w),  name_w)
+  local price_part = _pad_right(price:sub(poff + 1, poff + price_w), price_w)
+
+  return name_part, price_part
+end
+
+function PromptMenuInstance:_shop_row_parts(opt, is_selected)
+  local L = self.layout
+  local name  = tostring(opt.shop_name or "")
+  local price = _compact_money_num(opt.shop_price)
+
+  local name_w  = L.shop_name_chars
+  local price_w = L.shop_price_chars
+
+  local noff = (is_selected and (self._shop_name_off or 0)) or 0
+  local poff = (is_selected and (self._shop_price_off or 0)) or 0
+
+  local name_part  = _pad_right(name:sub(noff + 1,  noff + name_w),  name_w)
+  local price_part = _pad_right(price:sub(poff + 1, poff + price_w), price_w)
+
+  return name_part, price_part
+end
 
 
 function PromptMenuInstance:render_menu_contents(force)
@@ -925,6 +1169,10 @@ do
         -- Amount line under MONIES (THIN)
     if L.monies_amount_enabled then
       local atext = tostring(L.monies_amount_text or "0$")
+      if type(self.monies_amount_fn) == "function" then
+        local ok, v = pcall(self.monies_amount_fn, self.player_id, self)
+        if ok and v ~= nil then atext = tostring(v) end
+      end
       local afont = tostring(L.monies_amount_font or "THIN")
 
       local ax_off = (tonumber(L.monies_amount_offset_x) or 0) * scale
@@ -1025,11 +1273,44 @@ do
               dx = cx - (w * sx) / 2
             end
 
-            draw_sprite_xy(self, self.spr.SHOP_ITEM, self.draw.shop_item, dx, dy, (L.z + zadd), sx, sy)
+            -- Resolve per-item texture (optional)
+            local tex = self.assets.shop_item
+            if type(self.shop_item_texture_fn) == "function" then
+              local ok, v = pcall(self.shop_item_texture_fn, cur, self.selection_index, self)
+              if ok and type(v) == "string" and v ~= "" then
+                tex = v
+              end
+            end
+
+            local spr_id = _ng_get_shop_dyn_sprite(self, tex)
+
+            -- If this is a card icon (40x40), center it in the 56x48 slot.
+            -- (slot size comes from talk_presets: shop_item_w/h = 56/48) :contentReference[oaicite:1]{index=1}
+            local src_w, src_h = w, h
+            if type(tex) == "string" and tex:find("/server/assets/cards/") then
+              src_w, src_h = 40, 40
+            end
+
+            -- Keep the sprite centered in the slot while the “unfold” anim runs
+            local cx_slot = ix + (w * scale) / 2
+            local cy_slot = iy + (h * scale) / 2
+
+            -- dx/dy should be the *top-left* of the sprite so its center matches the slot center
+            dx = cx_slot - (src_w * sx) / 2
+            dy = cy_slot - (src_h * sy) / 2
+
+            -- ONB can "stick" the first sprite used for a draw-id; force rebind on change
+            if self._last_shop_item_sprite_id ~= spr_id then
+              erase_sprite(self.player_id, self.draw.shop_item)
+              self._last_shop_item_sprite_id = spr_id
+            end
+
+            draw_sprite_xy(self, spr_id, self.draw.shop_item, dx, dy, (L.z + zadd), sx, sy)
 
           end
         else
           erase_sprite(self.player_id, self.draw.shop_item)
+          self._last_shop_item_sprite_id = nil
           erase_sprite(self.player_id, self.draw.shop_exit)
         end
 
@@ -1057,11 +1338,9 @@ end
     or (self._text_cache_rows ~= rows)
     or (self._text_cache_total ~= total)
 
+  -- Rebuild stable row IDs only when the visible window changes
   if redraw_text then
-    -- Keep a stable list of display IDs (one per visible row).
-    -- This prevents flicker caused by erase/recreate cycles.
     if not self.menu_text_ids or #self.menu_text_ids ~= rows then
-      -- wipe any old row ids
       self:clear_menu_text()
       self.menu_text_ids = {}
       for i = 1, rows do
@@ -1074,13 +1353,7 @@ end
     self._text_cache_total = total
   end
 
-
-
-  local rows = L.visible_rows
-  local total = #self.options
-  local top = self.scroll_top_index
-  local sel = self.selection_index
-
+  -- These MUST exist before the loop (your current file is missing them)
   local scale = tonumber(L.scale) or 2.0
   local row_h = (tonumber(L.row_height) or 12) * scale
 
@@ -1088,44 +1361,89 @@ end
   local cx = x0 + (L.padding_x or 0)
   local cy = y0 + (L.padding_y or 0)
 
-  if redraw_text then
-    for i = 0, rows - 1 do
-      local idx = top + i
-      local tx = cx
-      local ty = cy + (i * row_h)
+if redraw_text then
+  for i = 0, rows - 1 do
+    local idx = top + i
+    local tx = cx
+    local ty = cy + (i * row_h)
 
-      local display_id = self.menu_text_ids[i + 1]
+    local display_id = self.menu_text_ids[i + 1]
+    local name_id  = display_id .. "_name"
+    local price_id = display_id .. "_price"
 
-      if idx <= total then
-        local text = tostring(self.options[idx].text or "")
+    if idx <= total then
+      local opt = self.options[idx]
 
-        -- Intro animation: per-row fade + slight slide from the right
-        local opacity = 255
-        local xoff = 0
+      -- Intro animation: per-row fade + slight slide from the right
+      local opacity = 255
+      local xoff = 0
 
-        if self._text_intro_active and self.layout.text_intro_enabled then
-          local dur = (tonumber(self.layout.text_intro_frames) or 20) / 60
-          local stagger = (tonumber(self.layout.text_intro_stagger_frames) or 3) / 60
+      if self._text_intro_active and self.layout.text_intro_enabled then
+        local dur = (tonumber(self.layout.text_intro_frames) or 20) / 60
+        local stagger = (tonumber(self.layout.text_intro_stagger_frames) or 3) / 60
 
-          local row_t = (self._text_intro_t or 0) - (i * stagger)
-          local p = 0
-          if row_t > 0 and dur > 0 then
-            p = clamp(row_t / dur, 0, 1)
-          end
-
-          -- smoothstep easing (nice and cheap)
-          local eased = p * p * (3 - 2 * p)
-
-          opacity = math.floor(255 * eased)
-          xoff = (tonumber(self.layout.text_intro_slide_px) or 10) * (1 - eased) * scale
+        local row_t = (self._text_intro_t or 0) - (i * stagger)
+        local p = 0
+        if row_t > 0 and dur > 0 then
+          p = clamp(row_t / dur, 0, 1)
         end
 
-        -- Preserve your locked-dim behavior by multiplying opacity
-        if self.locked and (idx ~= sel) then
-          opacity = math.floor(opacity * (self.lock_dim_alpha or 0.35))
-        end
+        local eased = p * p * (3 - 2 * p)
 
-        local tint = { opacity = opacity }
+        opacity = math.floor(255 * eased)
+        xoff = (tonumber(self.layout.text_intro_slide_px) or 10) * (1 - eased) * scale
+      end
+
+      if self.locked and (idx ~= sel) then
+        opacity = math.floor(opacity * (self.lock_dim_alpha or 0.35))
+      end
+
+      local tint = { opacity = opacity }
+
+      local is_shop_cols =
+        self.layout.shop_columns_enabled
+        and type(opt) == "table"
+        and opt.shop_name ~= nil
+        and opt.shop_price ~= nil
+
+      if is_shop_cols then
+        local name_txt, price_txt = self:_shop_row_parts(opt, idx == sel)
+
+        -- Ensure the old combined row display isn't left behind
+        FontSystem:eraseTextDisplay(self.player_id, display_id)
+
+        -- NAME column
+        FontSystem:drawTextWithId(
+          self.player_id,
+          name_txt,
+          tx + xoff,
+          ty,
+          L.font,
+          scale,
+          (L.z + 2),
+          name_id,
+          tint
+        )
+
+        -- PRICE column (fixed X)
+        local price_x = cx + ((tonumber(L.shop_price_col_x) or 92) * scale)
+
+        FontSystem:drawTextWithId(
+          self.player_id,
+          price_txt,
+          price_x + xoff,
+          ty,
+          L.font,
+          scale,
+          (L.z + 2),
+          price_id,
+          tint
+        )
+      else
+        FontSystem:eraseTextDisplay(self.player_id, name_id)
+        FontSystem:eraseTextDisplay(self.player_id, price_id)
+
+        local text = tostring(opt.text or "")
 
         FontSystem:drawTextWithId(
           self.player_id,
@@ -1138,15 +1456,15 @@ end
           display_id,
           tint
         )
-
-
-      else
-        -- If fewer items than rows, erase the unused row display
-        FontSystem:eraseTextDisplay(self.player_id, display_id)
-        self.menu_row_last_len[i + 1] = 0
       end
+    else
+      FontSystem:eraseTextDisplay(self.player_id, display_id)
+      FontSystem:eraseTextDisplay(self.player_id, name_id)
+      FontSystem:eraseTextDisplay(self.player_id, price_id)
+      self.menu_row_last_len[i + 1] = 0
     end
   end
+end
 
   -- Highlight + cursor should only be visible once the menu is actually unlocked
   local sel_row = sel - top
@@ -1597,6 +1915,13 @@ function PromptMenuInstance:update(_dt)
   local total = #self.options
   self:update_cursor_bob(dt)
 
+-- =====================================================
+-- Shop columns marquee tick (selected row only)
+-- =====================================================
+if self:_tick_shop_cols_scroll(dt) then
+  self:render_menu_contents(true)
+end
+
     if Input.pop(player_id, "up") then
       local prev = self.selection_index
 
@@ -1605,13 +1930,20 @@ function PromptMenuInstance:update(_dt)
       else
         self.selection_index = self.selection_index - 1
       end
-          if self.selection_index ~= prev then
-            self:restart_shop_item_intro()
-            local sc_changed = self:update_scroll_for_selection(false)
-            play_cursor_move_sfx(player_id)
-            -- Let the intro timer drive redraw; only force when scrolling window changed
-            self:render_menu_contents(sc_changed)
+        if self.selection_index ~= prev then
+          self:restart_shop_item_intro()
+          local sc_changed = self:update_scroll_for_selection(false)
+
+          -- NEW (Point F): when selection changes, reset marquee + force redraw
+          if self.layout and self.layout.shop_columns_enabled then
+            self:_reset_shop_cols_scroll()
           end
+
+          play_cursor_move_sfx(player_id)
+
+          -- Force redraw so the newly-selected row starts from offset 0 immediately
+          self:render_menu_contents(true)
+        end
       return
 
     end
@@ -1627,8 +1959,14 @@ function PromptMenuInstance:update(_dt)
         if self.selection_index ~= prev then
           self:restart_shop_item_intro()
           local sc_changed = self:update_scroll_for_selection(false)
+
+          -- NEW (Point F): when selection changes, reset marquee + force redraw
+          if self.layout and self.layout.shop_columns_enabled then
+            self:_reset_shop_cols_scroll()
+          end
+
           play_cursor_move_sfx(player_id)
-          self:render_menu_contents(sc_changed)
+          self:render_menu_contents(true)
         end
       return
 
@@ -1681,6 +2019,7 @@ function PromptVertical._finalize_close(player_id, _reason, opts)
   erase_sprite(player_id, inst.draw.cursor)
   erase_sprite(player_id, inst.draw.scroll)
   erase_sprite(player_id, inst.draw.shop_item)
+  erase_sprite(player_id, inst.draw.shop_exit)
 
   -- Erase menu text
   inst:clear_menu_text()
@@ -1713,6 +2052,12 @@ function PromptVertical._finalize_close(player_id, _reason, opts)
     local cb = inst._post_close_cb
     inst._post_close_cb = nil
     pcall(cb)
+  end
+
+  if inst._dyn_shop_sprites and Net.player_dealloc_sprite then
+    for _, sid in pairs(inst._dyn_shop_sprites) do
+      pcall(Net.player_dealloc_sprite, player_id, sid)
+    end
   end
 
   PromptVertical.instances[player_id] = nil

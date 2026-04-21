@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="75" height="75" tilewidth="64" tileheight="32" infinite="0" nextlayerid="13" nextobjectid="237">
+<map version="1.10" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="75" height="75" tilewidth="64" tileheight="32" infinite="0" nextlayerid="13" nextobjectid="239">
  <properties>
   <property name="Background" value="custom"/>
   <property name="Background Animation" value="/server/assets/custom/backgrounds/wcity/01-generic1.animation"/>
@@ -1398,6 +1398,43 @@
     <property name="Dialogue Type" value="UnlockWhitelistPackage"/>
     <property name="Package ID" value="com.OFC.block.EXE6-013-UnderShirt"/>
     <property name="Reward Name" value="UnderShirt"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="237" name="Chip Seller" type="NPC" x="1144" y="958">
+   <properties>
+    <property name="Asset Name" value="normal-navi-bn4_red"/>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Direction" value="Up Right"/>
+    <property name="Next 1" type="object" value="238"/>
+    <property name="Text 1" value="Hey there, I sell chips!"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="238" name="ChipShop" type="Dialogue" x="1110.5" y="875.5">
+   <properties>
+    <property name="Currency" value="money"/>
+    <property name="Dialogue Type" value="chipshop"/>
+    <property name="Name 1" value="Spreader 1"/>
+    <property name="Name 2" value="Thunderball"/>
+    <property name="Name 3" value="Roll V1"/>
+    <property name="Name 4" value="Recovery 30"/>
+    <property name="Name 5" value="Vulcan 2"/>
+    <property name="Name 6" value="Grass Stage"/>
+    <property name="Preview Dir" value="chips/previews/"/>
+    <property name="Price 1" type="int" value="10000"/>
+    <property name="Price 2" type="int" value="15000"/>
+    <property name="Price 3" type="int" value="20000"/>
+    <property name="Price 4" type="int" value="20000"/>
+    <property name="Price 5" type="int" value="25000"/>
+    <property name="Price 6" type="int" value="30000"/>
+    <property name="Sell 1" value="spreadgun1"/>
+    <property name="Sell 2" value="thunderball"/>
+    <property name="Sell 3" value="roll1"/>
+    <property name="Sell 4" value="rec30"/>
+    <property name="Sell 5" value="vulcan2"/>
+    <property name="Sell 6" value="grassstage"/>
+    <property name="Shop Title" value="WCity1 Shop"/>
    </properties>
    <point/>
   </object>

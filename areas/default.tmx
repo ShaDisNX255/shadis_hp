@@ -1504,7 +1504,7 @@
   </object>
   <object id="188" name="Yes" type="Dialogue" x="551.5" y="610.5">
    <properties>
-    <property name="Dialogue Type" value="shop"/>
+    <property name="Dialogue Type" value="ng_shop"/>
     <property name="Item 1" type="object" value="193"/>
     <property name="Item 10" type="object" value="194"/>
     <property name="Item 11" type="object" value="198"/>

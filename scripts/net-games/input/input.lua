@@ -42,9 +42,9 @@ local st = {}
 --=====================================================
 -- Debug toggles
 --=====================================================
-Input.DEBUG = false                -- master debug
+Input.DEBUG = true                -- master debug
 Input.DEBUG_THROTTLE = 0          -- seconds; 0 = no throttle
-Input.DEBUG_CONFIRM_ONLY = false  -- if true, prints only when confirm group appears in packet
+Input.DEBUG_CONFIRM_ONLY = true  -- if true, prints only when confirm group appears in packet
 Input.DEBUG_DUMP_PACKET = false    -- if true, prints interpreted map each packet (noisy)
 
 local function now() return os.clock() end
@@ -99,6 +99,7 @@ local function refresh_non_dir_timeout(s)
       s.released[k] = true
       s.down[k] = false
       s.non_dir_armed[k] = true
+      s.require_release[k] = nil  -- NEW: allow confirm/cancel to work again without needing another packet
     end
   end
 end
@@ -533,14 +534,16 @@ function Input.attach_virtual_input_listener(bindings)
       -- So: allow Held to create an edge ONLY if we were previously up.
       --=====================================================
       if not is_dir_key(k) then
-        local saw_down_signal = saw_pressed or (saw_held and not s.down[k])
+        -- Keep the "down" timer alive on BOTH Pressed and Held.
+        -- But only generate an EDGE once per down (Pressed, or first Held when coming from up).
+        local saw_down_signal = saw_pressed or saw_held
+        local saw_edge_signal = saw_pressed or saw_held  -- edge is still gated by (not s.down[k]) below
 
         if s.require_release[k] then
           if saw_down_signal then
             s.non_dir_down_until[k] = t + NON_DIR_UP_TIMEOUT
             s.down[k] = true
           elseif t >= (s.non_dir_down_until[k] or 0) then
-            -- Release due to timeout
             if s.down[k] then
               s.released[k] = true
             end
@@ -550,18 +553,19 @@ function Input.attach_virtual_input_listener(bindings)
           end
 
         else
-          if saw_down_signal then
-            s.non_dir_down_until[k] = t + NON_DIR_UP_TIMEOUT
+            if saw_down_signal then
+              s.non_dir_down_until[k] = t + NON_DIR_UP_TIMEOUT
 
-            if (not s.down[k]) and s.non_dir_armed[k] then
-              s.edge[k] = true
-              s.non_dir_armed[k] = false
-            end
+              -- If we explicitly saw a Pressed packet, treat it as a fresh edge
+              -- even if our sticky state still thinks the key is down.
+              if saw_pressed or ((not s.down[k]) and s.non_dir_armed[k]) then
+                s.edge[k] = true
+                s.non_dir_armed[k] = false
+              end
 
-            s.down[k] = true
+              s.down[k] = true
 
           elseif t >= (s.non_dir_down_until[k] or 0) then
-            -- Release due to timeout
             if s.down[k] then
               s.released[k] = true
             end
