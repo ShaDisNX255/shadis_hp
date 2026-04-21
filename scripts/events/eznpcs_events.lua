@@ -654,7 +654,7 @@ local function reward_gutsman_chip_on_win(player_id, encounter_info, stats)
         return
     end
 
-    local ok, reason = whitelist.send_card_reward(player_id, "gutsman2", "*")
+    local ok, reason = whitelist.unlock_card(player_id, "gutsman2", "*")
     if ok then
         print("[Guts3 Battle] awarded GutsMan chip to", tostring(player_id), "score=" .. tostring(score))
     elseif reason == "already_unlocked" then
