@@ -37,6 +37,7 @@ a7776ddc2a0c163c8401f449eaa30fbd com.Thor.card.GrassStg
 963cbfc457cd9e3e11a6442242424b66 com.keristero.card.Vulcan2
 39847b540674ed8492b2da796f7b7b61 com.keristero.card.Vulcan3
 1a9ddce9c1f95666561bff6bbed7b5a4 com.louise.card.gutsmanv1
+c14fac7686de5b52b78f31a64361ca16 com.louise.card.gutsmanv1
 30e091d976b25642482380a7c432682d rune.legacy.bubbler
 
 ............................class BlockPackageManager............................
