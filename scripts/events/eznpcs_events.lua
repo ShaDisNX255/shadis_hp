@@ -649,12 +649,12 @@ local function reward_gutsman_chip_on_win(player_id, encounter_info, stats)
     end
 
     local score = _normalize_busting_score(stats and stats.score)
-    if score < 1 then
+    if score < 6 then
         print("[Guts3 Battle] no chip reward; score too low:", tostring(player_id), tostring(score))
         return
     end
 
-    local ok, reason = whitelist.unlock_card(player_id, "gutsman2", "*")
+    local ok, reason = whitelist.unlock_card(player_id, "gutsman1", "*")
     if ok then
         print("[Guts3 Battle] awarded GutsMan chip to", tostring(player_id), "score=" .. tostring(score))
     elseif reason == "already_unlocked" then

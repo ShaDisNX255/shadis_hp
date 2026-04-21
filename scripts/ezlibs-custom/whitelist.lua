@@ -132,11 +132,6 @@ whitelist.CARDS = {
     asset_path = "/server/assets/chips/EXE3-Gutsman1.zip",
     code = "*",
   },
-  gutsman2 = {
-    package_id = "com.louise.card.gutsmanv1",
-    asset_path = "/server/assets/chips/EXE3-Gutsman1v2.zip",
-    code = "*",
-  },
   rec30 = {
     package_id = "com.OFC.card.EXE6-157-Recovery30",
     asset_path = "/server/assets/chips/EXE6-Rec30.zip",
