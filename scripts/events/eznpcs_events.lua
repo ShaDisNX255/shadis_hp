@@ -2981,6 +2981,7 @@ if ok_menu then
   local prog_mug = helpers.deep_copy(TalkPresets.mugs.prog or { enabled = true })
   prog_mug.texture_path = ez_mug.texture_path
   prog_mug.anim_path = ez_mug.animation_path
+  prog_mug.sprite_id = nil
 
   local function normalize_preview_path(p)
     p = tostring(p or "")

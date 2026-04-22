@@ -42,9 +42,9 @@ local st = {}
 --=====================================================
 -- Debug toggles
 --=====================================================
-Input.DEBUG = true                -- master debug
+Input.DEBUG = false                -- master debug
 Input.DEBUG_THROTTLE = 0          -- seconds; 0 = no throttle
-Input.DEBUG_CONFIRM_ONLY = true  -- if true, prints only when confirm group appears in packet
+Input.DEBUG_CONFIRM_ONLY = false  -- if true, prints only when confirm group appears in packet
 Input.DEBUG_DUMP_PACKET = false    -- if true, prints interpreted map each packet (noisy)
 
 local function now() return os.clock() end

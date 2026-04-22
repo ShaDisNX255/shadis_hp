@@ -398,6 +398,7 @@ local dialogue_types = {
           local mug = helpers.deep_copy(TalkPresets.mugs.prog or { enabled = true })
           mug.texture_path = ez_mug.texture_path
           mug.anim_path = ez_mug.animation_path
+          mug.sprite_id = nil
 
           -- Build item options from Item # properties (same as eznpcs shop)
           local ids = helpers.extract_numbered_properties(dialogue, "Item ")
