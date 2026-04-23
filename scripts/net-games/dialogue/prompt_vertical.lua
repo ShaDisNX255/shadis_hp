@@ -552,6 +552,10 @@ function PromptMenuInstance:new(player_id, opts)
   -- Stable text display IDs (one per visible row) to prevent flicker.
   -- We reuse these IDs and redraw in-place instead of erasing/recreating every move.
   o.menu_text_ids = {}
+  o.menu_row_last_len = {}
+  for i = 1, (o.layout.visible_rows or 5) do
+    o.menu_row_last_len[i] = 0
+  end
 
   -- Cursor bob state (used only when menu input is active)
   o.cursor_phase  = 0
@@ -1461,6 +1465,7 @@ if redraw_text then
       FontSystem:eraseTextDisplay(self.player_id, display_id)
       FontSystem:eraseTextDisplay(self.player_id, name_id)
       FontSystem:eraseTextDisplay(self.player_id, price_id)
+      self.menu_row_last_len = self.menu_row_last_len or {}
       self.menu_row_last_len[i + 1] = 0
     end
   end

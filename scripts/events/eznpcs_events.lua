@@ -861,17 +861,42 @@ end
 
 -- Grant items for one pack (spending handled elsewhere)
 local function grant_one_pack(player_id, area_id, pack, names_acc)
-    for _ = 1, (pack.rolls or 1) do
+    local rolls = math.max(1, math.floor(tonumber(pack and pack.rolls) or 1))
+
+    for _ = 1, rolls do
         local group = pick_weighted(pack.groups or {})
-        if not group then return end
+        if not group then
+            break
+        end
+
         local items = group.items
-        if not items or #items == 0 then return end
+        if not items or #items == 0 then
+            break
+        end
+
         local idx = math.random(1, #items)
         local obj_id = items[idx]
         local info = helpers.read_item_information(area_id, obj_id)
+
         if info then
-            await(ezmemory.give_item_with_optional_notify(player_id, area_id, obj_id, info, false))
-            table.insert(names_acc, info.name)
+            if info.type == "keyitem" or info.type == "item" then
+                local is_key = (info.type == "keyitem")
+                ezmemory.create_or_update_item(info.name, info.description or "???", is_key)
+                ezmemory.give_player_item(player_id, info.name, info.amount or 1)
+                table.insert(names_acc, info.name)
+
+            elseif info.type == "money" then
+                ezmemory.spend_player_money(player_id, -(info.amount or 0))
+                table.insert(names_acc, tostring(info.amount or 0) .. "$")
+
+            elseif info.type == "fragments" then
+                ezmemory.add_player_fragments(player_id, info.amount or 0)
+                table.insert(names_acc, tostring(info.amount or 0) .. " Bug Fragments")
+
+            elseif info.type == "tokens" then
+                ezmemory.add_player_tokens(player_id, info.amount or 0)
+                table.insert(names_acc, tostring(info.amount or 0) .. " Tokens")
+            end
         end
     end
 end
@@ -935,6 +960,63 @@ local function open_n_packs(player_id, area_id, pack, mug, n)
     return true
 end
 
+local function open_packs_for_ng_shop(player_id, area_id, pack, n)
+    n = math.max(1, math.floor(tonumber(n) or 1))
+
+    local unit_price = math.max(0, tonumber(pack.price) or 0)
+    local total_cost = unit_price * n
+
+    if total_cost > 0 and not ezmemory.spend_player_money(player_id, total_cost) then
+        return false, "You don't have enough money."
+    end
+
+    local counts, order = {}, {}
+
+    for _ = 1, n do
+        local names = {}
+        grant_one_pack(player_id, area_id, pack, names)
+
+        for _, name in ipairs(names) do
+            if not counts[name] then
+                counts[name] = 1
+                table.insert(order, name)
+            else
+                counts[name] = counts[name] + 1
+            end
+        end
+    end
+
+    if sfx and sfx.item_get then
+        Net.play_sound_for_player(player_id, sfx.item_get)
+    end
+
+    if JobBBS and JobBBS.on_pack_open then
+        pcall(JobBBS.on_pack_open, player_id, { count = n, pack = pack.name })
+    end
+
+    local lines = {}
+    for _, name in ipairs(order) do
+        lines[#lines + 1] = string.format("x%d %s", counts[name], name)
+    end
+
+    local header
+    if n == 1 then
+        header = string.format("Opened 1 x %s and got:", tostring(pack.name))
+    else
+        header = string.format("Opened %d x %s and got:", n, tostring(pack.name))
+    end
+
+    local body = (#lines > 0)
+        and (header .. "\n- " .. table.concat(lines, "\n- "))
+        or (header .. "\n(nothing?)")
+
+    if total_cost > 0 then
+        body = body .. string.format("\n\n(-%d$)", total_cost)
+    end
+
+    return true, body
+end
+
 local function short_money(n)
     n = tonumber(n) or 0
     local abs = math.abs(n)
@@ -985,27 +1067,219 @@ local function choose_buy_quantity(player_id, mug, pack)
     return nil
 end
 
+local function normalize_shop_preview_path(p)
+    p = tostring(p or "")
+    if p == "" then return nil end
+
+    if not p:match("%.[%w]+$") then
+        p = p .. ".png"
+    end
+
+    if p:sub(1, 7) == "/server/" then
+        return p
+    end
+
+    if p:sub(1, 1) == "/" then
+        return p
+    end
+
+    return "/server/assets/" .. p
+end
+
 local function pack_shop_action(npc, player_id, dialogue, relay_object)
     return async(function ()
         local area_id = Net.get_player_area(player_id)
         local mug = eznpcs.get_dialogue_mugshot(npc, player_id, dialogue)
         local pack = read_single_pack(dialogue)
+        local ci = build_ci_props(dialogue)
 
         if not pack or not pack.groups or #pack.groups == 0 then
-            await(Async.message_player(player_id, "Sorry, I'm not selling any packs right now.", mug.texture_path, mug.animation_path))
+            await(Async.message_player(
+                player_id,
+                "Sorry, I'm not selling any packs right now.",
+                mug.texture_path, mug.animation_path
+            ))
             return dialogue.custom_properties["Next 1"]
         end
 
-        -- Intro once
+        --=====================================================
+        -- NEW: net-games powered pack shop
+        --=====================================================
+        local ok_menu, TalkVertMenu_or_err = pcall(require, "scripts/net-games/npcs/talk_vert_menu")
+        if ok_menu then
+            local TalkVertMenu = TalkVertMenu_or_err
+            local TalkPresets = require("scripts/net-games/npcs/talk_presets")
+
+            local title = tostring(get_ci(ci, "shop title") or "Pack Shop")
+
+            -- PROG prompt mug, but using this NPC's real mug assets
+            local prog_mug = helpers.deep_copy(TalkPresets.mugs.prog or { enabled = true })
+            prog_mug.texture_path = mug.texture_path
+            prog_mug.anim_path = mug.animation_path
+            prog_mug.sprite_id = nil
+
+            local DEFAULT_ICON = "/server/assets/net-games/ui/card_shop_item.png"
+
+            local preview_path = normalize_shop_preview_path(
+                get_ci(ci, "pack preview")
+                or get_ci(ci, "preview")
+                or get_ci(ci, "icon")
+                or get_ci(ci, "shop preview")
+                or get_ci(ci, "preview path")
+            )
+
+            if preview_path and Net and Net.has_asset then
+                local ok, exists = pcall(Net.has_asset, preview_path)
+                if ok and exists == false then
+                    preview_path = nil
+                end
+            end
+
+            local pack_icon = preview_path or DEFAULT_ICON
+
+            if Net and Net.provide_asset_for_player then
+                pcall(Net.provide_asset_for_player, player_id, pack_icon)
+            end
+
+            local price = math.max(0, tonumber(pack.price) or 0)
+            local rolls = math.max(1, tonumber(pack.rolls) or 1)
+            local suffix = (rolls == 1) and "card" or "cards"
+
+            local options = {
+                {
+                    id = "buy1",
+                    text = "Buy 1",
+                    shop_name = "Buy 1",
+                    shop_price = price,
+                },
+                {
+                    id = "buy10",
+                    text = "Buy 10",
+                    shop_name = "Buy 10",
+                    shop_price = price * 10,
+                },
+                {
+                    id = "exit",
+                    text = "Exit",
+                }
+            }
+
+            local intro_lines = {
+                tostring(pack.name),
+                string.format("%d$ each • %d %s", price, rolls, suffix),
+            }
+
+            local desc = tostring(pack.description or "")
+            if desc ~= "" then
+                intro_lines[#intro_lines + 1] = desc
+            end
+
+            local talk_cfg = {
+                preset = "prog_prompt",
+                area_id = area_id,
+                object = "packshop_" .. tostring(dialogue.id or "shop"),
+                ui = {
+                    mugshot = prog_mug,
+                    typing_speed = 9999,
+                }
+            }
+
+            local layout = TalkPresets.get_vert_menu_layout("prog_prompt_shop") or {}
+
+            local assets = {
+                menu_bg       = "/server/assets/net-games/ui/prompt_vert_menu_shop_an.png",
+                menu_bg_anim  = "/server/assets/net-games/ui/prompt_vert_menu_an.animation",
+                menu_bg_frame = "/server/assets/net-games/ui/prompt_vert_menu_shop_an_frame.png",
+                highlight     = "/server/assets/net-games/ui/highlight_shop.png",
+            }
+
+            if Net.lock_player_input then
+                pcall(Net.lock_player_input, player_id)
+            end
+
+            TalkVertMenu.open(player_id, title, talk_cfg, {
+                intro_text = table.concat(intro_lines, "\n"),
+                options = options,
+                exit_index = #options,
+                layout = layout,
+                assets = assets,
+
+                monies_amount_fn = function(pid)
+                    return tostring(tonumber(Net.get_player_money(pid) or 0) or 0)
+                end,
+
+                shop_item_texture_fn = function(choice)
+                    if not choice or not choice.id then
+                        return DEFAULT_ICON
+                    end
+                    if tostring(choice.id) == "exit" then
+                        return DEFAULT_ICON
+                    end
+                    return pack_icon
+                end,
+
+                flow = {
+                    keep_menu_open = true,
+                    after_text = "Anything else?",
+                    exit_goodbye_text = "Come again!",
+
+                    confirm = {
+                        enabled = true,
+                        skip_ids = { exit = true },
+                        text_fn = function(pid, choice_id)
+                            local qty = (tostring(choice_id) == "buy10") and 10 or 1
+                            local total_cost = price * qty
+                            local have = tonumber(Net.get_player_money(pid) or 0) or 0
+
+                            return string.format(
+                                "Buy %d x %s for %d$?\nYou have %d$",
+                                qty,
+                                tostring(pack.name),
+                                total_cost,
+                                have
+                            )
+                        end,
+                    },
+
+                    post_select = { enabled = true, skip_ids = { exit = true } },
+                },
+
+                on_confirm_yes = function(pid, choice_id, _choice_text, menu)
+                    local qty = (tostring(choice_id) == "buy10") and 10 or 1
+
+                    local ok, result_text = open_packs_for_ng_shop(pid, area_id, pack, qty)
+                    if not ok then
+                        return result_text or "You don't have enough money.", "Anything else?"
+                    end
+
+                    -- refresh live balance immediately
+                    if menu and menu.render_menu_contents then
+                        pcall(function() menu:render_menu_contents(true) end)
+                    end
+
+                    return result_text, "Anything else?"
+                end,
+            })
+
+            while TalkVertMenu.is_busy and TalkVertMenu.is_busy(player_id) do
+                await(Async.sleep(0.05))
+            end
+
+            return dialogue.custom_properties["Next 1"]
+        end
+
+        --=====================================================
+        -- Fallback: keep old Pack Shop behavior if net-games is unavailable
+        --=====================================================
         local rolls = pack.rolls or 1
         local suffix = (rolls == 1) and "card" or "cards"
+
         await(Async.message_player(
             player_id,
             string.format("%s - %d$ (%d %s)\n\n%s", pack.name, pack.price or 0, rolls, suffix, pack.description or ""),
             mug.texture_path, mug.animation_path
         ))
 
-        -- First purchase (1/10/Cancel)
         local qty = choose_buy_quantity(player_id, mug, pack)
         if not qty then
             return dialogue.custom_properties["Next 1"]
@@ -1017,12 +1291,14 @@ local function pack_shop_action(npc, player_id, dialogue, relay_object)
         else
             ok, msg = open_n_packs(player_id, area_id, pack, mug, 10)
         end
+
         if not ok then
-            if msg then await(Async.message_player(player_id, msg, mug.texture_path, mug.animation_path)) end
+            if msg then
+                await(Async.message_player(player_id, msg, mug.texture_path, mug.animation_path))
+            end
             return dialogue.custom_properties["Next 1"]
         end
 
-        -- Loop: offer 1/10/Cancel again
         while true do
             local qty2 = choose_buy_quantity(player_id, mug, pack)
             if not qty2 then break end
@@ -1035,7 +1311,9 @@ local function pack_shop_action(npc, player_id, dialogue, relay_object)
             end
 
             if not ok2 then
-                if msg2 then await(Async.message_player(player_id, msg2, mug.texture_path, mug.animation_path)) end
+                if msg2 then
+                    await(Async.message_player(player_id, msg2, mug.texture_path, mug.animation_path))
+                end
                 break
             end
         end

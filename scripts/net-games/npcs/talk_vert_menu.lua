@@ -133,6 +133,17 @@ local function reset_box_text(player_id, box_id, ui, text, indicator_enabled)
   end
 end
 
+local function estimate_text_pages(text, ui)
+  local max_lines = tonumber(ui and ui.backdrop and ui.backdrop.max_lines) or 3
+  local lines = 1
+
+  for _ in tostring(text or ""):gmatch("\n") do
+    lines = lines + 1
+  end
+
+  return math.max(1, math.ceil(lines / max_lines))
+end
+
 local function resolve_frame(frame_key_or_table)
   if not frame_key_or_table then return nil end
   if type(frame_key_or_table) == "table" then
@@ -272,6 +283,7 @@ local function ensure_tick()
             end
 
             reset_box_text(player_id, box_id, ui, post_text, true)
+            local estimated_pages = estimate_text_pages(post_text, ui)
 
             pending_ack[player_id] = {
               box_id = box_id,
@@ -282,6 +294,7 @@ local function ensure_tick()
               choice_text = choice_text,
               flow = flow,
               after_text_override = after_text,
+              remaining_pages = estimated_pages,
             }
           end,
 
@@ -343,49 +356,60 @@ local function ensure_tick()
             Input.require_release(player_id, { "confirm" })
           end
 
-        elseif st == "waiting" then
-          -- Phase 2 auto-returns to menu when it finishes printing (waiting)
-          if p.phase == 2 then
-            set_textbox_indicator(p.ui, false)
-            if p.menu then
-              set_menu_locked(p.menu, false)
-            end
-            pending_ack[player_id] = nil
-
-          -- Phase 1: confirm advances
-          elseif Input.pop(player_id, "confirm") then
-            Input.consume(player_id)
-            Input.clear_require_release(player_id, { "confirm", "cancel" })
-            Input.swallow(player_id, 0.10)
-
-            if p.choice_id == "exit" then
-              -- Start closing animation
-              Displayer.Text.closeTextBox(player_id, p.box_id)
+          elseif st == "waiting" then
+            -- Phase 2 auto-returns to menu when it finishes printing (waiting)
+            if p.phase == 2 then
+              set_textbox_indicator(p.ui, false)
+              if p.menu then
+                set_menu_locked(p.menu, false)
+              end
               pending_ack[player_id] = nil
 
-              -- Do NOT unlock here. Keep input locked until textbox is removed.
-              goodbye_closing[player_id] = { box_id = p.box_id }
+            -- Phase 1: confirm advances
+            elseif Input.pop(player_id, "confirm") then
+                local remaining = tonumber(p.remaining_pages or 1) or 1
 
-              -- Eat carry-press so we can't re-interact during the close window
-              Input.consume(player_id)
-              Input.clear_require_release(player_id, { "confirm", "cancel" })
-              Input.require_release(player_id, { "confirm", "cancel" })
-              Input.swallow(player_id, 0.12)
-              return
+                -- If the result text still has more pages, advance it first.
+                if remaining > 1 then
+                  Displayer.Text.advance_text_box(player_id, p.box_id)
+                  p.remaining_pages = remaining - 1
+                  Input.consume(player_id)
+                  Input.require_release(player_id, { "confirm" })
+
+              else
+                Input.consume(player_id)
+                Input.clear_require_release(player_id, { "confirm", "cancel" })
+                Input.swallow(player_id, 0.10)
+
+                if p.choice_id == "exit" then
+                  -- Start closing animation
+                  Displayer.Text.closeTextBox(player_id, p.box_id)
+                  pending_ack[player_id] = nil
+
+                  -- Do NOT unlock here. Keep input locked until textbox is removed.
+                  goodbye_closing[player_id] = { box_id = p.box_id }
+
+                  -- Eat carry-press so we can't re-interact during the close window
+                  Input.consume(player_id)
+                  Input.clear_require_release(player_id, { "confirm", "cancel" })
+                  Input.require_release(player_id, { "confirm", "cancel" })
+                  Input.swallow(player_id, 0.12)
+                  return
+                end
+
+                -- Only after the LAST page of the result do we show "Anything else?"
+                reset_box_text(
+                  player_id,
+                  p.box_id,
+                  p.ui,
+                  (p.after_text_override or p.flow.after_yes_text or p.flow.after_text
+                    or "Thank you!{p_1} Is there anything else you'd like?"),
+                  false
+                )
+                p.phase = 2
+              end
             end
-
-            -- Phase 1 confirm -> show after_text (NO indicator) then auto-return
-            reset_box_text(
-              player_id,
-              p.box_id,
-              p.ui,
-              (p.after_text_override or p.flow.after_yes_text or p.flow.after_text
-                or "Thank you!{p_1} Is there anything else you'd like?"),
-              false
-            )
-            p.phase = 2
           end
-        end
       end
     end
   end)
