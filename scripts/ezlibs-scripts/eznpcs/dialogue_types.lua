@@ -3,6 +3,7 @@ local helpers = require('scripts/ezlibs-scripts/helpers')
 local ezmemory = require('scripts/ezlibs-scripts/ezmemory')
 local ezquests = require('scripts/ezlibs-scripts/ezquests')
 local ezemail = require('scripts/ezlibs-scripts/ezemail')
+local NG_SHOP_ITEM_GET_SFX = "/server/assets/ezlibs-assets/sfx/item_get.ogg"
 --=====================================================
 -- net-games UI warm-up (pre-provide talk/menu assets on login)
 --=====================================================
@@ -596,6 +597,12 @@ local dialogue_types = {
               -- Force refresh so the money text updates immediately
               if menu and menu.render_menu_contents then
                 pcall(function() menu:render_menu_contents(true) end)
+              end
+
+              -- Play purchase SFX like the other migrated shops
+              if NG_SHOP_ITEM_GET_SFX then
+                pcall(Net.provide_asset_for_player, pid, NG_SHOP_ITEM_GET_SFX)
+                pcall(Net.play_sound_for_player, pid, NG_SHOP_ITEM_GET_SFX)
               end
 
               return string.format("Purchased %s!\n(-%d$)", tostring(rec.info.name), cost), "Anything else?"

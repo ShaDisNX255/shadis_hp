@@ -1141,6 +1141,16 @@ end
   local L = self.layout
   local x0, y0 = self:menu_origin()
 
+-- Cosmetic-shop style hook:
+-- Even if the built-in shop item panel is disabled, still let the selection callback run,
+-- because some shops use it only for side effects (like drawing a custom preview UI).
+do
+  if not L.shop_item_enabled and type(self.shop_item_texture_fn) == "function" then
+    local cur = self.options and self.options[self.selection_index]
+    pcall(self.shop_item_texture_fn, cur, self.selection_index, self)
+  end
+end
+
 -- ========================
 -- SHOP label: "MONIES" (WIDE font) - top-right of menu window
 -- ========================

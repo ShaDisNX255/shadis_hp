@@ -49,6 +49,11 @@ local cfg = {
   menu_preview_z      = 8,    -- slightly above menu bg/window
   menu_preview_scale  = 1.25, -- smaller than full cosmetics (menu_scale=2.0)
 
+  -- Cosmetic SHOP preview (separate from the normal cosmetics menu preview)
+  shop_preview_base_x = 172,  -- lower = further left
+  shop_preview_base_y = 35,
+  shop_preview_z      = 140,
+
   -- Rarity stars (crarity.png + crarity.animation)
   -- These are global knobs; one rarity sprite, updated when you move the cursor.
   rarity_texture        = "/server/assets/ui/cosmetics/crarity.png",

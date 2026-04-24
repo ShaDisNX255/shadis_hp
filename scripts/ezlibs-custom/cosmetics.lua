@@ -1192,6 +1192,98 @@ function Cosmetics.get_name_for_id(cosmetic_id)
   return opt and opt.name or nil
 end
 
+function Cosmetics.get_shop_option(cosmetic_id)
+  return OPTIONS_BY_ID[cosmetic_id]
+end
+
+function Cosmetics.clear_shop_previews(pid)
+  clear_shop_preview_internal(pid)
+  clear_rarity_ui(pid)
+  clear_rarity_bg_ui(pid)
+
+  if not frame.remove_ui_element then
+    return
+  end
+
+  for _, opt in ipairs(OPTIONS) do
+    local sid = menu_preview_sprite_id_for_opt(opt) .. "_shop"
+    pcall(frame.remove_ui_element, sid, pid)
+  end
+end
+
+local function _shop_safe_has_asset(path)
+  if not path or path == "" then return false end
+  if not (Net and Net.has_asset) then return true end
+  local ok, res = pcall(Net.has_asset, path)
+  return ok and res == true
+end
+
+local function _shop_safe_provide(pid, path)
+  if not (Net and Net.provide_asset_for_player) then return end
+  if not _shop_safe_has_asset(path) then return end
+  pcall(Net.provide_asset_for_player, pid, path)
+end
+
+function Cosmetics.show_shop_preview(pid, cosmetic_id)
+  local opt = OPTIONS_BY_ID[cosmetic_id]
+  Cosmetics.clear_shop_previews(pid)
+
+  if not opt then
+    return false, "unknown_id"
+  end
+
+  local texture = opt.menu_preview_texture or opt.texture
+  local anim    = opt.menu_preview_animation or opt.animation
+  local state   = opt.menu_preview_anim_state or opt.anim_state or "SNOWFLAKE_PARTICLE"
+
+  if not texture or texture == "" or not anim or anim == "" then
+    return false, "missing_assets"
+  end
+
+  _shop_safe_provide(pid, texture)
+  _shop_safe_provide(pid, anim)
+
+  local x = (cfg.shop_preview_base_x or cfg.menu_preview_base_x or 180) + (opt.menu_preview_offset_x or 0)
+  local y = (cfg.shop_preview_base_y or cfg.menu_preview_base_y or 35)  + (opt.menu_preview_offset_y or 0)
+
+  -- IMPORTANT: the prompt shop item slot is drawn way above the cosmetics menu z values.
+  -- Put the cosmetic preview above that slot so it actually shows.
+  local z = cfg.shop_preview_z or 140
+
+  local s = opt.menu_preview_scale or cfg.menu_preview_scale or 1.0
+
+  local sprite_id = menu_preview_sprite_id_for_opt(opt) .. "_shop"
+
+  if not frame.add_ui_element then
+    return false, "no_ui"
+  end
+
+  frame.add_ui_element(
+    sprite_id,
+    pid,
+    texture,
+    anim,
+    state,
+    x, y, z,
+    s, s
+  )
+
+  if frame.update_ui_position then
+    frame.update_ui_position(sprite_id, pid, x, y, z)
+  end
+
+  if frame.update_ui_element then
+    pcall(frame.update_ui_element, sprite_id, pid, { opacity = 255 })
+  end
+
+  draw_shop_rarity_for_cosmetic(pid, opt)
+  return true
+end
+
+function Cosmetics.preview_for_shop(pid, cosmetic_id)
+  return Cosmetics.show_shop_preview(pid, cosmetic_id)
+end
+
 -- ---------------------------------------------------------------------------
 -- Public API
 -- ---------------------------------------------------------------------------
@@ -1715,35 +1807,22 @@ if Net and Net.on then
 end
 
 function Cosmetics.preview_for_shop(pid, cosmetic_id)
-  -- Clear any previous shop preview cosmetic
-  clear_shop_preview_internal(pid)
-
-  -- Also clear previous rarity UI for safety
-  clear_rarity_ui(pid)
-  clear_rarity_bg_ui(pid)
-
-  if not cosmetic_id then
-    return
-  end
-
-  local opt = OPTIONS_BY_ID[cosmetic_id]
-  if not opt then
-    return
-  end
-
-  -- Apply the temporary cosmetic (what you already had)
-  apply_shop_preview_internal(pid, opt)
-
-  -- NEW: draw rarity background + stars for this cosmetic
-  draw_shop_rarity_for_cosmetic(pid, opt)
+  return Cosmetics.show_shop_preview(pid, cosmetic_id)
 end
 
 function Cosmetics.clear_shop_previews(pid)
-  -- Remove temporary cosmetic
   clear_shop_preview_internal(pid)
-  -- Remove rarity UI that was drawn for the preview
   clear_rarity_ui(pid)
   clear_rarity_bg_ui(pid)
+
+  if not frame.remove_ui_element then
+    return
+  end
+
+  for _, opt in ipairs(OPTIONS) do
+    local sid = menu_preview_sprite_id_for_opt(opt) .. "_shop"
+    pcall(frame.remove_ui_element, sid, pid)
+  end
 end
 
 return Cosmetics
