@@ -10,6 +10,8 @@ local ENFORCED_AREAS = {
   WCity1 = true,
   WCity2 = true,
   WCity3 = true,
+  TechLab1 = true,
+  TechLab2 = true,
   Dungeon1 = true,
 }
 
@@ -160,6 +162,70 @@ whitelist.CARDS = {
   grassstage = {
     package_id = "com.Thor.card.GrassStg",
     asset_path = "/server/assets/chips/EXE3-GrassStage.zip",
+    code = "*",
+  },
+  dashatk = {
+    package_id = "com.louise.card.dashattck",
+    asset_path = "/server/assets/chips/BN3-DashAtk.zip",
+    code = "*",
+  },
+
+  wavearm = {
+    package_id = "hoov.cards.wavearm1",
+    asset_path = "/server/assets/chips/BN6-Wavearm1.zip",
+    code = "*",
+  },
+
+  boomerang1 = {
+    package_id = "com.OFC.card.EXEPoN-066-Boomerang1",
+    asset_path = "/server/assets/chips/EXEPoN-Boomerang1.zip",
+    code = "*",
+  },
+
+  boomerang2 = {
+    package_id = "com.OFC.card.EXEPoN-067-Boomerang2",
+    asset_path = "/server/assets/chips/EXEPoN-Boomerang2.zip",
+    code = "*",
+  },
+
+  highcannon = {
+    package_id = "com.OFC.card.EXEPoN-002-HighCannon",
+    asset_path = "/server/assets/chips/EXEPoN-HighCannon.zip",
+    code = "*",
+  },
+
+  gundelsol1 = {
+    package_id = "com.OFC.card.EXE6-015-GunDelSol1",
+    asset_path = "/server/assets/chips/EXE6-GunDelSol1.zip",
+    code = "*",
+  },
+
+  energybomb = {
+    package_id = "com.rune.k1rbyat1na.card.EXE6-060-EnergyBomb",
+    asset_path = "/server/assets/chips/EXE6-EnergyBomb.zip",
+    code = "*",
+  },
+
+  megaenergybomb = {
+    package_id = "com.rune.k1rbyat1na.card.EXE6-061-MegaEnergyBomb",
+    asset_path = "/server/assets/chips/EXE6-MegaEnergyBomb.zip",
+    code = "*",
+  },
+
+  stonecube = {
+    package_id = "com.OFC.card.EXE6-138-StoneCube",
+    asset_path = "/server/assets/chips/EXE6-StoneCube.zip",
+    code = "*",
+  },
+
+  attack20 = {
+    package_id = "com.OFC.card.EXEPoN-121-Attack+20",
+    asset_path = "/server/assets/chips/EXEPoN-Attack20.zip",
+    code = "*",
+  },
+  barrier = {
+    package_id = "Barr10.Unified.Library.92",
+    asset_path = "/server/assets/chips/EXE6-Barrier.zip",
     code = "*",
   },
 }

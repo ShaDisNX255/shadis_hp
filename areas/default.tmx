@@ -887,31 +887,31 @@
   <object id="343" name="Cosmetic Shop" type="Dialogue" x="872" y="646">
    <properties>
     <property name="Dialogue Type" value="cosmeticshop"/>
-    <property name="Price 1" type="int" value="600000"/>
-    <property name="Price 10" type="int" value="1000000"/>
-    <property name="Price 11" type="int" value="1000000"/>
-    <property name="Price 12" type="int" value="1100000"/>
-    <property name="Price 13" type="int" value="1100000"/>
-    <property name="Price 14" type="int" value="1100000"/>
-    <property name="Price 15" type="int" value="1200000"/>
-    <property name="Price 16" type="int" value="1200000"/>
-    <property name="Price 17" type="int" value="1300000"/>
-    <property name="Price 18" type="int" value="1300000"/>
-    <property name="Price 19" type="int" value="1300000"/>
-    <property name="Price 2" type="int" value="700000"/>
-    <property name="Price 20" type="int" value="1300000"/>
-    <property name="Price 21" type="int" value="1500000"/>
-    <property name="Price 22" type="int" value="1500000"/>
-    <property name="Price 23" type="int" value="1700000"/>
-    <property name="Price 24" type="int" value="1700000"/>
-    <property name="Price 25" type="int" value="1700000"/>
-    <property name="Price 3" type="int" value="700000"/>
-    <property name="Price 4" type="int" value="800000"/>
-    <property name="Price 5" value="800000"/>
-    <property name="Price 6" type="int" value="800000"/>
-    <property name="Price 7" type="int" value="900000"/>
-    <property name="Price 8" type="int" value="900000"/>
-    <property name="Price 9" type="int" value="1000000"/>
+    <property name="Price 1" type="int" value="60000"/>
+    <property name="Price 10" type="int" value="100000"/>
+    <property name="Price 11" type="int" value="100000"/>
+    <property name="Price 12" type="int" value="110000"/>
+    <property name="Price 13" type="int" value="110000"/>
+    <property name="Price 14" type="int" value="110000"/>
+    <property name="Price 15" type="int" value="120000"/>
+    <property name="Price 16" type="int" value="120000"/>
+    <property name="Price 17" type="int" value="130000"/>
+    <property name="Price 18" type="int" value="130000"/>
+    <property name="Price 19" type="int" value="130000"/>
+    <property name="Price 2" type="int" value="70000"/>
+    <property name="Price 20" type="int" value="130000"/>
+    <property name="Price 21" type="int" value="150000"/>
+    <property name="Price 22" type="int" value="150000"/>
+    <property name="Price 23" type="int" value="170000"/>
+    <property name="Price 24" type="int" value="170000"/>
+    <property name="Price 25" type="int" value="170000"/>
+    <property name="Price 3" type="int" value="70000"/>
+    <property name="Price 4" type="int" value="80000"/>
+    <property name="Price 5" value="80000"/>
+    <property name="Price 6" type="int" value="80000"/>
+    <property name="Price 7" type="int" value="90000"/>
+    <property name="Price 8" type="int" value="90000"/>
+    <property name="Price 9" type="int" value="100000"/>
     <property name="Sell 1" value="Sims"/>
     <property name="Sell 10" value="DarkAura"/>
     <property name="Sell 11" value="confetti"/>
@@ -1232,12 +1232,12 @@
    <properties>
     <property name="Dialogue Type" value="sleeveshop"/>
     <property name="Price 1" value="0"/>
-    <property name="Price 2" value="800000"/>
-    <property name="Price 3" value="800000"/>
-    <property name="Price 4" value="800000"/>
-    <property name="Price 5" value="800000"/>
-    <property name="Price 6" value="800000"/>
-    <property name="Price 7" value="800000"/>
+    <property name="Price 2" value="80000"/>
+    <property name="Price 3" value="80000"/>
+    <property name="Price 4" value="80000"/>
+    <property name="Price 5" value="80000"/>
+    <property name="Price 6" value="80000"/>
+    <property name="Price 7" value="80000"/>
     <property name="Sell 1" value="normal"/>
     <property name="Sell 2" value="black-bronze"/>
     <property name="Sell 3" value="black-gray"/>
@@ -1451,6 +1451,9 @@
     <property name="5 Area" value="96.60.137.203:8768,default,orange line"/>
     <property name="5 Name" value="Central Station"/>
     <property name="5 Type" value="Server"/>
+    <property name="6 Area" value="TechLab2"/>
+    <property name="6 Name" value="TechLab2"/>
+    <property name="6 Type" value="Area"/>
     <property name="Train" value="ShaDisHP"/>
    </properties>
    <point/>
@@ -1530,6 +1533,7 @@
     <property name="Dialogue Type" value="Pack Shop"/>
     <property name="Pack Description" value="1st Pack Available"/>
     <property name="Pack Name" value="Skulled Minions"/>
+    <property name="Pack Preview" value="cards/packs/SkulledMinions.png"/>
     <property name="Pack Price" type="int" value="20000"/>
     <property name="Pack Rolls" type="int" value="3"/>
     <property name="common 1" type="object" value="189"/>
@@ -1619,6 +1623,7 @@
     <property name="Dialogue Type" value="Pack Shop"/>
     <property name="Pack Description" value="2nd set"/>
     <property name="Pack Name" value="Ghost of the Past"/>
+    <property name="Pack Preview" value="cards/packs/GhostOfThePast.png"/>
     <property name="Pack Price" type="int" value="40000"/>
     <property name="Pack Rolls" type="int" value="4"/>
     <property name="common 1" type="object" value="193"/>
@@ -1659,6 +1664,7 @@
     <property name="Dialogue Type" value="Pack Shop"/>
     <property name="Pack Description" value="Kaiba themed pack"/>
     <property name="Pack Name" value="Kaiba's Revenge"/>
+    <property name="Pack Preview" value="cards/packs/KaibaPack.png"/>
     <property name="Pack Price" type="int" value="50000"/>
     <property name="Pack Rolls" type="int" value="4"/>
     <property name="common 1" type="object" value="356"/>

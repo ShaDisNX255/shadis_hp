@@ -982,6 +982,7 @@
     <property name="Asset Name" value="normal-navi-bn4_green"/>
     <property name="Dialogue Type" value="first"/>
     <property name="Direction" value="Up Right"/>
+    <property name="Next Waypoint 1" type="object" value="144"/>
     <property name="Text 1" value="Did you know that the green mystery data re-generates itself every time you log out? Heh, I'm gonna keep grabbing them"/>
     <property name="Wait Time" type="int" value="5"/>
     <property name="Waypoint Type" value="first"/>
@@ -1081,8 +1082,8 @@
     <property name="Next 2" type="object" value="180"/>
     <property name="Next 3" type="object" value="181"/>
     <property name="Once Key" value="KeyHP01"/>
-    <property name="Price" type="int" value="1000000"/>
-    <property name="Renewal Price" type="int" value="800000"/>
+    <property name="Price" type="int" value="100000"/>
+    <property name="Renewal Price" type="int" value="80000"/>
    </properties>
    <point/>
   </object>
@@ -1136,8 +1137,8 @@
     <property name="Next 2" type="object" value="186"/>
     <property name="Next 3" type="object" value="187"/>
     <property name="Once Key" value="KeyHP02"/>
-    <property name="Price" type="int" value="1000000"/>
-    <property name="Renewal Price" type="int" value="800000"/>
+    <property name="Price" type="int" value="100000"/>
+    <property name="Renewal Price" type="int" value="80000"/>
    </properties>
    <point/>
   </object>
@@ -1170,34 +1171,6 @@
     <property name="Text 1" value="You don't have enough moneyz!"/>
    </properties>
    <point/>
-  </object>
-  <object id="206" name="???" type="NPC" x="1392" y="992">
-   <properties>
-    <property name="Asset Name" value="ranked-navi-bn3"/>
-    <property name="Dialogue Type" value="first"/>
-    <property name="Direction" value="Down Right"/>
-    <property name="Next 1" type="object" value="208"/>
-    <property name="Text 1" value="..."/>
-   </properties>
-   <point/>
-  </object>
-  <object id="208" type="Dialogue" x="1360" y="976">
-   <properties>
-    <property name="Boss Money" type="int" value="90000"/>
-    <property name="Dialogue Type" value="none"/>
-    <property name="Event Name" value="raid"/>
-    <property name="Raid ID" value="Mettaur1"/>
-    <property name="Wave1 Money" type="int" value="50000"/>
-    <property name="Wave2 Money" type="int" value="75000"/>
-   </properties>
-   <point/>
-  </object>
-  <object id="209" name="RaidBBS" type="RaidBBS" gid="432" x="1360" y="1024" width="48" height="69">
-   <properties>
-    <property name="Color" type="color" value="#ffff0000"/>
-    <property name="Name" value="RaidBBS"/>
-    <property name="Raid ID" value="Mettaur1"/>
-   </properties>
   </object>
   <object id="212" name="Green NormalNavi" type="NPC" x="1521.5" y="882.5">
    <properties>
@@ -1398,43 +1371,6 @@
     <property name="Dialogue Type" value="UnlockWhitelistPackage"/>
     <property name="Package ID" value="com.OFC.block.EXE6-013-UnderShirt"/>
     <property name="Reward Name" value="UnderShirt"/>
-   </properties>
-   <point/>
-  </object>
-  <object id="237" name="Chip Seller" type="NPC" x="1144" y="958">
-   <properties>
-    <property name="Asset Name" value="normal-navi-bn4_red"/>
-    <property name="Dialogue Type" value="first"/>
-    <property name="Direction" value="Up Right"/>
-    <property name="Next 1" type="object" value="238"/>
-    <property name="Text 1" value="Hey there, I sell chips!"/>
-   </properties>
-   <point/>
-  </object>
-  <object id="238" name="ChipShop" type="Dialogue" x="1110.5" y="875.5">
-   <properties>
-    <property name="Currency" value="money"/>
-    <property name="Dialogue Type" value="chipshop"/>
-    <property name="Name 1" value="Spreader 1"/>
-    <property name="Name 2" value="Thunderball"/>
-    <property name="Name 3" value="Roll V1"/>
-    <property name="Name 4" value="Recovery 30"/>
-    <property name="Name 5" value="Vulcan 2"/>
-    <property name="Name 6" value="Grass Stage"/>
-    <property name="Preview Dir" value="chips/previews/"/>
-    <property name="Price 1" type="int" value="10000"/>
-    <property name="Price 2" type="int" value="15000"/>
-    <property name="Price 3" type="int" value="20000"/>
-    <property name="Price 4" type="int" value="20000"/>
-    <property name="Price 5" type="int" value="25000"/>
-    <property name="Price 6" type="int" value="30000"/>
-    <property name="Sell 1" value="spreadgun1"/>
-    <property name="Sell 2" value="thunderball"/>
-    <property name="Sell 3" value="roll1"/>
-    <property name="Sell 4" value="rec30"/>
-    <property name="Sell 5" value="vulcan2"/>
-    <property name="Sell 6" value="grassstage"/>
-    <property name="Shop Title" value="WCity1 Shop"/>
    </properties>
    <point/>
   </object>
@@ -1805,8 +1741,8 @@
     <property name="Next 2" type="object" value="192"/>
     <property name="Next 3" type="object" value="193"/>
     <property name="Once Key" value="KeyHP03"/>
-    <property name="Price" type="int" value="1000000"/>
-    <property name="Renewal Price" type="int" value="800000"/>
+    <property name="Price" type="int" value="100000"/>
+    <property name="Renewal Price" type="int" value="80000"/>
    </properties>
    <point/>
   </object>
@@ -1860,8 +1796,8 @@
     <property name="Next 2" type="object" value="198"/>
     <property name="Next 3" type="object" value="199"/>
     <property name="Once Key" value="KeyHP04"/>
-    <property name="Price" type="int" value="1000000"/>
-    <property name="Renewal Price" type="int" value="800000"/>
+    <property name="Price" type="int" value="100000"/>
+    <property name="Renewal Price" type="int" value="80000"/>
    </properties>
    <point/>
   </object>
@@ -1915,8 +1851,8 @@
     <property name="Next 2" type="object" value="204"/>
     <property name="Next 3" type="object" value="205"/>
     <property name="Once Key" value="KeyHP05"/>
-    <property name="Price" type="int" value="1000000"/>
-    <property name="Renewal Price" type="int" value="800000"/>
+    <property name="Price" type="int" value="100000"/>
+    <property name="Renewal Price" type="int" value="80000"/>
    </properties>
    <point/>
   </object>

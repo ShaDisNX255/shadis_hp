@@ -2195,13 +2195,13 @@ eznpcs.add_event{
 
 local TOKEN_SHOP_COLOR = { r = 110, g = 220, b = 255 } -- bright cyan
 local TOKEN_OFFERS = {
-  { id = "__tok_buy_1__",  qty = 1,  price = 20000  },
-  { id = "__tok_buy_3__",  qty = 3,  price = 60000  },
-  { id = "__tok_buy_5__",  qty = 5,  price = 100000 },
-  { id = "__tok_buy_10__", qty = 10, price = 200000 },
-  { id = "__tok_buy_30__", qty = 30, price = 600000 },
-  { id = "__tok_buy_50__", qty = 50, price = 1000000 },
-  { id = "__tok_buy_100__", qty = 100, price = 2000000 },
+  { id = "__tok_buy_1__",  qty = 1,  price = 2000  },
+  { id = "__tok_buy_3__",  qty = 3,  price = 6000  },
+  { id = "__tok_buy_5__",  qty = 5,  price = 10000 },
+  { id = "__tok_buy_10__", qty = 10, price = 20000 },
+  { id = "__tok_buy_30__", qty = 30, price = 60000 },
+  { id = "__tok_buy_50__", qty = 50, price = 100000 },
+  { id = "__tok_buy_100__", qty = 100, price = 200000 },
 }
 
 eznpcs.add_event{

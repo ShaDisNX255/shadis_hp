@@ -4,6 +4,7 @@ f19ac8da5e3db97da4be0db3910d20ca com.OFC.card.EXE6-004-AirShoot
 2431d156fabba0247ebdaa65f43ebd29 com.OFC.card.EXE6-156-Recovery10
 724ec2ba6340794b36d4564ed80dc1be com.OFC.card.EXE6-165-AreaSteal
 96d065b6fe553c004c5445233c84fdcf com.OFC.card.EXE6-196-Attack+10
+d3bf619937ed1b05977effd8741f39e5 com.OFC.card.EXEPoN-001-Cannon
 9cb7f94a5351936a9a561bbbe45b8d9a com.OFC.card.EXEPoN-038-Sword
 8cb999f6f1e2ca75ea32c2756a8855d4 com.OFC.card.EXEPoN-039-WideSword
 29211b7981416b4bf524b77bb14c30aa com.alrysc.card.BusterUp
@@ -13,6 +14,7 @@ c81aaf22631981e586578c8d9b308e22 com.keristero.k1rbyat1na.card.EXE6-058-MiniBomb
 c582e127fcfd88cb1229fbb14244c250 Barr10.Unified.Library.92
 1ea2339e8b3e8ce1d21b0dfb9f4df8ee com.OFC.card.EXE6-009-SpreadGun1
 b48c6e3336815fe7f45dd80c7ee0b79c com.OFC.card.EXE6-010-SpreadGun2
+9079148c0e015a9058b4e6d76bc7389e com.OFC.card.EXE6-015-GunDelSol1
 ee8944d83b41d4d0f010316c3acd0faf com.OFC.card.EXE6-018-YoYo
 102acf1aa109a0931d0a9ced8d21b0bb com.OFC.card.EXE6-019-HellsBurner1
 bb8ee65fffa4796d02537f5f5542f2da com.OFC.card.EXE6-029-ThunderBall
@@ -22,8 +24,10 @@ bb8ee65fffa4796d02537f5f5542f2da com.OFC.card.EXE6-029-ThunderBall
 98a03e4b7f777907af40ad27625c2554 com.OFC.card.EXE6-116-KillerSensor1
 c2073649b5af70291f2bec3fc7ad9b8b com.OFC.card.EXE6-117-KillerSensor2
 09061357ad2b044e3353586db7ccd9a5 com.OFC.card.EXE6-134-Toppuu
+373fd6cd4a0e6e09708948ffa89cf595 com.OFC.card.EXE6-138-StoneCube
 6458abe25f4154ec89095830176bf3f1 com.OFC.card.EXE6-157-Recovery30
 027eb4c21344cf356f25ad476b68ceea com.OFC.card.EXE6-158-Recovery50
+57d6174a8b7dda697f30bfeb0bb53cf9 com.OFC.card.EXEPoN-002-HighCannon
 f7d5197c91b65273fafcf2307aa3e070 com.OFC.card.EXEPoN-014-HeatShot
 2bfa00687231ff7083149c0bbf7145a3 com.OFC.card.EXEPoN-017-RabiRing1
 609a9d32c06b1c11503827763a61b807 com.OFC.card.EXEPoN-018-RabiRing2
@@ -32,11 +36,18 @@ ce1ba77e9d976d0b46aa5a962163d043 com.OFC.card.EXEPoN-032-Ratton2
 0e76f2448c177e50e5af7b4c0760cfe4 com.OFC.card.EXEPoN-040-LongSword
 942e5f1ce21f76c7c4a8b8eb0885fea4 com.OFC.card.EXEPoN-051-ShockWave
 186182b50e49c1abc0f79bc096773fd5 com.OFC.card.EXEPoN-052-SonicWave
+c8bd15a58318f59a7345ca0e0245d1ab com.OFC.card.EXEPoN-066-Boomerang1
+2806d21ade02e2039d993f03e771e42b com.OFC.card.EXEPoN-067-Boomerang2
+20f427a39b6df961b2d4cbc77b3703ae com.OFC.card.EXEPoN-121-Attack+20
 a7776ddc2a0c163c8401f449eaa30fbd com.Thor.card.GrassStg
 494b80fe2f92432fab3607374a8d37e9 com.k1rbyat1na.card.EXE6-222-Roll
 963cbfc457cd9e3e11a6442242424b66 com.keristero.card.Vulcan2
 39847b540674ed8492b2da796f7b7b61 com.keristero.card.Vulcan3
+54e71a98a2a41862820999e9661052d1 com.louise.card.dashattck
 1a9ddce9c1f95666561bff6bbed7b5a4 com.louise.card.gutsmanv1
+b45ba712c91161f3b0aba2f8ff41da74 com.rune.k1rbyat1na.card.EXE6-060-EnergyBomb
+269d50448aea1c9e50d7ce9ebe6de185 com.rune.k1rbyat1na.card.EXE6-061-MegaEnergyBomb
+c976d03fa4ce445ae67e7ab6bf2ee4b3 hoov.cards.wavearm1
 30e091d976b25642482380a7c432682d rune.legacy.bubbler
 
 ............................class BlockPackageManager............................

@@ -1005,7 +1005,7 @@
   </object>
   <object id="141" name="give moneyz" type="Dialogue" x="1110.5" y="885.5">
    <properties>
-    <property name="Amount" type="int" value="30000"/>
+    <property name="Amount" type="int" value="20000"/>
     <property name="Dialogue Type" value="none"/>
     <property name="Event Name" value="Win_Gamble"/>
     <property name="Next 1" type="object" value="142"/>
@@ -1063,7 +1063,7 @@
   </object>
   <object id="148" name="give moneyz" type="Dialogue" x="1045.5" y="900.5">
    <properties>
-    <property name="Amount" type="int" value="20000"/>
+    <property name="Amount" type="int" value="10000"/>
     <property name="Dialogue Type" value="none"/>
     <property name="Event Name" value="Win_Gamble"/>
     <property name="Next 1" type="object" value="0"/>
@@ -1411,34 +1411,6 @@
     <property name="CosmeticGotText" value="You got the 'GigFreez' cosmetic!"/>
     <property name="CosmeticID" value="GigFreez"/>
     <property name="Flavor" value="This square feels weird..."/>
-   </properties>
-  </object>
-  <object id="192" name="???" type="NPC" x="270.5" y="553.5">
-   <properties>
-    <property name="Asset Name" value="ranked-navi-bn3"/>
-    <property name="Dialogue Type" value="first"/>
-    <property name="Direction" value="Down Left"/>
-    <property name="Next 1" type="object" value="193"/>
-    <property name="Text 1" value="..."/>
-   </properties>
-   <point/>
-  </object>
-  <object id="193" type="Dialogue" x="191.5" y="492.5">
-   <properties>
-    <property name="Boss Money" type="int" value="120000"/>
-    <property name="Dialogue Type" value="none"/>
-    <property name="Event Name" value="raid"/>
-    <property name="Raid ID" value="Swordy1"/>
-    <property name="Wave1 Money" type="int" value="80000"/>
-    <property name="Wave2 Money" type="int" value="90000"/>
-   </properties>
-   <point/>
-  </object>
-  <object id="194" name="RaidBBS" type="RaidBBS" gid="2147484059" x="208" y="528" width="48" height="69">
-   <properties>
-    <property name="Color" type="color" value="#ffff0000"/>
-    <property name="Name" value="RaidBBS"/>
-    <property name="Raid ID" value="Swordy1"/>
    </properties>
   </object>
   <object id="201" gid="666" x="16" y="528" width="56" height="88"/>
@@ -1929,18 +1901,19 @@
    <properties>
     <property name="Currency" value="money"/>
     <property name="Dialogue Type" value="chipshop"/>
+    <property name="Name 1" value="Spreader 1"/>
+    <property name="Name 2" value="HighCannon"/>
+    <property name="Name 3" value="GunDelSol"/>
+    <property name="Name 4" value="EnergyBomb"/>
+    <property name="Preview Dir" value="chips/previews/"/>
     <property name="Price 1" type="int" value="10000"/>
     <property name="Price 2" type="int" value="15000"/>
     <property name="Price 3" type="int" value="20000"/>
     <property name="Price 4" type="int" value="20000"/>
-    <property name="Price 5" type="int" value="25000"/>
-    <property name="Price 6" type="int" value="30000"/>
     <property name="Sell 1" value="spreadgun1"/>
-    <property name="Sell 2" value="thunderball"/>
-    <property name="Sell 3" value="roll1"/>
-    <property name="Sell 4" value="rec30"/>
-    <property name="Sell 5" value="vulcan2"/>
-    <property name="Sell 6" value="grassstage"/>
+    <property name="Sell 2" value="highcannon"/>
+    <property name="Sell 3" value="gundelsol1"/>
+    <property name="Sell 4" value="energybomb"/>
     <property name="Shop Title" value="WCity2 Shop"/>
    </properties>
    <point/>

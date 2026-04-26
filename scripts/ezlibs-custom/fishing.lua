@@ -148,8 +148,8 @@ local FISHING      = {
   FISH_REWARD_PER_LB     = Constants.FISH_REWARD_PER_LB, -- edit to taste
 
   PET_REWARDS           = Constants.PET_REWARDS or {
-    jelly   = 0.03,
-    piranha = 0.03,
+    jelly   = 0.02,
+    piranha = 0.02,
   },
 
   -- Waiting phase: bite indicator (public, visible to everyone)

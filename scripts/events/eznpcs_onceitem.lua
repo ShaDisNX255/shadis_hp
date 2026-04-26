@@ -1073,6 +1073,103 @@ local function _catalog_by_id(id)
   return nil
 end
 
+local function _pet_display_name_from_item_id(item_id)
+  local entry = _catalog_by_id(item_id)
+  local name = entry and entry.name or tostring(item_id or "")
+
+  name = tostring(name):gsub("^Pet:%s*", "")
+  if name == tostring(item_id or "") then
+    name = name:gsub("^pet_", "")
+    name = name:gsub("^%l", string.upper)
+  end
+
+  return name
+end
+
+local function _pet_preview_path(raw)
+  raw = tostring(raw or "")
+  if raw == "" then return nil end
+
+  if not raw:match("%.[%w]+$") then
+    raw = raw .. ".png"
+  end
+
+  if raw:sub(1, 7) == "/server/" then
+    return raw
+  end
+
+  if raw:sub(1, 1) == "/" then
+    return raw
+  end
+
+  return "/server/assets/" .. raw
+end
+
+local function _resolve_pet_shop_preview(ci, idx, item_id)
+  idx = tonumber(idx) or 0
+  item_id = tostring(item_id or "")
+  local kind = pet_kind_from_item_id(item_id)
+
+  local preview_dir = tostring(_decor_get_prop_ci(ci, "Preview Dir") or "")
+  local preview_ext = tostring(_decor_get_prop_ci(ci, "Preview Ext") or ".png")
+  local preview_template = tostring(_decor_get_prop_ci(ci, "Preview Template") or "")
+
+  if preview_ext ~= "" and preview_ext:sub(1, 1) ~= "." then
+    preview_ext = "." .. preview_ext
+  end
+
+  local function finalize(raw)
+    raw = _pet_preview_path(raw)
+    if raw and not _shop_safe_has_asset(raw) then
+      return nil
+    end
+    return raw
+  end
+
+  local p = _decor_get_prop_ci(ci, "Preview " .. tostring(idx))
+         or _decor_get_prop_ci(ci, "Preview " .. item_id)
+         or _decor_get_prop_ci(ci, "Icon " .. tostring(idx))
+         or _decor_get_prop_ci(ci, "Icon " .. item_id)
+
+  if (not p or p == "") and preview_template ~= "" then
+    p = preview_template
+      :gsub("{id}", tostring(item_id))
+      :gsub("{item_id}", tostring(item_id))
+      :gsub("{pet}", tostring(item_id))
+      :gsub("{kind}", tostring(kind))
+  end
+
+  if (not p or p == "") and preview_dir ~= "" then
+    local dir = preview_dir
+    if dir:sub(-1) ~= "/" then dir = dir .. "/" end
+
+    -- First try the full Sell/Buy value, like chipshop does.
+    p = finalize(dir .. tostring(item_id) .. preview_ext)
+
+    -- Nice fallback: also allow files named by kind only, like "mettaur.png".
+    if (not p or p == "") and kind ~= "" and kind ~= item_id then
+      p = finalize(dir .. tostring(kind) .. preview_ext)
+    end
+
+    return p
+  end
+
+  return finalize(p)
+end
+
+local function _shop_safe_has_asset(path)
+  if not path or path == "" then return false end
+  if not (Net and Net.has_asset) then return true end
+  local ok, res = pcall(Net.has_asset, path)
+  return ok and res == true
+end
+
+local function _shop_safe_provide(pid, path)
+  if not (Net and Net.provide_asset_for_player) then return end
+  if not _shop_safe_has_asset(path) then return end
+  pcall(Net.provide_asset_for_player, pid, path)
+end
+
 local function _player_decor_mem(pid)
   local pm = ezmemory.get_player_memory(pid)
   pm.decor_inventory = pm.decor_inventory or {}   -- { [id]=count }
@@ -3474,6 +3571,503 @@ eznpcs.add_event{
 
         ::continue::
         -- loop again
+      end
+
+      return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+    end)
+  end
+}
+
+eznpcs.add_event{
+  name = "petshop",
+  action = function(npc, player_id, dialogue, relay_object)
+    return async(function()
+      local area_id = Net.get_player_area(player_id)
+      local mug = eznpcs.get_dialogue_mugshot(npc, player_id, dialogue)
+      local ci = _decor_ci(dialogue)
+
+      local ok_menu, TalkVertMenu = pcall(require, "scripts/net-games/npcs/talk_vert_menu")
+      if not ok_menu or not TalkVertMenu then
+        await(Async.message_player(
+          player_id,
+          "The new pet shop UI isn't available right now.",
+          mug.texture_path, mug.animation_path
+        ))
+        return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+      end
+
+      local ok_presets, TalkPresets = pcall(require, "scripts/net-games/npcs/talk_presets")
+      if not ok_presets or not TalkPresets then
+        await(Async.message_player(
+          player_id,
+          "The new pet shop presets aren't available right now.",
+          mug.texture_path, mug.animation_path
+        ))
+        return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+      end
+
+      local sell_rows = {}
+      do
+        local n = 1
+        while true do
+          local spec = _decor_get_prop_ci(ci, "Sell " .. n)
+          if not spec then break end
+
+          for id in tostring(spec):gmatch("[^,%s]+") do
+            if is_pet_item_id(id) and _catalog_by_id(id) then
+              table.insert(sell_rows, { idx = n, id = id })
+            end
+          end
+          n = n + 1
+        end
+
+        -- If no explicit Sell N, default to all pet_* entries from catalog
+        if #sell_rows == 0 then
+          for i, e in ipairs(ONCEHUB_CATALOG) do
+            if is_pet_item_id(e.id) then
+              table.insert(sell_rows, { idx = i, id = e.id })
+            end
+          end
+        end
+      end
+
+      local prog_mug = helpers.deep_copy(TalkPresets.mugs.prog or { enabled = true })
+      prog_mug.texture_path = mug.texture_path
+      prog_mug.anim_path = mug.animation_path
+      prog_mug.sprite_id = nil
+
+      local title = _decor_get_prop_ci(ci, "Shop Title") or "Pet Shop"
+      local DEFAULT_ICON = "/server/assets/net-games/ui/card_shop_item.png"
+
+      local options = {}
+      local by_choice_id = {}
+      local icon_by_id = {}
+
+      for _, row in ipairs(sell_rows) do
+        local item_id = tostring(row.id)
+        local name = _pet_display_name_from_item_id(item_id)
+        local price = price_for_index_or_id(dialogue, row.idx, item_id)
+
+        local id = tostring(#options + 1)
+        options[#options + 1] = {
+          id = id,
+          text = name,
+          shop_name = name,
+          shop_price = tonumber(price) or 0,
+        }
+
+        by_choice_id[id] = {
+          item_id = item_id,
+          kind = pet_kind_from_item_id(item_id),
+          name = name,
+          price = tonumber(price) or 0,
+        }
+
+        local preview = _resolve_pet_shop_preview(ci, row.idx, item_id)
+        icon_by_id[id] = preview or DEFAULT_ICON
+      end
+
+      if #options == 0 then
+        await(Async.message_player(
+          player_id,
+          "Sorry, I'm not selling any pets right now.",
+          mug.texture_path, mug.animation_path
+        ))
+        return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+      end
+
+      options[#options + 1] = { id = "exit", text = "Exit" }
+      local exit_index = #options
+
+      local seen = {}
+      for _, path in pairs(icon_by_id) do
+        if path and not seen[path] then
+          seen[path] = true
+          _shop_safe_provide(player_id, path)
+        end
+      end
+      await(Async.sleep(0.05))
+
+      local layout = TalkPresets.get_vert_menu_layout("prog_prompt_shop") or {}
+      local talk_cfg = {
+        preset = "prog_prompt",
+        area_id = area_id,
+        object = "petshop_" .. tostring(dialogue.id or "shop"),
+        ui = {
+          mugshot = prog_mug,
+          typing_speed = 9999,
+        }
+      }
+
+      local assets = {
+        menu_bg       = "/server/assets/net-games/ui/prompt_vert_menu_shop_an.png",
+        menu_bg_anim  = "/server/assets/net-games/ui/prompt_vert_menu_an.animation",
+        menu_bg_frame = "/server/assets/net-games/ui/prompt_vert_menu_shop_an_frame.png",
+        highlight     = "/server/assets/net-games/ui/highlight_shop.png",
+      }
+
+      if Net.lock_player_input then
+        pcall(Net.lock_player_input, player_id)
+      end
+
+      TalkVertMenu.open(player_id, title, talk_cfg, {
+        intro_text = "Which pet would you like?",
+        options = options,
+        exit_index = exit_index,
+        layout = layout,
+        assets = assets,
+
+        monies_amount_fn = function(pid)
+          return tostring(tonumber(Net.get_player_money(pid) or 0) or 0)
+        end,
+
+        shop_item_texture_fn = function(choice)
+          if not choice or not choice.id then return DEFAULT_ICON end
+          if tostring(choice.id) == "exit" then return DEFAULT_ICON end
+          return icon_by_id[tostring(choice.id)] or DEFAULT_ICON
+        end,
+
+        flow = {
+          keep_menu_open = true,
+          after_text = "Anything else?",
+          exit_goodbye_text = "Come again!",
+
+          confirm = {
+            enabled = true,
+            skip_ids = { exit = true },
+            text_fn = function(pid, choice_id)
+              local offer = by_choice_id[tostring(choice_id)]
+              if not offer then
+                return "Buy this pet?"
+              end
+
+              local have = tonumber(Net.get_player_money(pid) or 0) or 0
+              return string.format(
+                "Buy %s for %d$?\nYou have %d$",
+                tostring(offer.name),
+                tonumber(offer.price) or 0,
+                have
+              )
+            end,
+          },
+
+          post_select = { enabled = true, skip_ids = { exit = true } },
+        },
+
+        on_confirm_yes = function(pid, choice_id, _choice_text, menu)
+          local offer = by_choice_id[tostring(choice_id)]
+          if not offer then
+            return "Huh? That pet is gone.", "Anything else?"
+          end
+
+          local cost = math.max(0, tonumber(offer.price) or 0)
+          if cost > 0 and not ezmemory.spend_player_money(pid, cost) then
+            local have = tonumber(Net.get_player_money(pid) or 0) or 0
+            return string.format(
+              "Not enough money.\nCost: %d$  You have: %d$",
+              cost,
+              have
+            ), "Anything else?"
+          end
+
+          local created = pets.grant_owned_pet(pid, offer.item_id, 1)
+          local pet = created and created[1]
+
+          if not pet or not pet.uid then
+            if cost > 0 then
+              ezmemory.spend_player_money(pid, -cost)
+            end
+            return "Couldn't create that pet.", "Anything else?"
+          end
+
+          if menu and menu.render_menu_contents then
+            pcall(function() menu:render_menu_contents(true) end)
+          end
+
+          if sfx and sfx.item_get then
+            pcall(Net.play_sound_for_player, pid, sfx.item_get)
+          end
+
+          return string.format(
+            "You bought %s!\nPet ID: %s\n(-%d$)",
+            tostring(offer.name),
+            tostring(pet.uid),
+            cost
+          ), "Anything else?"
+        end,
+      })
+
+      while TalkVertMenu.is_busy and TalkVertMenu.is_busy(player_id) do
+        await(Async.sleep(0.05))
+      end
+
+      return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+    end)
+  end
+}
+
+eznpcs.add_event{
+  name = "petbuyer",
+  action = function(npc, player_id, dialogue, relay_object)
+    return async(function()
+      local area_id = Net.get_player_area(player_id)
+      local mug = eznpcs.get_dialogue_mugshot(npc, player_id, dialogue)
+      local ci = _decor_ci(dialogue)
+
+      local ok_menu, TalkVertMenu = pcall(require, "scripts/net-games/npcs/talk_vert_menu")
+      if not ok_menu or not TalkVertMenu then
+        await(Async.message_player(
+          player_id,
+          "The new pet buyer UI isn't available right now.",
+          mug.texture_path, mug.animation_path
+        ))
+        return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+      end
+
+      local ok_presets, TalkPresets = pcall(require, "scripts/net-games/npcs/talk_presets")
+      if not ok_presets or not TalkPresets then
+        await(Async.message_player(
+          player_id,
+          "The new pet buyer presets aren't available right now.",
+          mug.texture_path, mug.animation_path
+        ))
+        return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+      end
+
+      -- Build what THIS NPC buys: Buy 1 / Price 1 / Preview 1 ...
+      local allowed = {}
+      local preview_by_item_id = {}
+      do
+        local n = 1
+        while true do
+          local spec = _decor_get_prop_ci(ci, "Buy " .. n)
+          if not spec then break end
+
+          for id in tostring(spec):gmatch("[^,%s]+") do
+            if is_pet_item_id(id) and _catalog_by_id(id) then
+              allowed[id] = {
+                item_id = id,
+                kind = pet_kind_from_item_id(id),
+                name = _pet_display_name_from_item_id(id),
+                price = tonumber(_decor_get_prop_ci(ci, "Price " .. n))
+                     or tonumber(_decor_get_prop_ci(ci, "Price " .. id))
+                     or 0,
+              }
+
+              preview_by_item_id[id] = _resolve_pet_shop_preview(ci, n, id)
+            end
+          end
+
+          n = n + 1
+        end
+      end
+
+      if next(allowed) == nil then
+        await(Async.message_player(
+          player_id,
+          "This buyer isn't configured to buy any pets.",
+          mug.texture_path, mug.animation_path
+        ))
+        return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+      end
+
+      local prog_mug = helpers.deep_copy(TalkPresets.mugs.prog or { enabled = true })
+      prog_mug.texture_path = mug.texture_path
+      prog_mug.anim_path = mug.animation_path
+      prog_mug.sprite_id = nil
+
+      local title = _decor_get_prop_ci(ci, "Shop Title") or "Pet Buyer"
+      local DEFAULT_ICON = "/server/assets/net-games/ui/card_shop_item.png"
+
+      -- Use companion_candidates because it already gives display_name/base_name
+      -- and excludes expedition/training pets.
+      local owned = {}
+      if pets and pets.list_companion_candidates then
+        owned = pets.list_companion_candidates(player_id) or {}
+      end
+
+      local options = {}
+      local by_choice_id = {}
+      local sold_uids = {}
+
+      for _, p in ipairs(owned) do
+        local item_id = "pet_" .. tostring(p.kind or "mettaur")
+        local offer = allowed[item_id]
+
+        -- Buyer only wants configured pet kinds, and only inventory pets (not placed in HP).
+        if offer and not p.placed then
+          local display_name = tostring(p.display_name or p.nickname or p.base_name or offer.name)
+          local base_name = tostring(p.base_name or offer.name)
+          local uid = tostring(p.uid or "")
+
+          if uid ~= "" then
+            local id = uid
+            local row_name = string.format("%s [%s] (%s)", display_name, base_name, uid)
+
+            options[#options + 1] = {
+              id = id,
+              text = row_name,
+              shop_name = row_name,
+              shop_price = tonumber(offer.price) or 0,
+            }
+
+            by_choice_id[id] = {
+              uid = uid,
+              kind = tostring(p.kind or offer.kind),
+              item_id = item_id,
+              display_name = display_name,
+              base_name = base_name,
+              price = tonumber(offer.price) or 0,
+            }
+          end
+        end
+      end
+
+      if #options == 0 then
+        await(Async.message_player(
+          player_id,
+          "You don't have any pets this buyer wants right now.",
+          mug.texture_path, mug.animation_path
+        ))
+        return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+      end
+
+      options[#options + 1] = { id = "exit", text = "Exit" }
+      local exit_index = #options
+
+      local seen = {}
+      for _, path in pairs(preview_by_item_id) do
+        if path and not seen[path] then
+          seen[path] = true
+          _shop_safe_provide(player_id, path)
+        end
+      end
+      await(Async.sleep(0.05))
+
+      local layout = TalkPresets.get_vert_menu_layout("prog_prompt_shop") or {}
+      local talk_cfg = {
+        preset = "prog_prompt",
+        area_id = area_id,
+        object = "petbuyer_" .. tostring(dialogue.id or "shop"),
+        ui = {
+          mugshot = prog_mug,
+          typing_speed = 9999,
+        }
+      }
+
+      local assets = {
+        menu_bg       = "/server/assets/net-games/ui/prompt_vert_menu_shop_an.png",
+        menu_bg_anim  = "/server/assets/net-games/ui/prompt_vert_menu_an.animation",
+        menu_bg_frame = "/server/assets/net-games/ui/prompt_vert_menu_shop_an_frame.png",
+        highlight     = "/server/assets/net-games/ui/highlight_shop.png",
+      }
+
+      if Net.lock_player_input then
+        pcall(Net.lock_player_input, player_id)
+      end
+
+      TalkVertMenu.open(player_id, title, talk_cfg, {
+        intro_text = "Which pet would you like to sell?",
+        options = options,
+        exit_index = exit_index,
+        layout = layout,
+        assets = assets,
+
+        monies_amount_fn = function(pid)
+          return tostring(tonumber(Net.get_player_money(pid) or 0) or 0)
+        end,
+
+        shop_item_texture_fn = function(choice)
+          if not choice or not choice.id then return DEFAULT_ICON end
+          if tostring(choice.id) == "exit" then return DEFAULT_ICON end
+
+          local rec = by_choice_id[tostring(choice.id)]
+          if not rec then return DEFAULT_ICON end
+
+          return preview_by_item_id[rec.item_id] or DEFAULT_ICON
+        end,
+
+        flow = {
+          keep_menu_open = true,
+          after_text = "Anything else?",
+          exit_goodbye_text = "Come again!",
+
+          confirm = {
+            enabled = true,
+            skip_ids = { exit = true },
+            text_fn = function(pid, choice_id)
+              local rec = by_choice_id[tostring(choice_id)]
+              if not rec then
+                return "Sell this pet?"
+              end
+
+              return string.format(
+                "Sell %s [%s]\nPet ID: %s\nfor %d$?",
+                tostring(rec.display_name),
+                tostring(rec.base_name),
+                tostring(rec.uid),
+                tonumber(rec.price) or 0
+              )
+            end,
+          },
+
+          post_select = { enabled = true, skip_ids = { exit = true } },
+        },
+
+        on_confirm_yes = function(pid, choice_id, _choice_text, menu)
+          local rec = by_choice_id[tostring(choice_id)]
+          if not rec then
+            return "That pet is gone.", "Anything else?"
+          end
+
+          if sold_uids[rec.uid] then
+            return "That pet was already sold.", "Anything else?"
+          end
+
+          local ok, result = pets.delete_owned_pet(pid, rec.uid)
+          if not ok then
+            return tostring(result or "Couldn't sell that pet."), "Anything else?"
+          end
+
+          sold_uids[rec.uid] = true
+
+          local payout = math.max(0, tonumber(rec.price) or 0)
+          if payout > 0 then
+            ezmemory.spend_player_money(pid, -payout)
+          end
+
+          -- Mark row as sold for the rest of this session.
+          if menu and menu.options then
+            for _, opt in ipairs(menu.options) do
+              if tostring(opt.id) == tostring(rec.uid) then
+                opt.shop_name = string.format("%s [Sold]", tostring(rec.display_name))
+                opt.text = opt.shop_name
+                opt.shop_price = 0
+                break
+              end
+            end
+          end
+
+          if menu and menu.render_menu_contents then
+            pcall(function() menu:render_menu_contents(true) end)
+          end
+
+          if sfx and sfx.item_get then
+            pcall(Net.play_sound_for_player, pid, sfx.item_get)
+          end
+
+          return string.format(
+            "Sold %s [%s].\nPet ID: %s\n(+%d$)",
+            tostring(rec.display_name),
+            tostring(rec.base_name),
+            tostring(rec.uid),
+            payout
+          ), "Anything else?"
+        end,
+      })
+
+      while TalkVertMenu.is_busy and TalkVertMenu.is_busy(player_id) do
+        await(Async.sleep(0.05))
       end
 
       return dialogue.custom_properties and dialogue.custom_properties["Next 1"]

@@ -91,37 +91,37 @@
   <object id="4" name="Decorshop" type="Dialogue" x="447.5" y="404.5">
    <properties>
     <property name="Dialogue Type" value="decorshop"/>
-    <property name="Price 1" type="int" value="30000"/>
-    <property name="Price 10" type="int" value="40000"/>
-    <property name="Price 11" type="int" value="50000"/>
-    <property name="Price 12" type="int" value="50000"/>
-    <property name="Price 13" type="int" value="50000"/>
-    <property name="Price 14" type="int" value="50000"/>
-    <property name="Price 15" type="int" value="400000"/>
-    <property name="Price 16" type="int" value="400000"/>
-    <property name="Price 17" type="int" value="400000"/>
-    <property name="Price 18" type="int" value="400000"/>
-    <property name="Price 19" type="int" value="400000"/>
-    <property name="Price 2" type="int" value="40000"/>
-    <property name="Price 20" type="int" value="700000"/>
-    <property name="Price 21" type="int" value="40000"/>
-    <property name="Price 22" type="int" value="100000"/>
-    <property name="Price 23" type="int" value="900000"/>
-    <property name="Price 24" type="int" value="500000"/>
-    <property name="Price 25" type="int" value="500000"/>
-    <property name="Price 26" type="int" value="500000"/>
-    <property name="Price 27" type="int" value="500000"/>
-    <property name="Price 28" type="int" value="400000"/>
-    <property name="Price 29" type="int" value="400000"/>
-    <property name="Price 3" type="int" value="50000"/>
-    <property name="Price 30" type="int" value="500000"/>
-    <property name="Price 31" type="int" value="1000000"/>
-    <property name="Price 4" type="int" value="50000"/>
-    <property name="Price 5" type="int" value="60000"/>
-    <property name="Price 6" type="int" value="50000"/>
-    <property name="Price 7" type="int" value="10000"/>
-    <property name="Price 8" type="int" value="60000"/>
-    <property name="Price 9" type="int" value="50000"/>
+    <property name="Price 1" type="int" value="3000"/>
+    <property name="Price 10" type="int" value="4000"/>
+    <property name="Price 11" type="int" value="5000"/>
+    <property name="Price 12" type="int" value="5000"/>
+    <property name="Price 13" type="int" value="5000"/>
+    <property name="Price 14" type="int" value="5000"/>
+    <property name="Price 15" type="int" value="40000"/>
+    <property name="Price 16" type="int" value="40000"/>
+    <property name="Price 17" type="int" value="40000"/>
+    <property name="Price 18" type="int" value="40000"/>
+    <property name="Price 19" type="int" value="40000"/>
+    <property name="Price 2" type="int" value="4000"/>
+    <property name="Price 20" type="int" value="70000"/>
+    <property name="Price 21" type="int" value="4000"/>
+    <property name="Price 22" type="int" value="10000"/>
+    <property name="Price 23" type="int" value="90000"/>
+    <property name="Price 24" type="int" value="50000"/>
+    <property name="Price 25" type="int" value="50000"/>
+    <property name="Price 26" type="int" value="50000"/>
+    <property name="Price 27" type="int" value="50000"/>
+    <property name="Price 28" type="int" value="40000"/>
+    <property name="Price 29" type="int" value="40000"/>
+    <property name="Price 3" type="int" value="5000"/>
+    <property name="Price 30" type="int" value="50000"/>
+    <property name="Price 31" type="int" value="100000"/>
+    <property name="Price 4" type="int" value="5000"/>
+    <property name="Price 5" type="int" value="6000"/>
+    <property name="Price 6" type="int" value="5000"/>
+    <property name="Price 7" type="int" value="1000"/>
+    <property name="Price 8" type="int" value="6000"/>
+    <property name="Price 9" type="int" value="5000"/>
     <property name="Sell 1" value="bus_stop"/>
     <property name="Sell 10" value="spinning_top"/>
     <property name="Sell 11" value="red_boss"/>
@@ -356,18 +356,19 @@
   </object>
   <object id="61" name="Pet Shop" type="Dialogue" x="243.5" y="320.5">
    <properties>
-    <property name="Dialogue Type" value="decorshop"/>
-    <property name="Price 1" type="int" value="1000000"/>
-    <property name="Price 2" type="int" value="1000000"/>
-    <property name="Price 3" type="int" value="1000000"/>
-    <property name="Price 4" type="int" value="1000000"/>
-    <property name="Price 5" type="int" value="1000000"/>
-    <property name="Price 6" type="int" value="1000000"/>
-    <property name="Price 7" type="int" value="1000000"/>
-    <property name="Price 8" type="int" value="1000000"/>
-    <property name="Price 9" type="int" value="1000000"/>
-    <property name="Price 10" type="int" value="1000000"/>
+    <property name="Event Name" value="petshop"/>
+    <property name="Price 1" type="int" value="100000"/>
+    <property name="Price 10" type="int" value="100000"/>
+    <property name="Price 2" type="int" value="100000"/>
+    <property name="Price 3" type="int" value="100000"/>
+    <property name="Price 4" type="int" value="100000"/>
+    <property name="Price 5" type="int" value="100000"/>
+    <property name="Price 6" type="int" value="100000"/>
+    <property name="Price 7" type="int" value="100000"/>
+    <property name="Price 8" type="int" value="100000"/>
+    <property name="Price 9" type="int" value="100000"/>
     <property name="Sell 1" value="pet_mettaur"/>
+    <property name="Sell 10" value="pet_brushman"/>
     <property name="Sell 2" value="pet_ratty"/>
     <property name="Sell 3" value="pet_powie"/>
     <property name="Sell 4" value="pet_swordy"/>
@@ -376,7 +377,6 @@
     <property name="Sell 7" value="pet_volgear"/>
     <property name="Sell 8" value="pet_magtect"/>
     <property name="Sell 9" value="pet_fishy"/>
-    <property name="Sell 10" value="pet_brushman"/>
    </properties>
    <point/>
   </object>

@@ -10,16 +10,16 @@ Month.DEFAULT = {
   min_gp_for_consolation = 5,      -- loser eligibility
 
   team_win = {
-    money = 500000,                -- winners always get this money
+    money = 50000,                -- winners always get this money
     -- (you can add default packs/items here later if you want)
   },
 
   top_player = {
-    money = 300000,                -- top player per team always gets this money
+    money = 100000,                -- top player per team always gets this money
   },
 
   losing_team = {
-    money = 150000,                 -- losers (meeting min GP) always get this money
+    money = 25000,                 -- losers (meeting min GP) always get this money
   },
 }
 

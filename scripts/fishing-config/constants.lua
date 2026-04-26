@@ -53,7 +53,7 @@ local CONSTANTS = {
   EXPECTED_EX_SIZE       = { w = 22, h = 22 },
   EX_SCREEN_SHIFT        = { x = -1.0, y = -1.0, z = 0.0 },
   -- Catch/Reward Values
-  FISH_REWARD_PER_LB     = 700,
+  FISH_REWARD_PER_LB     = 500,
 
   PET_REWARDS = {
     jelly   = 0.03,

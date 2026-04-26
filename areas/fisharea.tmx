@@ -12,38 +12,10 @@
  </properties>
  <tileset firstgid="1" source="../assets/tiles/central_platform.tsx"/>
  <tileset firstgid="241" source="../assets/tiles/EXE6_Shortcuts.tsx"/>
- <tileset firstgid="273" source="../assets/tiles/Roadblock.tsx"/>
- <tileset firstgid="275" source="../assets/fishing/normal/0.tsx"/>
- <tileset firstgid="276" source="../assets/fishing/normal/1.tsx"/>
- <tileset firstgid="277" source="../assets/fishing/normal/2.tsx"/>
- <tileset firstgid="278" source="../assets/fishing/normal/3.tsx"/>
- <tileset firstgid="279" source="../assets/fishing/normal/4.tsx"/>
- <tileset firstgid="280" source="../assets/fishing/normal/5.tsx"/>
- <tileset firstgid="281" source="../assets/fishing/normal/6.tsx"/>
- <tileset firstgid="282" source="../assets/fishing/normal/7.tsx"/>
- <tileset firstgid="283" source="../assets/fishing/normal/8.tsx"/>
- <tileset firstgid="284" source="../assets/fishing/normal/9.tsx"/>
- <tileset firstgid="285" source="../assets/fishing/normal/10.tsx"/>
- <tileset firstgid="286" source="../assets/fishing/sweet-spot/1.tsx"/>
- <tileset firstgid="287" source="../assets/fishing/sweet-spot/10.tsx"/>
- <tileset firstgid="288" source="../assets/fishing/sweet-spot/2.tsx"/>
- <tileset firstgid="289" source="../assets/fishing/sweet-spot/3.tsx"/>
- <tileset firstgid="290" source="../assets/fishing/sweet-spot/4.tsx"/>
- <tileset firstgid="291" source="../assets/fishing/sweet-spot/5.tsx"/>
- <tileset firstgid="292" source="../assets/fishing/sweet-spot/6.tsx"/>
- <tileset firstgid="293" source="../assets/fishing/sweet-spot/7.tsx"/>
- <tileset firstgid="294" source="../assets/fishing/sweet-spot/8.tsx"/>
- <tileset firstgid="295" source="../assets/fishing/sweet-spot/9.tsx"/>
- <tileset firstgid="296" source="../assets/tiles/BBSOldFixed.tsx"/>
- <tileset firstgid="299" source="../assets/fishing/timer/0.tsx"/>
- <tileset firstgid="300" source="../assets/fishing/timer/1.tsx"/>
- <tileset firstgid="301" source="../assets/fishing/timer/2.tsx"/>
- <tileset firstgid="302" source="../assets/fishing/timer/3.tsx"/>
- <tileset firstgid="303" source="../assets/fishing/timer/4.tsx"/>
- <tileset firstgid="304" source="../assets/fishing/timer/5.tsx"/>
- <tileset firstgid="305" source="../assets/fishing/ex.tsx"/>
- <tileset firstgid="306" source="../assets/tiles/enclosed-water-tiles.tsx"/>
- <tileset firstgid="354" source="../assets/tiles/HoloPanelz.tsx"/>
+ <tileset firstgid="289" source="../assets/tiles/Roadblock.tsx"/>
+ <tileset firstgid="314" source="../assets/tiles/enclosed-water-tiles.tsx"/>
+ <tileset firstgid="362" source="../assets/tiles/HoloPanelz.tsx"/>
+ <tileset firstgid="372" source="../assets/tiles/BBSOldFixed.tsx"/>
  <layer id="1" name="Tile Layer 0" width="50" height="50">
   <data encoding="csv">
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -66,13 +38,13 @@
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,316,320,320,318,63,73,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,315,307,307,321,72,83,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,315,307,307,321,72,83,0,0,0,62,63,73,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,315,307,307,321,72,83,93,109,91,61,72,83,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,315,307,307,321,72,83,0,0,0,71,81,82,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,315,307,307,321,72,83,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,314,319,319,317,81,82,0,0,0,0,0,0,355,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,324,328,328,326,63,73,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,323,315,315,329,72,83,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,323,315,315,329,72,83,0,0,0,62,63,73,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,323,315,315,329,72,83,93,109,91,61,72,83,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,323,315,315,329,72,83,0,0,0,71,81,82,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,323,315,315,329,72,83,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,322,327,327,325,81,82,0,0,0,0,0,0,363,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -106,7 +78,7 @@
     <property name="Target Object" value="307"/>
    </properties>
   </object>
-  <object id="36" name="FishBBS" type="FishBBS" gid="297" x="1136" y="832" width="48" height="69">
+  <object id="36" name="FishBBS" type="FishBBS" gid="373" x="1136" y="832" width="48" height="69">
    <properties>
     <property name="Color" type="color" value="#ffff0000"/>
     <property name="Name" value="FishBBS"/>
@@ -160,7 +132,7 @@
    <properties>
     <property name="Description" value="Bait used to fish"/>
     <property name="Name" value="bait"/>
-    <property name="Price" value="5500"/>
+    <property name="Price" value="4000"/>
     <property name="Type" value="item"/>
    </properties>
    <point/>
@@ -188,27 +160,27 @@
    </properties>
    <point/>
   </object>
-  <object id="86" name="Fishing Test" type="Water" gid="2147483921" x="1136" y="656" width="64" height="64" visible="0">
+  <object id="86" name="Fishing Test" type="Water" gid="2147483937" x="1136" y="656" width="64" height="64" visible="0">
    <properties>
     <property name="Water" type="bool" value="true"/>
    </properties>
   </object>
-  <object id="87" name="Fishing Test" type="Water" gid="2147483921" x="1136" y="688" width="64" height="64" visible="0">
+  <object id="87" name="Fishing Test" type="Water" gid="2147483937" x="1136" y="688" width="64" height="64" visible="0">
    <properties>
     <property name="Water" type="bool" value="true"/>
    </properties>
   </object>
-  <object id="88" name="Fishing Test" type="Water" gid="2147483921" x="1136" y="720" width="64" height="64" visible="0">
+  <object id="88" name="Fishing Test" type="Water" gid="2147483937" x="1136" y="720" width="64" height="64" visible="0">
    <properties>
     <property name="Water" type="bool" value="true"/>
    </properties>
   </object>
-  <object id="89" name="Fishing Test" type="Water" gid="2147483921" x="1136" y="752" width="64" height="64" visible="0">
+  <object id="89" name="Fishing Test" type="Water" gid="2147483937" x="1136" y="752" width="64" height="64" visible="0">
    <properties>
     <property name="Water" type="bool" value="true"/>
    </properties>
   </object>
-  <object id="90" name="Fishing Test" type="Water" gid="2147483921" x="1136" y="784" width="64" height="64" visible="0">
+  <object id="90" name="Fishing Test" type="Water" gid="2147483937" x="1136" y="784" width="64" height="64" visible="0">
    <properties>
     <property name="Water" type="bool" value="true"/>
    </properties>

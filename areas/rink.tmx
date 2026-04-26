@@ -27,35 +27,8 @@
  <tileset firstgid="269" source="../assets/tiles/enclosed-water-tiles.tsx"/>
  <tileset firstgid="317" source="../assets/tiles/Roadblock.tsx"/>
  <tileset firstgid="319" source="../assets/tiles/ice-clean.tsx"/>
- <tileset firstgid="415" source="../assets/fishing/timer/0.tsx"/>
- <tileset firstgid="416" source="../assets/fishing/timer/1.tsx"/>
- <tileset firstgid="417" source="../assets/fishing/timer/2.tsx"/>
- <tileset firstgid="418" source="../assets/fishing/timer/3.tsx"/>
- <tileset firstgid="419" source="../assets/fishing/timer/4.tsx"/>
- <tileset firstgid="420" source="../assets/fishing/timer/5.tsx"/>
- <tileset firstgid="421" source="../assets/fishing/ex.tsx"/>
- <tileset firstgid="422" source="../assets/fishing/icy-normal/0.tsx"/>
- <tileset firstgid="422" source="../assets/fishing/icy-normal/1.tsx"/>
- <tileset firstgid="422" source="../assets/fishing/icy-normal/2.tsx"/>
- <tileset firstgid="422" source="../assets/fishing/icy-normal/3.tsx"/>
- <tileset firstgid="422" source="../assets/fishing/icy-normal/4.tsx"/>
- <tileset firstgid="422" source="../assets/fishing/icy-normal/5.tsx"/>
- <tileset firstgid="422" source="../assets/fishing/icy-normal/6.tsx"/>
- <tileset firstgid="422" source="../assets/fishing/icy-normal/7.tsx"/>
- <tileset firstgid="422" source="../assets/fishing/icy-normal/8.tsx"/>
- <tileset firstgid="422" source="../assets/fishing/icy-normal/9.tsx"/>
- <tileset firstgid="422" source="../assets/fishing/icy-normal/10.tsx"/>
- <tileset firstgid="422" source="../assets/fishing/icy-sweet/0.tsx"/>
- <tileset firstgid="422" source="../assets/fishing/icy-sweet/1.tsx"/>
- <tileset firstgid="422" source="../assets/fishing/icy-sweet/2.tsx"/>
- <tileset firstgid="422" source="../assets/fishing/icy-sweet/3.tsx"/>
- <tileset firstgid="422" source="../assets/fishing/icy-sweet/4.tsx"/>
- <tileset firstgid="422" source="../assets/fishing/icy-sweet/5.tsx"/>
- <tileset firstgid="422" source="../assets/fishing/icy-sweet/6.tsx"/>
- <tileset firstgid="422" source="../assets/fishing/icy-sweet/7.tsx"/>
- <tileset firstgid="422" source="../assets/fishing/icy-sweet/8.tsx"/>
- <tileset firstgid="422" source="../assets/fishing/icy-sweet/9.tsx"/>
- <tileset firstgid="422" source="../assets/tiles/ice-clean-darker.tsx"/>
+ <tileset firstgid="415" source="../assets/fishing/ex.tsx"/>
+ <tileset firstgid="416" source="../assets/tiles/ice-clean-darker.tsx"/>
  <layer id="1" name="Tile Layer 1" width="50" height="50">
   <data encoding="csv">
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -442,9 +415,9 @@
    </properties>
    <point/>
   </object>
-  <object id="131" name="100,000" type="Mystery Option" x="627" y="302">
+  <object id="131" name="70,000" type="Mystery Option" x="627" y="302">
    <properties>
-    <property name="Amount" value="100000"/>
+    <property name="Amount" value="70000"/>
     <property name="Type" value="money"/>
    </properties>
    <point/>
@@ -465,15 +438,15 @@
   </object>
   <object id="135" type="Mystery Data" gid="253" x="598" y="630" width="14" height="43">
    <properties>
-    <property name="Amount" type="int" value="100000"/>
+    <property name="Amount" type="int" value="10000"/>
     <property name="Next 1" type="object" value="0"/>
     <property name="Once" type="bool" value="true"/>
     <property name="Type" value="money"/>
    </properties>
   </object>
-  <object id="136" name="50,000" type="Mystery Option" x="639.5" y="316.5">
+  <object id="136" name="30,000" type="Mystery Option" x="639.5" y="316.5">
    <properties>
-    <property name="Amount" value="50000"/>
+    <property name="Amount" value="30000"/>
     <property name="Type" value="money"/>
    </properties>
    <point/>
