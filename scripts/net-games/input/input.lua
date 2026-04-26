@@ -47,7 +47,12 @@ Input.DEBUG_THROTTLE = 0          -- seconds; 0 = no throttle
 Input.DEBUG_CONFIRM_ONLY = false  -- if true, prints only when confirm group appears in packet
 Input.DEBUG_DUMP_PACKET = false    -- if true, prints interpreted map each packet (noisy)
 
-local function now() return os.clock() end
+Input._time = Input._time or 0.0
+Input._tick_attached = Input._tick_attached or false
+
+local function now()
+  return Input._time or 0.0
+end
 
 -- How long we wait without seeing a non‑directional key before treating it as "up".
 -- Missing keys in event.events do NOT imply released.
@@ -102,6 +107,29 @@ local function refresh_non_dir_timeout(s)
       s.require_release[k] = nil  -- NEW: allow confirm/cancel to work again without needing another packet
     end
   end
+end
+
+local function ensure_tick_clock()
+  if Input._tick_attached then
+    return
+  end
+
+  Input._tick_attached = true
+
+  Net:on("tick", function(event)
+    local dt = (event and event.delta_time) or (1 / 60)
+
+    -- Match the duel-side safety clamp so server hitches don't create giant jumps.
+    if dt < 0 then dt = 0 end
+    if dt > 0.25 then dt = 0.25 end
+
+    Input._time = (Input._time or 0.0) + dt
+
+    -- Keep timeout-based releases progressing even if no new virtual_input packet arrives.
+    for _, s in pairs(st) do
+      refresh_non_dir_timeout(s)
+    end
+  end)
 end
 
 local function ensure(player_id)
@@ -497,6 +525,8 @@ function Input.attach_virtual_input_listener(bindings)
   print("[Input] attaching Net:on('virtual_input') listener")
 
   bindings = bindings or DEFAULT_BINDINGS
+
+  ensure_tick_clock()
 
   Net:on("virtual_input", function(event)
     local player_id = event.player_id
