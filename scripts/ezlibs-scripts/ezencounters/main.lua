@@ -522,7 +522,7 @@ local function _build_random_obstacles(cfg, occupied, player_positions)
     return obstacles, obstacle_positions
 end
 
-local function _build_random_tiles(cfg)
+local function _build_random_tiles(cfg, player_positions, obstacle_positions)
     local panel_cfg = cfg and cfg.panels or {}
     local tiles = _copy_grid((cfg and cfg.base_tiles) or DEFAULT_RANDOM_TILES)
 
@@ -546,8 +546,37 @@ local function _build_random_tiles(cfg)
     if count_min < 1 then count_min = 1 end
     if count_max < count_min then count_max = count_min end
 
+    local blocked = {}
+
+    -- Never spawn panels under player starting positions.
+    for key, value in pairs(_get_blocked_player_cells(player_positions)) do
+        blocked[key] = value
+    end
+
+    -- Also avoid obstacle positions so panels don't silently stack under objects.
+    for y, row in ipairs(obstacle_positions or {}) do
+        for x, value in ipairs(row) do
+            if tonumber(value or 0) > 0 then
+                blocked[_cell_key(x, y)] = true
+            end
+        end
+    end
+
+    local free_cells = {}
+    for _, cell in ipairs(DEFAULT_RANDOM_ALL_CELLS) do
+        if not blocked[_cell_key(cell.x, cell.y)] then
+            free_cells[#free_cells + 1] = cell
+        end
+    end
+
+    if #free_cells == 0 then
+        return tiles
+    end
+
     local count = math.random(count_min, count_max)
-    local chosen_cells = _pick_distinct(DEFAULT_RANDOM_ALL_CELLS, count)
+    count = math.min(count, #free_cells)
+
+    local chosen_cells = _pick_distinct(free_cells, count)
 
     for _, cell in ipairs(chosen_cells) do
         tiles[cell.y][cell.x] = panel_pool[math.random(#panel_pool)]
@@ -619,7 +648,7 @@ local function _build_random_encounter(area_id, area_table)
         positions = positions,
         obstacle_positions = obstacle_positions,
         player_positions = player_positions,
-        tiles = _build_random_tiles(cfg),
+        tiles = _build_random_tiles(cfg, player_positions, obstacle_positions),
         teams = _copy_grid(cfg.teams or DEFAULT_RANDOM_TEAMS),
 
         -- carry over area/random-level metadata used later

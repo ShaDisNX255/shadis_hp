@@ -12,30 +12,30 @@ local function notify_jobbbs(player_id, encounter_info, stats)
 end
 
 local COMMON_DROP = {
-  [11] = 0.75, -- S
-  [10] = 0.55,
-  [9]  = 0.40,
-  [8]  = 0.25,
-  [7]  = 0.15,
-  [6]  = 0.08,
-  [5]  = 0.04,
+  [11] = 0.90, -- S
+  [10] = 0.80,
+  [9]  = 0.75,
+  [8]  = 0.65,
+  [7]  = 0.50,
+  [6]  = 0.35,
+  [5]  = 0.25,
 }
 
 local UNCOMMON_DROP = {
-  [11] = 0.55, -- S
-  [10] = 0.40,
-  [9]  = 0.25,
-  [8]  = 0.15,
-  [7]  = 0.08,
-  [6]  = 0.04,
+  [11] = 0.80, -- S
+  [10] = 0.70,
+  [9]  = 0.65,
+  [8]  = 0.55,
+  [7]  = 0.40,
+  [6]  = 0.25,
 }
 
 local RARE_DROP = {
-  [11] = 0.35, -- S
-  [10] = 0.25,
-  [9]  = 0.15,
-  [8]  = 0.08,
-  [7]  = 0.04,
+  [11] = 0.75, -- S
+  [10] = 0.65,
+  [9]  = 0.60,
+  [8]  = 0.50,
+  [7]  = 0.35,
 }
 
 local function chip_drop(card, chances)
@@ -55,7 +55,7 @@ return {
     enabled = true,
     money = {
       enabled = true,
-      score_multiplier = 120,
+      score_multiplier = 90,
     },
     health = {
       enabled = true,
@@ -65,7 +65,7 @@ return {
 
     cards = {
       enabled = true,
-      duplicate_fallback_score_multiplier = 80,
+      duplicate_fallback_score_multiplier = 90,
 
       drops = {
         Boomer = {
@@ -140,7 +140,7 @@ return {
       enabled = true,
       pool = { 13 }, -- lava only
       chance = 0.45,
-      min = 1,
+      min = 2,
       max = 3,
     },
 
@@ -160,7 +160,7 @@ return {
       { name = "Fishy",     ranks = { "1" } },      -- old filler: DashAtk
       { name = "Volcano",   ranks = { "1", "2" } }, -- no chip; lava synergy
       { name = "Metrid",    ranks = { "1" } },      -- no chip filler
-      { name = "MegaCorn",  ranks = { "1" } },      -- no chip filler for now
+      { name = "BombCorn",  ranks = { "1" } },      -- no chip filler for now
     },
   },
 }

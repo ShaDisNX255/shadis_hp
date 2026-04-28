@@ -48,7 +48,7 @@ a7776ddc2a0c163c8401f449eaa30fbd com.Thor.card.GrassStg
 b45ba712c91161f3b0aba2f8ff41da74 com.rune.k1rbyat1na.card.EXE6-060-EnergyBomb
 269d50448aea1c9e50d7ce9ebe6de185 com.rune.k1rbyat1na.card.EXE6-061-MegaEnergyBomb
 c976d03fa4ce445ae67e7ab6bf2ee4b3 hoov.cards.wavearm1
-30e091d976b25642482380a7c432682d rune.legacy.bubbler
+aae8420ea8025b457b587388d5d49e44 rune.legacy.bubbler
 
 ............................class BlockPackageManager............................
 2e6bd07f5f9614f8fce403bdea369392 com.OFC.block.EXE6-013-UnderShirt

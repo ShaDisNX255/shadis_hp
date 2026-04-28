@@ -12,32 +12,32 @@ local function notify_jobbbs(player_id, encounter_info, stats)
 end
 
 local STARTER_DROP = {
-  [11] = 0.80, -- S
-  [10] = 0.65,
-  [9]  = 0.45,
-  [8]  = 0.30,
-  [7]  = 0.18,
-  [6]  = 0.10,
-  [5]  = 0.05,
+  [11] = 0.90, -- S
+  [10] = 0.80,
+  [9]  = 0.75,
+  [8]  = 0.65,
+  [7]  = 0.50,
+  [6]  = 0.35,
+  [5]  = 0.25,
 }
 
 local COMMON_DROP = {
-  [11] = 0.75, -- S
-  [10] = 0.55,
-  [9]  = 0.40,
-  [8]  = 0.25,
-  [7]  = 0.15,
-  [6]  = 0.08,
-  [5]  = 0.04,
+  [11] = 0.85, -- S
+  [10] = 0.75,
+  [9]  = 0.70,
+  [8]  = 0.60,
+  [7]  = 0.45,
+  [6]  = 0.30,
+  [5]  = 0.25,
 }
 
 local UNCOMMON_DROP = {
-  [11] = 0.55, -- S
-  [10] = 0.40,
-  [9]  = 0.25,
-  [8]  = 0.15,
-  [7]  = 0.08,
-  [6]  = 0.04,
+  [11] = 0.80, -- S
+  [10] = 0.70,
+  [9]  = 0.65,
+  [8]  = 0.55,
+  [7]  = 0.40,
+  [6]  = 0.25,
 }
 
 local function chip_drop(card, chances)
@@ -57,7 +57,7 @@ return {
     enabled = true,
     money = {
       enabled = true,
-      score_multiplier = 105,
+      score_multiplier = 80,
     },
     health = {
       enabled = true,
@@ -67,7 +67,7 @@ return {
 
     cards = {
       enabled = true,
-      duplicate_fallback_score_multiplier = 60,
+      duplicate_fallback_score_multiplier = 80,
 
       drops = {
         Mettaur = {

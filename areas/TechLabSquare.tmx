@@ -347,17 +347,17 @@
     <property name="Dialogue Type" value="chipshop"/>
     <property name="Name 1" value="Spreader 2"/>
     <property name="Name 2" value="Stone Cube"/>
-    <property name="Name 3" value="MegaEnergyBomb"/>
-    <property name="Name 4" value="Barrier"/>
+    <property name="Name 3" value="Barrier"/>
+    <property name="Name 4" value="MegaEnergyBomb"/>
     <property name="Preview Dir" value="chips/previews/"/>
-    <property name="Price 1" type="int" value="10000"/>
-    <property name="Price 2" type="int" value="15000"/>
-    <property name="Price 3" type="int" value="20000"/>
-    <property name="Price 4" type="int" value="25000"/>
+    <property name="Price 1" type="int" value="15000"/>
+    <property name="Price 2" type="int" value="20000"/>
+    <property name="Price 3" type="int" value="25000"/>
+    <property name="Price 4" type="int" value="30000"/>
     <property name="Sell 1" value="spreadgun2"/>
     <property name="Sell 2" value="stonecube"/>
-    <property name="Sell 3" value="megaenergybomb"/>
-    <property name="Sell 4" value="barrier"/>
+    <property name="Sell 3" value="barrier"/>
+    <property name="Sell 4" value="megaenergybomb"/>
     <property name="Shop Title" value="TechLabSqr Shop"/>
    </properties>
    <point/>

@@ -285,7 +285,7 @@ local give_result_awards = function (player_id, encounter_info, stats)
   end
 
   -- 1) Money = busting level * 100
-  local monies = (stats.score or 0) * 400
+  local monies = (stats.score or 0) * 100
 
   -- 2) HP bonus:
   --    If HP < 101: always +150
@@ -350,7 +350,7 @@ local mini_boss_rewards = function (player_id, encounter_info, stats)
   end
 
   -- 1) Money = busting level * 1500
-  local monies = (stats.score or 0) * 1500
+  local monies = (stats.score or 0) * 200
 
   -- 2) If post-battle HP < 101, give +300 HP
   local hp_bonus = ((stats.health or 0) < 101) and 300 or 0
@@ -552,17 +552,18 @@ local MainBoss = {
 
 
 local DUNGEON_RARE_DROP = {
-  [11] = 0.30, -- S
-  [10] = 0.20,
-  [9]  = 0.12,
-  [8]  = 0.06,
+  [11] = 0.75, -- S
+  [10] = 0.65,
+  [9]  = 0.60,
+  [8]  = 0.50,
+  [7]  = 0.35,
 }
 
 local DUNGEON_VERY_RARE_DROP = {
-  [11] = 0.24, -- S
-  [10] = 0.15,
-  [9]  = 0.08,
-  [8]  = 0.04,
+  [11] = 0.70, -- S
+  [10] = 0.60,
+  [9]  = 0.55,
+  [8]  = 0.45,
 }
 
 local function chip_drop(card, chances)
@@ -603,19 +604,19 @@ return {
             drops = {
                 Yort = {
                     ["1"] = {
-                        chip_drop("yoyo1", DUNGEON_VERY_RARE_DROP),
+                        chip_drop("yoyo1", DUNGEON_RARE_DROP),
                     },
                 },
 
                 Gunner = {
                     ["2"] = {
-                        chip_drop("MachineGun2", DUNGEON_RARE_DROP),
+                        chip_drop("MachineGun2", DUNGEON_VERY_RARE_DROP),
                     },
                 },
 
                 DemonEye = {
                     ["1"] = {
-                        chip_drop("KillerSensor2", DUNGEON_RARE_DROP),
+                        chip_drop("KillerSensor2", DUNGEON_VERY_RARE_DROP),
                     },
                 },
 
@@ -667,21 +668,18 @@ return {
         pool = {
             -- Dungeon-exclusive chase drops
             { name = "Yort",      ranks = { "1" } }, -- YoYo
-            { name = "Gunner",    ranks = { "2" } }, -- MachineGun2
+            { name = "Gunner",    ranks = { "1", "2" } }, -- MachineGun2
             { name = "DemonEye",  ranks = { "1" } }, -- KillerSensor2
             { name = "TuffBunny", ranks = { "1" } }, -- RabiRing2
 
-            -- no-drop / harsh filler to dilute the good chips
-            { name = "Volcano",   ranks = { "1", "2", "3" } },
-            { name = "Metrid",    ranks = { "2", "3", "4" } },
+            { name = "Volcano",   ranks = { "1", "2" } },
+            { name = "Metrid",    ranks = { "1", "2" } },
             { name = "MegaCorn",  ranks = { "1" } },
-            { name = "Fishy",     ranks = { "3" } },
-            { name = "Beetank",   ranks = { "2", "3" } },
-            { name = "Spikey",    ranks = { "3", "4" } },
-            { name = "Swordy",    ranks = { "3" } },
-            { name = "Quaker",    ranks = { "2", "3" } },
-            { name = "Chumpy",    ranks = { "1" } },
-            { name = "Noir",      ranks = { "1" } },
+            { name = "Fishy",     ranks = { "1", "2" } },
+            { name = "Beetank",   ranks = { "1", "2" } },
+            { name = "Spikey",    ranks = { "2", "3" } },
+            { name = "Swordy",    ranks = { "2", "3" } },
+            { name = "Quaker",    ranks = { "1", "2" } },
         },
     },
 }

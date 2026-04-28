@@ -92,6 +92,32 @@ function ezmystery.handle_player_disconnect(player_id)
     revealed_mysteries_for_players[player_id] = nil
 end
 
+local function reapply_random_mystery_visibility(player_id, area_id, visible_mysteries)
+    if type(visible_mysteries) ~= "table" then
+        return
+    end
+
+    local visible_by_id = {}
+    for _, object_id in ipairs(visible_mysteries) do
+        visible_by_id[tostring(object_id)] = true
+    end
+
+    local objects = Net.list_objects(area_id)
+    for _, object_id in next, objects do
+        local object = Net.get_object_by_id(area_id, object_id)
+
+        if object and object_is_mystery_data(object) then
+            local once = is_property_true(object.custom_properties["Once"])
+            local locked = is_property_true(object.custom_properties["Locked"])
+            local id = tostring(object.id)
+
+            if not once and not locked and not visible_by_id[id] then
+                ezmemory.hide_object_from_player_till_disconnect(player_id, area_id, id)
+            end
+        end
+    end
+end
+
 function ezmystery.hide_random_data(player_id)
     local area_id = Net.get_player_area(player_id)
     local objects = Net.list_objects(area_id)
@@ -99,7 +125,11 @@ function ezmystery.hide_random_data(player_id)
     local area_max_mystery_count = tonumber(Net.get_area_custom_property(area_id, "Mystery Data Maximum")) or 0
     if area_min_mystery_count > area_max_mystery_count then return end
     if revealed_mysteries_for_players[player_id] == nil then revealed_mysteries_for_players[player_id] = {} end
-    if revealed_mysteries_for_players[player_id] and revealed_mysteries_for_players[player_id][area_id] then
+    local existing_roll = revealed_mysteries_for_players[player_id]
+        and revealed_mysteries_for_players[player_id][area_id]
+
+    if existing_roll then
+        reapply_random_mystery_visibility(player_id, area_id, existing_roll)
         return
     end
     local mystery_count = 0

@@ -12,13 +12,13 @@ local function notify_jobbbs(player_id, encounter_info, stats)
 end
 
 local STARTER_DROP = {
-  [11] = 0.80, -- S
-  [10] = 0.65,
-  [9]  = 0.45,
-  [8]  = 0.30,
-  [7]  = 0.18,
-  [6]  = 0.10,
-  [5]  = 0.05,
+  [11] = 0.90, -- S
+  [10] = 0.80,
+  [9]  = 0.75,
+  [8]  = 0.65,
+  [7]  = 0.50,
+  [6]  = 0.35,
+  [5]  = 0.25,
 }
 
 local function chip_drop(card, chances)
@@ -38,7 +38,7 @@ return {
     enabled = true,
     money = {
       enabled = true,
-      score_multiplier = 80,
+      score_multiplier = 60,
     },
     health = {
       enabled = true,

@@ -899,7 +899,7 @@ function ezmemory.object_is_hidden_from_player_till_disconnect(player_id, area_i
 end
 
 function ezmemory.handle_player_disconnect(player_id)
-    objects_hidden_till_disconnect_for_player = {}
+    objects_hidden_till_disconnect_for_player[player_id] = nil
 end
 
 function ezmemory.handle_player_join(player_id)

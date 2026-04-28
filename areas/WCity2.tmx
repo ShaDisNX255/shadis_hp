@@ -1902,18 +1902,18 @@
     <property name="Currency" value="money"/>
     <property name="Dialogue Type" value="chipshop"/>
     <property name="Name 1" value="Spreader 1"/>
-    <property name="Name 2" value="HighCannon"/>
-    <property name="Name 3" value="GunDelSol"/>
-    <property name="Name 4" value="EnergyBomb"/>
+    <property name="Name 2" value="EnergyBomb"/>
+    <property name="Name 3" value="HighCannon"/>
+    <property name="Name 4" value="GunDelSol"/>
     <property name="Preview Dir" value="chips/previews/"/>
     <property name="Price 1" type="int" value="10000"/>
-    <property name="Price 2" type="int" value="15000"/>
-    <property name="Price 3" type="int" value="20000"/>
+    <property name="Price 2" type="int" value="10000"/>
+    <property name="Price 3" type="int" value="15000"/>
     <property name="Price 4" type="int" value="20000"/>
     <property name="Sell 1" value="spreadgun1"/>
-    <property name="Sell 2" value="highcannon"/>
-    <property name="Sell 3" value="gundelsol1"/>
-    <property name="Sell 4" value="energybomb"/>
+    <property name="Sell 2" value="energybomb"/>
+    <property name="Sell 3" value="highcannon"/>
+    <property name="Sell 4" value="gundelsol1"/>
     <property name="Shop Title" value="WCity2 Shop"/>
    </properties>
    <point/>
