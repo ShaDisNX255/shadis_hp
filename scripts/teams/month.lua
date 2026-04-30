@@ -10,16 +10,16 @@ Month.DEFAULT = {
   min_gp_for_consolation = 5,      -- loser eligibility
 
   team_win = {
-    money = 500000,                -- winners always get this money
+    money = 50000,                -- winners always get this money
     -- (you can add default packs/items here later if you want)
   },
 
   top_player = {
-    money = 300000,                -- top player per team always gets this money
+    money = 100000,                -- top player per team always gets this money
   },
 
   losing_team = {
-    money = 150000,                 -- losers (meeting min GP) always get this money
+    money = 25000,                 -- losers (meeting min GP) always get this money
   },
 }
 
@@ -193,6 +193,45 @@ Month.MONTHS = {
       },
     },
   },
+
+  -- April 2026
+  ["2026-04"] = {
+    team_win = {
+      pack_name = "Pet Chip Drops!",
+      pack_rolls = 10,   -- how many random cards to give from pack_pool
+      pack_pool = {
+        -- weight is relative odds; amount is how many copies of that card to give
+        { type = "item", name = "PetChip: Recovery30", description = "Pet battle chip: Recovery30", amount = 1, weight = 20 },
+        { type = "item", name = "PetChip: Recovery50", description = "Pet battle chip: Recovery50", amount = 1, weight = 10 },
+        { type = "item", name = "PetChip: PanelSteal", description = "Pet battle chip: PanelSteal", amount = 1, weight = 20 },
+        { type = "item", name = "PetChip: AreaSteal",  description = "Pet battle chip: AreaSteal",  amount = 1, weight = 10 },
+        { type = "item", name = "PetChip: HolyPanel",  description = "Pet battle chip: HolyPanel",  amount = 1, weight = 20 },
+        { type = "item", name = "PetChip: Sanctuary",  description = "Pet battle chip: Sanctuary",  amount = 1, weight = 10 },
+        { type = "item", name = "PetChip: Invisible",  description = "Pet battle chip: Invisible",  amount = 1, weight = 20 },
+        { type = "item", name = "PetChip: Shadow",     description = "Pet battle chip: Shadow",     amount = 1, weight = 10 },
+        { type = "item", name = "PetChip: Barrier",    description = "Pet battle chip: Barrier",    amount = 1, weight = 20 },
+        { type = "item", name = "PetChip: Barrier100", description = "Pet battle chip: Barrier100", amount = 1, weight = 10 },
+      },
+    },
+    losing_team = {
+      pack_name = "Pet Chip Drops!",
+      pack_rolls = 5,   -- how many random cards to give from pack_pool
+      pack_pool = {
+        -- weight is relative odds; amount is how many copies of that card to give
+        { type = "item", name = "PetChip: Recovery30", description = "Pet battle chip: Recovery30", amount = 1, weight = 20 },
+        { type = "item", name = "PetChip: Recovery50", description = "Pet battle chip: Recovery50", amount = 1, weight = 10 },
+        { type = "item", name = "PetChip: PanelSteal", description = "Pet battle chip: PanelSteal", amount = 1, weight = 20 },
+        { type = "item", name = "PetChip: AreaSteal",  description = "Pet battle chip: AreaSteal",  amount = 1, weight = 10 },
+        { type = "item", name = "PetChip: HolyPanel",  description = "Pet battle chip: HolyPanel",  amount = 1, weight = 20 },
+        { type = "item", name = "PetChip: Sanctuary",  description = "Pet battle chip: Sanctuary",  amount = 1, weight = 10 },
+        { type = "item", name = "PetChip: Invisible",  description = "Pet battle chip: Invisible",  amount = 1, weight = 20 },
+        { type = "item", name = "PetChip: Shadow",     description = "Pet battle chip: Shadow",     amount = 1, weight = 10 },
+        { type = "item", name = "PetChip: Barrier",    description = "Pet battle chip: Barrier",    amount = 1, weight = 20 },
+        { type = "item", name = "PetChip: Barrier100", description = "Pet battle chip: Barrier100", amount = 1, weight = 10 },
+      },
+    },
+  },
+
 }
 
 -- ===== Dated special events (independent of monthly rewards) =====
