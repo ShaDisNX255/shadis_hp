@@ -16,6 +16,7 @@
  <tileset firstgid="314" source="../assets/tiles/enclosed-water-tiles.tsx"/>
  <tileset firstgid="362" source="../assets/tiles/HoloPanelz.tsx"/>
  <tileset firstgid="372" source="../assets/tiles/BBSOldFixed.tsx"/>
+ <tileset firstgid="415" source="../assets/fishing/ex.tsx"/>
  <layer id="1" name="Tile Layer 0" width="50" height="50">
   <data encoding="csv">
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,

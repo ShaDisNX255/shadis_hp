@@ -1461,4 +1461,26 @@ if not _G.__RAIDS_LOGIN_ANNOUNCE then
   end)
 end
 
+-- Public marquee announcer API.
+-- Other scripts can call:
+--   _G.RaidAnnouncer.announce("Some message", { loops = 2 })
+function Raids.announce(text, opts, area_id)
+  opts = opts or {}
+
+  if opts.loops == nil then
+    opts.loops = 2
+  end
+
+  if opts.id == nil then
+    opts.id = "__global_announce"
+  end
+
+  return _announce_all(tostring(text or ""), opts, area_id)
+end
+
+_G.RaidAnnouncer = _G.RaidAnnouncer or {}
+_G.RaidAnnouncer.announce = function(text, opts, area_id)
+  return Raids.announce(text, opts, area_id)
+end
+
 return Raids

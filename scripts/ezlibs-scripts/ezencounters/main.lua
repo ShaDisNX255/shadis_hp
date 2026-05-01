@@ -1039,6 +1039,13 @@ end
 ezencounters.begin_encounter = function (player_id,encounter_info,trigger_object)
     return async(function ()
         ezencounters.clear_tiles_since_encounter(player_id)
+        if _G.Tournaments and _G.Tournaments.unregister_if_queued_for_battle then
+            pcall(
+                _G.Tournaments.unregister_if_queued_for_battle,
+                player_id,
+                "You were unregistered from the tournament because you started another battle."
+            )
+        end
 
         local final_encounter_info = _inject_armed_pet(player_id, encounter_info)
 
