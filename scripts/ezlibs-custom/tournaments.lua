@@ -637,6 +637,186 @@ local function await(v)
   return Async.await(v)
 end
 
+-- -----------------------------------------------------------------------------
+-- Tournament visual asset warmup
+-- -----------------------------------------------------------------------------
+
+local function tournament_safe_has_asset(path)
+  if not path or path == "" then return false end
+  if not Net or not Net.has_asset then return true end
+
+  local ok, res = pcall(Net.has_asset, path)
+  return ok and res == true
+end
+
+local function tournament_safe_provide(player_id, path)
+  if not player_id or not path or path == "" then return end
+  if not Net or not Net.provide_asset_for_player then return end
+
+  -- Never provide a missing asset; some server builds can hard-crash on bad paths.
+  if not tournament_safe_has_asset(path) then return end
+
+  pcall(Net.provide_asset_for_player, player_id, path)
+end
+
+local function tournament_add_asset(out, seen, path)
+  if not path or path == "" then return end
+  if seen[path] then return end
+
+  seen[path] = true
+  out[#out + 1] = path
+end
+
+local function tournament_collect_visual_assets()
+  local assets = {}
+  local seen = {}
+
+  local function add(path)
+    tournament_add_asset(assets, seen, path)
+  end
+
+  -- Board background variants.
+  if constants and constants.bracket_background_path then
+    for _, bg in pairs(constants.bracket_background_path) do
+      add(bg.gradient_texture)
+      add(bg.grid_texture)
+    end
+  end
+
+  -- Board animations.
+  if constants then
+    add(constants.default_background_anim_path_bn4)
+    add(constants.default_grid_anim_path_bn4)
+    add(constants.default_bracket_anim_path_bn4)
+    add(constants.default_mug_anim)
+
+    -- Brackets / toppers / crowns.
+    add(constants.bracket_bm_bn4)
+    add(constants.bracket_rs_bn4)
+
+    add(constants.champion_topper_bn4)
+    add(constants.champion_topper_bn45)
+    add(constants.champion_topper_bn4_anim)
+    add(constants.champion_topper_bn45_anim)
+
+    add(constants.crown_texture_path)
+    add(constants.crown_anim_path)
+  end
+
+  -- Hardcoded board assets used by draw_tournament_board_for_player().
+  add("/server/assets/tourney/tourney-board-elements/mini-mug-frame.png")
+  add("/server/assets/tourney/tourney-board-elements/mini-mug-frame.anim")
+  add("/server/assets/tourney/title-banner.png")
+  add("/server/assets/tourney/title-banner.anim")
+
+  -- Tournament music.
+  add(VISUALS.music)
+
+  -- Textbox assets used by TOURNEY_TEXT.backdrop.style = "textbox_panel".
+  add("/server/assets/net-games/displayer/textbox.png")
+  add("/server/assets/net-games/displayer/textbox.animation")
+
+  -- Known NPC mugshots.
+  for _, pool in pairs(NPC_POOLS or {}) do
+    for _, npc in ipairs(pool or {}) do
+      add(npc.mug_texture)
+      add(npc.mug_animation or DEFAULT_MUG_ANIM)
+    end
+  end
+
+  return assets
+end
+
+local function tournament_prewarm_visual_assets(player_id)
+  if not player_id then return end
+
+  local assets = tournament_collect_visual_assets()
+
+  for _, path in ipairs(assets) do
+    tournament_safe_provide(player_id, path)
+  end
+
+  -- Like fishing/dialogue_types: give the client a moment to download, then touch
+  -- the key board sprites offscreen so first real draw is more reliable.
+  async(function()
+    await(Async.sleep(1.0))
+
+    if not Net.is_player(player_id) then return end
+    if not games or not games.add_ui_element then return end
+
+    local function prewarm(sprite_id, texture, anim, state)
+      if not tournament_safe_has_asset(texture) then return end
+      if anim and anim ~= "" and not tournament_safe_has_asset(anim) then return end
+
+      pcall(
+        games.add_ui_element,
+        sprite_id,
+        player_id,
+        texture,
+        anim or "",
+        state or "UI",
+        -1000,
+        -1000,
+        0,
+        2.0,
+        2.0
+      )
+    end
+
+    -- One of each reusable board element.
+    if constants and constants.bracket_background_path then
+      for key, bg in pairs(constants.bracket_background_path) do
+        prewarm("__tourney_pre_bg_" .. tostring(key), bg.gradient_texture, constants.default_background_anim_path_bn4, "BG")
+        prewarm("__tourney_pre_grid_" .. tostring(key), bg.grid_texture, constants.default_grid_anim_path_bn4, "UI")
+      end
+    end
+
+    if constants then
+      prewarm("__tourney_pre_bracket_bm", constants.bracket_bm_bn4, constants.default_bracket_anim_path_bn4, "UI")
+      prewarm("__tourney_pre_bracket_rs", constants.bracket_rs_bn4, constants.default_bracket_anim_path_bn4, "UI")
+
+      prewarm("__tourney_pre_topper_bn4", constants.champion_topper_bn4, constants.champion_topper_bn4_anim, "UI")
+      prewarm("__tourney_pre_topper_bn45", constants.champion_topper_bn45, constants.champion_topper_bn45_anim, "UI")
+
+      prewarm("__tourney_pre_crown", constants.crown_texture_path, constants.crown_anim_path, "INACTIVE")
+    end
+
+    prewarm(
+      "__tourney_pre_mug_frame",
+      "/server/assets/tourney/tourney-board-elements/mini-mug-frame.png",
+      "/server/assets/tourney/tourney-board-elements/mini-mug-frame.anim",
+      "ACTIVE"
+    )
+
+    prewarm(
+      "__tourney_pre_title_banner",
+      "/server/assets/tourney/title-banner.png",
+      "/server/assets/tourney/title-banner.anim",
+      "RED"
+    )
+
+    prewarm(
+      "__tourney_pre_textbox",
+      "/server/assets/net-games/displayer/textbox.png",
+      "/server/assets/net-games/displayer/textbox.animation",
+      "OPEN_IDLE"
+    )
+
+    _G.__TOURNEY_VISUAL_PREWARM_DONE = _G.__TOURNEY_VISUAL_PREWARM_DONE or {}
+    _G.__TOURNEY_VISUAL_PREWARM_DONE[player_id] = true
+  end)
+end
+
+if not _G.__TOURNEY_VISUAL_WARMUP_HOOKED then
+  _G.__TOURNEY_VISUAL_WARMUP_HOOKED = true
+
+  Net:on("player_join", function(event)
+    local pid = event.player_id
+    if not pid then return end
+    tournament_prewarm_visual_assets(pid)
+  end)
+end
+
 local function await_with_timeout(promise, timeout_seconds)
   return async(function()
     local completed = false
