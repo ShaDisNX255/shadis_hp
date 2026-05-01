@@ -1464,9 +1464,6 @@
     <property name="5 Area" value="96.60.137.203:8768,default,orange line"/>
     <property name="5 Name" value="Central Station"/>
     <property name="5 Type" value="Server"/>
-    <property name="6 Area" value="TechLab2"/>
-    <property name="6 Name" value="TechLab2"/>
-    <property name="6 Type" value="Area"/>
     <property name="Train" value="ShaDisHP"/>
    </properties>
    <point/>
