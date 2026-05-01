@@ -115,8 +115,8 @@
     <property name="Buy 1" value="pet_jelly"/>
     <property name="Buy 2" value="pet_piranha"/>
     <property name="Event Name" value="petbuyer"/>
-    <property name="Price 1" type="int" value="50000"/>
-    <property name="Price 2" type="int" value="50000"/>
+    <property name="Price 1" type="int" value="25000"/>
+    <property name="Price 2" type="int" value="25000"/>
    </properties>
    <point/>
   </object>
