@@ -314,7 +314,7 @@
    <properties>
     <property name="Description" value="SRare: Buster Blader - A: 2600 / D: 2300"/>
     <property name="Name" value="[SR]BBlader"/>
-    <property name="Price" value="500000"/>
+    <property name="Price" value="50000"/>
     <property name="Type" value="item"/>
    </properties>
    <point/>
@@ -323,7 +323,7 @@
    <properties>
     <property name="Description" value="SRare: Dark Magician Girl - A: 2000 / D: 1700"/>
     <property name="Name" value="[SR]DMGirl"/>
-    <property name="Price" value="400000"/>
+    <property name="Price" value="40000"/>
     <property name="Type" value="item"/>
    </properties>
    <point/>
@@ -332,7 +332,7 @@
    <properties>
     <property name="Description" value="URare: Dark Magician - A: 2500 / D: 2100"/>
     <property name="Name" value="[UR]DMag"/>
-    <property name="Price" value="700000"/>
+    <property name="Price" value="70000"/>
     <property name="Type" value="item"/>
    </properties>
    <point/>
@@ -341,7 +341,7 @@
    <properties>
     <property name="Description" value="URare: Magician of Black Chaos - A: 2800 / D: 2600"/>
     <property name="Name" value="[UR]BChaos"/>
-    <property name="Price" value="800000"/>
+    <property name="Price" value="80000"/>
     <property name="Type" value="item"/>
    </properties>
    <point/>
@@ -350,7 +350,7 @@
    <properties>
     <property name="Description" value="URare: Black Luster Soldier - A: 3000 / D: 2500"/>
     <property name="Name" value="[UR]B.L.S."/>
-    <property name="Price" value="1000000"/>
+    <property name="Price" value="100000"/>
     <property name="Type" value="item"/>
    </properties>
    <point/>
@@ -359,7 +359,7 @@
    <properties>
     <property name="Description" value="URare: Blue Eyes White Dragon - A: 3000 / D: 2500"/>
     <property name="Name" value="[UR]B.E.W.D."/>
-    <property name="Price" value="1000000"/>
+    <property name="Price" value="100000"/>
     <property name="Type" value="item"/>
    </properties>
    <point/>
@@ -377,7 +377,7 @@
    <properties>
     <property name="Description" value="SRare: Judge Man - A: 2200 / D: 1500"/>
     <property name="Name" value="[SR]JudgeM"/>
-    <property name="Price" value="450000"/>
+    <property name="Price" value="45000"/>
     <property name="Type" value="item"/>
    </properties>
    <point/>

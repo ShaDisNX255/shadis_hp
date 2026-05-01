@@ -1383,7 +1383,7 @@
     <property name="Tournament NPC Pool" value="wcity_rank1"/>
     <property name="Tournament Name" value="WCity1"/>
     <property name="Tournament PVP Mode" value="wcity"/>
-    <property name="Tournament Start Minute" type="int" value="0"/>
+    <property name="Tournament Start Minute" type="int" value="30"/>
     <property name="Tournament Start Second" type="int" value="0"/>
    </properties>
   </object>
