@@ -1,86 +1,11 @@
 local ezmemory = require('scripts/ezlibs-scripts/ezmemory')
 local helpers = require('scripts/ezlibs-scripts/helpers')
+local condition = require('scripts/ezlibs-scripts/condition')
+local ezbus = require('scripts/ezlibs-scripts/ezbus')
 
 local ezcheckpoints = {}
 
---[[Features
-
-Key Name (string) = money
-    if name is money, spend money
-Required Keys (number) = 1
-Consume Key (bool) = false
-
-Once (bool) = true 
-    if the gate is hidden forever
-
-Unlocking Frame Index (number)
-Unlocking Animation Time (number)
-Unlocking Sound Path (string)
-
-Skip Prompt (bool) = false 
-    dont ask the player if they want to unlock
-Description (string) = 
-    description before lock prompt
-Unlocked Message (string) 
-    override the message on unlock
-Unlock Failed Message (string) 
-    override the message on failed unlock
-]]
-
-local function password_check(player_id,prompt_message,correct_password)
-    return async(function ()
-        local passed = false
-        if #prompt_message > 0 then
-            await(Async.message_player(player_id,prompt_message))
-        end
-        local input = await(Async.prompt_player(player_id))
-        if input == correct_password then
-            passed = true
-        end
-        return passed
-    end)
-end
-
-local function money_check(player_id,prompt_message,amount,consume_money)
-    return async(function ()
-        local passed = false
-        local choice = 1
-        if #prompt_message > 0 then
-            choice = await(Async.question_player(player_id,prompt_message))
-            if choice == 0 then
-                return nil
-            end
-        end
-        if choice == 1 then
-            if consume_money then
-                passed = ezmemory.spend_player_money(player_id, amount)
-            else
-                passed = Net.get_player_money(player_id) >= amount
-            end
-        end
-        return passed
-    end)
-end
-
-local function item_check(player_id,prompt_message,required_item,amount,consume_item)
-    return async(function ()
-        local passed = false
-        local choice = 1
-        if #prompt_message > 0 then
-            choice = await(Async.question_player(player_id,prompt_message))
-            if choice == 0 then
-                return nil
-            end
-        end
-        if choice == 1 then
-            passed = ezmemory.count_player_item(player_id,required_item) >= amount
-            if passed and consume_item then
-                ezmemory.remove_player_item(player_id, required_item, amount)
-            end
-        end
-        return passed
-    end)
-end
+-- ... (original header comments) ...
 
 local function unlock_checkpoint_for_player(player_id, area_id, object_id, unlocking_asset_name, unlocking_sound_path, unlocking_animation_time, once)
   return async(function ()
@@ -119,6 +44,11 @@ local function unlock_checkpoint_for_player(player_id, area_id, object_id, unloc
     end
 
     Net.unlock_player_input(player_id)
+    ezbus:emit("checkpoint_unlocked", {
+        player_id = player_id,
+        area_id = area_id,
+        object_id = object_id
+    })
     return true
   end)
 end
@@ -135,7 +65,6 @@ Net:on("object_interaction", function(event)
     if not checkpoint_object then return end
     if checkpoint_object.type ~= "Checkpoint" then return end
 
-    -- anti spam lock
     local lock_id = player_id.."_"..area_id.."_"..checkpoint_object.id
     local lock = helpers.get_lock(player_id, lock_id)
     if not lock then
@@ -144,8 +73,6 @@ Net:on("object_interaction", function(event)
 
     local cp = checkpoint_object.custom_properties or {}
 
-    -- Gather information from checkpoint object
-    -- by default it will just ask for 1 money and vanish
     local password = cp["Password"] or false
     local key_name = cp["Key Name"] or "money"
     local required_keys = tonumber(cp["Required Keys"] or 1)
@@ -159,7 +86,6 @@ Net:on("object_interaction", function(event)
     local unlocked_message = cp["Unlocked Message"] or "The Security Cube was unlocked!"
     local unlock_failed_message = cp["Unlock Failed Message"] or "You were unable to unlock the Security Cube"
 
-    -- Boss Gate config (only used if Boss Gate)
     local boss_gate_flag = (cp["Boss Gate"] == "true")
     local key_name_l = tostring(key_name or ""):lower()
     local is_boss_gate = boss_gate_flag or (key_name_l == "boss gate") or (key_name_l == "bossgate")
@@ -179,18 +105,10 @@ Net:on("object_interaction", function(event)
     end
 
     return async(function ()
-        -- Always show description first (keeps legacy behavior)
         if #tostring(description or "") > 0 then
             await(Async.message_player(player_id, description))
         end
 
-        --------------------------------------------------------------------
-        -- Boss Gate special-case:
-        --  - No Yes/No prompt
-        --  - Check dungeon boss pools
-        --  - If not defeated -> message & return
-        --  - If defeated -> unlock immediately
-        --------------------------------------------------------------------
         if is_boss_gate then
             local okD, dungeon = pcall(require, "scripts/ezlibs-custom/dungeon")
             if not okD or type(dungeon) ~= "table" or type(dungeon.are_bosses_defeated) ~= "function" then
@@ -202,7 +120,7 @@ Net:on("object_interaction", function(event)
             local boss_ids = _split_csv(cp["Boss IDs"] or cp["Boss ID"] or "")
             local mem_area = _trim(cp["Boss Memory Area"] or area_id)
             if mem_area == "" then mem_area = area_id end
-
+        
             if #boss_ids == 0 then
                 await(Async.message_player(player_id, "[Boss Gate] Missing 'Boss IDs' property."))
                 lock.release()
@@ -222,7 +140,6 @@ Net:on("object_interaction", function(event)
                 return
             end
 
-            -- All required bosses defeated -> unlock and message
             local unlocked = await(unlock_checkpoint_for_player(
                 player_id,
                 area_id,
@@ -234,7 +151,6 @@ Net:on("object_interaction", function(event)
             ))
 
             if unlocked then
-                -- remember this boss gate so MainBoss can restore it during a dungeon reset
                 if dungeon and dungeon.record_boss_gate then
                     pcall(dungeon.record_boss_gate, mem_area, area_id, object_id, once)
                 end
@@ -249,47 +165,73 @@ Net:on("object_interaction", function(event)
             return
         end
 
-        --------------------------------------------------------------------
-        -- Legacy behavior (money / item / password) unchanged
-        --------------------------------------------------------------------
         local prompt_message = ""
-        local prompt_type = "item"
+        local cond = nil
 
-        if not skip_prompt then
-            prompt_message = "Use "..key_name.." to Unlock?"
-
-            if key_name == "money" then
-                prompt_type = "money"
+        if password then
+            prompt_message = "Please input the password"
+        elseif key_name == "money" then
+            cond = { type = "money", amount = required_keys, consume = consume }
+            if not skip_prompt then
                 if consume then
                     prompt_message = "Spend "..required_keys.."$ to Unlock?"
                 else
                     prompt_message = "Show "..required_keys.."$ to Unlock?"
                 end
-            elseif prompt_type == "item" and required_keys > 1 then
+            end
+        elseif key_name == "fragments" or key_name == "fragment" then
+            cond = { type = "fragments", amount = required_keys, consume = consume }
+            if not skip_prompt then
                 if consume then
-                    prompt_message = "Use "..required_keys.." "..key_name.." to Unlock?"
+                    prompt_message = "Spend "..required_keys.." Fragments to Unlock?"
                 else
-                    prompt_message = "Show "..required_keys.." "..key_name.." to Unlock?"
+                    prompt_message = "Show "..required_keys.." Fragments to Unlock?"
                 end
             end
-
-            -- password overrides if it exists
-            if password then
-                prompt_message = "Please input the password"
-                prompt_type = "password"
+        elseif key_name == "tokens" or key_name == "token" then
+            cond = { type = "tokens", amount = required_keys, consume = consume }
+            if not skip_prompt then
+                if consume then
+                    prompt_message = "Spend "..required_keys.." Tokens to Unlock?"
+                else
+                    prompt_message = "Show "..required_keys.." Tokens to Unlock?"
+                end
+            end
+        else
+            cond = { type = "item", name = key_name, amount = required_keys, consume = consume }
+            if not skip_prompt then
+                if required_keys > 1 then
+                    if consume then
+                        prompt_message = "Use "..required_keys.." "..key_name.." to Unlock?"
+                    else
+                        prompt_message = "Show "..required_keys.." "..key_name.." to Unlock?"
+                    end
+                else
+                    prompt_message = "Use "..key_name.." to Unlock?"
+                end
             end
         end
 
         local unlocked = false
-        if prompt_type == "password" then
-            unlocked = await(password_check(player_id, prompt_message, password))
-        elseif prompt_type == "money" then
-            unlocked = await(money_check(player_id, prompt_message, required_keys, consume))
-        else
-            unlocked = await(item_check(player_id, prompt_message, key_name, required_keys, consume))
+
+        if password then
+            if #prompt_message > 0 then
+                await(Async.message_player(player_id, prompt_message))
+            end
+            local input = await(Async.prompt_player(player_id))
+            unlocked = (input == password)
+        elseif cond then
+            if #prompt_message > 0 then
+                local choice = await(Async.question_player(player_id, prompt_message))
+                if choice == 0 then
+                    lock.release()
+                    return
+                end
+            end
+            unlocked = condition.evaluate(player_id, cond)
         end
 
-        if unlocked == true then
+        if unlocked then
             await(unlock_checkpoint_for_player(
                 player_id,
                 area_id,
@@ -302,7 +244,7 @@ Net:on("object_interaction", function(event)
             if #tostring(unlocked_message or "") > 0 then
                 await(Async.message_player(player_id, unlocked_message))
             end
-        elseif unlocked == false then
+        else
             await(Async.message_player(player_id, unlock_failed_message))
         end
 

@@ -81,8 +81,18 @@ local function is_lobby_open(pid)
   return false
 end
 
+local function is_prompt_vertical_open(pid)
+  local ok, PromptVertical = pcall(require, "scripts/net-games/dialogue/prompt_vertical")
+  if not ok or type(PromptVertical) ~= "table" then return false end
+  return (PromptVertical.instances and PromptVertical.instances[pid]) ~= nil
+end
+
 local function is_modal_open(pid)
-  return is_slots_open(pid) or is_blackjack_open(pid) or is_duel_open(pid) or is_lobby_open(pid)
+  return is_slots_open(pid)
+      or is_blackjack_open(pid)
+      or is_duel_open(pid)
+      or is_lobby_open(pid)
+      or is_prompt_vertical_open(pid) -- NEW: blocks during ng_shop / prompt vert menus
 end
 
 

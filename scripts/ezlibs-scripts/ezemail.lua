@@ -1,9 +1,11 @@
 local helpers = require('scripts/ezlibs-scripts/helpers')
 local ezmemory = require('scripts/ezlibs-scripts/ezmemory')
+local ezbus = require('scripts/ezlibs-scripts/ezbus')
+local CONFIG = require('scripts/ezlibs-scripts/ezconfig')
 
 local ezemail = {}
 -- tweak these
-local NEW_MAIL_MESSAGE_DELAY = 1.5        -- seconds: wait after ring before message_player
+local NEW_MAIL_MESSAGE_DELAY = CONFIG.NEW_MAIL_MESSAGE_DELAY or 1.5        -- seconds: wait after ring before message_player
 local ENABLE_TEST_EMAIL_ON_JOIN = false    -- set false after you finish tuning
 local TEST_EMAIL_DELAY = 2.0              -- seconds (start same as NEW_MAIL_MESSAGE_DELAY)
 local EZEMAIL_DEBUG = true -- set false after verified
@@ -14,6 +16,7 @@ local function _preload_email_assets(player_id, mail)
   if not (Net and Net.provide_asset_for_player) then return end
   if not mail then return end
 
+  -- Email system requires mug paths anyway; but keep these checks safe.
   if mail.mug_texture_path and mail.mug_texture_path ~= "" then
     pcall(Net.provide_asset_for_player, player_id, mail.mug_texture_path)
   end
@@ -57,12 +60,14 @@ local function _get_tombstone_set()
 
   local set = {}
 
+  -- supports list-style: { "ID1", "ID2" }
   for _, id in ipairs(t) do
     id = tostring(id)
     set[id] = true
     set[_percent_decode(id)] = true
   end
 
+  -- also supports map-style: { ID1=true, ID2=true }
   for k, v in pairs(t) do
     if v == true then
       k = tostring(k)
@@ -78,8 +83,10 @@ local function _find_mail_in_bucket(bucket, email_id)
     if not bucket or not email_id then return nil, nil end
     email_id = tostring(email_id)
 
+    -- 1) direct
     if bucket[email_id] then return bucket[email_id], email_id end
 
+    -- 2) decoded comparisons (handles %XX mismatch)
     local want = _percent_decode(email_id)
 
     for k, v in pairs(bucket) do
@@ -168,7 +175,7 @@ function ezemail.resend_all(player_id)
     local dirty = false
     local tombstones = _get_tombstone_set()
 
-    -- Remove tombstoned emails from memory so they won't be restored
+    -- Remove tombstoned emails from memory so they will no longer be restored
     if tombstones and next(tombstones) ~= nil then
       local to_delete = {}
 
@@ -249,17 +256,23 @@ function ezemail.send_once(player_id, mail, opts)
     pcall(function()
         _preload_email_assets(player_id, mail_to_send)
         Net.send_player_email(player_id, mail_to_send)
+        ezbus:emit("email_sent", {
+            player_id = player_id,
+            email_id = mail.id,
+            persistent = true
+        })
     end)
 
     -- Notify only the first time: ring + popup message
     if first_time and opts.notify ~= false then
         local msg = opts.notify_message or "Looks like you got an e-mail."
         local delay = opts.notify_delay or NEW_MAIL_MESSAGE_DELAY
-        _notify_new_mail(player_id, msg, delay, false) -- full notification
+        _notify_new_mail(player_id, msg, delay, false)
     end
 end
 
 -- Sends an email WITHOUT saving it (session-only).
+-- Still supports notify timing (ring -> wait -> message).
 function ezemail.send_temp(player_id, mail, opts)
     opts = opts or {}
     if not mail or not mail.id then return end
@@ -268,6 +281,11 @@ function ezemail.send_temp(player_id, mail, opts)
     pcall(function()
         _preload_email_assets(player_id, mail)
         Net.send_player_email(player_id, mail)
+        ezbus:emit("email_sent", {
+            player_id = player_id,
+            email_id = mail.id,
+            persistent = false
+        })
     end)
 
     if opts.notify ~= false then
@@ -300,17 +318,18 @@ function ezemail.send_test_email(player_id, delay_seconds)
 
 end
 
--- Silent restore on login (no ring/message for read mail; ring only for unread)
+-- Silent restore on login (no ring/message)
 Net:on("player_join", function(event)
     if not event or not event.player_id then return end
 
+    -- If ezmemory isn't loaded yet, the player will be kicked by ezmemory anyway.
     if ezmemory and ezmemory.is_loaded and not ezmemory.is_loaded() then
         return
     end
 
     ezemail.resend_all(event.player_id)
     pcall(function()
-      local ezannounce = require('scripts/ezlibs-scripts/ezannounce')
+      local ezannounce = require('scripts/ezlibs-scripts/ezannounce/ezannounce')
       ezannounce.send_missing(event.player_id)
     end)
     if ENABLE_TEST_EMAIL_ON_JOIN then
@@ -318,12 +337,14 @@ Net:on("player_join", function(event)
     end
 end)
 
--- Now that email_read is fixed, we use it to actually mark emails as read in memory
+-- Handle email_read events: mark the email as read in player memory
 Net:on("email_read", function(event)
   local player_id = event.player_id
   local email_id = event.email_id
 
-  _dbg("email_read fired:", tostring(player_id), tostring(email_id))
+  _dbg("email_read fired for player", player_id, "email", email_id)
+
+  -- Mark the email as read in persistent memory
   _mark_email_read(player_id, email_id)
 end)
 

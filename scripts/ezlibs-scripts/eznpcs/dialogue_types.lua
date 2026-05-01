@@ -3,6 +3,125 @@ local helpers = require('scripts/ezlibs-scripts/helpers')
 local ezmemory = require('scripts/ezlibs-scripts/ezmemory')
 local ezquests = require('scripts/ezlibs-scripts/ezquests')
 local ezemail = require('scripts/ezlibs-scripts/ezemail')
+local NG_SHOP_ITEM_GET_SFX = "/server/assets/ezlibs-assets/sfx/item_get.ogg"
+--=====================================================
+-- net-games UI warm-up (pre-provide talk/menu assets on login)
+--=====================================================
+if not _G.__EZNG_UI_WARMUP_HOOKED then
+  _G.__EZNG_UI_WARMUP_HOOKED = true
+
+  local function safe_has_asset(path)
+    if not path or path == "" then return false end
+    if not (Net and Net.has_asset) then return true end
+    local ok, res = pcall(Net.has_asset, path)
+    return ok and res == true
+  end
+
+  local function safe_provide(pid, path)
+    if not (Net and Net.provide_asset_for_player) then return end
+    -- IMPORTANT: never provide a missing asset; it can hard-crash the server.
+    if not safe_has_asset(path) then return end
+    pcall(Net.provide_asset_for_player, pid, path)
+  end
+
+  local function list_dir_files(fs_dir)
+    local out = {}
+    local is_win = package.config:sub(1,1) == "\\"
+    local cmd
+    if is_win then
+      local d = fs_dir:gsub("/", "\\")
+      cmd = 'dir /b "' .. d .. '\\*"'
+    else
+      cmd = 'ls -1 "' .. fs_dir .. '" 2>/dev/null'
+    end
+
+    local pp = io.popen(cmd)
+    if not pp then return out end
+
+    for line in pp:lines() do
+      local name = (line or ""):gsub("\r", "")
+      if name ~= "" then
+        table.insert(out, name)
+      end
+    end
+    pp:close()
+    return out
+  end
+
+  local function safe_provide_dir(pid, fs_dir, asset_prefix, allow_ext)
+    allow_ext = allow_ext or { png=true, animation=true, ogg=true, wav=true }
+    for _, name in ipairs(list_dir_files(fs_dir)) do
+      local ext = name:match("%.([%w]+)$")
+      ext = ext and ext:lower() or nil
+      if ext and allow_ext[ext] then
+        safe_provide(pid, asset_prefix .. name)
+      end
+    end
+  end
+
+  Net:on("player_join", function(event)
+    local pid = event.player_id
+    if not pid then return end
+
+    -- net-games UI (menus + textbox backdrops usually live here)
+    safe_provide_dir(pid, "assets/net-games/ui",      "/server/assets/net-games/ui/")
+    safe_provide_dir(pid, "assets/net-games/cursors", "/server/assets/net-games/cursors/")
+    safe_provide_dir(pid, "assets/net-games/displayer", "/server/assets/net-games/displayer/")
+    safe_provide_dir(pid, "assets/net-games/sfx",     "/server/assets/net-games/sfx/")
+
+    -- PROG prompt mug/nameplate used by TalkPresets
+    safe_provide_dir(pid, "assets/ow/prog", "/server/assets/ow/prog/", { png=true, animation=true })
+
+    -- Give the client time to download the UI assets, then "touch" them by alloc+draw offscreen
+    _G.__EZNG_UI_PREWARM_DONE = _G.__EZNG_UI_PREWARM_DONE or {}
+    if not _G.__EZNG_UI_PREWARM_DONE[pid] then
+      async(function()
+        await(Async.sleep(1.0))
+
+        local function safe_alloc_draw(sprite_id, tex, anim, state)
+          if not safe_has_asset(tex) then return end
+          if anim and not safe_has_asset(anim) then return end
+
+          if anim then
+            pcall(Net.player_alloc_sprite, pid, sprite_id, {
+              texture_path = tex,
+              anim_path = anim,
+              anim_state = state or "OPEN_IDLE",
+            })
+          else
+            pcall(Net.player_alloc_sprite, pid, sprite_id, { texture_path = tex })
+          end
+
+          -- Draw offscreen so the client actually resolves it this session
+          pcall(Net.player_draw_sprite, pid, sprite_id, {
+            id = "__ezng_prewarm_draw_" .. sprite_id,
+            x = -1000, y = -1000, z = 0,
+            sx = 2.0, sy = 2.0,
+            anim_state = state,
+          })
+        end
+
+        local ANIM = "/server/assets/net-games/ui/prompt_vert_menu_an.animation"
+
+        safe_alloc_draw("__ezng_pre_menu_bg",      "/server/assets/net-games/ui/prompt_vert_menu_an.png",        ANIM, "OPEN_IDLE")
+        safe_alloc_draw("__ezng_pre_menu_bg_shop", "/server/assets/net-games/ui/prompt_vert_menu_shop_an.png",   ANIM, "OPEN_IDLE")
+        safe_alloc_draw("__ezng_pre_menu_frame",   "/server/assets/net-games/ui/prompt_vert_menu_an_frame.png",  ANIM, "OPEN_IDLE")
+        safe_alloc_draw("__ezng_pre_menu_frame_shop","/server/assets/net-games/ui/prompt_vert_menu_shop_an_frame.png", ANIM, "OPEN_IDLE")
+
+        safe_alloc_draw("__ezng_pre_highlight",     "/server/assets/net-games/ui/highlight_default.png")
+        safe_alloc_draw("__ezng_pre_highlight_shop","/server/assets/net-games/ui/highlight_shop.png")
+        safe_alloc_draw("__ezng_pre_cursor",        "/server/assets/net-games/cursors/green_cursor.png")
+        safe_alloc_draw("__ezng_pre_scroll",        "/server/assets/net-games/ui/scrollbar.png")
+
+        safe_alloc_draw("__ezng_pre_shop_item",     "/server/assets/net-games/ui/card_shop_item.png")
+        safe_alloc_draw("__ezng_pre_shop_exit",     "/server/assets/net-games/ui/card_shop_exit.png")
+
+        _G.__EZNG_UI_PREWARM_DONE[pid] = true
+      end)
+    end
+  end)
+end
+
 
 --Dialogue Types
 local dialogue_types = {
@@ -235,6 +354,268 @@ local dialogue_types = {
                 return next_id
             end)
         end
+    },
+    ng_shop = {
+      name = "ng_shop",
+      action = function(npc, player_id, dialogue, relay_object)
+        return async(function()
+          local area_id = Net.get_player_area(player_id)
+
+          -- If net-games isn’t installed, fall back to the stock ezmemory shop.
+          local ok_menu, TalkVertMenu_or_err = pcall(require, "scripts/net-games/npcs/talk_vert_menu")
+          if not ok_menu then
+            print("[ng_shop] failed to load talk_vert_menu:", TalkVertMenu_or_err)
+
+            -- fallback to old shop...
+            local mugshot = eznpcs.get_dialogue_mugshot(npc, player_id, dialogue)
+            local shop_items = {}
+            local ids = helpers.extract_numbered_properties(dialogue, "Item ")
+            for _, oid in ipairs(ids) do
+              local info = helpers.read_item_information(area_id, oid)
+              if info then
+                table.insert(shop_items, {
+                  name = info.name,
+                  price = info.price,
+                  description = info.description or "???",
+                  is_key = info.type == "keyitem"
+                })
+              end
+            end
+            await(ezmemory.open_shop_async(player_id, shop_items, mugshot.texture_path, mugshot.animation_path))
+            return first_value_from_table(helpers.extract_numbered_properties(dialogue, "Next "))
+          end
+
+          local TalkVertMenu = TalkVertMenu_or_err
+          local ok_presets, TalkPresets_or_err = pcall(require, "scripts/net-games/npcs/talk_presets")
+          if not ok_presets then
+            print("[ng_shop] failed to load talk_presets:", TalkPresets_or_err)
+            -- If you want, you can fallback to old shop UI here like you do above.
+            return first_value_from_table(helpers.extract_numbered_properties(dialogue, "Next "))
+          end
+          local TalkPresets = TalkPresets_or_err
+
+          -- Build a PROG-style mugshot, but swap texture/anim to match eznpcs Asset Name/Mugshot.
+          local ez_mug = eznpcs.get_dialogue_mugshot(npc, player_id, dialogue)
+          local mug = helpers.deep_copy(TalkPresets.mugs.prog or { enabled = true })
+          mug.texture_path = ez_mug.texture_path
+          mug.anim_path = ez_mug.animation_path
+          mug.sprite_id = nil
+
+          -- Build item options from Item # properties (same as eznpcs shop)
+          local ids = helpers.extract_numbered_properties(dialogue, "Item ")
+          local options = {}
+          local by_id = {}
+
+          for _, oid in ipairs(ids) do
+            local info = helpers.read_item_information(area_id, oid)
+            if info and info.name and info.price then
+              local price = tonumber(info.price) or 0
+              local id = tostring(oid)
+
+              options[#options+1] = {
+                id = id,
+                text = string.format("%s  %d$", tostring(info.name), price), -- fallback if columns disabled
+                shop_name = tostring(info.name),
+                shop_price = tonumber(price) or 0,
+              }
+
+              by_id[id] = {
+                object_id = oid,
+                info = info,
+                price = price,
+                is_key = (info.type == "keyitem"),
+              }
+            end
+          end
+
+          options[#options+1] = { id = "exit", text = "Exit" }
+          local exit_index = #options
+
+          -- Card filename index (case-insensitive) using your cards_list.txt if present
+          local function build_cards_index()
+            local map = {}
+
+            local function add_file(file)
+              file = (file or ""):gsub("\r", "")
+              if file:match("%.png$") then
+                local base = file:gsub("%.png$", "")
+                map[base:lower()] = file
+              end
+            end
+
+            local tried = {
+              "assets/cards/cards_list.txt",
+              "assets/cards_list.txt",
+            }
+
+            for _, p in ipairs(tried) do
+              local f = io.open(p, "r")
+              if f then
+                for line in f:lines() do add_file(line) end
+                f:close()
+                return map
+              end
+            end
+
+            -- Fallback: directory listing
+            local is_win = package.config:sub(1,1) == "\\"
+            local cmd = is_win and 'dir /b "assets\\cards\\*.png"' or 'ls -1 "assets/cards"/*.png 2>/dev/null'
+            local pp = io.popen(cmd)
+            if pp then
+              for line in pp:lines() do
+                local file = (line or ""):match("([^/\\\\]+)$") or line
+                add_file(file)
+              end
+              pp:close()
+            end
+
+            return map
+          end
+
+          local cards_index = build_cards_index()
+
+          local function strip_tag(name)
+            name = tostring(name or "")
+            name = name:gsub("^%[[^%]]+%]%s*", "") -- remove leading [C]/[UR]/etc
+            name = name:gsub("%s+", "")            -- remove spaces
+            return name
+          end
+
+          local DEFAULT_ICON = "/server/assets/net-games/ui/card_shop_item.png"
+
+          local icon_by_choice = {}
+          for id, rec in pairs(by_id) do
+            local raw = tostring(rec.info.name or "")
+            if raw:match("^%[[^%]]+%]") then
+              local base = strip_tag(raw)
+              local file = cards_index[base:lower()] or (base .. ".png")
+              icon_by_choice[id] = "/server/assets/cards/" .. file
+            else
+              icon_by_choice[id] = DEFAULT_ICON
+            end
+          end
+
+          -- Pre-provide icons to avoid stutter while scrolling
+          local function safe_has_asset(path)
+            if not path or path == "" then return false end
+            if not (Net and Net.has_asset) then return true end
+            local ok, res = pcall(Net.has_asset, path)
+            return ok and res == true
+          end
+
+          if Net and Net.provide_asset_for_player then
+            for _, path in pairs(icon_by_choice) do
+              if safe_has_asset(path) then
+                pcall(Net.provide_asset_for_player, player_id, path)
+              end
+            end
+          end
+
+          local talk_cfg = {
+            preset = "prog_prompt",
+            area_id = area_id,
+            object = "ng_shop_" .. tostring(dialogue.id or "shop"),
+            ui = {
+              mugshot = mug,
+              typing_speed = 9999,
+            }
+          }
+
+          local layout = TalkPresets.get_vert_menu_layout("prog_prompt_shop") or {}
+
+          local assets = {
+            menu_bg       = "/server/assets/net-games/ui/prompt_vert_menu_shop_an.png",
+            menu_bg_anim  = "/server/assets/net-games/ui/prompt_vert_menu_an.animation",
+            menu_bg_frame = "/server/assets/net-games/ui/prompt_vert_menu_shop_an_frame.png",
+            highlight     = "/server/assets/net-games/ui/highlight_shop.png",
+          }
+
+          TalkVertMenu.open(player_id, npc.name or "SHOP", talk_cfg, {
+            intro_text = "What would you like?",
+            options = options,
+            exit_index = exit_index,
+            layout = layout,
+            assets = assets,
+
+            monies_amount_fn = function(pid)
+              return tostring(Net.get_player_money(pid) or 0) .. "$"
+            end,
+
+            shop_item_texture_fn = function(choice)
+              if not choice or not choice.id then return DEFAULT_ICON end
+              return icon_by_choice[tostring(choice.id)] or DEFAULT_ICON
+            end,
+
+            flow = {
+              keep_menu_open = true,
+              after_text = "Anything else?",
+              exit_goodbye_text = "Come again!",
+
+              confirm = {
+                enabled = true,
+                skip_ids = { exit = true },
+                text_fn = function(pid, choice_id)
+                  local rec = by_id[tostring(choice_id)]
+                  if not rec then return "Buy this?" end
+                  local have = tonumber(Net.get_player_money(pid) or 0) or 0
+                  return string.format("Buy %s for %d$?\nYou have %d$", tostring(rec.info.name), rec.price, have)
+                end,
+              },
+
+              post_select = { enabled = true, skip_ids = { exit = true } },
+            },
+
+            on_confirm_yes = function(pid, choice_id, _choice_text, menu)
+              local rec = by_id[tostring(choice_id)]
+              if not rec then
+                return "Huh? That item is gone.", "Anything else?"
+              end
+
+              if rec.is_key then
+                local owned = tonumber(ezmemory.count_player_item(pid, rec.info.name) or 0) or 0
+                if owned > 0 then
+                  return "You already have that key item.", "Anything else?"
+                end
+              end
+
+              local cost = rec.price or 0
+              if cost < 0 then cost = 0 end
+
+              local ok = ezmemory.spend_player_money(pid, cost)
+              if not ok then
+                local have = tonumber(Net.get_player_money(pid) or 0) or 0
+                return string.format("Not enough money.\nCost: %d$  You have: %d$", cost, have), "Anything else?"
+              end
+
+              -- Grant synchronously (same logic as give_item_with_optional_notify, minus the popup)
+              local is_key = rec.is_key
+              if is_key or rec.info.type == "item" then
+                ezmemory.create_or_update_item(rec.info.name, rec.info.description or "???", is_key)
+                ezmemory.give_player_item(pid, rec.info.name, rec.info.amount or 1)
+              end
+
+              -- Force refresh so the money text updates immediately
+              if menu and menu.render_menu_contents then
+                pcall(function() menu:render_menu_contents(true) end)
+              end
+
+              -- Play purchase SFX like the other migrated shops
+              if NG_SHOP_ITEM_GET_SFX then
+                pcall(Net.provide_asset_for_player, pid, NG_SHOP_ITEM_GET_SFX)
+                pcall(Net.play_sound_for_player, pid, NG_SHOP_ITEM_GET_SFX)
+              end
+
+              return string.format("Purchased %s!\n(-%d$)", tostring(rec.info.name), cost), "Anything else?"
+            end,
+          })
+
+          while TalkVertMenu.is_busy and TalkVertMenu.is_busy(player_id) do
+            await(Async.sleep(0.05))
+          end
+
+          return first_value_from_table(helpers.extract_numbered_properties(dialogue, "Next "))
+        end)
+      end
     },
     password={
         name = "password",

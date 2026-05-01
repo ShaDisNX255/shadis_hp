@@ -259,6 +259,16 @@ end
 local PLAYER_ARMED_PET_KEY = "armed_pet_v1"
 local OWNED_PETS_MEM_KEY   = "owned_pet_instances_v1"
 local LEGACY_PET_COUNT_KEYS = { "oncehub_decor_inventory_v1", "decor_inventory" }
+local PET_IDS_MIGRATED_MEM_KEY = "owned_pet_instances_migrated_v1"
+
+local function dbg(...)
+  if not EXPEDITION.debug then return end
+  local parts = {}
+  for i = 1, select("#", ...) do
+    parts[#parts+1] = tostring(select(i, ...))
+  end
+  print("[pets][exp] "..table.concat(parts, " "))
+end
 
 local function _safe_get_player_memory(secret)
   secret = tostring(secret or "")
@@ -846,8 +856,17 @@ function pets.ensure_player_pet_ids(owner_or_pid)
   local owner_secret = _resolve_pet_owner_secret(owner_or_pid)
   if owner_secret == "" then return false end
 
-  local store = select(1, _get_player_pets_store(owner_secret))
-  if not store then return false end
+  local store, pmem = _get_player_pets_store(owner_secret)
+  if not store or type(pmem) ~= "table" then
+    return false
+  end
+
+  -- IMPORTANT:
+  -- Old decor-based pet counts should only be imported ONCE.
+  -- After that, owned_pet_instances_v1 becomes the source of truth.
+  if pmem[PET_IDS_MIGRATED_MEM_KEY] == true then
+    return true
+  end
 
   local dirty = false
 
@@ -867,8 +886,11 @@ function pets.ensure_player_pet_ids(owner_or_pid)
     end
   end
 
-  if dirty then
-    ezmemory.save_player_memory(owner_secret)
+  pmem[OWNED_PETS_MEM_KEY] = store
+  pmem[PET_IDS_MIGRATED_MEM_KEY] = true
+
+  if dirty or pmem[PET_IDS_MIGRATED_MEM_KEY] == true then
+    _safe_save_player_memory(owner_secret, pmem)
   end
 
   return true
@@ -1388,6 +1410,57 @@ function pets.grant_owned_pet(owner_or_pid, item_id, qty)
   return created
 end
 
+function pets.delete_owned_pet(owner_or_pid, uid)
+  local owner_secret = _resolve_pet_owner_secret(owner_or_pid)
+  if owner_secret == "" then
+    return false, "Pet owner not found."
+  end
+
+  uid = tostring(uid or "")
+  if uid == "" then
+    return false, "Missing pet id."
+  end
+
+  local store, pmem = _get_player_pets_store(owner_secret)
+  if not store or type(pmem) ~= "table" then
+    return false, "Pet memory isn't ready yet."
+  end
+
+  local p = _get_owned_pet(owner_secret, uid)
+  if not p then
+    return false, "Pet not found."
+  end
+
+  -- Selling should only work on inventory pets, not pets currently placed in an HP.
+  if p.placement ~= nil then
+    return false, "That pet is placed somewhere. Remove it from the HP before selling it."
+  end
+
+  -- Training guard
+  local training = pmem[PET_TRAINING_MEM_KEY]
+  if type(training) == "table" and tostring(training.uid or "") == uid then
+    return false, "That pet is currently in training."
+  end
+
+  -- If this pet is currently selected as the player's companion, handle that safely.
+  local armed = pmem[PLAYER_ARMED_PET_KEY]
+  if type(armed) == "table" and tostring(armed.uid or "") == uid then
+    if armed.summoned == true then
+      return false, "Call your companion pet back before selling it."
+    end
+    pmem[PLAYER_ARMED_PET_KEY] = nil
+  end
+
+  store.pets[uid] = nil
+  pmem[OWNED_PETS_MEM_KEY] = store
+
+  if not _safe_save_player_memory(owner_secret, pmem) then
+    return false, "Couldn't save pet data."
+  end
+
+  return true, p
+end
+
 local function build_paths(kind, stat_attack)
   local def = PET_DEFS[kind]
   if not def then return nil end
@@ -1432,15 +1505,6 @@ end
 
 local function now_seed_rng()
   pcall(function() math.randomseed(os.time() % 2147483647) end)
-end
-
-local function dbg(...)
-  if not EXPEDITION.debug then return end
-  local parts = {}
-  for i = 1, select("#", ...) do
-    parts[#parts+1] = tostring(select(i, ...))
-  end
-  print("[pets][exp] "..table.concat(parts, " "))
 end
 
 -- Ask custom.lua to ignore the very next board_close for this player (one-shot)

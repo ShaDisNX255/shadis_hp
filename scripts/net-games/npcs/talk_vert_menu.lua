@@ -133,6 +133,17 @@ local function reset_box_text(player_id, box_id, ui, text, indicator_enabled)
   end
 end
 
+local function estimate_text_pages(text, ui)
+  local max_lines = tonumber(ui and ui.backdrop and ui.backdrop.max_lines) or 3
+  local lines = 1
+
+  for _ in tostring(text or ""):gmatch("\n") do
+    lines = lines + 1
+  end
+
+  return math.max(1, math.ceil(lines / max_lines))
+end
+
 local function resolve_frame(frame_key_or_table)
   if not frame_key_or_table then return nil end
   if type(frame_key_or_table) == "table" then
@@ -222,11 +233,13 @@ local function ensure_tick()
         Input.clear_require_release(player_id, { "confirm", "cancel" })
         Input.swallow(player_id, 0.10)
       end
-    end    --=====================================================
+    end
+
+
+    --=====================================================
     -- Deferred CONFIRM yes/no (open on next tick)
     --=====================================================
     for player_id, c in pairs(confirm_pending) do
-      -- Only fire while the menu instance still exists (player didn't exit)
       if PromptVertical.instances and PromptVertical.instances[player_id] then
         confirm_pending[player_id] = nil
 
@@ -237,20 +250,40 @@ local function ensure_tick()
         local choice_id = c.choice_id
         local choice_text = c.choice_text
 
-        -- Keep the menu locked while confirm is up
         set_menu_locked(menu, true)
 
         local qfmt = flow.confirm.text_format or 'Are you sure you want "%s"?'
+        local q = nil
+        if type(flow.confirm.text_fn) == "function" then
+          local ok, v = pcall(flow.confirm.text_fn, player_id, choice_id, choice_text, menu)
+          if ok and type(v) == "string" and v ~= "" then q = v end
+        end
+        if not q then q = string.format(qfmt, choice_text) end
+
         Prompt.yesno(player_id, {
           ui = ui,
           reuse_existing_box = true,
-          question = string.format(qfmt, choice_text),
+          question = q,
 
           on_yes = function()
             play_sfx(player_id, flow.sfx.confirm)
-            -- This runs the same path as "no-confirm" selections
-            local fmt = flow.post_select.text_format or 'You got "%s".'
-            reset_box_text(player_id, box_id, ui, string.format(fmt, choice_text), true)
+
+            local post_text, after_text
+            if type(c.on_confirm_yes) == "function" then
+              local ok, a, b = pcall(c.on_confirm_yes, player_id, choice_id, choice_text, menu)
+              if ok then
+                post_text = a
+                after_text = b
+              end
+            end
+
+            if type(post_text) ~= "string" or post_text == "" then
+              local fmt = flow.post_select.text_format or 'You got "%s".'
+              post_text = string.format(fmt, choice_text)
+            end
+
+            reset_box_text(player_id, box_id, ui, post_text, true)
+            local estimated_pages = estimate_text_pages(post_text, ui)
 
             pending_ack[player_id] = {
               box_id = box_id,
@@ -260,13 +293,14 @@ local function ensure_tick()
               choice_id = choice_id,
               choice_text = choice_text,
               flow = flow,
+              after_text_override = after_text,
+              remaining_pages = estimated_pages,
             }
           end,
 
           on_no = function()
             play_sfx(player_id, flow.sfx.close)
 
-            -- Prompt may have unlocked input; relock because menu is still visible+locked
             if Net.lock_player_input then
               pcall(function() Net.lock_player_input(player_id) end)
             end
@@ -295,7 +329,6 @@ local function ensure_tick()
 
         return
       else
-        -- Menu was closed before we got here
         confirm_pending[player_id] = nil
       end
     end
@@ -323,49 +356,60 @@ local function ensure_tick()
             Input.require_release(player_id, { "confirm" })
           end
 
-        elseif st == "waiting" then
-          -- Phase 2 auto-returns to menu when it finishes printing (waiting)
-          if p.phase == 2 then
-            set_textbox_indicator(p.ui, false)
-            if p.menu then
-              set_menu_locked(p.menu, false)
-            end
-            pending_ack[player_id] = nil
-
-          -- Phase 1: confirm advances
-          elseif Input.pop(player_id, "confirm") then
-            Input.consume(player_id)
-            Input.clear_require_release(player_id, { "confirm", "cancel" })
-            Input.swallow(player_id, 0.10)
-
-            if p.choice_id == "exit" then
-              -- Start closing animation
-              Displayer.Text.closeTextBox(player_id, p.box_id)
+          elseif st == "waiting" then
+            -- Phase 2 auto-returns to menu when it finishes printing (waiting)
+            if p.phase == 2 then
+              set_textbox_indicator(p.ui, false)
+              if p.menu then
+                set_menu_locked(p.menu, false)
+              end
               pending_ack[player_id] = nil
 
-              -- Do NOT unlock here. Keep input locked until textbox is removed.
-              goodbye_closing[player_id] = { box_id = p.box_id }
+            -- Phase 1: confirm advances
+            elseif Input.pop(player_id, "confirm") then
+                local remaining = tonumber(p.remaining_pages or 1) or 1
 
-              -- Eat carry-press so we can't re-interact during the close window
-              Input.consume(player_id)
-              Input.clear_require_release(player_id, { "confirm", "cancel" })
-              Input.require_release(player_id, { "confirm", "cancel" })
-              Input.swallow(player_id, 0.12)
-              return
+                -- If the result text still has more pages, advance it first.
+                if remaining > 1 then
+                  Displayer.Text.advance_text_box(player_id, p.box_id)
+                  p.remaining_pages = remaining - 1
+                  Input.consume(player_id)
+                  Input.require_release(player_id, { "confirm" })
+
+              else
+                Input.consume(player_id)
+                Input.clear_require_release(player_id, { "confirm", "cancel" })
+                Input.swallow(player_id, 0.10)
+
+                if p.choice_id == "exit" then
+                  -- Start closing animation
+                  Displayer.Text.closeTextBox(player_id, p.box_id)
+                  pending_ack[player_id] = nil
+
+                  -- Do NOT unlock here. Keep input locked until textbox is removed.
+                  goodbye_closing[player_id] = { box_id = p.box_id }
+
+                  -- Eat carry-press so we can't re-interact during the close window
+                  Input.consume(player_id)
+                  Input.clear_require_release(player_id, { "confirm", "cancel" })
+                  Input.require_release(player_id, { "confirm", "cancel" })
+                  Input.swallow(player_id, 0.12)
+                  return
+                end
+
+                -- Only after the LAST page of the result do we show "Anything else?"
+                reset_box_text(
+                  player_id,
+                  p.box_id,
+                  p.ui,
+                  (p.after_text_override or p.flow.after_yes_text or p.flow.after_text
+                    or "Thank you!{p_1} Is there anything else you'd like?"),
+                  false
+                )
+                p.phase = 2
+              end
             end
-
-            -- Phase 1 confirm -> show after_text (NO indicator) then auto-return
-            reset_box_text(
-              player_id,
-              p.box_id,
-              p.ui,
-              (p.flow.after_yes_text or p.flow.after_text or "Thank you!{p_1} Is there anything else you'd like?"),
-
-              false
-            )
-            p.phase = 2
           end
-        end
       end
     end
   end)
@@ -448,6 +492,8 @@ function TalkVertMenu.open(player_id, bot_name, talk_cfg, menu_cfg)
     layout = layout,
 
     assets = menu_cfg.assets,
+    monies_amount_fn = menu_cfg.monies_amount_fn,
+    shop_item_texture_fn = menu_cfg.shop_item_texture_fn,
 
 
     question = tostring(menu_cfg.intro_text or "Choose:"),
@@ -539,6 +585,7 @@ function TalkVertMenu.open(player_id, bot_name, talk_cfg, menu_cfg)
         flow = flow,
         choice_id = choice_id,
         choice_text = choice_text,
+		on_confirm_yes = menu_cfg.on_confirm_yes,
       }
       return
 end,

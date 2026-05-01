@@ -32,6 +32,16 @@ local function find_in_table(t, v1)
     return nil
 end
 
+local function unregister_tourney_queue_for_pvp(pid)
+  if _G.Tournaments and _G.Tournaments.unregister_if_queued_for_battle then
+    pcall(
+      _G.Tournaments.unregister_if_queued_for_battle,
+      pid,
+      "You were unregistered from the tournament because you started PVP."
+    )
+  end
+end
+
 local function load_file(file_path, ranks)
   Async.read_file(file_path..".json").and_then(function(value)
     if value ~= "" then
@@ -285,6 +295,9 @@ local function start_ranked_battle(p1, p2, mode)
     end
   end
 
+  unregister_tourney_queue_for_pvp(p1)
+  unregister_tourney_queue_for_pvp(p2)
+
   local hps = { Net.get_player_max_health(p1), Net.get_player_max_health(p2) }
 
   -- Force HP to 1000 for ranked
@@ -333,6 +346,8 @@ if Lobby and Lobby.register_activity then
     start = function(players)
       local p1, p2 = players[1], players[2]
       if Net.is_player_battling(p1) or Net.is_player_battling(p2) then return false end
+      unregister_tourney_queue_for_pvp(p1)
+      unregister_tourney_queue_for_pvp(p2)
       Net.initiate_pvp(p1, p2)
       players_in_battle[p1] = p2
       players_in_battle[p2] = p1
@@ -534,6 +549,8 @@ Net:on("actor_interaction", function(event)
 			if mode == "wcity" then
 				start_ranked_battle(player_id, actor_id, mode)
 			else
+				unregister_tourney_queue_for_pvp(player_id)
+				unregister_tourney_queue_for_pvp(actor_id)
 				Net.initiate_pvp(player_id, actor_id)
 				players_in_battle[player_id] = actor_id
 				players_in_battle[actor_id] = player_id

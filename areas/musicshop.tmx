@@ -92,7 +92,7 @@
     <property name="Dialogue Type" value="songshop"/>
     <property name="Next 1" type="object" value="57"/>
     <property name="Shop Title" value="Song Shop - 200k Each"/>
-    <property name="Song Price" type="int" value="200000"/>
+    <property name="Song Price" type="int" value="20000"/>
    </properties>
    <point/>
   </object>

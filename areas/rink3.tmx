@@ -21,36 +21,9 @@
  <tileset firstgid="97" source="../assets/tiles/home_warp.tsx"/>
  <tileset firstgid="102" source="../assets/tiles/ice-clean-darker.tsx"/>
  <tileset firstgid="198" source="../assets/tiles/enclosed-water-tiles.tsx"/>
- <tileset firstgid="246" source="../assets/fishing/icy-normal/0.tsx"/>
- <tileset firstgid="246" source="../assets/fishing/icy-normal/1.tsx"/>
- <tileset firstgid="246" source="../assets/fishing/icy-normal/2.tsx"/>
- <tileset firstgid="246" source="../assets/fishing/icy-normal/3.tsx"/>
- <tileset firstgid="246" source="../assets/fishing/icy-normal/4.tsx"/>
- <tileset firstgid="246" source="../assets/fishing/icy-normal/5.tsx"/>
- <tileset firstgid="246" source="../assets/fishing/icy-normal/6.tsx"/>
- <tileset firstgid="246" source="../assets/fishing/icy-normal/7.tsx"/>
- <tileset firstgid="246" source="../assets/fishing/icy-normal/8.tsx"/>
- <tileset firstgid="246" source="../assets/fishing/icy-normal/9.tsx"/>
- <tileset firstgid="246" source="../assets/fishing/icy-normal/10.tsx"/>
- <tileset firstgid="246" source="../assets/fishing/icy-sweet/0.tsx"/>
- <tileset firstgid="246" source="../assets/fishing/icy-sweet/1.tsx"/>
- <tileset firstgid="246" source="../assets/fishing/icy-sweet/2.tsx"/>
- <tileset firstgid="246" source="../assets/fishing/icy-sweet/3.tsx"/>
- <tileset firstgid="246" source="../assets/fishing/icy-sweet/4.tsx"/>
- <tileset firstgid="246" source="../assets/fishing/icy-sweet/5.tsx"/>
- <tileset firstgid="246" source="../assets/fishing/icy-sweet/6.tsx"/>
- <tileset firstgid="246" source="../assets/fishing/icy-sweet/7.tsx"/>
- <tileset firstgid="246" source="../assets/fishing/icy-sweet/8.tsx"/>
- <tileset firstgid="246" source="../assets/fishing/icy-sweet/9.tsx"/>
- <tileset firstgid="246" source="../assets/fishing/timer/0.tsx"/>
- <tileset firstgid="247" source="../assets/fishing/timer/1.tsx"/>
- <tileset firstgid="248" source="../assets/fishing/timer/2.tsx"/>
- <tileset firstgid="249" source="../assets/fishing/timer/3.tsx"/>
- <tileset firstgid="250" source="../assets/fishing/timer/4.tsx"/>
- <tileset firstgid="251" source="../assets/fishing/timer/5.tsx"/>
- <tileset firstgid="252" source="../assets/fishing/ex.tsx"/>
- <tileset firstgid="253" source="../assets/tiles/Roadblock.tsx"/>
- <tileset firstgid="255" source="../assets/tiles/HoloPanelz.tsx"/>
+ <tileset firstgid="246" source="../assets/fishing/ex.tsx"/>
+ <tileset firstgid="247" source="../assets/tiles/Roadblock.tsx"/>
+ <tileset firstgid="249" source="../assets/tiles/HoloPanelz.tsx"/>
  <layer id="1" name="Tile Layer 0" width="50" height="50">
   <data encoding="csv">
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -100,7 +73,7 @@
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,6,8,6,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8,5,6,5,8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,8,7,8,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,256,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,250,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 </data>
@@ -621,7 +594,7 @@
   </object>
   <object id="85" type="Mystery Data" gid="81" x="629" y="211.5" width="14" height="43">
    <properties>
-    <property name="Amount" type="int" value="600000"/>
+    <property name="Amount" type="int" value="60000"/>
     <property name="Next 1" type="object" value="0"/>
     <property name="Once" type="bool" value="true"/>
     <property name="Type" value="money"/>
@@ -717,16 +690,16 @@
    </properties>
    <point/>
   </object>
-  <object id="96" name="90,000" type="Mystery Option" x="349" y="-24">
+  <object id="96" name="40,000" type="Mystery Option" x="349" y="-24">
    <properties>
-    <property name="Amount" value="90000"/>
+    <property name="Amount" value="40000"/>
     <property name="Type" value="money"/>
    </properties>
    <point/>
   </object>
-  <object id="97" name="140,000" type="Mystery Option" x="329" y="-48">
+  <object id="97" name="50,000" type="Mystery Option" x="329" y="-48">
    <properties>
-    <property name="Amount" value="140000"/>
+    <property name="Amount" value="50000"/>
     <property name="Type" value="money"/>
    </properties>
    <point/>
@@ -752,9 +725,9 @@
     <property name="Target Object" value="144"/>
    </properties>
   </object>
-  <object id="101" name="60,000" type="Mystery Option" x="357.5" y="-13.5">
+  <object id="101" name="30,000" type="Mystery Option" x="357.5" y="-13.5">
    <properties>
-    <property name="Amount" value="60000"/>
+    <property name="Amount" value="30000"/>
     <property name="Type" value="money"/>
    </properties>
    <point/>
@@ -951,17 +924,17 @@
     <property name="Name" value="FishBBS"/>
    </properties>
   </object>
-  <object id="111" name="Fishing Test" type="Water" gid="253" x="752" y="208" width="64" height="64" visible="0">
+  <object id="111" name="Fishing Test" type="Water" gid="247" x="752" y="208" width="64" height="64" visible="0">
    <properties>
     <property name="Water" type="bool" value="true"/>
    </properties>
   </object>
-  <object id="112" name="Fishing Test" type="Water" gid="253" x="784" y="208" width="64" height="64" visible="0">
+  <object id="112" name="Fishing Test" type="Water" gid="247" x="784" y="208" width="64" height="64" visible="0">
    <properties>
     <property name="Water" type="bool" value="true"/>
    </properties>
   </object>
-  <object id="113" name="Fishing Test" type="Water" gid="253" x="816" y="208" width="64" height="64" visible="0">
+  <object id="113" name="Fishing Test" type="Water" gid="247" x="816" y="208" width="64" height="64" visible="0">
    <properties>
     <property name="Water" type="bool" value="true"/>
    </properties>

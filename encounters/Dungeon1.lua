@@ -285,7 +285,7 @@ local give_result_awards = function (player_id, encounter_info, stats)
   end
 
   -- 1) Money = busting level * 100
-  local monies = (stats.score or 0) * 400
+  local monies = (stats.score or 0) * 100
 
   -- 2) HP bonus:
   --    If HP < 101: always +150
@@ -350,7 +350,7 @@ local mini_boss_rewards = function (player_id, encounter_info, stats)
   end
 
   -- 1) Money = busting level * 1500
-  local monies = (stats.score or 0) * 1500
+  local monies = (stats.score or 0) * 200
 
   -- 2) If post-battle HP < 101, give +300 HP
   local hp_bonus = ((stats.health or 0) < 101) and 300 or 0
@@ -389,401 +389,7 @@ local mini_boss_rewards = function (player_id, encounter_info, stats)
 end
 
 
-local Dungeon1 = {
-    name="Dungeon1",
-    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
-    weight=10,
-    pet_exp=8,
-    enemies={
-        {name="Volcano",rank=2},
-        {name="Yort",rank=3},
-    },
-    obstacles={
-    },
-    positions={
-        {0,0,0,0,0,1},
-        {0,0,0,2,0,0},
-        {0,0,0,0,0,0},
-    },
-    obstacle_positions={
-        {0,0,0,0,0,0},
-        {0,0,0,0,0,0},
-        {0,0,0,0,0,0},
-    },
-    player_positions={
-        {0,0,0,0,0,0},
-        {0,1,0,0,0,0},
-        {0,0,0,0,0,0},
-    },
-    tiles={
-        {13,1,1,1,13,1},
-        {13,1,1,1,1,1},
-        {13,1,1,1,1,13},
-    },
-    teams={
-        {2,2,2,1,1,1},
-        {2,2,2,1,1,1},
-        {2,2,2,1,1,1},
-    },
-    results_callback = give_result_awards
-}
 
-local Dungeon2 = {
-    name="Dungeon2",
-    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
-    weight=10,
-    pet_exp=8,
-    enemies={
-        {name="Yort",rank=3},
-    },
-    obstacles={
-    },
-    positions={
-        {0,0,0,0,0,0},
-        {0,0,0,1,1,0},
-        {0,0,0,0,0,0},
-    },
-    obstacle_positions={
-        {0,0,0,0,0,0},
-        {0,0,0,0,0,0},
-        {0,0,0,0,0,0},
-    },
-    player_positions={
-        {0,0,0,0,0,0},
-        {0,1,0,0,0,0},
-        {0,0,0,0,0,0},
-    },
-    tiles={
-        {1,1,13,1,1,1},
-        {1,1,1,1,1,1},
-        {13,1,1,1,1,1},
-    },
-    teams={
-        {2,2,2,1,1,1},
-        {2,2,2,1,1,1},
-        {2,2,2,1,1,1},
-    },
-    results_callback = give_result_awards
-}
-
-local Dungeon3 = {
-    name="Dungeon3",
-    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
-    weight=10,
-    pet_exp=8,
-    enemies={
-        {name="Spikey",rank=3},
-        {name="Spikey",rank=2},
-        {name="Spikey",rank=4},
-    },
-    obstacles={
-        {name="RockCube"},
-        {name="RockCube"},
-        {name="Rock"},
-    },
-    positions={
-        {0,0,0,0,1,0},
-        {0,0,0,0,0,3},
-        {0,0,0,0,2,0},
-    },
-    obstacle_positions={
-        {0,0,0,2,0,0},
-        {0,0,1,0,0,0},
-        {0,0,0,0,0,0},
-    },
-    player_positions={
-        {0,0,0,0,0,0},
-        {0,1,0,0,0,0},
-        {0,0,0,0,0,0},
-    },
-    tiles={
-        {1,1,1,1,1,1},
-        {1,1,1,1,1,1},
-        {1,1,1,1,1,1},
-    },
-    teams={
-        {2,2,2,1,1,1},
-        {2,2,2,1,1,1},
-        {2,2,2,1,1,1},
-    },
-    results_callback = give_result_awards
-}
-
-local Dungeon4 = {
-    name="Dungeon4",
-    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
-    weight=10,
-    pet_exp=8,
-    enemies={
-        {name="Metrid",rank=2},
-        {name="Yort",rank=3},
-    },
-    obstacles={
-        {name="RockCube"},
-    },
-    positions={
-        {0,0,0,0,0,1},
-        {0,0,0,2,0,0},
-        {0,0,0,0,0,0},
-    },
-    obstacle_positions={
-        {0,0,0,0,1,0},
-        {0,0,0,0,0,0},
-        {0,0,0,0,0,0},
-    },
-    player_positions={
-        {0,0,0,0,0,0},
-        {0,1,0,0,0,0},
-        {0,0,0,0,0,0},
-    },
-    tiles={
-        {1,1,1,1,1,1},
-        {1,1,1,1,1,1},
-        {1,13,13,1,1,1},
-    },
-    teams={
-        {2,2,2,1,1,1},
-        {2,2,2,1,1,1},
-        {2,2,2,1,1,1},
-    },
-    results_callback = give_result_awards
-}
-
-local Dungeon5 = {
-    name="Dungeon5",
-    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
-    weight=10,
-    pet_exp=8,
-    enemies={
-        {name="Swordy",rank=3},
-        {name="Powie3",rank=1},
-    },
-    obstacles={
-    },
-    positions={
-        {0,0,0,0,0,0},
-        {0,0,0,1,2,0},
-        {0,0,0,0,0,0},
-    },
-    obstacle_positions={
-        {0,0,0,0,0,0},
-        {0,0,0,0,0,0},
-        {0,0,0,0,0,0},
-    },
-    player_positions={
-        {0,0,0,0,0,0},
-        {0,1,0,0,0,0},
-        {0,0,0,0,0,0},
-    },
-    tiles={
-        {1,1,13,13,1,1},
-        {1,1,1,1,1,1},
-        {1,13,13,1,1,1},
-    },
-    teams={
-        {2,2,2,1,1,1},
-        {2,2,2,1,1,1},
-        {2,2,2,1,1,1},
-    },
-    results_callback = give_result_awards
-}
-
-local Dungeon6 = {
-    name="Dungeon6",
-    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
-    weight=10,
-    pet_exp=8,
-    enemies={
-        {name="Volcano",rank=1},
-        {name="Volcano",rank=3},
-        {name="Volcano",rank=2},
-    },
-    obstacles={
-    },
-    positions={
-        {0,0,0,0,0,2},
-        {0,0,0,0,3,0},
-        {0,0,0,1,0,0},
-    },
-    obstacle_positions={
-        {0,0,0,0,0,0},
-        {0,0,0,0,0,0},
-        {0,0,0,0,0,0},
-    },
-    player_positions={
-        {0,0,0,0,0,0},
-        {0,1,0,0,0,0},
-        {0,0,0,0,0,0},
-    },
-    tiles={
-        {1,1,13,13,1,1},
-        {1,1,1,1,13,1},
-        {13,1,1,1,1,13},
-    },
-    teams={
-        {2,2,2,1,1,1},
-        {2,2,2,1,1,1},
-        {2,2,2,1,1,1},
-    },
-    results_callback = give_result_awards
-}
-
-local Dungeon7 = {
-    name="Dungeon7",
-    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
-    weight=10,
-    pet_exp=8,
-    enemies={
-        {name="Beetank",rank=3},
-        {name="Fishy",rank=3},
-    },
-    obstacles={
-    },
-    positions={
-        {0,0,0,0,0,1},
-        {0,0,0,0,2,0},
-        {0,0,0,0,0,0},
-    },
-    obstacle_positions={
-        {0,0,0,0,0,0},
-        {0,0,0,0,0,0},
-        {0,0,0,0,0,0},
-    },
-    player_positions={
-        {0,0,0,0,0,0},
-        {0,1,0,0,0,0},
-        {0,0,0,0,0,0},
-    },
-    tiles={
-        {13,1,13,1,1,1},
-        {1,1,1,1,1,1},
-        {13,1,13,1,1,1},
-    },
-    teams={
-        {2,2,2,1,1,1},
-        {2,2,2,1,1,1},
-        {2,2,2,1,1,1},
-    },
-    results_callback = give_result_awards
-}
-
-local Dungeon8 = {
-    name="Dungeon8",
-    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
-    weight=10,
-    pet_exp=8,
-    enemies={
-        {name="Sniper",rank=1},
-        {name="Gloomer",rank=1},
-    },
-    obstacles={
-    },
-    positions={
-        {0,0,0,0,0,2},
-        {0,0,0,0,1,0},
-        {0,0,0,0,0,0},
-    },
-    obstacle_positions={
-        {0,0,0,0,0,0},
-        {0,0,0,0,0,0},
-        {0,0,0,0,0,0},
-    },
-    player_positions={
-        {0,0,0,0,0,0},
-        {0,1,0,0,0,0},
-        {0,0,0,0,0,0},
-    },
-    tiles={
-        {1,1,1,1,1,1},
-        {1,1,13,1,1,1},
-        {1,1,1,1,1,1},
-    },
-    teams={
-        {2,2,2,1,1,1},
-        {2,2,2,1,1,1},
-        {2,2,2,1,1,1},
-    },
-    results_callback = give_result_awards
-}
-
-local Dungeon9 = {
-    name="Dungeon9",
-    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
-    weight=10,
-    pet_exp=8,
-    enemies={
-        {name="Mettaur",rank=4},
-        {name="Yort",rank=3},
-    },
-    obstacles={
-    },
-    positions={
-        {0,0,0,0,2,0},
-        {0,0,0,0,0,1},
-        {0,0,0,0,0,0},
-    },
-    obstacle_positions={
-        {0,0,0,0,0,0},
-        {0,0,0,0,0,0},
-        {0,0,0,0,0,0},
-    },
-    player_positions={
-        {0,0,0,0,0,0},
-        {0,1,0,0,0,0},
-        {0,0,0,0,0,0},
-    },
-    tiles={
-        {1,1,1,1,1,1},
-        {1,1,1,1,1,1},
-        {1,1,1,1,1,1},
-    },
-    teams={
-        {2,2,2,1,1,1},
-        {2,2,2,1,1,1},
-        {2,2,2,1,1,1},
-    },
-    results_callback = give_result_awards
-}
-
-local Dungeon10 = {
-    name="Dungeon10",
-    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
-    weight=10,
-    pet_exp=8,
-    enemies={
-        {name="Beetank",rank=2},
-        {name="Chumpy",rank=1},
-        {name="MegaCorn",rank=1},
-    },
-    obstacles={
-    },
-    positions={
-        {0,0,0,1,0,0},
-        {0,0,0,0,2,0},
-        {0,0,0,0,0,3},
-    },
-    obstacle_positions={
-        {0,0,0,0,0,0},
-        {0,0,0,0,0,0},
-        {0,0,0,0,0,0},
-    },
-    player_positions={
-        {0,0,0,0,0,0},
-        {0,1,0,0,0,0},
-        {0,0,0,0,0,0},
-    },
-    tiles={
-        {1,1,1,1,1,1},
-        {1,1,1,1,1,1},
-        {1,1,1,1,1,1},
-    },
-    teams={
-        {2,2,2,1,1,1},
-        {2,2,2,1,1,1},
-        {2,2,2,1,1,1},
-    },
-    results_callback = give_result_awards
-}
 
 local MiniBoss1 = {
     name="MiniBoss1",
@@ -944,8 +550,136 @@ local MainBoss = {
     results_callback = mini_boss_rewards
 }
 
+
+local DUNGEON_RARE_DROP = {
+  [11] = 0.75, -- S
+  [10] = 0.65,
+  [9]  = 0.60,
+  [8]  = 0.50,
+  [7]  = 0.35,
+}
+
+local DUNGEON_VERY_RARE_DROP = {
+  [11] = 0.70, -- S
+  [10] = 0.60,
+  [9]  = 0.55,
+  [8]  = 0.45,
+}
+
+local function chip_drop(card, chances)
+  return {
+    card = card,
+    score_chances = chances,
+    duplicate_score_multiplier = 180,
+  }
+end
+
 return {
-    minimum_steps_before_encounter=40,
-    encounter_chance_per_step=0.10,
-    encounters={Dungeon1,Dungeon2,Dungeon3,Dungeon4,Dungeon5,Dungeon6,Dungeon7,Dungeon8,Dungeon9,Dungeon10,MiniBoss1,MiniBoss2,MiniBoss3,MainBoss}
+    minimum_steps_before_encounter = 50,
+    encounter_chance_per_step = 0.10,
+
+    -- Keep scripted dungeon boss encounters registered by name.
+    -- They have 0 weight and random_encounters uses static=0/random=100,
+    -- so they won't be picked as normal random battles.
+    encounters = {
+        MiniBoss1,
+        MiniBoss2,
+        MiniBoss3,
+        MainBoss,
+    },
+
+    -- Dungeon custom callbacks still handle money/HP/lives.
+    -- This reward block is only here so the shared whitelist chip-drop logic can run.
+    rewards = {
+        enabled = true,
+        money = {
+            enabled = false,
+        },
+        health = {
+            enabled = false,
+        },
+        cards = {
+            enabled = true,
+            duplicate_fallback_score_multiplier = 180,
+            drops = {
+                Yort = {
+                    ["1"] = {
+                        chip_drop("yoyo1", DUNGEON_RARE_DROP),
+                    },
+                },
+
+                Gunner = {
+                    ["2"] = {
+                        chip_drop("MachineGun2", DUNGEON_VERY_RARE_DROP),
+                    },
+                },
+
+                DemonEye = {
+                    ["1"] = {
+                        chip_drop("KillerSensor2", DUNGEON_VERY_RARE_DROP),
+                    },
+                },
+
+                TuffBunny = {
+                    ["1"] = {
+                        chip_drop("RabiRing2", DUNGEON_RARE_DROP),
+                    },
+                },
+            },
+        },
+    },
+
+    random_encounters = {
+        enabled = true,
+        package_path = "/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+
+        source_weights = {
+            static = 0,
+            random = 100,
+        },
+
+        pet_exp = 10,
+        allow_duplicates = true,
+
+        enemy_count = {
+            min = 3,
+            max = 4,
+        },
+
+        obstacles = {
+            enabled = false,
+        },
+
+        panels = {
+            enabled = true,
+            pool = { 13 }, -- lava only
+            chance = 0.95,
+            min = 5,
+            max = 10,
+        },
+
+        bosses = {
+            enabled = false,
+        },
+
+        -- Preserve your existing dungeon reward/death/run handling for random battles.
+        results_callback = give_result_awards,
+
+        pool = {
+            -- Dungeon-exclusive chase drops
+            { name = "Yort",      ranks = { "1" } }, -- YoYo
+            { name = "Gunner",    ranks = { "1", "2" } }, -- MachineGun2
+            { name = "DemonEye",  ranks = { "1" } }, -- KillerSensor2
+            { name = "TuffBunny", ranks = { "1" } }, -- RabiRing2
+
+            { name = "Volcano",   ranks = { "1", "2" } },
+            { name = "Metrid",    ranks = { "1", "2" } },
+            { name = "MegaCorn",  ranks = { "1" } },
+            { name = "Fishy",     ranks = { "1", "2" } },
+            { name = "Beetank",   ranks = { "1", "2" } },
+            { name = "Spikey",    ranks = { "2", "3" } },
+            { name = "Swordy",    ranks = { "2", "3" } },
+            { name = "Quaker",    ranks = { "1", "2" } },
+        },
+    },
 }

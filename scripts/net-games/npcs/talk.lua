@@ -55,6 +55,20 @@ local function force_indicator_on(player_id, box_id)
   end
 end
 
+local function stable_hash_mod(s, mod)
+  s = tostring(s or "")
+  local h = 0
+  for i = 1, #s do
+    h = (h * 131 + s:byte(i)) % mod
+  end
+  return h
+end
+
+local function stable_mug_sprite_id_from_box(box_id)
+  -- Keep far away from preset ids like 5300 :contentReference[oaicite:4]{index=4}
+  return 60000 + stable_hash_mod(box_id, 10000)
+end
+
 local function get_talk_vert_menu()
   -- Lazy require to avoid require-cycle:
   -- talk.lua <-> talk_vert_menu.lua
@@ -165,6 +179,33 @@ local function build_ui(cfg, bot_name, opts)
 
     if ui.backdrop.indicator and ui.backdrop.indicator.enabled == nil then
       ui.backdrop.indicator.enabled = true
+    end
+  end
+
+  -- Mugshot sprite_id safety:
+  -- If sprite_id stays constant (e.g. 5300), the engine may "stick" to the first texture/anim.
+  -- Derive a unique mug sprite_id per box_id unless the caller explicitly set one.
+  if ui.mugshot and ui.mugshot.enabled ~= false then
+    local explicit = false
+    local function is_default_preset_mug_id(id)
+      id = tonumber(id)
+      return id and id >= 5300 and id <= 5311
+    end
+
+    if cfg and cfg.ui and cfg.ui.mugshot and cfg.ui.mugshot.sprite_id ~= nil
+       and not is_default_preset_mug_id(cfg.ui.mugshot.sprite_id)
+    then
+      explicit = true
+    end
+
+    if cfg and type(cfg.mug) == "table" and cfg.mug.sprite_id ~= nil
+       and not is_default_preset_mug_id(cfg.mug.sprite_id)
+    then
+      explicit = true
+    end
+
+    if not explicit then
+      ui.mugshot.sprite_id = stable_mug_sprite_id_from_box(ui.box_id)
     end
   end
 

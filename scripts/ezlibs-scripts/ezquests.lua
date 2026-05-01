@@ -1,6 +1,5 @@
 local ezmemory = require('scripts/ezlibs-scripts/ezmemory')
 local helpers = require('scripts/ezlibs-scripts/helpers')
-local ezemail = require('scripts/ezlibs-scripts/ezemail')
 
 local ezquests = {
     quests={}
@@ -39,7 +38,7 @@ function ezquests.set_player_quest_flag(player_id,quest_name,flag_name,flag_stat
     ezmemory.save_player_memory(safe_secret)
 end
 
-function ezquests.get_player_quest_flag(player_id,quest_name,flag_name)
+function ezquests.get_player_quest_flag(player_id,quest_name,flag_name,flag_state)
     local safe_secret = helpers.get_safe_player_secret(player_id)
     local player_memory = ezmemory.get_player_memory(safe_secret)
     if not player_memory["quests"] then
@@ -71,13 +70,21 @@ function ezquests.get_quest(quest_name)
     end
 end
 
-function ezquests.get_player_quest_state(player_id,quest_name)
+function ezquests.get_player_quest_state(player_id, quest_name)
     local quest = ezquests.get_quest(quest_name)
+    if not quest then
+        warn('[ezquests] quest "' .. tostring(quest_name) .. '" not found, returning nil')
+        return nil
+    end
     return quest:determine_state(player_id)
 end
 
 function ezquests.quest_event(player_id,quest_name,event_value)
     local quest = ezquests.get_quest(quest_name)
+    if not quest then
+        warn('[ezquests] cannot send event: quest "' .. tostring(quest_name) .. '" not found')
+        return async(function() end)()  -- return empty promise
+    end
     print('[ezquests] quest=',quest)
     return quest:handle_event_async(player_id,event_value)
 end
@@ -203,7 +210,7 @@ local quest_echo_program = {
             if event_value == "zary_meet_surface" then
                 -- Optional hint. Never let this rewind/override later steps.
                 ezquests.unset_player_quest_flag(player_id, self.name, "need_zary_dungeon")
-            
+
                 if ezquests.get_player_quest_flag(player_id, self.name, "need_protoman")
                     or ezquests.get_player_quest_flag(player_id, self.name, "completed") then
                     return

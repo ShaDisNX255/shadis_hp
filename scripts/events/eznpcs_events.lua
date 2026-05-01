@@ -16,6 +16,7 @@ local ezmenus   = require('scripts/ezlibs-scripts/ezmenus')
 local duels  = require('scripts/ezlibs-custom/duels')
 local card_sleeves = require('scripts/ezlibs-custom/card_sleeves')
 local ezquests = require('scripts/ezlibs-scripts/ezquests')
+local whitelist = require('scripts/ezlibs-custom/whitelist')
 
 local Pets = (function()
   local ok, M = pcall(require, 'scripts/ezlibs-custom/pets')
@@ -362,12 +363,19 @@ local function _encounter_result_flags(stats)
     }
 end
 
+local function _normalize_busting_score(score)
+    if type(score) == "string" and string.upper(score) == "S" then
+        return 11
+    end
+    return math.floor(tonumber(score) or 0)
+end
+
 local boss2 = {
     name="boss2",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     pet_exp=9,
     enemies={
-        {name="HeelNavi",rank=2},
+        {name="HeelNavi",rank=1},
     },
     obstacles={
     },
@@ -448,7 +456,7 @@ local boss4 = {
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     pet_exp=10,
     enemies={
-        {name="ProtomanPoN",rank=2},
+        {name="ProtomanPoN",rank=1},
     },
     obstacles={
     },
@@ -501,10 +509,27 @@ local event4 = {
 }
 eznpcs.add_event(event4)
 
+local function reward_roll1_on_win(player_id, encounter_info, stats)
+    local flags = _encounter_result_flags(stats)
+    if not flags.won then
+        return
+    end
+
+    local ok, reason = whitelist.unlock_card(player_id, "roll1", "*")
+    if ok then
+        print("[Roll Battle] awarded Roll1 to", tostring(player_id))
+    elseif reason == "already_unlocked" then
+        print("[Roll Battle] player already owns Roll1:", tostring(player_id))
+    else
+        print("[Roll Battle] failed to award Roll1:", tostring(player_id), tostring(reason))
+    end
+end
+
 local boss5 = {
     name="boss5",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     pet_exp=8,
+    results_callback = reward_roll1_on_win,
     enemies={
         {name="Roll",rank=2},
     },
@@ -617,10 +642,33 @@ local event6 = {
 }
 eznpcs.add_event(event6)
 
+local function reward_gutsman_chip_on_win(player_id, encounter_info, stats)
+    local flags = _encounter_result_flags(stats)
+    if not flags.won then
+        return
+    end
+
+    local score = _normalize_busting_score(stats and stats.score)
+    if score < 6 then
+        print("[Guts3 Battle] no chip reward; score too low:", tostring(player_id), tostring(score))
+        return
+    end
+
+    local ok, reason = whitelist.unlock_card(player_id, "gutsman1", "*")
+    if ok then
+        print("[Guts3 Battle] awarded GutsMan chip to", tostring(player_id), "score=" .. tostring(score))
+    elseif reason == "already_unlocked" then
+        print("[Guts3 Battle] player already owns GutsMan chip:", tostring(player_id), "score=" .. tostring(score))
+    else
+        print("[Guts3 Battle] failed to award GutsMan chip:", tostring(player_id), tostring(reason), "score=" .. tostring(score))
+    end
+end
+
 local boss7 = {
     name="boss7",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     pet_exp=11,
+    results_callback = reward_gutsman_chip_on_win,
     enemies={
         {name="GutsManEXE3",rank=3},
     },
@@ -813,17 +861,42 @@ end
 
 -- Grant items for one pack (spending handled elsewhere)
 local function grant_one_pack(player_id, area_id, pack, names_acc)
-    for _ = 1, (pack.rolls or 1) do
+    local rolls = math.max(1, math.floor(tonumber(pack and pack.rolls) or 1))
+
+    for _ = 1, rolls do
         local group = pick_weighted(pack.groups or {})
-        if not group then return end
+        if not group then
+            break
+        end
+
         local items = group.items
-        if not items or #items == 0 then return end
+        if not items or #items == 0 then
+            break
+        end
+
         local idx = math.random(1, #items)
         local obj_id = items[idx]
         local info = helpers.read_item_information(area_id, obj_id)
+
         if info then
-            await(ezmemory.give_item_with_optional_notify(player_id, area_id, obj_id, info, false))
-            table.insert(names_acc, info.name)
+            if info.type == "keyitem" or info.type == "item" then
+                local is_key = (info.type == "keyitem")
+                ezmemory.create_or_update_item(info.name, info.description or "???", is_key)
+                ezmemory.give_player_item(player_id, info.name, info.amount or 1)
+                table.insert(names_acc, info.name)
+
+            elseif info.type == "money" then
+                ezmemory.spend_player_money(player_id, -(info.amount or 0))
+                table.insert(names_acc, tostring(info.amount or 0) .. "$")
+
+            elseif info.type == "fragments" then
+                ezmemory.add_player_fragments(player_id, info.amount or 0)
+                table.insert(names_acc, tostring(info.amount or 0) .. " Bug Fragments")
+
+            elseif info.type == "tokens" then
+                ezmemory.add_player_tokens(player_id, info.amount or 0)
+                table.insert(names_acc, tostring(info.amount or 0) .. " Tokens")
+            end
         end
     end
 end
@@ -887,6 +960,63 @@ local function open_n_packs(player_id, area_id, pack, mug, n)
     return true
 end
 
+local function open_packs_for_ng_shop(player_id, area_id, pack, n)
+    n = math.max(1, math.floor(tonumber(n) or 1))
+
+    local unit_price = math.max(0, tonumber(pack.price) or 0)
+    local total_cost = unit_price * n
+
+    if total_cost > 0 and not ezmemory.spend_player_money(player_id, total_cost) then
+        return false, "You don't have enough money."
+    end
+
+    local counts, order = {}, {}
+
+    for _ = 1, n do
+        local names = {}
+        grant_one_pack(player_id, area_id, pack, names)
+
+        for _, name in ipairs(names) do
+            if not counts[name] then
+                counts[name] = 1
+                table.insert(order, name)
+            else
+                counts[name] = counts[name] + 1
+            end
+        end
+    end
+
+    if sfx and sfx.item_get then
+        Net.play_sound_for_player(player_id, sfx.item_get)
+    end
+
+    if JobBBS and JobBBS.on_pack_open then
+        pcall(JobBBS.on_pack_open, player_id, { count = n, pack = pack.name })
+    end
+
+    local lines = {}
+    for _, name in ipairs(order) do
+        lines[#lines + 1] = string.format("x%d %s", counts[name], name)
+    end
+
+    local header
+    if n == 1 then
+        header = string.format("Opened 1 x %s and got:", tostring(pack.name))
+    else
+        header = string.format("Opened %d x %s and got:", n, tostring(pack.name))
+    end
+
+    local body = (#lines > 0)
+        and (header .. "\n- " .. table.concat(lines, "\n- "))
+        or (header .. "\n(nothing?)")
+
+    if total_cost > 0 then
+        body = body .. string.format("\n\n(-%d$)", total_cost)
+    end
+
+    return true, body
+end
+
 local function short_money(n)
     n = tonumber(n) or 0
     local abs = math.abs(n)
@@ -937,27 +1067,219 @@ local function choose_buy_quantity(player_id, mug, pack)
     return nil
 end
 
+local function normalize_shop_preview_path(p)
+    p = tostring(p or "")
+    if p == "" then return nil end
+
+    if not p:match("%.[%w]+$") then
+        p = p .. ".png"
+    end
+
+    if p:sub(1, 7) == "/server/" then
+        return p
+    end
+
+    if p:sub(1, 1) == "/" then
+        return p
+    end
+
+    return "/server/assets/" .. p
+end
+
 local function pack_shop_action(npc, player_id, dialogue, relay_object)
     return async(function ()
         local area_id = Net.get_player_area(player_id)
         local mug = eznpcs.get_dialogue_mugshot(npc, player_id, dialogue)
         local pack = read_single_pack(dialogue)
+        local ci = build_ci_props(dialogue)
 
         if not pack or not pack.groups or #pack.groups == 0 then
-            await(Async.message_player(player_id, "Sorry, I'm not selling any packs right now.", mug.texture_path, mug.animation_path))
+            await(Async.message_player(
+                player_id,
+                "Sorry, I'm not selling any packs right now.",
+                mug.texture_path, mug.animation_path
+            ))
             return dialogue.custom_properties["Next 1"]
         end
 
-        -- Intro once
+        --=====================================================
+        -- NEW: net-games powered pack shop
+        --=====================================================
+        local ok_menu, TalkVertMenu_or_err = pcall(require, "scripts/net-games/npcs/talk_vert_menu")
+        if ok_menu then
+            local TalkVertMenu = TalkVertMenu_or_err
+            local TalkPresets = require("scripts/net-games/npcs/talk_presets")
+
+            local title = tostring(get_ci(ci, "shop title") or "Pack Shop")
+
+            -- PROG prompt mug, but using this NPC's real mug assets
+            local prog_mug = helpers.deep_copy(TalkPresets.mugs.prog or { enabled = true })
+            prog_mug.texture_path = mug.texture_path
+            prog_mug.anim_path = mug.animation_path
+            prog_mug.sprite_id = nil
+
+            local DEFAULT_ICON = "/server/assets/net-games/ui/card_shop_item.png"
+
+            local preview_path = normalize_shop_preview_path(
+                get_ci(ci, "pack preview")
+                or get_ci(ci, "preview")
+                or get_ci(ci, "icon")
+                or get_ci(ci, "shop preview")
+                or get_ci(ci, "preview path")
+            )
+
+            if preview_path and Net and Net.has_asset then
+                local ok, exists = pcall(Net.has_asset, preview_path)
+                if ok and exists == false then
+                    preview_path = nil
+                end
+            end
+
+            local pack_icon = preview_path or DEFAULT_ICON
+
+            if Net and Net.provide_asset_for_player then
+                pcall(Net.provide_asset_for_player, player_id, pack_icon)
+            end
+
+            local price = math.max(0, tonumber(pack.price) or 0)
+            local rolls = math.max(1, tonumber(pack.rolls) or 1)
+            local suffix = (rolls == 1) and "card" or "cards"
+
+            local options = {
+                {
+                    id = "buy1",
+                    text = "Buy 1",
+                    shop_name = "Buy 1",
+                    shop_price = price,
+                },
+                {
+                    id = "buy10",
+                    text = "Buy 10",
+                    shop_name = "Buy 10",
+                    shop_price = price * 10,
+                },
+                {
+                    id = "exit",
+                    text = "Exit",
+                }
+            }
+
+            local intro_lines = {
+                tostring(pack.name),
+                string.format("%d$ each • %d %s", price, rolls, suffix),
+            }
+
+            local desc = tostring(pack.description or "")
+            if desc ~= "" then
+                intro_lines[#intro_lines + 1] = desc
+            end
+
+            local talk_cfg = {
+                preset = "prog_prompt",
+                area_id = area_id,
+                object = "packshop_" .. tostring(dialogue.id or "shop"),
+                ui = {
+                    mugshot = prog_mug,
+                    typing_speed = 9999,
+                }
+            }
+
+            local layout = TalkPresets.get_vert_menu_layout("prog_prompt_shop") or {}
+
+            local assets = {
+                menu_bg       = "/server/assets/net-games/ui/prompt_vert_menu_shop_an.png",
+                menu_bg_anim  = "/server/assets/net-games/ui/prompt_vert_menu_an.animation",
+                menu_bg_frame = "/server/assets/net-games/ui/prompt_vert_menu_shop_an_frame.png",
+                highlight     = "/server/assets/net-games/ui/highlight_shop.png",
+            }
+
+            if Net.lock_player_input then
+                pcall(Net.lock_player_input, player_id)
+            end
+
+            TalkVertMenu.open(player_id, title, talk_cfg, {
+                intro_text = table.concat(intro_lines, "\n"),
+                options = options,
+                exit_index = #options,
+                layout = layout,
+                assets = assets,
+
+                monies_amount_fn = function(pid)
+                    return tostring(tonumber(Net.get_player_money(pid) or 0) or 0)
+                end,
+
+                shop_item_texture_fn = function(choice)
+                    if not choice or not choice.id then
+                        return DEFAULT_ICON
+                    end
+                    if tostring(choice.id) == "exit" then
+                        return DEFAULT_ICON
+                    end
+                    return pack_icon
+                end,
+
+                flow = {
+                    keep_menu_open = true,
+                    after_text = "Anything else?",
+                    exit_goodbye_text = "Come again!",
+
+                    confirm = {
+                        enabled = true,
+                        skip_ids = { exit = true },
+                        text_fn = function(pid, choice_id)
+                            local qty = (tostring(choice_id) == "buy10") and 10 or 1
+                            local total_cost = price * qty
+                            local have = tonumber(Net.get_player_money(pid) or 0) or 0
+
+                            return string.format(
+                                "Buy %d x %s for %d$?\nYou have %d$",
+                                qty,
+                                tostring(pack.name),
+                                total_cost,
+                                have
+                            )
+                        end,
+                    },
+
+                    post_select = { enabled = true, skip_ids = { exit = true } },
+                },
+
+                on_confirm_yes = function(pid, choice_id, _choice_text, menu)
+                    local qty = (tostring(choice_id) == "buy10") and 10 or 1
+
+                    local ok, result_text = open_packs_for_ng_shop(pid, area_id, pack, qty)
+                    if not ok then
+                        return result_text or "You don't have enough money.", "Anything else?"
+                    end
+
+                    -- refresh live balance immediately
+                    if menu and menu.render_menu_contents then
+                        pcall(function() menu:render_menu_contents(true) end)
+                    end
+
+                    return result_text, "Anything else?"
+                end,
+            })
+
+            while TalkVertMenu.is_busy and TalkVertMenu.is_busy(player_id) do
+                await(Async.sleep(0.05))
+            end
+
+            return dialogue.custom_properties["Next 1"]
+        end
+
+        --=====================================================
+        -- Fallback: keep old Pack Shop behavior if net-games is unavailable
+        --=====================================================
         local rolls = pack.rolls or 1
         local suffix = (rolls == 1) and "card" or "cards"
+
         await(Async.message_player(
             player_id,
             string.format("%s - %d$ (%d %s)\n\n%s", pack.name, pack.price or 0, rolls, suffix, pack.description or ""),
             mug.texture_path, mug.animation_path
         ))
 
-        -- First purchase (1/10/Cancel)
         local qty = choose_buy_quantity(player_id, mug, pack)
         if not qty then
             return dialogue.custom_properties["Next 1"]
@@ -969,12 +1291,14 @@ local function pack_shop_action(npc, player_id, dialogue, relay_object)
         else
             ok, msg = open_n_packs(player_id, area_id, pack, mug, 10)
         end
+
         if not ok then
-            if msg then await(Async.message_player(player_id, msg, mug.texture_path, mug.animation_path)) end
+            if msg then
+                await(Async.message_player(player_id, msg, mug.texture_path, mug.animation_path))
+            end
             return dialogue.custom_properties["Next 1"]
         end
 
-        -- Loop: offer 1/10/Cancel again
         while true do
             local qty2 = choose_buy_quantity(player_id, mug, pack)
             if not qty2 then break end
@@ -987,7 +1311,9 @@ local function pack_shop_action(npc, player_id, dialogue, relay_object)
             end
 
             if not ok2 then
-                if msg2 then await(Async.message_player(player_id, msg2, mug.texture_path, mug.animation_path)) end
+                if msg2 then
+                    await(Async.message_player(player_id, msg2, mug.texture_path, mug.animation_path))
+                end
                 break
             end
         end
@@ -1178,8 +1504,8 @@ eznpcs.add_event{
   action = function(npc, player_id, dialogue, relay_object)
     return async(function()
       local mug = eznpcs.get_dialogue_mugshot(npc, player_id, dialogue)
+      local ci = build_ci_props(dialogue)
 
-      -- Safety check: cosmetics module available?
       if not cosmetics or not cosmetics.unlock_for_player then
         await(Async.message_player(
           player_id,
@@ -1189,37 +1515,29 @@ eznpcs.add_event{
         return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
       end
 
-      -- Lowercased custom props helper (already used by Pack Shop)
-      local function ci_props(d)
-        local ci = {}
-        for k, v in pairs(d.custom_properties or {}) do
-          ci[string.lower(tostring(k))] = v
-        end
-        return ci
-      end
+      local title = tostring(get_ci(ci, "shop title") or "Cosmetic Shop")
+      local not_enough_msg = tostring(get_ci(ci, "not enough msg") or "You don't have enough money.")
+      local owned_msg = tostring(get_ci(ci, "already owned msg") or "You already have that cosmetic.")
 
-      local ci = ci_props(dialogue)
-
-      -- Build the list of offers from Sell N / Price N
       local offers = {}
       local i = 1
       while true do
-        local sell = ci["sell " .. i]
+        local sell = get_ci(ci, "sell " .. i)
         if not sell then break end
 
-        local price_raw = ci["price " .. i] or ci["cost " .. i]
-        local price = tonumber(price_raw) or 0
-        if price < 0 then price = 0 end
+        local price = math.max(0, math.floor(tonumber(
+          get_ci(ci, "price " .. i)
+          or get_ci(ci, "cost " .. i)
+          or 0
+        ) or 0))
 
         local cosmetic_id = tostring(sell)
-        local name = cosmetics.get_name_for_id
-                    and cosmetics.get_name_for_id(cosmetic_id)
-                    or cosmetic_id
+        local pretty = (cosmetics.get_name_for_id and cosmetics.get_name_for_id(cosmetic_id)) or cosmetic_id
 
         table.insert(offers, {
           cosmetic_id = cosmetic_id,
-          price       = price,
-          name        = name,
+          price = price,
+          name = pretty,
         })
 
         i = i + 1
@@ -1234,134 +1552,226 @@ eznpcs.add_event{
         return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
       end
 
-      -- Shop loop (BBS board)
-      while true do
-        -- Build BBS posts fresh each time so "Owned" tags update after purchases
-        local posts, items = {}, {}
-        for _, offer in ipairs(offers) do
-          local owned = cosmetics.has_cosmetic
-                     and cosmetics.has_cosmetic(player_id, offer.cosmetic_id)
-          local label = owned
-            and string.format("%s (%s, Owned)", offer.name, short_money(offer.price))
-            or  string.format("%s (%s)",        offer.name, short_money(offer.price))
-
-          local post = helpers.create_bbs_option(label)
-          table.insert(posts, post)
-          items[#posts] = offer
-        end
-
-        -- Open BBS-style board
-        local board = ezmenus.open_menu(
+      local ok_menu, TalkVertMenu_or_err = pcall(require, "scripts/net-games/npcs/talk_vert_menu")
+      if not ok_menu then
+        await(Async.message_player(
           player_id,
-          "Cosmetic Shop",
-          COSMETIC_SHOP_COLOR,
-          posts
-        )
+          "The new shop UI isn't available right now.",
+          mug.texture_path, mug.animation_path
+        ))
+        return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+      end
 
-        local sel = await(board.selection_once())
-        Net.close_bbs(player_id)  -- close board after selection / cancel
+      local function safe_has_asset(path)
+        if not path or path == "" then return false end
+        if not (Net and Net.has_asset) then return true end
+        local ok, res = pcall(Net.has_asset, path)
+        return ok and res == true
+      end
 
-        if not sel then break end  -- B pressed / closed
+      if Net and Net.provide_asset_for_player then
+        local seen = {}
 
-        -- Find which offer was chosen
-        local chosen
-        for idx, post in ipairs(posts) do
-          local pid = post.id or post.title or ""
-          if sel == pid then
-            chosen = items[idx]
-            break
+        local function push(path)
+          if not path or path == "" or seen[path] then return end
+          if not safe_has_asset(path) then return end
+          seen[path] = true
+          pcall(Net.provide_asset_for_player, player_id, path)
+        end
+
+        for _, offer in ipairs(offers) do
+          local opt = cosmetics.get_shop_option and cosmetics.get_shop_option(offer.cosmetic_id)
+          if opt then
+            push(opt.menu_preview_texture or opt.texture)
+            push(opt.menu_preview_animation or opt.animation)
           end
         end
-        if not chosen then break end
+      end
 
-        -- Already owned? Block re-purchase.
-        if cosmetics.has_cosmetic and cosmetics.has_cosmetic(player_id, chosen.cosmetic_id) then
-          await(Async.message_player(
-            player_id,
-            "You already have the " .. chosen.name .. " cosmetic.",
-            mug.texture_path, mug.animation_path
-          ))
-        else
-          -- Yes/No confirmation (single quantity) with live preview
-          local question = string.format(
-            "Buy %s for %s?",
-            chosen.name,
-            short_money(chosen.price)
-          )
+await(Async.sleep(0.05))
 
-          -- Apply a temporary cosmetic so the player can see it
-          if cosmetics.preview_for_shop then
-            cosmetics.preview_for_shop(player_id, chosen.cosmetic_id)
+      local TalkVertMenu = TalkVertMenu_or_err
+      local TalkPresets = require("scripts/net-games/npcs/talk_presets")
+
+      local prog_mug = helpers.deep_copy(TalkPresets.mugs.prog or { enabled = true })
+      prog_mug.texture_path = mug.texture_path
+      prog_mug.anim_path = mug.animation_path
+      prog_mug.sprite_id = nil
+
+      local talk_cfg = {
+        preset = "prog_prompt",
+        area_id = Net.get_player_area(player_id),
+        object = "cosmeticshop_" .. tostring(dialogue.id or "shop"),
+        ui = {
+          mugshot = prog_mug,
+          typing_speed = 9999,
+        }
+      }
+
+      local layout = TalkPresets.get_vert_menu_layout("prog_prompt_shop") or {}
+
+      layout.shop_item_enabled = false
+      layout.shop_item_swap_exit = false
+
+      local assets = {
+        menu_bg       = "/server/assets/net-games/ui/prompt_vert_menu_shop_an.png",
+        menu_bg_anim  = "/server/assets/net-games/ui/prompt_vert_menu_an.animation",
+        menu_bg_frame = "/server/assets/net-games/ui/prompt_vert_menu_shop_an_frame.png",
+        highlight     = "/server/assets/net-games/ui/highlight_shop.png",
+      }
+
+      local DEFAULT_ICON = "/server/assets/net-games/ui/card_shop_item.png"
+
+      local options = {}
+      local by_choice_id = {}
+
+      for _, offer in ipairs(offers) do
+        local owned = cosmetics.has_cosmetic and cosmetics.has_cosmetic(player_id, offer.cosmetic_id)
+        local display_name = owned and (offer.name .. " [Owned]") or offer.name
+
+        options[#options + 1] = {
+          id = offer.cosmetic_id,
+          text = display_name,
+          shop_name = display_name,
+          shop_price = offer.price,
+        }
+
+        by_choice_id[offer.cosmetic_id] = offer
+      end
+
+      options[#options + 1] = { id = "exit", text = "Exit" }
+      local exit_index = #options
+
+      if Net.lock_player_input then
+        pcall(Net.lock_player_input, player_id)
+      end
+
+      TalkVertMenu.open(player_id, title, talk_cfg, {
+        intro_text = "What would you like?",
+        options = options,
+        exit_index = exit_index,
+        layout = layout,
+        assets = assets,
+
+        monies_amount_fn = function(pid)
+          return tostring(tonumber(Net.get_player_money(pid) or 0) or 0)
+        end,
+
+        shop_item_texture_fn = function(choice)
+          if not choice or not choice.id then
+            if cosmetics.clear_shop_previews then
+              cosmetics.clear_shop_previews(player_id)
+            end
+            return nil
           end
 
-          -- Ask the question; 1 = Yes, anything else = No/Cancel
-          local res = await(Async.question_player(
-            player_id,
-            question,
-            mug.texture_path, mug.animation_path
-          ))
-          local do_buy = (res == 1)
-
-          -- Always clear the temporary preview after the question
-          if cosmetics.clear_shop_previews then
-            cosmetics.clear_shop_previews(player_id)
+          if tostring(choice.id) == "exit" then
+            if cosmetics.clear_shop_previews then
+              cosmetics.clear_shop_previews(player_id)
+            end
+            return nil
           end
 
-          if do_buy then
-            local price = chosen.price or 0
+          if cosmetics.show_shop_preview then
+            cosmetics.show_shop_preview(player_id, tostring(choice.id))
+          end
 
-            -- Paid cosmetic
-            if price > 0 then
-              if not ezmemory.spend_player_money(player_id, price) then
-                await(Async.message_player(
-                  player_id,
-                  "You don't have enough money.",
-                  mug.texture_path, mug.animation_path
-                ))
-              else
-                local ok, reason = cosmetics.unlock_for_player(player_id, chosen.cosmetic_id)
-                if ok then
-                  if sfx and sfx.item_get then
-                    Net.play_sound_for_player(player_id, sfx.item_get)
-                  end
-                  await(Async.message_player(
-                    player_id,
-                    "You got the " .. chosen.name .. " cosmetic!",
-                    mug.texture_path, mug.animation_path
-                  ))
-                else
-                  await(Async.message_player(
-                    player_id,
-                    "Couldn't unlock that cosmetic (" .. tostring(reason or "error") .. ").",
-                    mug.texture_path, mug.animation_path
-                  ))
-                end
+          return nil
+        end,
+
+        flow = {
+          keep_menu_open = true,
+          after_text = "Anything else?",
+          exit_goodbye_text = "Come again!",
+
+          confirm = {
+            enabled = true,
+            skip_ids = { exit = true },
+            text_fn = function(pid, choice_id)
+              local offer = by_choice_id[tostring(choice_id)]
+              if not offer then
+                return "Buy this cosmetic?"
               end
 
-            -- Free cosmetic
-            else
-              local ok, reason = cosmetics.unlock_for_player(player_id, chosen.cosmetic_id)
-              if ok then
-                if sfx and sfx.item_get then
-                  Net.play_sound_for_player(player_id, sfx.item_get)
-                end
-                await(Async.message_player(
-                  player_id,
-                  "You got the " .. chosen.name .. " cosmetic!",
-                  mug.texture_path, mug.animation_path
-                ))
-              else
-                await(Async.message_player(
-                  player_id,
-                  "Couldn't unlock that cosmetic (" .. tostring(reason or "error") .. ").",
-                  mug.texture_path, mug.animation_path
-                ))
+              local have = tonumber(Net.get_player_money(pid) or 0) or 0
+              return string.format(
+                "Buy %s for %d$?\nYou have %d$",
+                tostring(offer.name),
+                tonumber(offer.price) or 0,
+                have
+              )
+            end,
+          },
+
+          post_select = { enabled = true, skip_ids = { exit = true } },
+        },
+
+        on_confirm_yes = function(pid, choice_id, _choice_text, menu)
+          local offer = by_choice_id[tostring(choice_id)]
+          if not offer then
+            return "Huh? That cosmetic is gone.", "Anything else?"
+          end
+
+          if cosmetics.has_cosmetic and cosmetics.has_cosmetic(pid, offer.cosmetic_id) then
+            return owned_msg, "Anything else?"
+          end
+
+          local cost = math.max(0, tonumber(offer.price) or 0)
+          if cost > 0 and not ezmemory.spend_player_money(pid, cost) then
+            local have = tonumber(Net.get_player_money(pid) or 0) or 0
+            return string.format(
+              "%s\nCost: %d$  You have: %d$",
+              not_enough_msg,
+              cost,
+              have
+            ), "Anything else?"
+          end
+
+          local ok, reason = cosmetics.unlock_for_player(pid, offer.cosmetic_id)
+          if not ok then
+            if cost > 0 then
+              ezmemory.spend_player_money(pid, -cost)
+            end
+
+            local msg = (reason == "already_owned" or reason == "already_unlocked")
+              and owned_msg
+              or ("Couldn't unlock that cosmetic (" .. tostring(reason or "error") .. ").")
+
+            return msg, "Anything else?"
+          end
+
+          if menu and menu.options then
+            for _, opt in ipairs(menu.options) do
+              if tostring(opt.id) == tostring(choice_id) then
+                opt.text = offer.name .. " [Owned]"
+                opt.shop_name = offer.name .. " [Owned]"
+                break
               end
             end
           end
-        end
 
-        -- loop continues until player cancels / closes the board
+          if menu and menu.render_menu_contents then
+            pcall(function() menu:render_menu_contents(true) end)
+          end
+
+          if sfx and sfx.item_get then
+            pcall(Net.play_sound_for_player, pid, sfx.item_get)
+          end
+
+          if cost > 0 then
+            return string.format("You got the %s cosmetic!\n(-%d$)", offer.name, cost), "Anything else?"
+          end
+
+          return string.format("You got the %s cosmetic!", offer.name), "Anything else?"
+        end,
+      })
+
+      while TalkVertMenu.is_busy and TalkVertMenu.is_busy(player_id) do
+        await(Async.sleep(0.05))
+      end
+
+      if cosmetics and cosmetics.clear_shop_previews then
+        cosmetics.clear_shop_previews(player_id)
       end
 
       return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
@@ -1785,13 +2195,13 @@ eznpcs.add_event{
 
 local TOKEN_SHOP_COLOR = { r = 110, g = 220, b = 255 } -- bright cyan
 local TOKEN_OFFERS = {
-  { id = "__tok_buy_1__",  qty = 1,  price = 20000  },
-  { id = "__tok_buy_3__",  qty = 3,  price = 60000  },
-  { id = "__tok_buy_5__",  qty = 5,  price = 100000 },
-  { id = "__tok_buy_10__", qty = 10, price = 200000 },
-  { id = "__tok_buy_30__", qty = 30, price = 600000 },
-  { id = "__tok_buy_50__", qty = 50, price = 1000000 },
-  { id = "__tok_buy_100__", qty = 100, price = 2000000 },
+  { id = "__tok_buy_1__",  qty = 1,  price = 2000  },
+  { id = "__tok_buy_3__",  qty = 3,  price = 6000  },
+  { id = "__tok_buy_5__",  qty = 5,  price = 10000 },
+  { id = "__tok_buy_10__", qty = 10, price = 20000 },
+  { id = "__tok_buy_30__", qty = 30, price = 60000 },
+  { id = "__tok_buy_50__", qty = 50, price = 100000 },
+  { id = "__tok_buy_100__", qty = 100, price = 200000 },
 }
 
 eznpcs.add_event{
@@ -2776,6 +3186,532 @@ eznpcs.add_event{
     end)
   end
 }
+
+eznpcs.add_event{
+  name = "UnlockWhitelistPackage",
+  action = function(npc, player_id, dialogue, relay_object)
+    return async(function()
+      local mug = eznpcs.get_dialogue_mugshot(npc, player_id, dialogue)
+      local ci = build_ci_props(dialogue)
+
+      local package_id = get_ci(ci, "package id") or get_ci(ci, "packageid")
+      local reward_name = tostring(get_ci(ci, "reward name") or get_ci(ci, "reward") or package_id or "that unlock")
+      local already_msg = tostring(get_ci(ci, "already msg") or ("You already unlocked " .. reward_name .. "."))
+      local unlock_msg = tostring(get_ci(ci, "unlock msg") or ("You can now use " .. reward_name .. "!"))
+
+      if not package_id or package_id == "" then
+        await(Async.message_player(
+          player_id,
+          "This NPC is missing a Package ID.",
+          mug.texture_path, mug.animation_path
+        ))
+        return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+      end
+
+      if whitelist.player_has_package_unlocked(player_id, package_id) then
+        await(Async.message_player(
+          player_id,
+          already_msg,
+          mug.texture_path, mug.animation_path
+        ))
+        return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+      end
+
+      local ok, reason = whitelist.unlock_package(player_id, package_id)
+
+      if ok then
+        if sfx and sfx.item_get then
+          Net.play_sound_for_player(player_id, sfx.item_get)
+        end
+
+        await(Async.message_player(
+          player_id,
+          unlock_msg,
+          mug.texture_path, mug.animation_path
+        ))
+      else
+        local fail_msg = (reason == "already_unlocked") and already_msg
+          or "I couldn't unlock that right now."
+
+        await(Async.message_player(
+          player_id,
+          fail_msg,
+          mug.texture_path, mug.animation_path
+        ))
+      end
+
+      return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+    end)
+  end
+}
+
+eznpcs.add_event({
+  name = "chipshop",
+  action = function(npc, player_id, dialogue, relay_object)
+    return async(function()
+      local mug = eznpcs.get_dialogue_mugshot(npc, player_id, dialogue)
+      local ci = build_ci_props(dialogue)
+
+      local title = tostring(get_ci(ci, "shop title") or "Chip Shop")
+      local currency = string.lower(tostring(
+        get_ci(ci, "currency")
+        or get_ci(ci, "currency type")
+        or get_ci(ci, "seller type")
+        or "money"
+      ))
+
+      if currency == "bugfrag" or currency == "bugfrags" or currency == "frags" then
+        currency = "bugfrags"
+      else
+        currency = "money"
+      end
+
+      local not_enough_msg = tostring(
+        get_ci(ci, "not enough msg")
+        or ((currency == "bugfrags") and "You don't have enough BugFrags." or "You don't have enough money.")
+      )
+      local owned_msg = tostring(
+        get_ci(ci, "already owned msg")
+        or "You already bought that chip."
+      )
+
+      local offers = {}
+      local i = 1
+      while true do
+        local sell = get_ci(ci, "sell " .. i)
+        if not sell then break end
+
+        local price = math.max(0, math.floor(tonumber(
+          get_ci(ci, "price " .. i)
+          or get_ci(ci, "cost " .. i)
+          or 0
+        ) or 0))
+
+        local code = tostring(get_ci(ci, "code " .. i) or "*")
+        local card_def = whitelist.get_card_def(sell)
+
+        if card_def then
+          local display_name = tostring(
+            get_ci(ci, "name " .. i)
+            or get_ci(ci, "reward name " .. i)
+            or sell
+          )
+
+          table.insert(offers, {
+            lookup = tostring(sell),
+            package_id = card_def.package_id,
+            price = price,
+            code = code,
+            name = display_name,
+            prop_index = i,
+          })
+        end
+
+        i = i + 1
+      end
+
+      if #offers == 0 then
+        await(Async.message_player(
+          player_id,
+          "Sorry, I'm not selling any chips right now.",
+          mug.texture_path, mug.animation_path
+        ))
+        return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+      end
+
+--=====================================================
+-- NEW: net-games powered shop UI (PromptVertical)
+-- (falls back to existing BBS shop if net-games missing)
+--=====================================================
+local ok_menu, TalkVertMenu_or_err = pcall(require, "scripts/net-games/npcs/talk_vert_menu")
+if ok_menu then
+  local TalkVertMenu = TalkVertMenu_or_err
+  local TalkPresets = require("scripts/net-games/npcs/talk_presets")
+
+  -- If selling for bugfrags, ensure API exists (mirrors fragshop’s safety style)
+  if currency == "bugfrags" and (not ezmemory.get_player_fragments or not ezmemory.spend_player_fragments) then
+    await(Async.message_player(
+      player_id,
+      "BugFrag chip shop isn't available on this server build.",
+      mug.texture_path, mug.animation_path
+    ))
+    return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+  end
+
+  -- Build a PROG-style mugshot, but swap texture/anim to match eznpcs Asset Name/Mugshot.
+  local ez_mug = mug
+  local prog_mug = helpers.deep_copy(TalkPresets.mugs.prog or { enabled = true })
+  prog_mug.texture_path = ez_mug.texture_path
+  prog_mug.anim_path = ez_mug.animation_path
+  prog_mug.sprite_id = nil
+
+  local function normalize_preview_path(p)
+    p = tostring(p or "")
+    if p == "" then return nil end
+
+    -- Add extension if missing
+    if not p:match("%.[%w]+$") then
+      p = p .. ".png"
+    end
+
+    -- Allow full /server/... paths, otherwise treat as relative to /server/assets/
+    if p:sub(1, 7) == "/server/" then
+      return p
+    end
+    if p:sub(1, 1) == "/" then
+      return p -- absolute (leave it)
+    end
+    return "/server/assets/" .. p
+  end
+
+  local preview_dir = tostring(get_ci(ci, "preview dir") or "")
+  local preview_ext = tostring(get_ci(ci, "preview ext") or ".png")
+  if preview_ext ~= "" and preview_ext:sub(1,1) ~= "." then
+    preview_ext = "." .. preview_ext
+  end
+  local preview_template = tostring(get_ci(ci, "preview template") or "")
+
+  local DEFAULT_ICON = "/server/assets/net-games/ui/card_shop_item.png"
+
+  local options = {}
+  local by_choice_id = {}     -- id -> offer
+  local opt_ref_by_id = {}    -- id -> option table (so we can update label to “Owned” after purchase)
+  local icon_by_id = {}       -- id -> texture path
+
+  for idx, offer in ipairs(offers) do
+    local id = tostring(idx)
+    by_choice_id[id] = offer
+
+    local owned = whitelist.player_has_card_unlocked(player_id, offer.package_id)
+    local display_name = owned and (offer.name .. " (Owned)") or offer.name
+
+    options[#options+1] = {
+      id = id,
+      text = display_name,           -- fallback
+      shop_name = display_name,      -- column name (your prompt_vertical column UI)
+      shop_price = tonumber(offer.price) or 0, -- number -> will render as 2k/5m etc in the menu rows
+    }
+    opt_ref_by_id[id] = options[#options]
+
+    -- Resolve preview path:
+    local p = get_ci(ci, "preview " .. tostring(offer.prop_index or idx))
+          or get_ci(ci, "icon " .. tostring(offer.prop_index or idx))
+
+    if (not p or p == "") and preview_template ~= "" then
+      p = preview_template
+        :gsub("{id}",   tostring(offer.lookup))
+        :gsub("{sell}", tostring(offer.lookup))
+        :gsub("{code}", tostring(offer.code or "*"))
+    end
+
+    if (not p or p == "") and preview_dir ~= "" then
+      local dir = preview_dir
+      if dir:sub(-1) ~= "/" then dir = dir .. "/" end
+      p = dir .. tostring(offer.lookup) .. preview_ext
+    end
+
+    p = normalize_preview_path(p)
+
+    -- Avoid engine panic: if asset doesn’t exist, fall back safely.
+    if p and Net and Net.has_asset then
+      local ok, exists = pcall(Net.has_asset, p)
+      if ok and exists == false then
+        p = nil
+      end
+    end
+
+    icon_by_id[id] = p or DEFAULT_ICON
+  end
+
+  options[#options+1] = { id = "exit", text = "Exit" }
+  local exit_index = #options
+
+  -- Pre-provide icons so first-open isn’t blank
+  if Net and Net.provide_asset_for_player then
+    local seen = {}
+    for _, path in pairs(icon_by_id) do
+      if path and not seen[path] then
+        seen[path] = true
+        pcall(Net.provide_asset_for_player, player_id, path)
+      end
+    end
+  end
+
+  -- Slight delay helps first-time icon render on fresh login (same idea as your fishing preload)
+  await(Async.sleep(0.05))
+
+  local layout = TalkPresets.get_vert_menu_layout("prog_prompt_shop") or {}
+  layout.monies_label_text = (currency == "bugfrags") and "FRAGS" or "MONIES"
+
+  local talk_cfg = {
+    preset = "prog_prompt",
+    area_id = Net.get_player_area(player_id),
+    object = "chipshop_" .. tostring(dialogue.id or "shop"),
+    ui = {
+      mugshot = prog_mug,
+      typing_speed = 9999,
+    }
+  }
+
+  local function get_balance(pid)
+    if currency == "bugfrags" then
+      return tonumber(ezmemory.get_player_fragments(pid) or 0) or 0
+    end
+    return tonumber(Net.get_player_money(pid) or 0) or 0
+  end
+
+  -- Make sure input is locked so net-games virtual_input works
+  if Net.lock_player_input then
+    pcall(Net.lock_player_input, player_id)
+  end
+
+  local assets = {
+    menu_bg       = "/server/assets/net-games/ui/prompt_vert_menu_shop_an.png",
+    menu_bg_anim  = "/server/assets/net-games/ui/prompt_vert_menu_an.animation",
+    menu_bg_frame = "/server/assets/net-games/ui/prompt_vert_menu_shop_an_frame.png",
+    highlight     = "/server/assets/net-games/ui/highlight_shop.png",
+  }
+
+  TalkVertMenu.open(player_id, title, talk_cfg, {
+    intro_text = "What would you like?",
+    options = options,
+    exit_index = exit_index,
+    layout = layout,
+    assets = assets,
+
+    monies_amount_fn = function(pid)
+      -- NOTE: no "$" / "M" suffix; your prompt_vertical row formatter does k/m already
+      return tostring(get_balance(pid))
+    end,
+
+    shop_item_texture_fn = function(choice)
+      if not choice or not choice.id then return DEFAULT_ICON end
+      return icon_by_id[tostring(choice.id)] or DEFAULT_ICON
+    end,
+
+    flow = {
+      keep_menu_open = true,
+      after_text = "Anything else?",
+      exit_goodbye_text = "Come again!",
+
+      confirm = {
+        enabled = true,
+        skip_ids = { exit = true },
+        text_fn = function(pid, choice_id)
+          local offer = by_choice_id[tostring(choice_id)]
+          if not offer then return "Buy this?" end
+
+          local have = get_balance(pid)
+          local unit = (currency == "bugfrags") and " BF" or "$"
+          return string.format(
+            "Buy %s for %d%s?\nYou have %d%s",
+            tostring(offer.name),
+            tonumber(offer.price) or 0,
+            unit,
+            have,
+            unit
+          )
+        end,
+      },
+
+      post_select = { enabled = true, skip_ids = { exit = true } },
+    },
+
+    on_confirm_yes = function(pid, choice_id, _choice_text, menu)
+      local offer = by_choice_id[tostring(choice_id)]
+      if not offer then
+        return "Huh? That chip is gone.", "Anything else?"
+      end
+
+      if whitelist.player_has_card_unlocked(pid, offer.package_id) then
+        return owned_msg, "Anything else?"
+      end
+
+      local cost = tonumber(offer.price) or 0
+      if cost < 0 then cost = 0 end
+
+      local paid = true
+      if cost > 0 then
+        if currency == "bugfrags" then
+          paid = ezmemory.spend_player_fragments(pid, cost)
+        else
+          paid = ezmemory.spend_player_money(pid, cost)
+        end
+      end
+
+      if not paid then
+        return not_enough_msg, "Anything else?"
+      end
+
+      local ok, reason = whitelist.unlock_card(pid, offer.lookup, offer.code)
+
+      if not ok then
+        -- refund if unlock failed
+        if cost > 0 then
+          if currency == "bugfrags" then
+            ezmemory.spend_player_fragments(pid, -cost)
+          else
+            ezmemory.spend_player_money(pid, -cost)
+          end
+        end
+
+        local msg = (reason == "already_unlocked")
+          and owned_msg
+          or ("Couldn't unlock that chip (" .. tostring(reason or "error") .. ").")
+
+        return msg, "Anything else?"
+      end
+
+      -- Mark as owned in the menu row immediately
+      local opt = opt_ref_by_id[tostring(choice_id)]
+      if opt then
+        opt.shop_name = tostring(offer.name) .. " (Owned)"
+        opt.text = opt.shop_name
+      end
+
+      -- Force a redraw so the row + balance update immediately
+      if menu and menu.render_menu_contents then
+        pcall(function() menu:render_menu_contents(true) end)
+      end
+
+      if sfx and sfx.item_get then
+        Net.play_sound_for_player(pid, sfx.item_get)
+      end
+
+      return "You bought " .. tostring(offer.name) .. "!", "Anything else?"
+    end,
+  })
+
+  -- IMPORTANT: do not let eznpcs finish the dialogue until the menu is closed,
+  -- otherwise overworld input unlocks and the menu stops receiving inputs.
+  while TalkVertMenu.is_busy and TalkVertMenu.is_busy(player_id) do
+    await(Async.sleep(0.05))
+  end
+
+  return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+else
+  print("[chipshop] failed to load talk_vert_menu:", TalkVertMenu_or_err)
+end
+
+      while true do
+        local posts = {}
+        local items = {}
+
+        for idx, offer in ipairs(offers) do
+          local owned = whitelist.player_has_card_unlocked(player_id, offer.package_id)
+          local price_label = (currency == "bugfrags")
+            and (tostring(offer.price) .. " BF")
+            or short_money(offer.price)
+
+          local label = owned
+            and string.format("%s (%s, Owned)", offer.name, price_label)
+            or  string.format("%s (%s)", offer.name, price_label)
+
+          local post = helpers.create_bbs_option(label)
+          post.id = "__chipshop:" .. tostring(idx)
+          table.insert(posts, post)
+          items[post.id] = offer
+        end
+
+        local balance
+        if currency == "bugfrags" then
+          balance = tonumber(ezmemory.get_player_fragments(player_id) or 0) or 0
+        else
+          balance = tonumber(Net.get_player_money(player_id) or 0) or 0
+        end
+
+        local bal_post = helpers.create_bbs_option(
+          (currency == "bugfrags")
+            and ("Your BugFrags: " .. tostring(balance))
+            or ("Your Money: " .. short_money(balance))
+        )
+        bal_post.id = "__chipshop_balance__"
+        table.insert(posts, bal_post)
+
+        local board = ezmenus.open_menu(player_id, title, COSMETIC_SHOP_COLOR, posts)
+        local sel = await(board.selection_once())
+        Net.close_bbs(player_id)
+
+        if not sel then
+          break
+        end
+
+        if sel ~= "__chipshop_balance__" then
+          local chosen = items[tostring(sel)]
+          if chosen then
+            if whitelist.player_has_card_unlocked(player_id, chosen.package_id) then
+              await(Async.message_player(
+                player_id,
+                owned_msg,
+                mug.texture_path, mug.animation_path
+              ))
+            else
+              local price_label = (currency == "bugfrags")
+                and (tostring(chosen.price) .. " BugFrags")
+                or short_money(chosen.price)
+
+              local confirm = await(Async.question_player(
+                player_id,
+                string.format("Buy %s for %s?", chosen.name, price_label),
+                mug.texture_path, mug.animation_path
+              ))
+
+              if confirm == 1 then
+                local paid = true
+
+                if chosen.price > 0 then
+                  if currency == "bugfrags" then
+                    paid = ezmemory.spend_player_fragments(player_id, chosen.price)
+                  else
+                    paid = ezmemory.spend_player_money(player_id, chosen.price)
+                  end
+                end
+
+                if not paid then
+                  await(Async.message_player(
+                    player_id,
+                    not_enough_msg,
+                    mug.texture_path, mug.animation_path
+                  ))
+                else
+                  local ok, reason, card_def = whitelist.unlock_card(
+                    player_id,
+                    chosen.lookup,
+                    chosen.code
+                  )
+
+                  if ok then
+                    if sfx and sfx.item_get then
+                      Net.play_sound_for_player(player_id, sfx.item_get)
+                    end
+
+                    await(Async.message_player(
+                      player_id,
+                      "You bought " .. chosen.name .. "!",
+                      mug.texture_path, mug.animation_path
+                    ))
+                  else
+                    local msg = (reason == "already_unlocked")
+                      and owned_msg
+                      or ("Couldn't unlock that chip (" .. tostring(reason or "error") .. ").")
+
+                    await(Async.message_player(
+                      player_id,
+                      msg,
+                      mug.texture_path, mug.animation_path
+                    ))
+                  end
+                end
+              end
+            end
+          end
+        end
+      end
+
+      return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+    end)
+  end
+})
 
 -- Repaint any already-revealed paths when players appear in an area
 Net:on("player_join", function(ev)
