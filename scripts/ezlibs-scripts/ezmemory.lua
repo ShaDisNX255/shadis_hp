@@ -1093,19 +1093,29 @@ end
 
 -- ===================== Missing Animation Helpers =====================
 function ezmemory.play_anim_get(player_id)
-    pcall(function()
-        return async(function()
-            local parsed = avatar_utils.parse_player_animation(player_id, "sheet")
-            print(parsed)
-            if parsed and (parsed["animations"]["ITEM_GET"] ~= nil and parsed["animations"]["ITEM_GET_HOLD"]) then
-                --print(parsed["animations"]["ITEM_GET_HOLD"].total_duration_ms)
-                Net.animate_player(player_id, "ITEM_GET", false)
-                await(Async.sleep(tonumber(parsed["animations"]["ITEM_GET"].total_duration_ms)))
-                Net.animate_player(player_id, "ITEM_GET_HOLD", true)
-            else
-                Net.animate_player(player_id, "ITEM_GET", false)
-            end
+    return async(function()
+        local ok, parsed = pcall(function()
+            return avatar_utils.parse_player_animation(player_id, "sheet")
         end)
+
+        if not ok then
+            parsed = nil
+        end
+
+        local animations = parsed and parsed.animations
+        local item_get = animations and animations["ITEM_GET"]
+        local item_get_hold = animations and animations["ITEM_GET_HOLD"]
+
+        if item_get and item_get_hold then
+            Net.animate_player(player_id, "ITEM_GET", false)
+
+            local duration_ms = tonumber(item_get.total_duration_ms) or 500
+            await(Async.sleep(duration_ms / 1000))
+
+            Net.animate_player(player_id, "ITEM_GET_HOLD", true)
+        else
+            Net.animate_player(player_id, "ITEM_GET", false)
+        end
     end)
 end
 

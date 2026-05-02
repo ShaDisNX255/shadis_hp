@@ -767,7 +767,7 @@ local function tournament_prewarm_visual_assets(player_id)
     if constants and constants.bracket_background_path then
       for key, bg in pairs(constants.bracket_background_path) do
         prewarm("__tourney_pre_bg_" .. tostring(key), bg.gradient_texture, constants.default_background_anim_path_bn4, "BG")
-        prewarm("__tourney_pre_grid_" .. tostring(key), bg.grid_texture, constants.default_grid_anim_path_bn4, "UI")
+        prewarm("__tourney_pre_grid_" .. tostring(key), bg.grid_texture, constants.default_grid_anim_path_bn4, "IDLE_UI")
       end
     end
 
