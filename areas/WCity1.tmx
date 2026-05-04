@@ -1377,7 +1377,7 @@
   <object id="239" type="Tournament Board" gid="430" x="1032" y="920" width="37" height="57">
    <properties>
     <property name="Registration Lead Seconds" type="int" value="600"/>
-    <property name="Tournament Every Hours" type="int" value="3"/>
+    <property name="Tournament Every Hours" type="int" value="1"/>
     <property name="Tournament Force PVP HP" value="false"/>
     <property name="Tournament Hour Offset" type="int" value="0"/>
     <property name="Tournament NPC Pool" value="wcity_rank1"/>

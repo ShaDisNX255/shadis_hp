@@ -327,14 +327,14 @@ local NPC_POOLS = {
       mug_texture = "/server/assets/tourney/npc-navis-testing/airman/mug.png",
     }),
 
-    encounter_npc({
-      id = "forte4",
-      display_name = "Forte",
-      alias = "ForteEXE4",
-      rank = "1",
-      weight = 100,
-      mug_texture = "/server/assets/tourney/npc-navis-testing/bass/mug.png",
-    }),
+--    encounter_npc({
+--      id = "forte4",
+--      display_name = "Forte",
+--      alias = "ForteEXE4",
+--      rank = "1",
+--      weight = 100,
+--      mug_texture = "/server/assets/tourney/npc-navis-testing/bass/mug.png",
+--    }),
 
     encounter_npc({
       id = "blastman3",
