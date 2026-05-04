@@ -401,7 +401,7 @@ function collect_datum(player_id, object, datum_id_override, is_quiz)
         else
             local direction = Net.get_player_direction(player_id)
             -- Normal item/money/fragments/tokens reward
-            await(ezmemory.play_anim_get(player_id))
+            ezmemory.play_anim_get(player_id)
             await(ezmemory.give_item_with_optional_notify(player_id, area_id, object.id, item_info))
             ezmemory.set_direction_anim(player_id, direction)
         end
