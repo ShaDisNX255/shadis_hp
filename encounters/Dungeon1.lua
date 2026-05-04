@@ -476,9 +476,9 @@ local MiniBoss3 = {
     weight=0,
     pet_exp=10,
     enemies={
-        {name="ElementMan",rank=4},
+        {name="ElementMan",rank=3},
         {name="JokerEye",rank=1},
-        {name="Sniper",rank=1},
+        {name="Gunner",rank=2},
     },
     obstacles={
     },
@@ -564,6 +564,7 @@ local DUNGEON_VERY_RARE_DROP = {
   [10] = 0.60,
   [9]  = 0.55,
   [8]  = 0.45,
+  [7]  = 0.30,
 }
 
 local function chip_drop(card, chances)
@@ -638,7 +639,7 @@ return {
             random = 100,
         },
 
-        pet_exp = 10,
+        pet_exp = 9,
         allow_duplicates = true,
 
         enemy_count = {

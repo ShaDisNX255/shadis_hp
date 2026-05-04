@@ -66,6 +66,11 @@ local start_queue_tournament
 local BRACKET_SIZE = 8
 local DEFAULT_MUG_ANIM = (constants and constants.default_mug_anim)
   or "/server/assets/tourney/tourney-board-elements/mug.anim"
+local FALLBACK_MUG_TEXTURE = "/server/assets/tourney/npc-navis-testing/mug.png"
+
+-- Last-resort fallback in case you haven't added question/mug.png yet.
+-- Change this to any guaranteed-good mug you already have.
+local LAST_RESORT_MUG_TEXTURE = "/server/assets/tourney/npc-navis-testing/gutsman/mug.png"
 local TOURNAMENT_PVP_HP = 1000
 local EZENCOUNTERS_PACKAGE_PATH = "/server/assets/ezlibs-assets/ezencounters/ezencounters.zip"
 
@@ -649,6 +654,43 @@ local function tournament_safe_has_asset(path)
   return ok and res == true
 end
 
+local function tournament_first_existing_asset(...)
+  for i = 1, select("#", ...) do
+    local path = select(i, ...)
+    if path and path ~= "" and tournament_safe_has_asset(path) then
+      return path
+    end
+  end
+
+  return nil
+end
+
+local function resolve_tournament_mug_texture(participant)
+  local original = participant and participant.mug_texture or nil
+
+  if original and original ~= "" and tournament_safe_has_asset(original) then
+    return original
+  end
+
+  local fallback = tournament_first_existing_asset(
+    FALLBACK_MUG_TEXTURE,
+    LAST_RESORT_MUG_TEXTURE
+  )
+
+  if original and original ~= "" then
+    print(
+      "[tournaments][visual] missing mug for "
+      .. tostring(participant and participant.name or participant and participant.player_id or "???")
+      .. ": "
+      .. tostring(original)
+      .. "; using fallback "
+      .. tostring(fallback)
+    )
+  end
+
+  return fallback
+end
+
 local function tournament_safe_provide(player_id, path)
   if not player_id or not path or path == "" then return end
   if not Net or not Net.provide_asset_for_player then return end
@@ -708,6 +750,10 @@ local function tournament_collect_visual_assets()
   add("/server/assets/tourney/tourney-board-elements/mini-mug-frame.anim")
   add("/server/assets/tourney/title-banner.png")
   add("/server/assets/tourney/title-banner.anim")
+  -- Fallback participant mug if a player mug asset disappears after disconnect.
+  add(FALLBACK_MUG_TEXTURE)
+  add(LAST_RESORT_MUG_TEXTURE)
+  add(DEFAULT_MUG_ANIM)
 
   -- Tournament music.
   add(VISUALS.music)
@@ -1511,23 +1557,32 @@ end
 local function add_participant_mugshot(player_id, tournament, index, participant, pos)
   if not participant or not pos then return end
 
-  local mug_texture = participant.mug_texture
+  local mug_texture = resolve_tournament_mug_texture(participant)
   if not mug_texture or mug_texture == "" then
     return
   end
+
+  local frame_pos = {
+    x = pos.x,
+    y = pos.y,
+    z = (pos.z or 0) + 1,
+  }
 
   draw_ui(
     player_id,
     tournament_visual_id(tournament, "MUG_FRAME_" .. index),
     "/server/assets/tourney/tourney-board-elements/mini-mug-frame.png",
     "/server/assets/tourney/tourney-board-elements/mini-mug-frame.anim",
-    participant.eliminated and "INACTIVE" or "ACTIVE",
-    { x = pos.x, y = pos.y, z = (pos.z or 3) + 1 }
+    "ACTIVE",
+    frame_pos,
+    VISUALS.mug_scale,
+    VISUALS.mug_scale
   )
 
-  draw_ui(
+  local mug_id = tournament_visual_id(tournament, "MUG_" .. index)
+  local mug_ok = draw_ui(
     player_id,
-    tournament_visual_id(tournament, "MUG_" .. index),
+    mug_id,
     mug_texture,
     participant.mug_animation or DEFAULT_MUG_ANIM,
     "UI",
@@ -1535,6 +1590,28 @@ local function add_participant_mugshot(player_id, tournament, index, participant
     VISUALS.mug_scale,
     VISUALS.mug_scale
   )
+
+  -- If the original texture existed when checked but still failed while drawing,
+  -- retry with fallback so one bad mug cannot kill the board.
+  if not mug_ok and mug_texture ~= FALLBACK_MUG_TEXTURE then
+    local fallback = tournament_first_existing_asset(
+      FALLBACK_MUG_TEXTURE,
+      LAST_RESORT_MUG_TEXTURE
+    )
+
+    if fallback then
+      draw_ui(
+        player_id,
+        mug_id,
+        fallback,
+        DEFAULT_MUG_ANIM,
+        "UI",
+        pos,
+        VISUALS.mug_scale,
+        VISUALS.mug_scale
+      )
+    end
+  end
 end
 
 local function remove_participant_mugshot(player_id, tournament, index)
