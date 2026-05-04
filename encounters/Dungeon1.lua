@@ -476,7 +476,7 @@ local MiniBoss3 = {
     weight=0,
     pet_exp=10,
     enemies={
-        {name="ElementMan",rank=3},
+        {name="ElementMan",rank=5},
         {name="JokerEye",rank=1},
         {name="Gunner",rank=2},
     },
