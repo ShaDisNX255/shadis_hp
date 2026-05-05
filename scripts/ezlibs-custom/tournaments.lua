@@ -382,7 +382,7 @@ local NPC_POOLS = {
       id = "elementman3",
       display_name = "ElementMan",
       alias = "ElementMan",
-      rank = "3",
+      rank = "5",
       weight = 50,
       mug_texture = "/server/assets/tourney/npc-navis-testing/cutman/mug.png",
     }),
