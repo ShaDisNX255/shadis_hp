@@ -39,6 +39,12 @@ elseif Input.attach_virtual_input_listener then
   Input.attach_virtual_input_listener()
 end
 
+local object_registry_ok, object_registry = pcall(require, "scripts/ezlibs-scripts/object_registry")
+if not object_registry_ok then
+  object_registry = nil
+  print("[tournaments] WARNING: object_registry could not be loaded; scheduled tournament announcements require board interaction first")
+end
+
 local function require_visual_module(label, path)
   local ok, mod = pcall(require, path)
   if not ok then
@@ -1227,6 +1233,40 @@ local function get_board_queue(area_id, object_id, object)
   return queue
 end
 
+local function scan_tournament_boards_for_scheduler()
+  if not TableUtils or not TableUtils.GetAllTiledObjOfXType then
+    return 0
+  end
+
+  local created = 0
+
+  for _, area_id in ipairs(Net.list_areas() or {}) do
+    local ok, boards = pcall(TableUtils.GetAllTiledObjOfXType, area_id, "Tournament Board")
+
+    if ok and type(boards) == "table" then
+      for _, object in ipairs(boards) do
+        if object and object.id then
+          local key = board_key(area_id, object.id)
+
+          if not board_queues[key] then
+            get_board_queue(area_id, object.id, object)
+            created = created + 1
+          else
+            -- Refresh props in case the map/object data became available after initial scan.
+            get_board_queue(area_id, object.id, object)
+          end
+        end
+      end
+    end
+  end
+
+  if created > 0 then
+    print("[tournaments][scheduler] initialized " .. tostring(created) .. " tournament board queue(s)")
+  end
+
+  return created
+end
+
 local function get_npc_pool_for_queue(queue)
   local key = queue and queue.npc_pool_key or "default"
   return NPC_POOLS[key] or NPC_POOLS.default or NPC_POOL
@@ -1575,8 +1615,8 @@ local function add_participant_mugshot(player_id, tournament, index, participant
     "/server/assets/tourney/tourney-board-elements/mini-mug-frame.anim",
     "ACTIVE",
     frame_pos,
-    VISUALS.mug_scale,
-    VISUALS.mug_scale
+    2.0,
+    2.0
   )
 
   local mug_id = tournament_visual_id(tournament, "MUG_" .. index)
@@ -1591,8 +1631,6 @@ local function add_participant_mugshot(player_id, tournament, index, participant
     VISUALS.mug_scale
   )
 
-  -- If the original texture existed when checked but still failed while drawing,
-  -- retry with fallback so one bad mug cannot kill the board.
   if not mug_ok and mug_texture ~= FALLBACK_MUG_TEXTURE then
     local fallback = tournament_first_existing_asset(
       FALLBACK_MUG_TEXTURE,
@@ -2419,8 +2457,7 @@ local function build_queue_summary(queue)
   else
     lines[#lines + 1] = "Registered players:"
     for i, participant in ipairs(queue.participants or {}) do
-      local host_mark = participant.player_id == queue.host_player_id and " [Host]" or ""
-      lines[#lines + 1] = tostring(i) .. ". " .. participant_name(participant) .. host_mark
+      lines[#lines + 1] = tostring(i) .. ". " .. participant_name(participant)
     end
   end
 
@@ -3361,6 +3398,37 @@ start_queue_tournament = function(queue, starter_id, automatic)
   return true
 end
 
+local function rewatch_eliminated_participant(tournament, player_id)
+  if not tournament or not Net.is_player(player_id) then
+    return false, "Tournament not found."
+  end
+
+  local participant = get_player_participant(tournament, player_id)
+
+  if not participant
+    or participant.kind ~= "player"
+    or not participant.eliminated
+    or participant.is_spectator_only
+  then
+    return false, "You're already in this tournament."
+  end
+
+  participant.wants_updates = true
+  participant.spectating = true
+
+  set_player_tournament_input_locked(player_id, true)
+
+  message_player_safe(player_id, "Now watching the tournament again. Press B during updates to stop watching.")
+
+  if tournament.active_spectator_match then
+    restore_battle_progress_if_needed(tournament, participant)
+  else
+    draw_tournament_board_for_player(player_id, tournament, "before_round")
+  end
+
+  return true
+end
+
 local function add_player_as_spectator(tournament, player_id)
   if not tournament or not Net.is_player(player_id) then
     return false, "Tournament not found."
@@ -3371,6 +3439,18 @@ local function add_player_as_spectator(tournament, player_id)
   end
 
   if player_to_tournament[player_id] then
+    if player_to_tournament[player_id] == tournament.id then
+      local participant = get_player_participant(tournament, player_id)
+
+      if participant
+        and participant.kind == "player"
+        and participant.eliminated
+        and not participant.is_spectator_only
+      then
+        return rewatch_eliminated_participant(tournament, player_id)
+      end
+    end
+
     return false, "You're already in a tournament or spectating one."
   end
 
@@ -3675,6 +3755,21 @@ Net:on("tick", function(event)
   end
 end)
 
+if object_registry and object_registry.register_handler then
+  object_registry.register_handler("Tournament Board", function(area_id, object)
+    if not object or not object.id then return end
+
+    local queue = get_board_queue(area_id, object.id, object)
+
+    print(
+      "[tournaments][object_registry] initialized board queue "
+      .. tostring(queue and queue.key)
+      .. " name="
+      .. tostring(queue and queue.name)
+    )
+  end, false)
+end
+
 Net:on("object_interaction", function(event)
   if event.button ~= 0 then
     return
@@ -3688,12 +3783,26 @@ Net:on("object_interaction", function(event)
     return
   end
 
+  local queue = get_board_queue(area_id, event.object_id, object)
+
   if player_to_tournament[player_id] then
+    local tournament = queue.active_tournament_id and active_tournaments[queue.active_tournament_id] or nil
+    local participant = get_player_participant(tournament, player_id)
+
+    if queue.status == "running"
+      and tournament
+      and participant
+      and participant.kind == "player"
+      and participant.eliminated
+    then
+      open_tournament_menu(player_id, queue)
+      return
+    end
+
     message_player_safe(player_id, "You're already in a tournament.")
     return
   end
 
-  local queue = get_board_queue(area_id, event.object_id, object)
   open_tournament_menu(player_id, queue)
 end)
 
