@@ -58,7 +58,7 @@ f7fdaa7ff00df8719942580daf4c7581 com.shadishp.block.duov2.blue
 926948c190aed4bd4b8320d981dec325 com.Loui.player.Elecman.basic
 3482863148ae4ffbc4dfe800d5e703f6 com.beaned.navi.megamanbn6.basic
 95f9abcdec7e81504d6ff841d1654932 com.scilabs.cossack.player.fortepvp.basic
-8368a79a70a92bb59ee755fc405aa04d com.shadis.navi.adventure.Luigi.basic
+d4a3031ff664c1ec351902c7dc796b96 com.shadis.navi.adventure.Luigi.basic
 6c78689ae81f84cb00c399e730849cb2 com.discord.imagiknight#0510.player.OreoEXEB
 b6de28d83fe9a2d5e7ad0965bc532644 61.Mannerek.Unified.Library
 08ec366a2374c067da789b744ac92540 com.silva.navi.zarymura.adventure
