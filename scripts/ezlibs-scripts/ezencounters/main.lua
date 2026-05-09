@@ -229,21 +229,30 @@ local function _result_flags(stats)
     }
 end
 
-local function _apply_area_result_awards(player_id, area_table, encounter_info, stats)
+local function _apply_area_result_awards(player_id, area_table, encounter_info, stats, options)
+    options = options or {}
+
+    local function persist_if_allowed(persist_stats)
+        if options.skip_health_persist then
+            return
+        end
+
+        _persist_health_and_emotion(player_id, persist_stats)
+    end
     local rewards_cfg = area_table and area_table.rewards
     if not rewards_cfg then
         return false
     end
 
     if rewards_cfg.enabled == false then
-        _persist_health_and_emotion(player_id, stats)
+        persist_if_allowed(stats)
         return true
     end
 
     local flags = _result_flags(stats)
 
     if not flags.won then
-        _persist_health_and_emotion(player_id, stats)
+        persist_if_allowed(stats)
         return true
     end
 
@@ -335,7 +344,7 @@ local function _apply_area_result_awards(player_id, area_table, encounter_info, 
         end
     end
 
-    _persist_health_and_emotion(player_id, {
+    persist_if_allowed({
         health = hp + hp_bonus,
         emotion = stats and stats.emotion or 0
     })
@@ -1182,27 +1191,46 @@ Net:on("battle_results", function(event)
 
         local area_table = area_id and area_encounter_tables[area_id] or nil
 
-        -- Always apply area rewards if this area defines them.
-        -- This is what makes rewards = { money=..., health=... } actually work.
-        _apply_area_result_awards(player_id, area_table, encounter_info or final_encounter_info, event)
-
         -- Run any encounter/area result callbacks once each.
+        -- Do this BEFORE shared area rewards so custom encounter packets
+        -- like Dungeon1 boss money/HP/BugFrags get first shot at the result screen.
         local ran_callbacks = {}
+        local custom_result_callback_ran = false
 
         local function run_result_callback(cb, info)
             if type(cb) == "function" and not ran_callbacks[cb] then
                 ran_callbacks[cb] = true
+                custom_result_callback_ran = true
                 cb(player_id, info or encounter_info or final_encounter_info, event)
             end
         end
 
+        local is_random_encounter =
+            (encounter_info and encounter_info._random_encounter == true)
+            or (final_encounter_info and final_encounter_info._random_encounter == true)
+
         run_result_callback(encounter_info and encounter_info.results_callback, encounter_info)
         run_result_callback(final_encounter_info and final_encounter_info.results_callback, final_encounter_info)
         run_result_callback(area_table and area_table.results_callback, encounter_info or final_encounter_info)
-        run_result_callback(
-            area_table and area_table.random_encounters and area_table.random_encounters.results_callback,
-            encounter_info or final_encounter_info
-        )
+
+        -- Only run the random_encounters callback for generated random battles.
+        -- Static/named encounters like Dungeon1 MiniBoss/MainBoss should not also run give_result_awards.
+        if is_random_encounter then
+            run_result_callback(
+                area_table and area_table.random_encounters and area_table.random_encounters.results_callback,
+                encounter_info or final_encounter_info
+            )
+        end
+
+        local skip_shared_area_rewards =
+            (encounter_info and encounter_info.skip_shared_area_rewards == true)
+            or (final_encounter_info and final_encounter_info.skip_shared_area_rewards == true)
+
+            if not skip_shared_area_rewards then
+                _apply_area_result_awards(player_id, area_table, encounter_info or final_encounter_info, event, {
+                    skip_health_persist = custom_result_callback_ran
+                })
+            end
 
         players_in_encounters[player_id] = nil
     end

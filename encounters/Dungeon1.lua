@@ -364,14 +364,19 @@ local mini_boss_rewards = function (player_id, encounter_info, stats)
   local bugfrag_amount = (math.random(100) <= 5) and 1 or 0
 
   local rewards = {}
-  if monies > 0 then
-    table.insert(rewards, { type = 0, value = monies })  -- 0=Money
+
+  -- Put BugFrags first so the battle result screen has the best chance to show it.
+  -- If the client only displays the first 1-2 reward entries, placing this last hides it.
+  if bugfrag_amount > 0 then
+    table.insert(rewards, { type = 3, value = bugfrag_amount }) -- 3=BugFrags
   end
+
   if hp_bonus > 0 then
     table.insert(rewards, { type = 2, value = hp_bonus }) -- 2=Health+
   end
-  if bugfrag_amount > 0 then
-    table.insert(rewards, { type = 3, value = bugfrag_amount }) -- 3=BugFrags
+
+  if monies > 0 then
+    table.insert(rewards, { type = 0, value = monies })  -- 0=Money
   end
 
   if #rewards > 0 then
@@ -396,6 +401,7 @@ local MiniBoss1 = {
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     weight=0,
     pet_exp=10,
+    skip_shared_area_rewards = true,
     enemies={
         {name="HeelNavi",rank=4},
         {name="Swordy",rank=3},
@@ -435,6 +441,7 @@ local MiniBoss2 = {
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     weight=0,
     pet_exp=10,
+    skip_shared_area_rewards = true,
     enemies={
         {name="Noir",rank=1},
         {name="Metrid",rank=2},
@@ -475,6 +482,7 @@ local MiniBoss3 = {
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     weight=0,
     pet_exp=10,
+    skip_shared_area_rewards = true,
     enemies={
         {name="ElementMan",rank=5},
         {name="JokerEye",rank=1},
@@ -515,6 +523,7 @@ local MainBoss = {
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     weight=0,
     pet_exp=12,
+    skip_shared_area_rewards = true,
     enemies={
         {name="MegaBunny",rank=1},
         {name="ShadeMan",rank=1},
