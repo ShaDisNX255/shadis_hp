@@ -44,6 +44,114 @@ local cargo_schedule = {}
 local passenger_cache = {}
 local track_cache = {}
 local player_using_train_menu = {}
+local active_train_trips = {}
+local train_trip_serial = 0
+
+local function safe_net_call(fn, ...)
+    if type(fn) ~= "function" then
+        return false, nil
+    end
+
+    local ok, result = pcall(fn, ...)
+    if not ok then
+        print("[trains] Safe Net call failed: " .. tostring(result))
+        return false, nil
+    end
+
+    return true, result
+end
+
+local function is_player_connected(player_id)
+    if not player_id then
+        return false
+    end
+
+    if Net.is_player then
+        local ok, result = safe_net_call(Net.is_player, player_id)
+        return ok and result == true
+    end
+
+    -- This project targets server versions that expose Net.is_player(). If an older
+    -- server does not have it, do not probe the player with another Net getter here,
+    -- because some getters can panic when handed a stale player_id.
+    return true
+end
+
+local function ensure_track_state(area_id, train_name)
+    if not area_id or not train_name then
+        return nil
+    end
+
+    if not track_cache[area_id] then
+        track_cache[area_id] = {}
+    end
+    if not track_cache[area_id][train_name] then
+        track_cache[area_id][train_name] = {}
+    end
+
+    return track_cache[area_id][train_name]
+end
+
+local function set_track_occupied(area_id, train_name, occupied)
+    local track = ensure_track_state(area_id, train_name)
+    if track then
+        track['occupied'] = occupied
+    end
+end
+
+local function safe_remove_bot(bot_id)
+    if bot_id then
+        safe_net_call(Net.remove_bot, bot_id, false)
+    end
+end
+
+local function begin_train_trip(player_id, area_id, train_name, phase)
+    train_trip_serial = train_trip_serial + 1
+
+    active_train_trips[player_id] = {
+        token = train_trip_serial,
+        area_id = area_id,
+        train_name = train_name,
+        phase = phase or "unknown"
+    }
+
+    return train_trip_serial
+end
+
+local function finish_train_trip(player_id, token)
+    local trip = active_train_trips[player_id]
+    if trip and trip.token == token then
+        active_train_trips[player_id] = nil
+    end
+end
+
+local function train_trip_is_alive(player_id, token)
+    local trip = active_train_trips[player_id]
+    return trip ~= nil
+        and trip.token == token
+        and is_player_connected(player_id)
+end
+
+local function remember_trip_destination(player_id, token, destination_area_id, destination_train_name)
+    local trip = active_train_trips[player_id]
+    if trip and trip.token == token then
+        trip.destination_area_id = destination_area_id
+        trip.destination_train_name = destination_train_name
+    end
+end
+
+local function clear_player_train_state(player_id)
+    local trip = active_train_trips[player_id]
+    if trip then
+        set_track_occupied(trip.area_id, trip.train_name, false)
+        set_track_occupied(trip.destination_area_id, trip.destination_train_name, false)
+    end
+
+    active_train_trips[player_id] = nil
+    passenger_cache[player_id] = nil
+    player_using_train_menu[player_id] = false
+end
+
 local server_timer = 60
 
 --purpose: splits a string based on a delimiter
@@ -77,6 +185,9 @@ function await(v) return Async.await(v) end
 local function summon_arriving_passenger_train(player_id)
     
         --Clear player specific cache
+        if not is_player_connected(player_id) or not passenger_cache[player_id] or not passenger_cache[player_id]['train'] then
+            return false
+        end
 
         Net.fade_player_camera(player_id, {r=0, g=0, b=0, a=255}, 0)
         Net.play_sound_for_player(player_id, "/server/assets/indy-trains/train_arrive_short.ogg")
@@ -85,6 +196,7 @@ local function summon_arriving_passenger_train(player_id)
         passenger_cache[player_id]['train'] = ""
         passenger_cache[player_id]['intransit'] = false
         local area_id = Net.get_player_area(player_id)
+        local trip_token = begin_train_trip(player_id, area_id, train_name, "arriving")
         local train = train_cache[area_id][train_name]
         local trainProps = train.custom_properties
         local direction = trainProps["Direction"]
@@ -162,15 +274,36 @@ local function summon_arriving_passenger_train(player_id)
         end 
 
         local pedestal_id = train.name..'-pedestal-'..area_id
+        local arriving_bot_ids = {driver_id, car_id, engine_id}
         if direction == "DR" or direction == "DL" then
+            table.insert(arriving_bot_ids, pedestal_id)
             --spawn pedestal
             local pedestal = Net.create_bot(pedestal_id,{name="", area_id=area_id, texture_path="/server/assets/indy-trains/pedestal.png", animation_path="/server/assets/indy-trains/pedestal_"..trainProps["Color"]..".animation", x=trainProps["startX"], y=trainProps["startY"], z=trainProps["trainZ"], solid=false,warp_in=false })
+        end
+
+        local function abort_arrival()
+            for _, bot_id in ipairs(arriving_bot_ids) do
+                safe_remove_bot(bot_id)
+            end
+            set_track_occupied(area_id, train_name, false)
+            finish_train_trip(player_id, trip_token)
+            return false
+        end
+
+        local function arrival_alive()
+            if train_trip_is_alive(player_id, trip_token) then
+                return true
+            end
+
+            abort_arrival()
+            return false
         end
 
         start_to_stop = trainProps["Duration Start to Stop"]
         stop_to_end = trainProps["Duration Stop to End"]
     return async(function ()
         await(Async.sleep(.1))
+        if not arrival_alive() then return false end
         --Move player with Train to Station
         if direction == "DR" then
             local keyframes = {{properties={{property="Animation",value="IDLE_"..direction},{property="X",ease="Out",value=(trainProps["startX"]+1.5-.5+trainProps["offset"])},{property="Y",ease="Out",value=(trainProps["startY"]+1.35+trainProps["offset"])}},duration=0}}
@@ -211,10 +344,12 @@ local function summon_arriving_passenger_train(player_id)
         end
 
         await(Async.sleep(start_to_stop+1))
+        if not arrival_alive() then return false end
 
         --Animate Light Path 
         local lightpath_id = train.name..'-light-'..area_id
         local lightpath = Net.create_bot(lightpath_id,{name="", area_id=area_id, texture_path="/server/assets/indy-trains/lightpath.png", animation_path="/server/assets/indy-trains/lightpath_"..trainProps["Color"]..".animation", x=trainProps["stopX"]+.5+light_offset_x, y=trainProps["stopY"]+.5+light_offset_y, z=trainProps["trainZ"], solid=false,warp_in=false })
+        table.insert(arriving_bot_ids, lightpath_id)
 
         local keyframes = {{properties={{property="Animation",value="IDLE_"..direction},{property="X",value=trainProps["stopX"]+.5+light_offset_x},{property="Y",value=trainProps["stopY"]+.5+light_offset_y}},duration=0}}
         keyframes[#keyframes+1] = {properties={{property="X",ease="Linear",value=trainProps["stopX"]+.5+light_offset_x},{property="Y",ease="Linear",value=trainProps["stopY"]+.5+light_offset_y}},duration=0}
@@ -222,6 +357,7 @@ local function summon_arriving_passenger_train(player_id)
         Net.play_sound_for_player(player_id, "/server/assets/indy-trains/train_jingle.ogg")
 
         await(Async.sleep(.5))
+        if not arrival_alive() then return false end
 
         --Animation for Player Disembarking train
         if direction == "DR" then
@@ -247,6 +383,7 @@ local function summon_arriving_passenger_train(player_id)
 
         end 
         await(Async.sleep(1.5))
+        if not arrival_alive() then return false end
 
         Net.play_sound_for_player(player_id, "/server/assets/indy-trains/train_away.ogg")
 
@@ -288,6 +425,7 @@ local function summon_arriving_passenger_train(player_id)
         await(Async.sleep(.5))
         --Unoccupy track
         track_cache[area_id][train_name]['occupied'] = false
+        finish_train_trip(player_id, trip_token)
     end)    
 end
 
@@ -329,10 +467,7 @@ local function summon_departing_passenger_train(player_id,post_id)
         return false
     end 
 
-    if not track_cache[area_id] then
-        track_cache[area_id] = {}
-        track_cache[area_id][train_name] = {}
-    end
+    ensure_track_state(area_id, train_name)
 
     if track_cache[area_id][train_name]['occupied'] ~= true then
 
@@ -342,11 +477,31 @@ local function summon_departing_passenger_train(player_id,post_id)
         end
         passenger_cache[player_id]['intransit'] = true
         passenger_cache[player_id]['train'] = train_name
+        local trip_token = begin_train_trip(player_id, area_id, train_name, "departing")
 
         return async(function ()
             local train = train_cache[area_id][train_name]
             local trainProps = train.custom_properties
             track_cache[area_id][train_name]['occupied'] = true
+            local departing_bot_ids = {}
+
+            local function abort_departure()
+                for _, bot_id in ipairs(departing_bot_ids) do
+                    safe_remove_bot(bot_id)
+                end
+                set_track_occupied(area_id, train_name, false)
+                finish_train_trip(player_id, trip_token)
+                return false
+            end
+
+            local function departure_alive()
+                if train_trip_is_alive(player_id, trip_token) then
+                    return true
+                end
+
+                abort_departure()
+                return false
+            end
             
             local direction = trainProps["Direction"]
             local car_offset_x = 0
@@ -409,6 +564,7 @@ local function summon_departing_passenger_train(player_id,post_id)
                 light_offset_x = .28
                 light_offset_y = .8
             end 
+            if not departure_alive() then return false end
             --Spawning Train Bots
             local driver_id = train.name..'-driver-'..area_id
             local driver = Net.create_bot(driver_id,{name="", area_id=area_id, texture_path=trainProps["Driver Texture"], animation_path=trainProps["Driver Animation"], x=trainProps["startX"], y=trainProps["startY"], z=trainProps["trainZ"], solid=false,warp_in=false })
@@ -417,8 +573,10 @@ local function summon_departing_passenger_train(player_id,post_id)
             local engine_id = train.name..'-engine-'..area_id
             local driver = Net.create_bot(engine_id,{name="", area_id=area_id, texture_path="/server/assets/indy-trains/"..trainProps["Color"].."_train.png", animation_path="/server/assets/indy-trains/"..trainProps["Color"].."_train.animation", x=trainProps["startX"], y=trainProps["startY"], z=trainProps["trainZ"], solid=false,warp_in=false })
             local pedestal_id = train.name..'-pedestal-'..area_id
+            departing_bot_ids = {driver_id, car_id, engine_id}
             
             if direction == "DR" or direction == "DL" then
+                table.insert(departing_bot_ids, pedestal_id)
                 pedestal = Net.create_bot(pedestal_id,{name="", area_id=area_id, texture_path="/server/assets/indy-trains/pedestal.png", animation_path="/server/assets/indy-trains/pedestal_"..trainProps["Color"]..".animation", x=trainProps["startX"], y=trainProps["startY"], z=trainProps["trainZ"], solid=false,warp_in=false })
             end
 
@@ -444,10 +602,12 @@ local function summon_departing_passenger_train(player_id,post_id)
             end
             Net.play_sound_for_player(player_id, "/server/assets/indy-trains/train_arrive.ogg")
             await(Async.sleep(start_to_stop+1))
+            if not departure_alive() then return false end
 
             --Light Path Animation
             local lightpath_id = train.name..'-light-'..area_id
             local lightpath = Net.create_bot(lightpath_id,{name="", area_id=area_id, texture_path="/server/assets/indy-trains/lightpath.png", animation_path="/server/assets/indy-trains/lightpath_"..trainProps["Color"]..".animation", x=trainProps["stopX"]+.5+light_offset_x, y=trainProps["stopY"]+.5+light_offset_y, z=trainProps["trainZ"], solid=false,warp_in=false })
+            table.insert(departing_bot_ids, lightpath_id)
 
             local keyframes = {{properties={{property="Animation",value="IDLE_"..direction},{property="X",value=trainProps["stopX"]+.5+light_offset_x},{property="Y",value=trainProps["stopY"]+.5+light_offset_y}},duration=0}}
             keyframes[#keyframes+1] = {properties={{property="X",ease="Linear",value=trainProps["stopX"]+.5+light_offset_x},{property="Y",ease="Linear",value=trainProps["stopY"]+.5+light_offset_y}},duration=0}
@@ -455,10 +615,15 @@ local function summon_departing_passenger_train(player_id,post_id)
             Net.play_sound_for_player(player_id, "/server/assets/indy-trains/train_jingle.ogg")
 
             await(Async.sleep(1.5))
+            if not departure_alive() then return false end
             Net.play_sound_for_player(player_id, "/server/assets/indy-trains/train_depart.ogg")
 
             --Animation for Player boarding train
+            if not departure_alive() then return false end
             local player_position = Net.get_player_position(player_id)
+            if not player_position then
+                return abort_departure()
+            end
             --Change player movements based on train direction 
             if direction == "DR" then --DONE
                 --Animation for Player Boarding Train
@@ -467,8 +632,10 @@ local function summon_departing_passenger_train(player_id,post_id)
                 keyframes[#keyframes+1] = {properties={{property="Animation",value="IDLE_"..direction}},duration=0}
                 Net.animate_player_properties(player_id, keyframes) 
                 await(Async.sleep(1.25))
+                if not departure_alive() then return false end
                 Net.remove_bot(lightpath_id,false)
                 await(Async.sleep(.25))
+                if not departure_alive() then return false end
 
                 --Animation for Train and Player Departing Platform
                 local keyframes = {{properties={{property="Animation",value="IDLE_"..direction},{property="X",ease="In",value=(trainProps["stopX"]+1.5-.5+trainProps["offset"])},{property="Y",ease="In",value=(trainProps["stopY"]+1.35+trainProps["offset"])}},duration=0}}
@@ -482,8 +649,10 @@ local function summon_departing_passenger_train(player_id,post_id)
                 keyframes[#keyframes+1] = {properties={{property="Animation",value="IDLE_"..direction}},duration=0}
                 Net.animate_player_properties(player_id, keyframes) 
                 await(Async.sleep(1.25))
+                if not departure_alive() then return false end
                 Net.remove_bot(lightpath_id,false)
                 await(Async.sleep(.25))
+                if not departure_alive() then return false end
                 --Animation for Train and Player Departing Platform
                 local keyframes = {{properties={{property="Animation",value="IDLE_"..direction},{property="X",ease="In",value=(trainProps["stopX"]+2.15+trainProps["offset"])},{property="Y",ease="In",value=(trainProps["stopY"]+1.4+trainProps["offset"])}},duration=0}}
                 keyframes[#keyframes+1] = {properties={{property="Animation",value="IDLE_"..direction},{property="X",ease="In",value=trainProps["endX"]+2.15+trainProps["offset"]},{property="Y",ease="In",value=trainProps["endY"]+1.4+trainProps["offset"]}},duration=stop_to_end}
@@ -496,8 +665,10 @@ local function summon_departing_passenger_train(player_id,post_id)
                 keyframes[#keyframes+1] = {properties={{property="Animation",value="IDLE_"..direction}},duration=0}
                 Net.animate_player_properties(player_id, keyframes) 
                 await(Async.sleep(1.25))
+                if not departure_alive() then return false end
                 Net.remove_bot(lightpath_id,false)
                 await(Async.sleep(.25))
+                if not departure_alive() then return false end
                 --Animation for Train and Player Departing Platform
                 local keyframes = {{properties={{property="Animation",value="IDLE_"..direction},{property="X",ease="In",value=(trainProps["stopX"]+1.4+trainProps["offset"])},{property="Y",ease="In",value=(trainProps["stopY"]+2.4+trainProps["offset"])}},duration=0}}
                 keyframes[#keyframes+1] = {properties={{property="Animation",value="IDLE_"..direction},{property="X",ease="In",value=trainProps["endX"]+1.4+trainProps["offset"]},{property="Y",ease="In",value=trainProps["endY"]+2.4+trainProps["offset"]}},duration=stop_to_end}
@@ -509,8 +680,10 @@ local function summon_departing_passenger_train(player_id,post_id)
                 keyframes[#keyframes+1] = {properties={{property="Animation",value="IDLE_"..direction}},duration=0}
                 Net.animate_player_properties(player_id, keyframes) 
                 await(Async.sleep(1.25))
+                if not departure_alive() then return false end
                 Net.remove_bot(lightpath_id,false)
                 await(Async.sleep(.25))
+                if not departure_alive() then return false end
                 --Animation for Train and Player Departing Platform
                 local keyframes = {{properties={{property="Animation",value="IDLE_"..direction},{property="X",ease="In",value=(trainProps["stopX"]+1.3+trainProps["offset"])},{property="Y",ease="In",value=(trainProps["stopY"]+1.05+trainProps["offset"])}},duration=0}}
                 keyframes[#keyframes+1] = {properties={{property="Animation",value="IDLE_"..direction},{property="X",ease="In",value=trainProps["endX"]+1.3+trainProps["offset"]},{property="Y",ease="In",value=trainProps["endY"]+1.05+trainProps["offset"]}},duration=stop_to_end}
@@ -534,10 +707,15 @@ local function summon_departing_passenger_train(player_id,post_id)
             end
             local fade_wait = stop_to_end/3
             await(Async.sleep(2*(fade_wait)))
+            if not departure_alive() then return false end
             Net.fade_player_camera(player_id, {r=0, g=0, b=0, a=255}, fade_wait)
             local player_position = Net.get_player_position(player_id)
+            if not player_position then
+                return abort_departure()
+            end
             Net.slide_player_camera(player_id, player_position.x, player_position.y, player_position.z, fade_wait)
             await(Async.sleep(fade_wait-.5))
+            if not departure_alive() then return false end
             Net.move_bot(engine_id,trainProps["endY"]+.5+train_offset_x,trainProps["endY"]+.5+train_offset_y,trainProps["Train Z"])
             Net.move_bot(driver_id,trainProps["endX"]+.5+driver_offset_x,trainProps["endY"]+.5+driver_offset_y,trainProps["Train Z"])
             Net.move_bot(car_id,trainProps["endX"]+.5+car_offset_x,trainProps["endY"]+.5+car_offset_y,trainProps["Train Z"])
@@ -555,6 +733,8 @@ local function summon_departing_passenger_train(player_id,post_id)
             --Clear the track so a new train can be requested
             track_cache[area_id][train_name]['occupied'] = false
 
+            if not departure_alive() then return false end
+
             --Handle an Area-to-Area transfer
             if destination_type == "area" then 
                 local destination_train = train_cache[destination_id][train_name]
@@ -565,8 +745,11 @@ local function summon_departing_passenger_train(player_id,post_id)
                 if not track_cache[destination_id][train_name] then
                     track_cache[destination_id][train_name] = {}
                 end
+                remember_trip_destination(player_id, trip_token, destination_id, train_name)
                 track_cache[destination_id][train_name]['occupied'] = true
             
+                if not departure_alive() then return false end
+
                 if direction == "DR" then
                     Net.transfer_player(player_id, destination_id, false, destination_trainProps["startX"]+1,destination_trainProps["startY"]+1.5,destination_trainProps["platformZ"], direction)    
                 elseif direction == "UL" then
@@ -587,11 +770,12 @@ local function summon_departing_passenger_train(player_id,post_id)
                 local address = server_parts[1]
                 local server_area = server_data[2]
                 local server_train = server_data[3]
+                if not departure_alive() then return false end
                 Net.transfer_server(player_id, server_parts[1], server_parts[2], false, "trains__"..server_area.."__"..server_train) 
             end 
         end)
     else 
-        local conductor = conductor_cache[area_id]['conductor-'..train.name..'-'..area_id]
+        local conductor = conductor_cache[area_id]['conductor-'..train_name..'-'..area_id]
         Net.message_player(player_id, "Another train is on the track, please wait for further traffic clearance.", conductor.custom_properties["Mug Texture"], conductor.custom_properties["Mug Animation"]) 
         
     end
@@ -1159,13 +1343,10 @@ Net:on("actor_interaction", function(event)
 end)
 
 Net:on("player_disconnect", function(event)
-    -- if a player disconnects we need to clear certain trackers
-    if player_using_train_menu[event.player_id] then 
-        player_using_train_menu[event.player_id] = false
-    end 
-    if passenger_cache[event.player_id] then
-        passenger_cache[event.player_id]['intransit'] = false
-    end 
+    -- If a player disconnects during a train animation, any async train coroutine
+    -- may still wake up later. Clear this state so those coroutines can detect
+    -- the stale player_id and stop before calling player-specific Net APIs.
+    clear_player_train_state(event.player_id)
 end)
 
 
