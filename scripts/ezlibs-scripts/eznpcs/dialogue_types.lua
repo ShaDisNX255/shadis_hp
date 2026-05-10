@@ -82,6 +82,29 @@ local function get_chip_display_name(card_def, fallback_key)
     return tostring(fallback_key or "BattleChip")
 end
 
+local function stop_chip_item_get_anim(player_id)
+    local direction = nil
+
+    -- Prefer the server's current player direction if available.
+    if Net.get_player_direction then
+        local ok, result = pcall(Net.get_player_direction, player_id)
+        if ok then
+            direction = result
+        end
+    end
+
+    -- Fallback in case this server build doesn't expose get_player_direction.
+    if not direction or direction == "" then
+        direction = "Down"
+    end
+
+    if ezmemory.set_direction_anim then
+        pcall(ezmemory.set_direction_anim, player_id, direction)
+    else
+        pcall(Net.animate_player, player_id, "IDLE_D", true)
+    end
+end
+
 local function notify_chip_get(player_id, chip_name, notify_player)
     return async(function()
         if notify_player ~= true then
@@ -93,12 +116,18 @@ local function notify_chip_get(player_id, chip_name, notify_player)
             pcall(Net.play_sound_for_player, player_id, NG_SHOP_ITEM_GET_SFX)
         end
 
-        -- Optional, but nice: use your existing item-get animation helper if present.
+        local started_anim = false
+
         if ezmemory.play_anim_get then
-            pcall(ezmemory.play_anim_get, player_id)
+            local ok = pcall(ezmemory.play_anim_get, player_id)
+            started_anim = ok
         end
 
         await(Async.message_player(player_id, "Got " .. tostring(chip_name) .. "!"))
+
+        if started_anim then
+            stop_chip_item_get_anim(player_id)
+        end
     end)
 end
 
