@@ -48,6 +48,60 @@ local function get_dialogue_chip_keys(dialogue)
     return keys
 end
 
+local function get_chip_display_name(card_def, fallback_key)
+    if card_def then
+        if card_def.name then
+            return tostring(card_def.name)
+        end
+
+        if card_def.display_name then
+            return tostring(card_def.display_name)
+        end
+
+        -- Prefer asset filename because package IDs sometimes use internal names.
+        -- Example: /server/assets/chips/EXEPoN-Shockwave.zip -> Shockwave
+        local asset_path = tostring(card_def.asset_path or "")
+        local file = asset_path:match("([^/\\]+)$")
+        if file and file ~= "" then
+            file = file:gsub("%.zip$", "")
+            file = file:gsub("^EXE%d+%-", "")
+            file = file:gsub("^EXEPoN%-", "")
+            file = file:gsub("^BN%d+%-", "")
+            if file ~= "" then
+                return file
+            end
+        end
+
+        local package_id = tostring(card_def.package_id or "")
+        local package_name = package_id:match("([^%.%-]+)$")
+        if package_name and package_name ~= "" then
+            return package_name
+        end
+    end
+
+    return tostring(fallback_key or "BattleChip")
+end
+
+local function notify_chip_get(player_id, chip_name, notify_player)
+    return async(function()
+        if notify_player ~= true then
+            return
+        end
+
+        if NG_SHOP_ITEM_GET_SFX then
+            pcall(Net.provide_asset_for_player, player_id, NG_SHOP_ITEM_GET_SFX)
+            pcall(Net.play_sound_for_player, player_id, NG_SHOP_ITEM_GET_SFX)
+        end
+
+        -- Optional, but nice: use your existing item-get animation helper if present.
+        if ezmemory.play_anim_get then
+            pcall(ezmemory.play_anim_get, player_id)
+        end
+
+        await(Async.message_player(player_id, "Got " .. tostring(chip_name) .. "!"))
+    end)
+end
+
 --=====================================================
 -- net-games UI warm-up (pre-provide talk/menu assets on login)
 --=====================================================
@@ -753,19 +807,20 @@ local dialogue_types = {
                 local chip_keys = get_dialogue_chip_keys(dialogue)
                 local props = dialogue.custom_properties or {}
 
+                local notify_player = props["Dont Notify"] ~= "true"
+
                 -- 1 tick makes NPC chip gifts feel immediate instead of using the default post-battle delay.
                 local delay_ticks = tonumber(props["Delay Ticks"] or props["Reward Delay Ticks"] or "1") or 1
 
                 for index, chip_key in ipairs(chip_keys) do
-                    local code =
-                        props["Code " .. tostring(index)] or
-                        props["Chip Code " .. tostring(index)] or
-                        props["Card Code " .. tostring(index)] or
-                        props["Code"]
+                    local code = props["Code " .. tostring(index)] or props["Code"]
 
                     local ok, reason, card_def = whitelist.unlock_card(player_id, chip_key, code, delay_ticks)
 
-                    if not ok and reason ~= "already_unlocked" then
+                    if ok then
+                        local chip_name = get_chip_display_name(card_def, chip_key)
+                        await(notify_chip_get(player_id, chip_name, notify_player))
+                    elseif reason ~= "already_unlocked" then
                         warn(
                             "[eznpcs] chip dialogue failed to unlock battle chip",
                             tostring(chip_key),
@@ -777,7 +832,7 @@ local dialogue_types = {
                     end
                 end
 
-                return dialogue.custom_properties["Next 1"]
+                return props["Next 1"]
             end)
         end
     },
