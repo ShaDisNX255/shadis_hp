@@ -3,7 +3,51 @@ local helpers = require('scripts/ezlibs-scripts/helpers')
 local ezmemory = require('scripts/ezlibs-scripts/ezmemory')
 local ezquests = require('scripts/ezlibs-scripts/ezquests')
 local ezemail = require('scripts/ezlibs-scripts/ezemail')
+local whitelist = require('scripts/ezlibs-custom/whitelist')
 local NG_SHOP_ITEM_GET_SFX = "/server/assets/ezlibs-assets/sfx/item_get.ogg"
+
+local function trim_string(value)
+    if value == nil then return nil end
+    local text = tostring(value)
+    text = text:gsub("^%s+", ""):gsub("%s+$", "")
+    if text == "" then return nil end
+    return text
+end
+
+local function get_case_insensitive_property(props, wanted_key)
+    if not props then return nil end
+
+    wanted_key = tostring(wanted_key):lower()
+
+    for key, value in pairs(props) do
+        if tostring(key):lower() == wanted_key then
+            return value
+        end
+    end
+
+    return nil
+end
+
+local function get_dialogue_chip_keys(dialogue)
+    local props = dialogue.custom_properties or {}
+    local keys = {}
+
+    local single = trim_string(get_case_insensitive_property(props, "Chip"))
+    if single then
+        keys[#keys + 1] = single
+    end
+
+    local numbered_chips = helpers.extract_numbered_properties(dialogue, "Chip ")
+    for _, chip_key in ipairs(numbered_chips) do
+        chip_key = trim_string(chip_key)
+        if chip_key then
+            keys[#keys + 1] = chip_key
+        end
+    end
+
+    return keys
+end
+
 --=====================================================
 -- net-games UI warm-up (pre-provide talk/menu assets on login)
 --=====================================================
@@ -220,6 +264,35 @@ local dialogue_types = {
                     next_dialogue_id = next_dialogues[2]
                 end
                 return next_dialogue_id
+            end)
+        end
+    },
+    chipcheck={
+        name = 'chipcheck',
+        action = function(npc, player_id, dialogue, relay_object)
+            return async(function ()
+                local next_dialogues = helpers.extract_numbered_properties(dialogue,"Next ")
+                local chip_keys = get_dialogue_chip_keys(dialogue)
+
+                if #chip_keys == 0 then
+                    warn("[eznpcs] chipcheck missing Chip/Card/Package Id on dialogue node", dialogue.id)
+                    return next_dialogues[2] or next_dialogues[1]
+                end
+
+                local check_passed = true
+
+                for _, chip_key in ipairs(chip_keys) do
+                    local has_chip, card_def = whitelist.player_has_card_unlocked(player_id, chip_key)
+
+                    if not card_def then
+                        warn("[eznpcs] chipcheck unknown battle chip", tostring(chip_key), "on dialogue node", dialogue.id)
+                        check_passed = false
+                    elseif not has_chip then
+                        check_passed = false
+                    end
+                end
+
+                return next_dialogues[check_passed and 1 or 2]
             end)
         end
     },
@@ -669,6 +742,41 @@ local dialogue_types = {
                 for index, item_id in ipairs(gift_item_ids) do
                     ezmemory.give_item_with_optional_notify(player_id,area_id,item_id,nil,notify_player)
                 end
+                return dialogue.custom_properties["Next 1"]
+            end)
+        end
+    },
+    chip={
+        name = "chip",
+        action = function(npc, player_id, dialogue, relay_object)
+            return async(function ()
+                local chip_keys = get_dialogue_chip_keys(dialogue)
+                local props = dialogue.custom_properties or {}
+
+                -- 1 tick makes NPC chip gifts feel immediate instead of using the default post-battle delay.
+                local delay_ticks = tonumber(props["Delay Ticks"] or props["Reward Delay Ticks"] or "1") or 1
+
+                for index, chip_key in ipairs(chip_keys) do
+                    local code =
+                        props["Code " .. tostring(index)] or
+                        props["Chip Code " .. tostring(index)] or
+                        props["Card Code " .. tostring(index)] or
+                        props["Code"]
+
+                    local ok, reason, card_def = whitelist.unlock_card(player_id, chip_key, code, delay_ticks)
+
+                    if not ok and reason ~= "already_unlocked" then
+                        warn(
+                            "[eznpcs] chip dialogue failed to unlock battle chip",
+                            tostring(chip_key),
+                            "reason:",
+                            tostring(reason),
+                            "dialogue:",
+                            tostring(dialogue.id)
+                        )
+                    end
+                end
+
                 return dialogue.custom_properties["Next 1"]
             end)
         end
