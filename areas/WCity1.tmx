@@ -1379,7 +1379,9 @@
     <property name="Registration Lead Seconds" type="int" value="600"/>
     <property name="Tournament Every Hours" type="int" value="1"/>
     <property name="Tournament Force PVP HP" value="false"/>
+    <property name="Tournament GP Reward" type="int" value="2"/>
     <property name="Tournament Hour Offset" type="int" value="0"/>
+    <property name="Tournament Money Reward" type="int" value="20000"/>
     <property name="Tournament NPC Pool" value="wcity_rank1"/>
     <property name="Tournament Name" value="WCity1"/>
     <property name="Tournament PVP Mode" value="wcity"/>

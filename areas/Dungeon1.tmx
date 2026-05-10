@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="57" height="57" tilewidth="64" tileheight="32" infinite="0" nextlayerid="7" nextobjectid="167">
+<map version="1.10" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="57" height="57" tilewidth="64" tileheight="32" infinite="0" nextlayerid="7" nextobjectid="169">
  <properties>
   <property name="Amount 1" type="int" value="1"/>
   <property name="Amount 2" type="int" value="1"/>
@@ -42,6 +42,7 @@
  <tileset firstgid="315" source="../assets/tiles/EXE6_Shortcuts.tsx"/>
  <tileset firstgid="363" source="../assets/ezlibs-assets/ezcheckpoints/bn5cubegreen_tile.tsx"/>
  <tileset firstgid="367" source="../assets/ezlibs-assets/ezmystery/BlueMysteryData.tsx"/>
+ <tileset firstgid="375" source="../assets/tiles/TBS.tsx"/>
  <layer id="1" name="Tile Layer 0" width="57" height="57">
   <data encoding="csv">
 0,0,0,0,0,0,0,0,23,24,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -658,6 +659,32 @@
     <property name="Next 1" type="object" value="181"/>
     <property name="Next 2" type="object" value="180"/>
     <property name="Quest Name" value="EchoProgram"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="167" type="Tournament Board" gid="2147484023" x="729" y="429" width="37" height="57">
+   <properties>
+    <property name="Board Background" value="pink_bn4"/>
+    <property name="Registration Lead Seconds" type="int" value="600"/>
+    <property name="Tournament Every Hours" type="int" value="2"/>
+    <property name="Tournament Force PVP HP" value="false"/>
+    <property name="Tournament GP Reward" type="int" value="2"/>
+    <property name="Tournament GP Stakes" type="bool" value="true"/>
+    <property name="Tournament Hour Offset" type="int" value="0"/>
+    <property name="Tournament Money Reward" type="int" value="20000"/>
+    <property name="Tournament NPC Pool" value="wcity_rank1"/>
+    <property name="Tournament Name" value="LostLab"/>
+    <property name="Tournament PVP Mode" value="wcity"/>
+    <property name="Tournament Start Minute" type="int" value="45"/>
+    <property name="Tournament Start Second" type="int" value="0"/>
+   </properties>
+  </object>
+  <object id="168" name="HeelNavi" type="NPC" x="750.5" y="519.5">
+   <properties>
+    <property name="Asset Name" value="heel-navi-exe4_black"/>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Direction" value="Down Left"/>
+    <property name="Text 1" value="We hold our very own tournaments here. You may not like who you face... or the stakes here hehe..."/>
    </properties>
    <point/>
   </object>

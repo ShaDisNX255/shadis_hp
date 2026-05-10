@@ -19,6 +19,12 @@ if not ezmemory_ok then
   ezmemory = nil
 end
 
+local teams_ok, Teams = pcall(require, "scripts/teams/teams")
+if not teams_ok then
+  Teams = nil
+  print("[tournaments] WARNING: scripts/teams/teams could not be loaded; tournament GP rewards disabled")
+end
+
 local games_ok, games = pcall(require, "scripts/net-games/main")
 if not games_ok then
   games = nil
@@ -1205,6 +1211,27 @@ local function remember_board_tournament_props(queue, object)
       or props["Battle Timeout Seconds"]
       or props["Match Timeout Seconds"],
     queue.battle_timeout_seconds or SETTINGS.battle_timeout_seconds
+  )
+
+  queue.winner_gp_reward = math.max(0, math.floor(to_number_or(
+    props["Tournament GP Reward"]
+      or props["GP Reward"]
+      or props["Winner GP"],
+    queue.winner_gp_reward or 0
+  )))
+
+  queue.winner_money_reward = math.max(0, math.floor(to_number_or(
+    props["Tournament Money Reward"]
+      or props["Money Reward"]
+      or props["Winner Money"],
+    queue.winner_money_reward or 0
+  )))
+
+  queue.deduct_opposing_team_gp = to_bool_or(
+    props["Tournament GP Stakes"]
+      or props["Deduct Opposing Team GP"]
+      or props["GP Stakes"],
+    queue.deduct_opposing_team_gp or false
   )
 end
 
@@ -2724,6 +2751,9 @@ local function create_tournament_from_queue(queue)
     pvp_mode = queue.pvp_mode or "auto",
     force_pvp_hp = queue.force_pvp_hp,
     battle_timeout_seconds = queue.battle_timeout_seconds or SETTINGS.battle_timeout_seconds,
+    winner_gp_reward = queue.winner_gp_reward or 0,
+    winner_money_reward = queue.winner_money_reward or 0,
+    deduct_opposing_team_gp = queue.deduct_opposing_team_gp == true,
   }
 
   active_tournaments[tournament_id] = tournament
@@ -3275,6 +3305,97 @@ end
 -- -----------------------------------------------------------------------------
 -- Tournament runner
 -- -----------------------------------------------------------------------------
+local function give_tournament_money_reward(player_id, amount, tournament)
+  amount = math.floor(tonumber(amount) or 0)
+  if amount <= 0 then
+    return 0
+  end
+
+  local ok = false
+
+  if ezmemory and ezmemory.get_player_money and ezmemory.set_player_money then
+    local current = tonumber(ezmemory.get_player_money(player_id) or 0) or 0
+    ok = pcall(ezmemory.set_player_money, player_id, current + amount)
+  elseif ezmemory and ezmemory.spend_player_money then
+    ok = pcall(ezmemory.spend_player_money, player_id, -amount)
+  elseif Net.get_player_money and Net.set_player_money then
+    local current = tonumber(Net.get_player_money(player_id) or 0) or 0
+    ok = pcall(Net.set_player_money, player_id, current + amount)
+  end
+
+  if ok then
+    message_player_safe(player_id, ("Tournament prize: +%d$!"):format(amount))
+    print(("[tournaments][reward] pid=%s tournament=%s money=+%d")
+      :format(tostring(player_id), tostring(tournament and tournament.name or "Tournament"), amount))
+    return amount
+  end
+
+  print(("[tournaments][reward] FAILED money reward pid=%s amount=%d")
+    :format(tostring(player_id), amount))
+  return 0
+end
+
+local function grant_tournament_winner_rewards(tournament)
+  if not tournament or not tournament.champion then
+    return
+  end
+
+  local champion = tournament.champion
+  if champion.kind ~= "player" or not champion.player_id or not Net.is_player(champion.player_id) then
+    return
+  end
+
+  local player_id = champion.player_id
+  local gp_reward = math.floor(tonumber(tournament.winner_gp_reward or 0) or 0)
+  local money_reward = math.floor(tonumber(tournament.winner_money_reward or 0) or 0)
+
+  if gp_reward > 0 then
+    if Teams and Teams.award_tournament_gp then
+      local awarded = Teams.award_tournament_gp(
+        player_id,
+        gp_reward,
+        "winning " .. tostring(tournament.name or "a tournament")
+      ) or 0
+
+      print(("[tournaments][reward] pid=%s tournament=%s gp_requested=%d gp_awarded=%d")
+        :format(tostring(player_id), tostring(tournament.name or "Tournament"), gp_reward, awarded))
+    else
+      message_player_safe(player_id, "Tournament GP reward is unavailable right now.")
+      print("[tournaments][reward] Teams.award_tournament_gp unavailable")
+    end
+  end
+
+  if tournament.deduct_opposing_team_gp == true then
+    if Teams and Teams.deduct_opposing_team_gp_for_player then
+      local deducted, opposing_team_name = Teams.deduct_opposing_team_gp_for_player(
+        player_id,
+        1,
+        "tournament stakes"
+      )
+
+      deducted = tonumber(deducted or 0) or 0
+
+      if deducted > 0 then
+        message_player_safe(
+          player_id,
+          ("Tournament stakes: %s lost %d GP!"):format(
+            tostring(opposing_team_name or "the opposing team"),
+            deducted
+          )
+        )
+      end
+
+      print(("[tournaments][reward] pid=%s tournament=%s opposing_gp_deducted=%d")
+        :format(tostring(player_id), tostring(tournament.name or "Tournament"), deducted))
+    else
+      print("[tournaments][reward] Teams.deduct_opposing_team_gp_for_player unavailable")
+    end
+  end
+
+  if money_reward > 0 then
+    give_tournament_money_reward(player_id, money_reward, tournament)
+  end
+end
 
 local function run_tournament(tournament)
   return async(function()
@@ -3332,6 +3453,8 @@ await(show_tournament_board_to_players(tournament, "after_round_animated"))
       tournament.name,
       participant_name(tournament.champion)
     ), 3.0))
+
+    grant_tournament_winner_rewards(tournament)
 
     if tournament.champion and tournament.champion.kind == "player" then
       tournament_announce(

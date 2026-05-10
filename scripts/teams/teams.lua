@@ -712,20 +712,21 @@ end
 -- =========================
 -- ====== GP EARNING  ======
 -- =========================
-local function _add_gp(pid, amount, why)
+local function _add_gp(pid, amount, why, uncapped)
   local mem, t_mem = _roll_month_if_needed()
   local secret, pmem = _pmem(pid)
   local cur = pmem.teams.current
 
   if not cur.team then
     Net.message_player(pid, "Join a team first to earn GP.")
-    return
+    return 0
   end
 
   amount = math.floor(tonumber(amount) or 0)
-  if amount <= 0 then return end
+  if amount <= 0 then return 0 end
 
   local is_checkin = (why == "daily check-in")
+  local bypasses_cap = is_checkin or uncapped == true
 
   -- Global per-player activity cap (does NOT include daily login GP)
   local cap          = _activity_cap_for_today()
@@ -734,7 +735,7 @@ local function _add_gp(pid, amount, why)
   local give         = amount
 
   -- Only non-check-in GP is limited by the global cap
-  if not is_checkin then
+  if not bypasses_cap then
     local room = math.max(0, cap - used_before)
     if room <= 0 then
       -- Nothing to award; log why
@@ -756,7 +757,7 @@ local function _add_gp(pid, amount, why)
       if why then
         Net.message_player(pid, "You've hit your GP cap for today.")
       end
-      return
+      return 0
     end
 
     give = math.min(amount, room)
@@ -773,7 +774,7 @@ local function _add_gp(pid, amount, why)
   local team_month_before   = tonumber(slot.total or 0)
 
   -- Update activity usage for non-check-in GP
-  if not is_checkin then
+  if not bypasses_cap then
     cur.activity_gp = (cur.activity_gp or 0) + give
   end
 
@@ -805,9 +806,10 @@ local function _add_gp(pid, amount, why)
   local team_name = _team_name(cur.team)
   local act_after = cur.activity_gp or used_before
 
-  if is_checkin then
-    print(("[GP DBG] %s gained %d GP for %s (check-in; activity %d/%d, bypasses cap)")
-      :format(name, give, tostring(why or "daily check-in"), act_after, cap))
+  if bypasses_cap then
+    local bypass_label = is_checkin and "check-in" or "uncapped"
+    print(("[GP DBG] %s gained %d GP for %s (%s; activity %d/%d, bypasses cap)")
+      :format(name, give, tostring(why or "unknown"), bypass_label, act_after, cap))
   else
     print(("[GP DBG] %s gained %d GP for %s (activity %d/%d)")
       :format(name, give, tostring(why or "unknown"), act_after, cap))
@@ -815,6 +817,7 @@ local function _add_gp(pid, amount, why)
 
   print(("[GP DBG] %s: %d -> %d this month")
     :format(team_name, team_month_before, team_month_before + give))
+  return give
 end
 
 -- GP from Fishing: +1 GP per N fish caught (subject to activity cap)
@@ -1631,6 +1634,111 @@ function Teams.debug_add_gp(pid, n) _add_gp(pid, n or 1, "debug") end
 -- This calls the internal _add_gp() logic so all caps and month tracking remain centralized.
 function Teams.award_activity_gp(pid, amount, why)
   _add_gp(pid, amount or 1, why or "pet expedition")
+end
+
+function Teams.award_tournament_gp(pid, amount, why)
+  return _add_gp(pid, amount or 1, why or "winning a tournament", true) or 0
+end
+
+function Teams.deduct_opposing_team_gp_for_player(pid, amount, why)
+  amount = math.floor(tonumber(amount) or 1)
+  if amount <= 0 then
+    return 0
+  end
+
+  local winner_secret, winner_pmem = _pmem(pid)
+  local cur = winner_pmem and winner_pmem.teams and winner_pmem.teams.current
+  local winner_team = tonumber(cur and cur.team)
+
+  if winner_team ~= 1 and winner_team ~= 2 then
+    return 0
+  end
+
+  local opposing_team = (winner_team == 1) and 2 or 1
+  local mem, t_mem = _roll_month_if_needed()
+  local slot = t_mem.month and t_mem.month[opposing_team]
+
+  if not slot then
+    return 0, _team_name(opposing_team, t_mem)
+  end
+
+  slot.gp_by_secret = slot.gp_by_secret or {}
+
+  local rows = {}
+  for secret, gp in pairs(slot.gp_by_secret) do
+    gp = math.floor(tonumber(gp) or 0)
+    if gp > 0 then
+      rows[#rows + 1] = {
+        secret = secret,
+        gp = gp,
+      }
+    end
+  end
+
+  table.sort(rows, function(a, b)
+    if a.gp ~= b.gp then
+      return a.gp > b.gp
+    end
+    return tostring(a.secret) < tostring(b.secret)
+  end)
+
+  local remaining = amount
+  local deducted = 0
+
+  for _, row in ipairs(rows) do
+    if remaining <= 0 then
+      break
+    end
+
+    local take = math.min(row.gp, remaining)
+    if take > 0 then
+      slot.gp_by_secret[row.secret] = row.gp - take
+      if slot.gp_by_secret[row.secret] <= 0 then
+        slot.gp_by_secret[row.secret] = nil
+      end
+
+      local pm = ezmemory.get_player_memory(row.secret) or {}
+      pm.teams = pm.teams or {}
+      local victim_cur = pm.teams.current
+
+      if victim_cur
+        and tonumber(victim_cur.team) == opposing_team
+        and victim_cur.month == _month_key()
+      then
+        victim_cur.gp = math.max(0, (tonumber(victim_cur.gp or 0) or 0) - take)
+
+        pm.teams.hist = pm.teams.hist or {}
+        pm.teams.hist[victim_cur.month] = {
+          team = victim_cur.team,
+          gp = victim_cur.gp,
+        }
+
+        if ezmemory.set_player_memory then
+          ezmemory.set_player_memory(row.secret, pm)
+        else
+          ezmemory.save_player_memory(row.secret)
+        end
+      end
+
+      deducted = deducted + take
+      remaining = remaining - take
+    end
+  end
+
+  if deducted > 0 then
+    local before = tonumber(slot.total or 0) or 0
+    slot.total = math.max(0, before - deducted)
+    _save_area()
+
+    local opposing_name = _team_name(opposing_team, t_mem)
+
+    print(("[GP DBG] %s lost %d GP from %s (%d -> %d)")
+      :format(opposing_name, deducted, tostring(why or "tournament stakes"), before, slot.total))
+
+    return deducted, opposing_name
+  end
+
+  return 0, _team_name(opposing_team, t_mem)
 end
 
 return Teams
