@@ -1449,21 +1449,24 @@
   </object>
   <object id="89" name="ShaDisCond" type="Conductor" x="732" y="502">
    <properties>
-    <property name="1 Area" value="server.keristero.com:8769,default,MainTrain"/>
-    <property name="1 Name" value="Gravy Yum Server"/>
+    <property name="1 Area" value="64.23.226.84:8766,trainstation,WebBrowser"/>
+    <property name="1 Name" value="WebBrowser"/>
     <property name="1 Type" value="Server"/>
     <property name="2 Area" value="138.197.119.219:1928,default,train"/>
     <property name="2 Name" value="The Block Server"/>
     <property name="2 Type" value="Server"/>
-    <property name="3 Area" value="96.60.137.203:8767,UnderSquare,Undersquare Train"/>
-    <property name="3 Name" value="Undernet Server"/>
+    <property name="3 Area" value="143.198.61.124:3000,acdc1,MainTrain"/>
+    <property name="3 Name" value="BN3 ACDC Station"/>
     <property name="3 Type" value="Server"/>
-    <property name="4 Area" value="143.198.61.124:3000,acdc1,MainTrain"/>
-    <property name="4 Name" value="BN3 ACDC Station"/>
+    <property name="4 Area" value="server.keristero.com:8769,default,MainTrain"/>
+    <property name="4 Name" value="Gravy Yum Server"/>
     <property name="4 Type" value="Server"/>
     <property name="5 Area" value="96.60.137.203:8768,default,orange line"/>
     <property name="5 Name" value="Central Station"/>
     <property name="5 Type" value="Server"/>
+    <property name="6 Area" value="96.60.137.203:8767,UnderSquare,Undersquare Train"/>
+    <property name="6 Name" value="Undernet Server"/>
+    <property name="6 Type" value="Server"/>
     <property name="Train" value="ShaDisHP"/>
    </properties>
    <point/>
