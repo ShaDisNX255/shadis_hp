@@ -12,7 +12,7 @@
   <property name="Mystery Data Minimum" type="int" value="2"/>
   <property name="Name" value="TechLab1"/>
   <property name="OctoPVP" value="true"/>
-  <property name="Song" value=""/>
+  <property name="Song" value="/server/assets/TechLab.ogg"/>
  </properties>
  <tileset firstgid="1" source="../assets/tiles/BN2 ACDC.tsx"/>
  <tileset firstgid="249" source="../assets/tiles/ShademanCompWarpAnimation.tsx"/>

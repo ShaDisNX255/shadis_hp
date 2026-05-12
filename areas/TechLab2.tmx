@@ -12,7 +12,7 @@
   <property name="Mystery Data Minimum" type="int" value="2"/>
   <property name="Name" value="TechLab2"/>
   <property name="OctoPVP" value="true"/>
-  <property name="Song" value=""/>
+  <property name="Song" value="/server/assets/TechLab.ogg"/>
  </properties>
  <tileset firstgid="1" source="../assets/tiles/BN2 ACDC.tsx"/>
  <tileset firstgid="249" source="../assets/tiles/coffee.tsx"/>
@@ -561,6 +561,7 @@
   <object id="52" name="Ask for Quiz" type="Dialogue" x="256" y="784">
    <properties>
     <property name="Dialogue Type" value="quiz"/>
+    <property name="Mugshot" value="none"/>
     <property name="Next 1" type="object" value="54"/>
     <property name="Next 2" type="object" value="53"/>
     <property name="Text 1" value="Sure thing!"/>
@@ -586,6 +587,7 @@
   <object id="55" name="Question1" type="Dialogue" x="246.5" y="767.5">
    <properties>
     <property name="Dialogue Type" value="quiz"/>
+    <property name="Mugshot" value="none"/>
     <property name="Next 1" type="object" value="56"/>
     <property name="Next 2" type="object" value="60"/>
     <property name="Next 3" type="object" value="56"/>
@@ -598,6 +600,7 @@
   <object id="56" name="Fail sfx" type="Dialogue" x="239.5" y="766.5">
    <properties>
     <property name="Dialogue Type" value="failsfx"/>
+    <property name="Mugshot" value="none"/>
     <property name="Next 1" type="object" value="57"/>
    </properties>
    <point/>
@@ -620,6 +623,7 @@
   <object id="59" name="Question 2" type="Dialogue" x="241.5" y="758.5">
    <properties>
     <property name="Dialogue Type" value="quiz"/>
+    <property name="Mugshot" value="none"/>
     <property name="Next 1" type="object" value="61"/>
     <property name="Next 2" type="object" value="56"/>
     <property name="Next 3" type="object" value="56"/>
@@ -632,6 +636,7 @@
   <object id="60" name="Correct sfx" type="Dialogue" x="244.5" y="763.5">
    <properties>
     <property name="Dialogue Type" value="sucesssfx"/>
+    <property name="Mugshot" value="none"/>
     <property name="Next 1" type="object" value="58"/>
    </properties>
    <point/>
@@ -639,6 +644,7 @@
   <object id="61" name="Correct sfx" type="Dialogue" x="240" y="756">
    <properties>
     <property name="Dialogue Type" value="sucesssfx"/>
+    <property name="Mugshot" value="none"/>
     <property name="Next 1" type="object" value="62"/>
    </properties>
    <point/>
@@ -654,6 +660,7 @@
   <object id="63" name="Question 3" type="Dialogue" x="237" y="751">
    <properties>
     <property name="Dialogue Type" value="quiz"/>
+    <property name="Mugshot" value="none"/>
     <property name="Next 1" type="object" value="64"/>
     <property name="Next 2" type="object" value="56"/>
     <property name="Next 3" type="object" value="56"/>
@@ -666,6 +673,7 @@
   <object id="64" name="Correct sfx" type="Dialogue" x="236.5" y="749.5">
    <properties>
     <property name="Dialogue Type" value="sucesssfx"/>
+    <property name="Mugshot" value="none"/>
     <property name="Next 1" type="object" value="65"/>
    </properties>
    <point/>
@@ -673,7 +681,7 @@
   <object id="65" name="Success" type="Dialogue" x="236" y="748">
    <properties>
     <property name="Dialogue Type" value="first"/>
-    <property name="Next 1" type="object" value="63"/>
+    <property name="Next 1" type="object" value="66"/>
     <property name="Text 1" value="Wow, you're on a roll! Speaking of Roll... question 4, what card did Roll lose?"/>
    </properties>
    <point/>
@@ -681,6 +689,7 @@
   <object id="66" name="Question 4" type="Dialogue" x="235.5" y="746.5">
    <properties>
     <property name="Dialogue Type" value="quiz"/>
+    <property name="Mugshot" value="none"/>
     <property name="Next 1" type="object" value="56"/>
     <property name="Next 2" type="object" value="56"/>
     <property name="Next 3" type="object" value="67"/>
@@ -693,6 +702,7 @@
   <object id="67" name="Correct sfx" type="Dialogue" x="235" y="745">
    <properties>
     <property name="Dialogue Type" value="sucesssfx"/>
+    <property name="Mugshot" value="none"/>
     <property name="Next 1" type="object" value="68"/>
    </properties>
    <point/>
@@ -708,6 +718,7 @@
   <object id="69" name="Question 5" type="Dialogue" x="234" y="742">
    <properties>
     <property name="Dialogue Type" value="quiz"/>
+    <property name="Mugshot" value="none"/>
     <property name="Next 1" type="object" value="56"/>
     <property name="Next 2" type="object" value="70"/>
     <property name="Next 3" type="object" value="56"/>
@@ -720,6 +731,7 @@
   <object id="70" name="Correct sfx" type="Dialogue" x="233.5" y="740.5">
    <properties>
     <property name="Dialogue Type" value="sucesssfx"/>
+    <property name="Mugshot" value="none"/>
     <property name="Next 1" type="object" value="71"/>
    </properties>
    <point/>
