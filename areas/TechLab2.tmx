@@ -635,7 +635,7 @@
   </object>
   <object id="60" name="Correct sfx" type="Dialogue" x="244.5" y="763.5">
    <properties>
-    <property name="Dialogue Type" value="sucesssfx"/>
+    <property name="Dialogue Type" value="successsfx"/>
     <property name="Mugshot" value="none"/>
     <property name="Next 1" type="object" value="58"/>
    </properties>
@@ -643,7 +643,7 @@
   </object>
   <object id="61" name="Correct sfx" type="Dialogue" x="240" y="756">
    <properties>
-    <property name="Dialogue Type" value="sucesssfx"/>
+    <property name="Dialogue Type" value="successsfx"/>
     <property name="Mugshot" value="none"/>
     <property name="Next 1" type="object" value="62"/>
    </properties>
@@ -672,7 +672,7 @@
   </object>
   <object id="64" name="Correct sfx" type="Dialogue" x="236.5" y="749.5">
    <properties>
-    <property name="Dialogue Type" value="sucesssfx"/>
+    <property name="Dialogue Type" value="successsfx"/>
     <property name="Mugshot" value="none"/>
     <property name="Next 1" type="object" value="65"/>
    </properties>
@@ -701,7 +701,7 @@
   </object>
   <object id="67" name="Correct sfx" type="Dialogue" x="235" y="745">
    <properties>
-    <property name="Dialogue Type" value="sucesssfx"/>
+    <property name="Dialogue Type" value="successsfx"/>
     <property name="Mugshot" value="none"/>
     <property name="Next 1" type="object" value="68"/>
    </properties>
@@ -730,7 +730,7 @@
   </object>
   <object id="70" name="Correct sfx" type="Dialogue" x="233.5" y="740.5">
    <properties>
-    <property name="Dialogue Type" value="sucesssfx"/>
+    <property name="Dialogue Type" value="successsfx"/>
     <property name="Mugshot" value="none"/>
     <property name="Next 1" type="object" value="71"/>
    </properties>
