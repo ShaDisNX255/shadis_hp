@@ -905,7 +905,7 @@
     <property name="Dialogue Type" value="first"/>
     <property name="Direction" value="Up Right"/>
     <property name="Next Waypoint 1" type="object" value="94"/>
-    <property name="Text 1" value="I wanted to try out Ice_Rink2 but some Navi placed a security block that didn't let me through. I just saw it jump on the Cyber Metro heading towards the SciLab area from BN3"/>
+    <property name="Text 1" value="I love going to the Ice Rink areas, it's a perfect way to get monies"/>
    </properties>
    <point/>
   </object>

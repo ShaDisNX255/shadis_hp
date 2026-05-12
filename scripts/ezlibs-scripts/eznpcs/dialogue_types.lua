@@ -5,6 +5,8 @@ local ezquests = require('scripts/ezlibs-scripts/ezquests')
 local ezemail = require('scripts/ezlibs-scripts/ezemail')
 local whitelist = require('scripts/ezlibs-custom/whitelist')
 local NG_SHOP_ITEM_GET_SFX = "/server/assets/ezlibs-assets/sfx/item_get.ogg"
+local SUCCESS_SFX = "/server/assets/sfx/compile_complete.ogg"
+local FAIL_SFX = "/server/assets/sfx/card_error.ogg"
 
 local function trim_string(value)
     if value == nil then return nil end
@@ -129,6 +131,20 @@ local function notify_chip_get(player_id, chip_name, notify_player)
             stop_chip_item_get_anim(player_id)
         end
     end)
+end
+
+local function play_dialogue_sfx_for_player(player_id, sfx_path)
+    if not sfx_path or sfx_path == "" then
+        return
+    end
+
+    if Net.provide_asset_for_player then
+        pcall(Net.provide_asset_for_player, player_id, sfx_path)
+    end
+
+    if Net.play_sound_for_player then
+        pcall(Net.play_sound_for_player, player_id, sfx_path)
+    end
 end
 
 --=====================================================
@@ -862,6 +878,24 @@ local dialogue_types = {
                 end
 
                 return props["Next 1"]
+            end)
+        end
+    },
+    successsfx={
+        name = "successsfx",
+        action = function(npc, player_id, dialogue, relay_object)
+            return async(function ()
+                play_dialogue_sfx_for_player(player_id, SUCCESS_SFX)
+                return dialogue.custom_properties["Next 1"]
+            end)
+        end
+    },
+    failsfx={
+        name = "failsfx",
+        action = function(npc, player_id, dialogue, relay_object)
+            return async(function ()
+                play_dialogue_sfx_for_player(player_id, FAIL_SFX)
+                return dialogue.custom_properties["Next 1"]
             end)
         end
     },

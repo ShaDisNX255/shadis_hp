@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="60" height="60" tilewidth="64" tileheight="32" infinite="0" nextlayerid="9" nextobjectid="48">
+<map version="1.10" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="60" height="60" tilewidth="64" tileheight="32" infinite="0" nextlayerid="9" nextobjectid="75">
  <properties>
   <property name="Background" value="custom"/>
   <property name="Background Animation" value="/server/assets/custom/backgrounds/techlab/07a-centralarea.animation"/>
@@ -519,6 +519,233 @@
     <property name="Next Waypoint 2" type="object" value="46"/>
     <property name="Wait Time" type="int" value="6"/>
     <property name="Waypoint Type" value="random"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="48" name="NormalNavi" type="NPC" x="267" y="811">
+   <properties>
+    <property name="Asset Name" value="male-navi-exe6_teal"/>
+    <property name="Dialogue Type" value="itemcheck"/>
+    <property name="Direction" value="Down Right"/>
+    <property name="Item 1" type="object" value="49"/>
+    <property name="Next 1" type="object" value="51"/>
+    <property name="Next 2" type="object" value="50"/>
+    <property name="Text 1" value=""/>
+   </properties>
+   <point/>
+  </object>
+  <object id="49" name="quiz1" type="Item" x="249" y="795">
+   <properties>
+    <property name="Description" value="Proof you traded completed the first quiz"/>
+    <property name="Name" value="quiz1"/>
+    <property name="Price" value="0"/>
+    <property name="Type" value="item"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="50" name="First Dialogue" type="Dialogue" x="260" y="794">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="52"/>
+    <property name="Text 1" value="Who called Mr. QuizNavi? Who called Mr. QuizNavi? It's quiz time! Hey you, want to take my quiz?"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="51" name="Final Dialogue" type="Dialogue" x="253" y="791">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Text 1" value="Nice job, you're now a quiz beginner. Stay on the look out for more of my Quiz family"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="52" name="Ask for Quiz" type="Dialogue" x="256" y="784">
+   <properties>
+    <property name="Dialogue Type" value="quiz"/>
+    <property name="Next 1" type="object" value="54"/>
+    <property name="Next 2" type="object" value="53"/>
+    <property name="Text 1" value="Sure thing!"/>
+    <property name="Text 2" value="Not now"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="53" name="Answer No" type="Dialogue" x="248" y="780">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Text 1" value="Alright then, maybe next time!"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="54" name="Start Quiz" type="Dialogue" x="252" y="776">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="55"/>
+    <property name="Text 1" value="Right on! Let's start. Question 1, how much damage does 'Sword' deal?"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="55" name="Question1" type="Dialogue" x="246.5" y="767.5">
+   <properties>
+    <property name="Dialogue Type" value="quiz"/>
+    <property name="Next 1" type="object" value="56"/>
+    <property name="Next 2" type="object" value="60"/>
+    <property name="Next 3" type="object" value="56"/>
+    <property name="Text 1" value="70"/>
+    <property name="Text 2" value="80"/>
+    <property name="Text 3" value="90"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="56" name="Fail sfx" type="Dialogue" x="239.5" y="766.5">
+   <properties>
+    <property name="Dialogue Type" value="failsfx"/>
+    <property name="Next 1" type="object" value="57"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="57" name="Failed" type="Dialogue" x="234" y="768">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Text 1" value="Sorry, that's incorrect. Feel free to try again!"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="58" name="Success" type="Dialogue" x="243" y="761">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="59"/>
+    <property name="Text 1" value="Correct! Question 2, how many vending machines are in WCityHP"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="59" name="Question 2" type="Dialogue" x="241.5" y="758.5">
+   <properties>
+    <property name="Dialogue Type" value="quiz"/>
+    <property name="Next 1" type="object" value="61"/>
+    <property name="Next 2" type="object" value="56"/>
+    <property name="Next 3" type="object" value="56"/>
+    <property name="Text 1" value="2"/>
+    <property name="Text 2" value="3"/>
+    <property name="Text 3" value="4"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="60" name="Correct sfx" type="Dialogue" x="244.5" y="763.5">
+   <properties>
+    <property name="Dialogue Type" value="sucesssfx"/>
+    <property name="Next 1" type="object" value="58"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="61" name="Correct sfx" type="Dialogue" x="240" y="756">
+   <properties>
+    <property name="Dialogue Type" value="sucesssfx"/>
+    <property name="Next 1" type="object" value="62"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="62" name="Success" type="Dialogue" x="238.5" y="753.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="63"/>
+    <property name="Text 1" value="Right once again! Question 3, not counting the progs, how many Navis are in WCity1?"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="63" name="Question 3" type="Dialogue" x="237" y="751">
+   <properties>
+    <property name="Dialogue Type" value="quiz"/>
+    <property name="Next 1" type="object" value="64"/>
+    <property name="Next 2" type="object" value="56"/>
+    <property name="Next 3" type="object" value="56"/>
+    <property name="Text 1" value="8"/>
+    <property name="Text 2" value="10"/>
+    <property name="Text 3" value="12"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="64" name="Correct sfx" type="Dialogue" x="236.5" y="749.5">
+   <properties>
+    <property name="Dialogue Type" value="sucesssfx"/>
+    <property name="Next 1" type="object" value="65"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="65" name="Success" type="Dialogue" x="236" y="748">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="63"/>
+    <property name="Text 1" value="Wow, you're on a roll! Speaking of Roll... question 4, what card did Roll lose?"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="66" name="Question 4" type="Dialogue" x="235.5" y="746.5">
+   <properties>
+    <property name="Dialogue Type" value="quiz"/>
+    <property name="Next 1" type="object" value="56"/>
+    <property name="Next 2" type="object" value="56"/>
+    <property name="Next 3" type="object" value="67"/>
+    <property name="Text 1" value="C.Dragon"/>
+    <property name="Text 2" value="M.Elf"/>
+    <property name="Text 3" value="Jinzo"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="67" name="Correct sfx" type="Dialogue" x="235" y="745">
+   <properties>
+    <property name="Dialogue Type" value="sucesssfx"/>
+    <property name="Next 1" type="object" value="68"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="68" name="Success" type="Dialogue" x="234.5" y="743.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="69"/>
+    <property name="Text 1" value="Correct! Wow, can you stick the landing? Final question. How much HP is your maximum in LostLab?"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="69" name="Question 5" type="Dialogue" x="234" y="742">
+   <properties>
+    <property name="Dialogue Type" value="quiz"/>
+    <property name="Next 1" type="object" value="56"/>
+    <property name="Next 2" type="object" value="70"/>
+    <property name="Next 3" type="object" value="56"/>
+    <property name="Text 1" value="300"/>
+    <property name="Text 2" value="500"/>
+    <property name="Text 3" value="1000"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="70" name="Correct sfx" type="Dialogue" x="233.5" y="740.5">
+   <properties>
+    <property name="Dialogue Type" value="sucesssfx"/>
+    <property name="Next 1" type="object" value="71"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="71" name="Quiz Finished" type="Dialogue" x="235" y="741">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="74"/>
+    <property name="Text 1" value="Wow, that is pretty awesome, you got them all correct! Here, take this as a reward."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="72" name="Reward1" type="Dialogue" x="236" y="742">
+   <properties>
+    <property name="Dialogue Type" value="item"/>
+    <property name="Dont Notify" type="bool" value="true"/>
+    <property name="Item 1" type="object" value="49"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="74" name="Chip Reward" type="Dialogue" x="236.5" y="741.5">
+   <properties>
+    <property name="Chip" value="rec30"/>
+    <property name="Code" value="*"/>
+    <property name="Dialogue Type" value="chip"/>
+    <property name="Next 1" type="object" value="72"/>
    </properties>
    <point/>
   </object>
