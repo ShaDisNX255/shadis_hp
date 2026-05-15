@@ -1,6 +1,6 @@
 {
     "listservers":{
-        "main":"https://onb.keristero.com/server_list/"
+        "main":"http://127.0.0.1:5055/server_list/"
     },
     "advertisements":[
         {

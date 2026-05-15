@@ -25,3 +25,6 @@ watcher.pid
 scripts/bbs/admin_pass_seed.lua
 scripts/ezlibs-scripts/ezannounce*
 nul
+advertise_relay.log
+advertise_relay.pid
+scripts/advertise_server/relay.py

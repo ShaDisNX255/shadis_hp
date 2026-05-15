@@ -1588,7 +1588,7 @@ eznpcs.add_event{
         end
       end
 
-await(Async.sleep(0.05))
+      await(Async.sleep(0.05))
 
       local TalkVertMenu = TalkVertMenu_or_err
       local TalkPresets = require("scripts/net-games/npcs/talk_presets")
@@ -1610,6 +1610,11 @@ await(Async.sleep(0.05))
 
       local layout = TalkPresets.get_vert_menu_layout("prog_prompt_shop") or {}
 
+      -- Reduce redraw/animation churn while the cosmetic preview is active.
+      layout.text_intro_enabled = false
+      layout.shop_item_intro_enabled = false
+
+      -- Cosmetic shop uses its own preview sprites, not the built-in shop item icon.
       layout.shop_item_enabled = false
       layout.shop_item_swap_exit = false
 
@@ -1619,8 +1624,6 @@ await(Async.sleep(0.05))
         menu_bg_frame = "/server/assets/net-games/ui/prompt_vert_menu_shop_an_frame.png",
         highlight     = "/server/assets/net-games/ui/highlight_shop.png",
       }
-
-      local DEFAULT_ICON = "/server/assets/net-games/ui/card_shop_item.png"
 
       local options = {}
       local by_choice_id = {}
@@ -1642,6 +1645,36 @@ await(Async.sleep(0.05))
       options[#options + 1] = { id = "exit", text = "Exit" }
       local exit_index = #options
 
+      local last_preview_id = "__none__"
+
+      local function update_cosmetic_shop_preview(choice)
+        local id = choice and choice.id and tostring(choice.id) or nil
+
+        if id == "exit" then
+          id = nil
+        end
+
+        -- PromptVertical can call this during normal redraws/animations.
+        -- Only touch preview sprites when the selected cosmetic actually changes.
+        if id == last_preview_id then
+          return nil
+        end
+
+        last_preview_id = id
+
+        if id then
+          if cosmetics.show_shop_preview then
+            cosmetics.show_shop_preview(player_id, id)
+          end
+        else
+          if cosmetics.clear_shop_previews then
+            cosmetics.clear_shop_previews(player_id)
+          end
+        end
+
+        return nil
+      end
+
       if Net.lock_player_input then
         pcall(Net.lock_player_input, player_id)
       end
@@ -1657,27 +1690,7 @@ await(Async.sleep(0.05))
           return tostring(tonumber(Net.get_player_money(pid) or 0) or 0)
         end,
 
-        shop_item_texture_fn = function(choice)
-          if not choice or not choice.id then
-            if cosmetics.clear_shop_previews then
-              cosmetics.clear_shop_previews(player_id)
-            end
-            return nil
-          end
-
-          if tostring(choice.id) == "exit" then
-            if cosmetics.clear_shop_previews then
-              cosmetics.clear_shop_previews(player_id)
-            end
-            return nil
-          end
-
-          if cosmetics.show_shop_preview then
-            cosmetics.show_shop_preview(player_id, tostring(choice.id))
-          end
-
-          return nil
-        end,
+        shop_item_texture_fn = update_cosmetic_shop_preview,
 
         flow = {
           keep_menu_open = true,
