@@ -296,7 +296,7 @@
    <properties>
     <property name="Description" value="Rare: Gaia The Fierce Knight - A: 2300 / D: 2100"/>
     <property name="Name" value="[R]Gaia"/>
-    <property name="Price" value="40000"/>
+    <property name="Price" value="4000"/>
     <property name="Type" value="item"/>
    </properties>
    <point/>
@@ -305,7 +305,7 @@
    <properties>
     <property name="Description" value="Rare: Curse of Dragon - A: 2000 / D: 1500"/>
     <property name="Name" value="[R]C.Dragon"/>
-    <property name="Price" value="35000"/>
+    <property name="Price" value="3500"/>
     <property name="Type" value="item"/>
    </properties>
    <point/>
@@ -314,7 +314,7 @@
    <properties>
     <property name="Description" value="SRare: Buster Blader - A: 2600 / D: 2300"/>
     <property name="Name" value="[SR]BBlader"/>
-    <property name="Price" value="50000"/>
+    <property name="Price" value="5000"/>
     <property name="Type" value="item"/>
    </properties>
    <point/>
@@ -323,7 +323,7 @@
    <properties>
     <property name="Description" value="SRare: Dark Magician Girl - A: 2000 / D: 1700"/>
     <property name="Name" value="[SR]DMGirl"/>
-    <property name="Price" value="40000"/>
+    <property name="Price" value="4000"/>
     <property name="Type" value="item"/>
    </properties>
    <point/>
@@ -332,7 +332,7 @@
    <properties>
     <property name="Description" value="URare: Dark Magician - A: 2500 / D: 2100"/>
     <property name="Name" value="[UR]DMag"/>
-    <property name="Price" value="70000"/>
+    <property name="Price" value="7000"/>
     <property name="Type" value="item"/>
    </properties>
    <point/>
@@ -341,7 +341,7 @@
    <properties>
     <property name="Description" value="URare: Magician of Black Chaos - A: 2800 / D: 2600"/>
     <property name="Name" value="[UR]BChaos"/>
-    <property name="Price" value="80000"/>
+    <property name="Price" value="8000"/>
     <property name="Type" value="item"/>
    </properties>
    <point/>
@@ -350,7 +350,7 @@
    <properties>
     <property name="Description" value="URare: Black Luster Soldier - A: 3000 / D: 2500"/>
     <property name="Name" value="[UR]B.L.S."/>
-    <property name="Price" value="100000"/>
+    <property name="Price" value="10000"/>
     <property name="Type" value="item"/>
    </properties>
    <point/>
@@ -359,7 +359,7 @@
    <properties>
     <property name="Description" value="URare: Blue Eyes White Dragon - A: 3000 / D: 2500"/>
     <property name="Name" value="[UR]B.E.W.D."/>
-    <property name="Price" value="100000"/>
+    <property name="Price" value="10000"/>
     <property name="Type" value="item"/>
    </properties>
    <point/>
@@ -368,7 +368,7 @@
    <properties>
     <property name="Description" value="Rare: Vorse Raider - A: 1900 / D: 1200"/>
     <property name="Name" value="[R]V.Raider"/>
-    <property name="Price" value="30000"/>
+    <property name="Price" value="3000"/>
     <property name="Type" value="item"/>
    </properties>
    <point/>
@@ -377,7 +377,7 @@
    <properties>
     <property name="Description" value="SRare: Judge Man - A: 2200 / D: 1500"/>
     <property name="Name" value="[SR]JudgeM"/>
-    <property name="Price" value="45000"/>
+    <property name="Price" value="4500"/>
     <property name="Type" value="item"/>
    </properties>
    <point/>
@@ -386,7 +386,7 @@
    <properties>
     <property name="Description" value="Rare: Swordstalker - A: 2000 / D: 1600"/>
     <property name="Name" value="[R]Swdstlk"/>
-    <property name="Price" value="35500"/>
+    <property name="Price" value="3550"/>
     <property name="Type" value="item"/>
    </properties>
    <point/>
@@ -1549,7 +1549,7 @@
     <property name="Pack Description" value="1st Pack Available"/>
     <property name="Pack Name" value="Skulled Minions"/>
     <property name="Pack Preview" value="cards/packs/SkulledMinions.png"/>
-    <property name="Pack Price" type="int" value="20000"/>
+    <property name="Pack Price" type="int" value="2000"/>
     <property name="Pack Rolls" type="int" value="3"/>
     <property name="common 1" type="object" value="189"/>
     <property name="common 2" type="object" value="191"/>
@@ -1639,7 +1639,7 @@
     <property name="Pack Description" value="2nd set"/>
     <property name="Pack Name" value="Ghost of the Past"/>
     <property name="Pack Preview" value="cards/packs/GhostOfThePast.png"/>
-    <property name="Pack Price" type="int" value="40000"/>
+    <property name="Pack Price" type="int" value="4000"/>
     <property name="Pack Rolls" type="int" value="4"/>
     <property name="common 1" type="object" value="193"/>
     <property name="common 2" type="object" value="185"/>
@@ -1680,7 +1680,7 @@
     <property name="Pack Description" value="Kaiba themed pack"/>
     <property name="Pack Name" value="Kaiba's Revenge"/>
     <property name="Pack Preview" value="cards/packs/KaibaPack.png"/>
-    <property name="Pack Price" type="int" value="50000"/>
+    <property name="Pack Price" type="int" value="5000"/>
     <property name="Pack Rolls" type="int" value="4"/>
     <property name="common 1" type="object" value="356"/>
     <property name="common 2" type="object" value="357"/>
