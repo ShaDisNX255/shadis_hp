@@ -3582,10 +3582,9 @@ if ok_menu then
         opt.text = opt.shop_name
       end
 
-      -- Force a redraw so the row + balance update immediately
-      if menu and menu.render_menu_contents then
-        pcall(function() menu:render_menu_contents(true) end)
-      end
+-- Do NOT force a menu redraw here.
+-- This runs right before TalkVertMenu resets the textbox to the purchase message,
+-- and it can corrupt/overlap the post-purchase text draw.
 
       if sfx and sfx.item_get then
         Net.play_sound_for_player(pid, sfx.item_get)

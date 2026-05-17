@@ -62,6 +62,11 @@ local exit_pending = {}
 -- Defer opening YES/NO confirm by 1 tick to avoid textbox clear/position race.
 local confirm_pending = {}
 
+-- result_pending[player_id] = deferred post-confirm result text.
+-- This avoids resetting the same textbox on the exact tick Prompt.yesno closes,
+-- which can cause old prompt text cleanup to erase pieces of the new message.
+local result_pending = {}
+
 -- goodbye_closing[player_id] = { box_id=... }
 -- Keep input locked until textbox is fully removed (post-close animation).
 local goodbye_closing = {}
@@ -282,19 +287,28 @@ local function ensure_tick()
               post_text = string.format(fmt, choice_text)
             end
 
-            reset_box_text(player_id, box_id, ui, post_text, true)
-            local estimated_pages = estimate_text_pages(post_text, ui)
+            -- Keep input controlled during the one-tick handoff delay.
+            if Net.lock_player_input then
+              pcall(function() Net.lock_player_input(player_id) end)
+            end
 
-            pending_ack[player_id] = {
+            Input.consume(player_id)
+            Input.clear_require_release(player_id, { "confirm", "cancel" })
+            Input.swallow(player_id, 0.10)
+
+            -- Do NOT reset the textbox immediately here.
+            -- Prompt.close(... keep_textbox=true) just ran, so old prompt glyph cleanup can
+            -- erase parts of the new message if we reuse the same box on this exact tick.
+            result_pending[player_id] = {
               box_id = box_id,
               ui = ui,
               menu = menu,
-              phase = 1,
               choice_id = choice_id,
               choice_text = choice_text,
               flow = flow,
+              post_text = post_text,
               after_text_override = after_text,
-              remaining_pages = estimated_pages,
+              frames = 1,
             }
           end,
 
@@ -333,6 +347,39 @@ local function ensure_tick()
       end
     end
 
+    --=====================================================
+    -- Deferred result text after YES confirmation
+    --=====================================================
+    for player_id, r in pairs(result_pending) do
+      if (tonumber(r.frames or 0) or 0) > 0 then
+        r.frames = r.frames - 1
+      elseif not (Prompt.instances and Prompt.instances[player_id]) then
+        result_pending[player_id] = nil
+
+        if Net.lock_player_input then
+          pcall(function() Net.lock_player_input(player_id) end)
+        end
+
+        Input.consume(player_id)
+        Input.clear_require_release(player_id, { "confirm", "cancel" })
+        Input.swallow(player_id, 0.10)
+
+        reset_box_text(player_id, r.box_id, r.ui, r.post_text, true)
+        local estimated_pages = estimate_text_pages(r.post_text, r.ui)
+
+        pending_ack[player_id] = {
+          box_id = r.box_id,
+          ui = r.ui,
+          menu = r.menu,
+          phase = 1,
+          choice_id = r.choice_id,
+          choice_text = r.choice_text,
+          flow = r.flow,
+          after_text_override = r.after_text_override,
+          remaining_pages = estimated_pages,
+        }
+      end
+    end
 
     --=====================================================
     -- Pending ACK phases (post-select / after-text / exit close) (post-select / after-text / exit close)
@@ -424,6 +471,7 @@ function TalkVertMenu.is_busy(player_id)
   if goodbye_closing[player_id] then return true end
   if pending_ack[player_id] then return true end
   if exit_pending[player_id] then return true end
+  if result_pending[player_id] then return true end
 
   if Prompt.instances and Prompt.instances[player_id] then return true end
   if PromptVertical.instances and PromptVertical.instances[player_id] then return true end
