@@ -41,8 +41,6 @@ local sfx = {
     item_get = '/server/assets/ezlibs-assets/sfx/item_get.ogg',
 }
 
-local pending_item_get_anims = {}
-
 -- ============================================================================
 -- Ensure directories and files exist at startup
 -- ============================================================================
@@ -1095,96 +1093,46 @@ end
 
 -- ===================== Missing Animation Helpers =====================
 local function get_item_get_duration_seconds(player_id)
-    local fallback_duration = 0.34 -- ITEM_GET is 4 frames * 0.0833333 in your overworld.animation
+    local fallback_duration = 0.34
 
     local ok, parsed = pcall(function()
         return avatar_utils.parse_player_animation(player_id, "sheet")
     end)
 
     if not ok or not parsed then
-        print("[ezmemory][item_get] animation parse failed, using fallback duration")
         return fallback_duration
     end
 
     local animations = parsed.animations or parsed["animations"]
     local item_get = animations and animations["ITEM_GET"]
-
     local duration = tonumber(item_get and item_get.total_duration_ms)
 
     if not duration then
-        print("[ezmemory][item_get] ITEM_GET duration missing, using fallback duration")
         return fallback_duration
     end
 
-    -- Some parsers return ms, some return seconds.
+    -- total_duration_ms is usually milliseconds, but guard in case parser returns seconds.
     if duration > 10 then
         duration = duration / 1000
     end
-
-    if duration < 0.10 then duration = 0.10 end
-    if duration > 2.00 then duration = fallback_duration end
 
     return duration
 end
 
 function ezmemory.play_anim_get(player_id)
-    pending_item_get_anims[player_id] = nil
+    return async(function()
+        local duration = get_item_get_duration_seconds(player_id)
 
-    local duration = get_item_get_duration_seconds(player_id)
+        Net.animate_player(player_id, "ITEM_GET", false)
+        await(Async.sleep(duration))
 
-    print("[ezmemory][item_get] start pid=" .. tostring(player_id) .. " duration=" .. tostring(duration))
-
-    Net.animate_player(player_id, "ITEM_GET", false)
-
-    -- Always schedule HOLD. Do not depend on animation parsing here.
-    -- If the state does not exist, Net.animate_player just won't visibly do anything,
-    -- but if it does exist, Linux path/case parsing issues won't block it anymore.
-    pending_item_get_anims[player_id] = {
-        remaining = duration,
-        holding = false,
-        resend_timer = 0,
-    }
-
-    return true
-end
-
-function ezmemory.on_tick(delta_time)
-    delta_time = tonumber(delta_time) or (1 / 60)
-
-    if delta_time < 0 then delta_time = 0 end
-    if delta_time > 0.25 then delta_time = 0.25 end
-
-    for player_id, state in pairs(pending_item_get_anims) do
-        if Net.is_player and not Net.is_player(player_id) then
-            pending_item_get_anims[player_id] = nil
-        else
-            if not state.holding then
-                state.remaining = (state.remaining or 0) - delta_time
-
-                if state.remaining <= 0 then
-                    state.holding = true
-                    state.resend_timer = 0
-                end
-            end
-
-            if state.holding then
-                state.resend_timer = (state.resend_timer or 0) - delta_time
-
-                if state.resend_timer <= 0 then
-                    Net.animate_player(player_id, "ITEM_GET_HOLD", true)
-
-                    -- Keep reasserting HOLD while the native textbox is open.
-                    -- set_direction_anim() cancels this once the textbox closes.
-                    state.resend_timer = 0.12
-                end
-            end
-        end
-    end
+        -- Play HOLD once only.
+        -- Do NOT re-send it on a timer; the Navi's own animation file controls its timing.
+        Net.animate_player(player_id, "ITEM_GET_HOLD", true)
+    end)
 end
 
 function ezmemory.set_direction_anim(player_id, direction)
-    pending_item_get_anims[player_id] = nil
-
     pcall(function()
         print(direction)
         Net.animate_player(player_id, idle_map[direction], true)

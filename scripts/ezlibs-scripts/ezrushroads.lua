@@ -484,12 +484,7 @@ function ezrushroads.handle_player_join(player_id)
     -- Ensure food item exists
     update_food_item(player_id, rush.food or 0)
 
-    -- Give starting food (original behavior)
-    ezrushroads.add_food(player_id, 10)
-    local name = Net.get_player_name(player_id)
-    if name == "D3str0y3d" then
-        ezrushroads.add_food(player_id, 6)
-    end
+    -- Rush Food is now bought from shops, not granted on login.
 
     -- Create temporary bots
     create_temp_bots_for_player(player_id)

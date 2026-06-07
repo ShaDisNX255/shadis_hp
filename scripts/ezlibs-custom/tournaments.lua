@@ -1543,6 +1543,65 @@ local function erase_tournament_board(player_id)
   player_visual_ids[player_id] = {}
 end
 
+local tournament_area_music = {}
+
+local function safe_get_area_song(area_id)
+  if not area_id or not Net.get_song then
+    return nil
+  end
+
+  local ok, song = pcall(Net.get_song, area_id)
+  if ok then
+    return song
+  end
+
+  return nil
+end
+
+local function acquire_tournament_music(area_id)
+  if not area_id or not VISUALS.music then
+    return nil
+  end
+
+  local state = tournament_area_music[area_id]
+
+  if not state then
+    state = {
+      original_song = safe_get_area_song(area_id),
+      users = 0,
+    }
+
+    tournament_area_music[area_id] = state
+    pcall(Net.set_song, area_id, VISUALS.music)
+  end
+
+  state.users = state.users + 1
+  return area_id
+end
+
+local function release_tournament_music(area_id)
+  if not area_id then
+    return
+  end
+
+  local state = tournament_area_music[area_id]
+  if not state then
+    return
+  end
+
+  state.users = state.users - 1
+
+  if state.users > 0 then
+    return
+  end
+
+  tournament_area_music[area_id] = nil
+
+  if state.original_song then
+    pcall(Net.set_song, area_id, state.original_song)
+  end
+end
+
 local function draw_ui(player_id, id, texture, anim, state, pos, sx, sy)
   if not texture or not pos then
     vdebug("[tournaments][visual] skipped draw: missing texture/pos for " .. tostring(id))
@@ -1858,7 +1917,7 @@ local function draw_tournament_board_for_player(player_id, tournament, mode)
   return async(function()
     local area_id = Net.get_player_area(player_id)
     local original_name = Net.get_area_name(area_id)
-    local original_song = Net.get_song(area_id)
+    local music_area = acquire_tournament_music(area_id)
 
     local bg_info = get_board_background(tournament)
     local pos = ui_data.unmoving_ui_pos or {}
@@ -1960,9 +2019,7 @@ local function draw_tournament_board_for_player(player_id, tournament, mode)
       pcall(Net.set_area_name, area_id, original_name)
     end
 
-    if original_song then
-      pcall(Net.set_song, area_id, original_song)
-    end
+    release_tournament_music(music_area)
 
     pcall(Net.fade_player_camera, player_id, { r = 0, g = 0, b = 0, a = 0 }, VISUALS.fade_seconds)
     if not tournament_input_locked[player_id] then

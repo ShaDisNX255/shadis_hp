@@ -79,4 +79,6 @@ e61232ec917b32226f6b217b4c1b8da9 com.discord.caseofthematts#8907.player.howler
 b0285b99f6524972761ae712f9fffd2f Discord_FenrirWyrmblood_Basic_BlazingFlizard
 4b5a0b2f3fa3192e8cfa1be527b613f2 com.darkware.navi.megamanstfpvp
 36424a4f5c28020af7228d7b3a1c06b2 com.shadis.navi.shockdos.basic
+edff2fd0b66d804b898e90d0138ae394 com.silva&darkware.navi.itsdefinitelynotzarypvp
+
 
