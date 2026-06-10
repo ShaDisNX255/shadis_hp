@@ -869,9 +869,12 @@ local function reopen_parent_later(pid, parent)
     return
   end
 
+  -- Do not use os.clock here.
+  -- Linux may count CPU time instead of real elapsed time, causing visible delays.
+  -- We only need to escape the current virtual_input event, so one tick is enough.
   pending_parent_reopen[pid] = {
     parent = parent,
-    at = ((os and os.clock and os.clock()) or 0) + 0.05,
+    ticks = 1,
   }
 end
 
@@ -884,10 +887,10 @@ if Net and Net.on and not rawget(_G, "__MENUAPI_PARENT_REOPEN_TICK__") then
       return
     end
 
-    local now = (os and os.clock and os.clock()) or 0
-
     for pid, job in pairs(pending) do
-      if now >= (tonumber(job.at) or 0) then
+      job.ticks = (tonumber(job.ticks) or 1) - 1
+
+      if job.ticks <= 0 then
         pending[pid] = nil
         open_parent(pid, job.parent)
       end
