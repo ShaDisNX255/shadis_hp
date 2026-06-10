@@ -418,6 +418,7 @@ function TextDisplay:createTextBox(player_id, box_id, text, x, y, width, height,
     z_order = z_order or 100
     speed = speed or self.text_box_settings.default_speed
     opts = opts or {}
+    local text_scale = tonumber(opts.text_scale or scale) or scale
 
     local type_sfx_path   = opts.type_sfx_path
     local type_sfx_min_dt = opts.type_sfx_min_dt
@@ -491,12 +492,13 @@ end
       local tmp_box = {
         mugshot = mugshot,
         scale = scale,
-        _line_height_px = line_height_px_for(font_name, scale, self.text_box_settings.line_height),
+        _line_height_px = line_height_px_for(font_name, text_scale, self.text_box_settings.line_height),
+        text_scale = text_scale,
       }
       mug_layout = compute_mug_layout(tmp_box)
 
       if mug_layout and mug_layout.reserve_w > 0 and mug_layout.lines > 0 then
-        local chars_per_pixel = ( ( ( (self.font_system.char_widths[font_name] or self.font_system.char_widths.THICK)["A"] or 6) * scale ) + ((self.text_box_settings.char_spacing or 1) * scale) )
+        local chars_per_pixel = ( ( ( (self.font_system.char_widths[font_name] or self.font_system.char_widths.THICK)["A"] or 6) * text_scale ) + ((self.text_box_settings.char_spacing or 1) * text_scale) )
         local mug_chars = math.floor((mug_layout.reserve_w + mug_layout.gap) / chars_per_pixel)
 
         wrap_opts = {
@@ -549,7 +551,7 @@ end
 
     -- Process text into pages with word wrapping (now respects \n and \f)
     local max_lines_override = actual_backdrop_config.max_lines
-    local pages = self:wrapTextToPages(wrapped_text, font_name, scale, inner_width, inner_height, max_lines_override, wrap_opts)
+    local pages = self:wrapTextToPages(wrapped_text, font_name, text_scale, inner_width, inner_height, max_lines_override, wrap_opts)
 
     -- Resolve sentinels into pause_marks based on FINAL wrapped pages
     local pause_marks = {}
@@ -606,6 +608,7 @@ end
         inner_height = inner_height,
         font = font_name,
         scale = scale,
+        text_scale = text_scale,
         z_order = z_order,
         speed = speed,
         char_delay = char_delay,
@@ -621,7 +624,7 @@ end
         mugshot = mugshot,
         mug_layout = mug_layout,
         line_x_offsets = {},
-        _line_height_px = line_height_px_for(font_name, scale, self.text_box_settings.line_height),
+        _line_height_px = line_height_px_for(font_name, text_scale, self.text_box_settings.line_height),
         backdrop = actual_backdrop_config,
         backdrop_id = nil,
         _backdrop_allocated = false,
@@ -699,6 +702,8 @@ function TextDisplay:resetTextBox(player_id, box_id, text, x, y, width, height, 
   speed     = speed     or box_data.speed or self.text_box_settings.default_speed
   opts      = opts      or {}
 
+  local text_scale = tonumber(opts.text_scale or box_data.text_scale or scale) or scale
+
   -- Ensure assets for typing sfx if changed
   local type_sfx_path   = opts.type_sfx_path or box_data.type_sfx_path
   local type_sfx_min_dt = opts.type_sfx_min_dt or box_data.type_sfx_min_dt
@@ -756,13 +761,13 @@ function TextDisplay:resetTextBox(player_id, box_id, text, x, y, width, height, 
   if mugshot and mugshot.enabled then
     local tmp_box = {
       mugshot = mugshot,
-      scale = scale,
-      _line_height_px = line_height_px_for(font_name, scale, self.text_box_settings.line_height),
+      scale = text_scale,
+      _line_height_px = line_height_px_for(font_name, text_scale, self.text_box_settings.line_height),
     }
     mug_layout = compute_mug_layout(tmp_box)
 
     if mug_layout and mug_layout.reserve_w > 0 and mug_layout.lines > 0 then
-      local chars_per_pixel = ( ( ( (self.font_system.char_widths[font_name] or self.font_system.char_widths.THICK)["A"] or 6) * scale ) + ((self.text_box_settings.char_spacing or 1) * scale) )
+      local chars_per_pixel = ( ( ( (self.font_system.char_widths[font_name] or self.font_system.char_widths.THICK)["A"] or 6) * text_scale ) + ((self.text_box_settings.char_spacing or 1) * text_scale) )
       local mug_chars = math.floor((mug_layout.reserve_w + mug_layout.gap) / chars_per_pixel)
 
       wrap_opts = {
@@ -812,7 +817,7 @@ function TextDisplay:resetTextBox(player_id, box_id, text, x, y, width, height, 
   local wrapped_text = table.concat(buf)
 
   local max_lines_override = actual_backdrop_config.max_lines
-  local pages = self:wrapTextToPages(wrapped_text, font_name, scale, inner_width, inner_height, max_lines_override, wrap_opts)
+  local pages = self:wrapTextToPages(wrapped_text, font_name, text_scale, inner_width, inner_height, max_lines_override, wrap_opts)
 
   -- Resolve sentinels into pause_marks based on FINAL wrapped pages
   local pause_marks = {}
@@ -867,6 +872,7 @@ function TextDisplay:resetTextBox(player_id, box_id, text, x, y, width, height, 
 
   box_data.font  = font_name
   box_data.scale = scale
+  box_data.text_scale = text_scale
   box_data.z_order = z_order
   box_data.speed = speed
   box_data.char_delay = 1.0 / (speed or 30)
@@ -896,7 +902,7 @@ function TextDisplay:resetTextBox(player_id, box_id, text, x, y, width, height, 
   box_data.mugshot = mugshot
   box_data.mug_layout = mug_layout
   box_data.line_x_offsets = {}
-  box_data._line_height_px = line_height_px_for(font_name, scale, self.text_box_settings.line_height)
+  box_data._line_height_px = line_height_px_for(font_name, text_scale, self.text_box_settings.line_height)
 
   box_data.backdrop = actual_backdrop_config
   box_data.padding_x = padding_x
@@ -1976,15 +1982,16 @@ function TextDisplay:drawTextBoxCharacter(player_id, box_id, box_data, play_sfx)
     self:_playTypeSfx(player_id, box_data)
   end
 
-local lh = box_data._line_height_px or (self.text_box_settings.line_height * box_data.scale)
+local text_scale = box_data.text_scale or box_data.scale
+local lh = box_data._line_height_px or (self.text_box_settings.line_height * text_scale)
 local line_y = box_data.inner_y + ((box_data.current_line - 1) * lh)
 
   local char_widths = self.font_system.char_widths[box_data.font] or self.font_system.char_widths.THICK
   local default_char_width = char_widths["A"] or char_widths["0"] or 6
-  local char_width = default_char_width * box_data.scale
+  local char_width = default_char_width * text_scale
 
   local base_spacing = self.text_box_settings.char_spacing or 1
-  local scaled_spacing = base_spacing * box_data.scale
+  local scaled_spacing = base_spacing * text_scale
   local line_offset = 0
   if box_data.line_x_offsets then
     line_offset = box_data.line_x_offsets[box_data.current_line] or 0
@@ -1999,8 +2006,8 @@ local line_y = box_data.inner_y + ((box_data.current_line - 1) * lh)
     x = current_x,
     y = line_y,
     z = box_data.z_order,
-    sx = box_data.scale,
-    sy = box_data.scale,
+    sx = text_scale,
+    sy = text_scale,
     anim_state = state
   })
 

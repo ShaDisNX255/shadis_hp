@@ -30,32 +30,46 @@ local MAX_TITLE_CH        = 28   -- keep one-line titles short
 local MAX_AUTHOR_CH       = 18
 
 -- ===== Persistence (ezmemory) =====
+local function _secret(pid)
+  return helpers.get_safe_player_secret(pid)
+end
+
 local function _mem(pid)
-  local secret = helpers.get_safe_player_secret(pid)
-  return ezmemory.get_player_memory(secret) or {}
+  local secret = _secret(pid)
+  return ezmemory.get_player_memory(secret) or {}, secret
 end
 
 local function _snapshot(st)
   return {
-    day_key  = st.day_key,
-    prog     = st.prog     or {},
-    boards   = st.boards   or {},
+    day_key   = st.day_key,
+    prog      = st.prog      or {},
+    boards    = st.boards    or {},
+    __migrate = st.__migrate or {},
   }
 end
 
 local function save_mem(pid, st)
-  local mem = _mem(pid)
+  local mem, secret = _mem(pid)
   mem.jobbbs = _snapshot(st)
-  -- If your ezmemory build needs an explicit save, call it here.
+
+  if ezmemory.set_player_memory then
+    pcall(ezmemory.set_player_memory, secret, mem)
+  end
+
+  if ezmemory.save_player_memory then
+    pcall(ezmemory.save_player_memory, secret)
+  end
 end
 
 local function load_mem_into_state(pid, st)
   local mem = _mem(pid)
   local slot = mem.jobbbs
-  if type(slot) == 'table' then
-    st.day_key = slot.day_key or st.day_key
-    st.prog    = slot.prog    or {}
-    st.boards  = slot.boards  or {}
+
+  if type(slot) == "table" then
+    st.day_key   = slot.day_key or st.day_key
+    st.prog      = slot.prog or {}
+    st.boards    = slot.boards or {}
+    st.__migrate = slot.__migrate or st.__migrate or {}
   end
 end
 
@@ -1029,7 +1043,9 @@ local function ensure_jobs_for_today(pid, st, board_id)
         end
       end
       B.flags_stamp = st.day_key
+      save_mem(pid, st)
     end
+    save_mem(pid, st)
     return B
   end
 
@@ -1271,6 +1287,241 @@ end
 
 function JobBBS.open_progress_board(pid)
   open_progress_board(pid)
+end
+
+local function get_menuapi()
+  local MenuAPI = rawget(_G, "MenuAPI")
+
+  if not (MenuAPI and type(MenuAPI.open) == "function") then
+    local ok, mod = pcall(require, "scripts/menuAPI/main")
+    if ok and type(mod) == "table" then
+      MenuAPI = mod
+    end
+  end
+
+  return MenuAPI
+end
+
+local function menuapi_tint(name, key)
+  local MenuAPI = get_menuapi()
+
+  if MenuAPI and type(MenuAPI.get_palette) == "function" then
+    local p = MenuAPI.get_palette(name)
+    if p and p[key] then
+      return p[key]
+    end
+  end
+
+  return nil
+end
+
+local function fit_menu_lines(text, width, max_lines)
+  local lines = wrap(text or "", width or 20)
+  local out = {}
+
+  for i = 1, max_lines do
+    out[i] = lines[i] or ""
+  end
+
+  if #lines > max_lines and max_lines > 0 then
+    local last = tostring(out[max_lines] or "")
+    if #last > 3 then
+      out[max_lines] = last:sub(1, math.max(1, width - 3)) .. "..."
+    else
+      out[max_lines] = "..."
+    end
+  end
+
+  return out
+end
+
+-- MenuAPI version of the LMenu Job Progress viewer.
+-- Shows accepted, unclaimed jobs from all boards.
+function JobBBS.build_menuapi_progress_rows(pid)
+  ensure_daily_reset(pid)
+
+  local st = attach_state(pid)
+  if not st then
+    return {
+      { id = "__jobprog:none", text = "No job data.", selectable = false, show_right = false },
+    }
+  end
+
+  local by_id = (function()
+    local p, _ = jobs_pool()
+    return p
+  end)()
+
+  local rows = {}
+
+  for board_id, B in pairs(st.boards or {}) do
+    if B and B.accepted then
+      ensure_jobs_for_today(pid, st, board_id)
+
+      local claimed = B.claimed or {}
+
+      for jid, accepted in pairs(B.accepted) do
+        if accepted and not claimed[jid] then
+          local job = by_id[jid]
+
+          if job and job.check then
+            local base_key = board_id .. "/" .. jid
+            local done, cur, need = job.check(pid, st, base_key)
+
+            cur = math.floor(tonumber(cur) or 0)
+            need = math.floor(tonumber(need) or 0)
+
+            if cur < 0 then cur = 0 end
+            if need < 0 then need = 0 end
+            if (not done) and need > 0 and cur > need then cur = need end
+
+            local status_tint = menuapi_tint(done and "green" or "gold", "row_tint")
+            local right = done and "Done" or string.format("%d/%d", cur, need)
+
+            rows[#rows + 1] = {
+              id = "__jobprog:title:" .. tostring(board_id) .. ":" .. tostring(jid),
+              text = trunc(job.title, MAX_TITLE_CH),
+              right = right,
+              tint = status_tint,
+              right_tint = status_tint,
+
+              -- Extra data used by MenuAPI confirm.
+              board_id = board_id,
+              job_id = jid,
+              job_title = job.title,
+              job_desc = job.desc,
+              job_poster = job.poster,
+              job_done = done,
+              job_cur = cur,
+              job_need = need,
+            }
+          end
+        end
+      end
+    end
+  end
+
+  table.sort(rows, function(a, b)
+    local ad = a.job_done and 1 or 0
+    local bd = b.job_done and 1 or 0
+    if ad ~= bd then return ad < bd end
+
+    local at = tostring(a.job_title or a.text or "")
+    local bt = tostring(b.job_title or b.text or "")
+    return at < bt
+  end)
+
+  if #rows == 0 then
+    rows[#rows + 1] = {
+      id = "__jobprog:none",
+      text = "No accepted jobs.",
+      selectable = false,
+      enabled = false,
+      show_right = false,
+    }
+  end
+
+  return rows
+end
+
+function JobBBS.handle_menuapi_progress_confirm(pid, row, menu_state, opts)
+  if type(row) ~= "table" or not row.job_id then
+    return true
+  end
+
+  opts = opts or {}
+
+  local cur = math.floor(tonumber(row.job_cur) or 0)
+  local need = math.floor(tonumber(row.job_need) or 0)
+
+  local progress_text
+  if row.job_done then
+    progress_text = "Progress: Complete"
+  else
+    progress_text = string.format("Progress: %d/%d", cur, need)
+  end
+
+  local desc = tostring(row.job_desc or "")
+  if desc == "" then
+    desc = tostring(row.job_title or "Job")
+  end
+
+  local MenuAPI = get_menuapi()
+
+  if MenuAPI and type(MenuAPI.open) == "function" then
+    local status_tint = menuapi_tint(row.job_done and "green" or "gold", "row_tint")
+    local desc_tint = menuapi_tint("gray", "row_tint")
+
+    local lines = fit_menu_lines(desc, 20, 3)
+
+    local detail_rows = {
+      { id = "__jobdetail:desc1", text = lines[1], selectable = false, disabled_prefix = false, tint = desc_tint, show_right = false },
+      { id = "__jobdetail:desc2", text = lines[2], selectable = false, disabled_prefix = false, tint = desc_tint, show_right = false },
+      { id = "__jobdetail:desc3", text = lines[3], selectable = false, disabled_prefix = false, tint = desc_tint, show_right = false },
+      { id = "__jobdetail:prog",  text = progress_text, selectable = false, disabled_prefix = false, tint = status_tint, show_right = false },
+    }
+
+    MenuAPI.open(pid, {
+      type = 2,
+      title = trunc(row.job_title or "Job", 18),
+      color = row.job_done and "green" or "gold",
+      rows = detail_rows,
+
+      lock_input = false,
+      cursor_enabled = false,
+      scroll_enabled = false,
+      show_right = false,
+
+      parent = function(pid)
+        JobBBS.open_menuapi_progress(pid, {
+          parent = opts.parent or "lmenu",
+          color = opts.color or "blue",
+          title = opts.title or "Job Progress",
+          lock_input = false,
+        })
+      end,
+    })
+
+    return true
+  end
+
+  local NL = string.char(10)
+  Net.message_player(pid, desc .. NL .. progress_text)
+  return true
+end
+
+function JobBBS.open_menuapi_progress(pid, opts)
+  opts = opts or {}
+
+  local MenuAPI = rawget(_G, "MenuAPI")
+  if not (MenuAPI and type(MenuAPI.open) == "function") then
+    local ok, mod = pcall(require, "scripts/menuAPI/main")
+    if ok and type(mod) == "table" then
+      MenuAPI = mod
+    end
+  end
+
+  if not (MenuAPI and type(MenuAPI.open) == "function") then
+    Net.message_player(pid, "(MenuAPI not available.)")
+    return false
+  end
+
+  return MenuAPI.open(pid, {
+    type = 1,
+    title = opts.title or "Job Progress",
+    parent = opts.parent or "lmenu",
+    color = opts.color or "blue",
+
+    -- LMenu already closed with keep_frozen = true,
+    -- so avoid double-locking input here.
+    lock_input = opts.lock_input == true,
+
+    rows = JobBBS.build_menuapi_progress_rows(pid),
+
+    on_confirm = function(pid, selected_row, menu_state)
+      return JobBBS.handle_menuapi_progress_confirm(pid, selected_row, menu_state, opts)
+    end,
+  })
 end
 
 function JobBBS.handle_post_selection(event)

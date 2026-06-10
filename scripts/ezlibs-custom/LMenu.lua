@@ -87,12 +87,29 @@ local function is_prompt_vertical_open(pid)
   return (PromptVertical.instances and PromptVertical.instances[pid]) ~= nil
 end
 
+local function is_menuapi_open(pid)
+  local MenuAPI = rawget(_G, "MenuAPI")
+  if type(MenuAPI) == "table" and type(MenuAPI.is_open) == "function" then
+    local ok, open = pcall(MenuAPI.is_open, pid)
+    if ok and open then return true end
+  end
+
+  local f = rawget(_G, "menuapi_ui_is_open")
+  if type(f) == "function" then
+    local ok, open = pcall(f, pid)
+    if ok and open then return true end
+  end
+
+  return false
+end
+
 local function is_modal_open(pid)
   return is_slots_open(pid)
       or is_blackjack_open(pid)
       or is_duel_open(pid)
       or is_lobby_open(pid)
-      or is_prompt_vertical_open(pid) -- NEW: blocks during ng_shop / prompt vert menus
+      or is_prompt_vertical_open(pid)
+      or is_menuapi_open(pid)
 end
 
 
@@ -150,6 +167,15 @@ end
 local JobBBSOK, JobBBS = pcall(require, "scripts/jobbbs/JobBBS")
 if not JobBBSOK then
   JobBBS = nil
+end
+
+-- ---------------------------------------------------------------------------
+-- Custom menu API
+-- ---------------------------------------------------------------------------
+
+local MenuAPIOK, MenuAPI = pcall(require, "scripts/menuAPI/main")
+if not MenuAPIOK then
+  MenuAPI = nil
 end
 
 -- ---------------------------------------------------------------------------
@@ -1210,7 +1236,7 @@ local function handle_lmenu_button(pid, btn)
       return
     end
 
-    -- Jobs progress viewer
+    --[[ Jobs progress viewer
     if row.id == "jobs" then
       LMenu.close(pid)
 
@@ -1222,6 +1248,34 @@ local function handle_lmenu_button(pid, btn)
       else
         Net.message_player(pid, "(Job progress viewer not available.)")
       end
+      return
+    end]]--
+
+    -- Jobs progress viewer - MenuAPI
+    if row.id == "jobs" then
+      LMenu.close(pid, { keep_frozen = true })
+
+      if JobBBS and type(JobBBS.open_menuapi_progress) == "function" then
+        local okj, errj = pcall(JobBBS.open_menuapi_progress, pid, {
+          parent = "lmenu",
+          color = "blue",
+          title = "Job Progress",
+          lock_input = false,
+        })
+
+        if not okj then
+          warn("JobBBS.open_menuapi_progress failed for", pid, ":", tostring(errj))
+          if Net and Net.unlock_player_input then
+            pcall(Net.unlock_player_input, pid)
+          end
+        end
+      else
+        Net.message_player(pid, "(Job progress viewer not available.)")
+        if Net and Net.unlock_player_input then
+          pcall(Net.unlock_player_input, pid)
+        end
+      end
+
       return
     end
 
