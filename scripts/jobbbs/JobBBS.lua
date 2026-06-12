@@ -449,12 +449,129 @@ JobBBS.on_claim_reward = function(pid, job)
   end
 end
 
+local JOB_PROGRESS_DESCS = {
+  -- Visit
+  visit3  = "Visit 3 different areas.",
+  visit4  = "Visit 4 different areas.",
+  visit5  = "Visit 5 different areas.",
+  visit6  = "Visit 6 different areas.",
+  visit7  = "Visit 7 different areas.",
+  visit8  = "Visit 8 different areas.",
+  visit9  = "Visit 9 different areas.",
+  visit10 = "Visit 10 different areas.",
+  visit11 = "Visit 11 different areas.",
+  visit12 = "Visit 12 different areas.",
+  visit13 = "Visit 13 different areas.",
+
+  -- NPC
+  npc3  = "Talk to 3 NPCs.",
+  npc6  = "Talk to 6 NPCs.",
+  npc9  = "Talk to 9 NPCs.",
+  npc12 = "Talk to 12 NPCs.",
+
+  -- Inspect
+  inspect3  = "Inspect 3 objects.",
+  inspect6  = "Inspect 6 objects.",
+  inspect9  = "Inspect 9 objects.",
+  inspect12 = "Inspect 12 objects.",
+
+  inspect_area3  = "Inspect objects in 3 areas.",
+  inspect_area6  = "Inspect objects in 6 areas.",
+  inspect_area9  = "Inspect objects in 9 areas.",
+  inspect_area12 = "Inspect objects in 13 areas.",
+
+  -- Virus
+  virus_clear3  = "Defeat 3 virus encounters.",
+  virus_clear6  = "Defeat 6 virus encounters.",
+  virus_clear9  = "Defeat 9 virus encounters.",
+  virus_clear12 = "Defeat 12 virus encounters.",
+
+  virus_run3  = "Run from 3 virus encounters.",
+  virus_run6  = "Run from 6 virus encounters.",
+  virus_run9  = "Run from 9 virus encounters.",
+  virus_run12 = "Run from 12 virus encounters.",
+
+  virus_bust8_3  = "Delete 3 viruses with Busting LV 8 or more.",
+  virus_bust8_6  = "Delete 6 viruses with Busting LV 8 or more.",
+  virus_bust8_9  = "Delete 9 viruses with Busting LV 8 or more.",
+  virus_bust8_12 = "Delete 12 viruses with Busting LV 8 or more.",
+
+  virus_turn1_3  = "Delete 3 viruses in 1 turn.",
+  virus_turn1_6  = "Delete 6 viruses in 1 turn.",
+  virus_turn1_9  = "Delete 9 viruses in 1 turn.",
+  virus_turn1_12 = "Delete 12 viruses in 1 turn.",
+
+  virus_fast3  = "Delete 3 viruses in 10s or less.",
+  virus_fast6  = "Delete 6 viruses in 10s or less.",
+  virus_fast9  = "Delete 9 viruses in 10s or less.",
+  virus_fast12 = "Delete 12 viruses in 10s or less.",
+
+  -- Duel
+  duel_win1 = "Win 1 YGO Duel.",
+  duel_win2 = "Win 2 YGO Duels.",
+  duel_win3 = "Win 3 YGO Duels.",
+
+  -- Pack
+  pack_open1  = "Open 1 booster pack.",
+  pack_open10 = "Open 10 booster packs.",
+
+  -- Fishing
+  fish_catch3  = "Catch 3 fish.",
+  fish_catch6  = "Catch 6 fish.",
+  fish_catch9  = "Catch 9 fish.",
+  fish_catch12 = "Catch 12 fish.",
+
+  fish_single_10lb = "Catch a fish 10 lbs or heavier.",
+  fish_single_15lb = "Catch a fish 15 lbs or heavier.",
+  fish_single_20lb = "Catch a fish 20 lbs or heavier.",
+
+  fish_total_40lb = "Catch 40 lbs of fish.",
+  fish_total_60lb = "Catch 60 lbs of fish.",
+  fish_total_90lb = "Catch 90 lbs of fish.",
+
+  fish_streak3 = "Catch 3 fish in a row.",
+  fish_streak4 = "Catch 4 fish in a row.",
+  fish_streak5 = "Catch 5 fish in a row.",
+  fish_streak6 = "Catch 6 fish in a row.",
+
+  fish_virus_lake3 = "Defeat 3 lake virus encounters.",
+  fish_virus_lake6 = "Defeat 6 lake virus encounters.",
+  fish_virus_lake9 = "Defeat 9 lake virus encounters.",
+
+  -- Raid
+  raid_wave2 = "Participate in 2 raid battles.",
+  raid_wave4 = "Participate in 4 raid battles.",
+
+  raid_pts30 = "Earn 30 raid points.",
+  raid_pts60 = "Earn 60 raid points.",
+
+  raid_bdmg500  = "Deal 500 raid boss damage.",
+  raid_bdmg1500 = "Deal 1500 raid boss damage.",
+
+  raid_kill = "Land the finishing blow on a raid boss.",
+}
+
 -- ===== Job pool (definitions) =====
 -- Each check accepts (pid, st, baseline_key)
 local function jobs_pool()
   local P = {}
-  local function J(id, title, poster, desc, check)
-    P[id] = { id=id, title=title, poster=poster, desc=desc, check=check }
+  local function J(id, title, poster, desc, progress_desc, check)
+    -- Backwards compatible:
+    -- Old format: J(id, title, poster, desc, check)
+    -- New format: J(id, title, poster, desc, progress_desc, check)
+    if type(progress_desc) == "function" and check == nil then
+      check = progress_desc
+      progress_desc = nil
+    end
+
+    P[id] = {
+      id = id,
+      title = title,
+      poster = poster,
+      desc = desc,
+      progress_desc = progress_desc or JOB_PROGRESS_DESCS[id],
+      check = check,
+    }
   end
 
   -- Visit
@@ -1390,6 +1507,7 @@ function JobBBS.build_menuapi_progress_rows(pid)
               job_id = jid,
               job_title = job.title,
               job_desc = job.desc,
+              job_progress_desc = job.progress_desc or job.desc,
               job_poster = job.poster,
               job_done = done,
               job_cur = cur,
@@ -1441,7 +1559,7 @@ function JobBBS.handle_menuapi_progress_confirm(pid, row, menu_state, opts)
     progress_text = string.format("Progress: %d/%d", cur, need)
   end
 
-  local desc = tostring(row.job_desc or "")
+  local desc = tostring(row.job_progress_desc or row.job_desc or "")
   if desc == "" then
     desc = tostring(row.job_title or "Job")
   end
@@ -1466,6 +1584,7 @@ function JobBBS.handle_menuapi_progress_confirm(pid, row, menu_state, opts)
       title = trunc(row.job_title or "Job", 18),
       color = row.job_done and "green" or "gold",
       rows = detail_rows,
+      open_sfx = false,
 
       lock_input = false,
       cursor_enabled = false,
@@ -1478,6 +1597,7 @@ function JobBBS.handle_menuapi_progress_confirm(pid, row, menu_state, opts)
           color = opts.color or "blue",
           title = opts.title or "Job Progress",
           lock_input = false,
+          open_sfx = false,
         })
       end,
     })
@@ -1511,6 +1631,7 @@ function JobBBS.open_menuapi_progress(pid, opts)
     title = opts.title or "Job Progress",
     parent = opts.parent or "lmenu",
     color = opts.color or "blue",
+    open_sfx = opts.open_sfx,
 
     -- LMenu already closed with keep_frozen = true,
     -- so avoid double-locking input here.

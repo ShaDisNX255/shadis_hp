@@ -1080,7 +1080,15 @@ function MenuAPI.open(pid, spec)
     pcall(Net.lock_player_input, pid)
   end
 
-  play_sfx(pid, cfg.open_sfx)
+  local open_sfx = spec.open_sfx
+  if open_sfx == nil then
+    open_sfx = cfg.open_sfx
+  end
+
+  if open_sfx ~= false and open_sfx ~= "" then
+    play_sfx(pid, open_sfx)
+  end
+
   redraw(pid)
   return true
 end

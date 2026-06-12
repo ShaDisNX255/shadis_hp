@@ -1261,6 +1261,7 @@ local function handle_lmenu_button(pid, btn)
           color = "blue",
           title = "Job Progress",
           lock_input = false,
+          open_sfx = false,
         })
 
         if not okj then
