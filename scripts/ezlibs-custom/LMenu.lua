@@ -100,6 +100,14 @@ local function is_menuapi_open(pid)
     if ok and open then return true end
   end
 
+  -- MenuAPI may have closed a child window and scheduled a parent reopen
+  -- for the next tick. Treat that as modal so this same LS press
+  -- does not also open LMenu.
+  local pending = rawget(_G, "__MENUAPI_PENDING_PARENT_REOPEN__")
+  if type(pending) == "table" and pending[pid] then
+    return true
+  end
+
   return false
 end
 
@@ -422,6 +430,32 @@ end
 --    rows   = { { id="cards" }, { id="summon" } / { id="unsummon" } , { id="friends" }, { id="cosmetics" } },
 -- }
 local st_by_pid = {}
+local last_row_id_by_pid = {}
+
+local function find_row_index_by_id(rows, row_id)
+  if not row_id then
+    return nil
+  end
+
+  for i, row in ipairs(rows or {}) do
+    if row and row.id == row_id then
+      return i
+    end
+  end
+
+  return nil
+end
+
+local function remember_lmenu_row(pid, st)
+  if not (pid and st and st.rows and st.cursor) then
+    return
+  end
+
+  local row = st.rows[st.cursor]
+  if row and row.id then
+    last_row_id_by_pid[pid] = row.id
+  end
+end
 
 local opened_once = {}
 
@@ -911,10 +945,22 @@ local function rebuild_and_redraw(pid)
     return
   end
 
+  -- Restore preferred row by id, because row indexes can shift
+  -- when Summon/Unsummon appears or disappears.
+  if st.preferred_row_id then
+    local preferred_index = find_row_index_by_id(rows, st.preferred_row_id)
+    if preferred_index then
+      st.cursor = preferred_index
+    end
+    st.preferred_row_id = nil
+  end
+
   -- Clamp cursor
   if not st.cursor or st.cursor < 1 or st.cursor > count then
     st.cursor = 1
   end
+
+  remember_lmenu_row(pid, st)
 
   -- Draw rows
   for i, row in ipairs(rows) do
@@ -963,11 +1009,12 @@ function LMenu.open(pid)
   end
 
   st_by_pid[pid] = {
-    cursor          = 1,
-    rows            = {},
-    last_nav_button = nil,
-    last_nav_time   = 0,
-    has_selected    = false,
+    cursor           = 1,
+    preferred_row_id = last_row_id_by_pid[pid],
+    rows             = {},
+    last_nav_button  = nil,
+    last_nav_time    = 0,
+    has_selected     = false,
   }
 
   -- Lock player input so we start receiving Net:on("virtual_input") events (net-games v2.1)
@@ -997,6 +1044,7 @@ function LMenu.close(pid, opts)
   local st = st_by_pid[pid]
   if not st then return end
 
+  remember_lmenu_row(pid, st)
   clear_all_ui(pid)
   st_by_pid[pid] = nil
 
@@ -1121,6 +1169,7 @@ local function handle_lmenu_button(pid, btn)
       if st.cursor > count then st.cursor = 1 end
     end
 
+    remember_lmenu_row(pid, st)
     rebuild_and_redraw(pid)
     play_sfx(pid, "select")
     return
@@ -1131,6 +1180,7 @@ local function handle_lmenu_button(pid, btn)
     local rows  = st.rows or {}
     local row   = rows[st.cursor or 1]
     if not row then return end
+    remember_lmenu_row(pid, st)
 
     st.has_selected = true
     play_sfx(pid, "choose")
@@ -1192,32 +1242,67 @@ local function handle_lmenu_button(pid, btn)
 
     -- OpenPVP
     if row.id == "pvp" then
-      LMenu.close(pid)
-
       local octo = rawget(_G, "OctoPVP")
-      if octo and type(octo.open_openpvp_menu) == "function" then
+
+      if octo and type(octo.open_openpvp_menuapi) == "function" then
+        LMenu.close(pid, { keep_frozen = true })
+
+        local okp, errp = pcall(octo.open_openpvp_menuapi, pid, {
+          parent = "lmenu",
+          color = "purple",
+          title = "Open PVP",
+          lock_input = false,
+          open_sfx = false,
+        })
+
+        if not okp then
+          warn("OctoPVP.open_openpvp_menuapi failed for", pid, ":", tostring(errp))
+          if Net and Net.unlock_player_input then
+            pcall(Net.unlock_player_input, pid)
+          end
+        end
+
+      elseif octo and type(octo.open_openpvp_menu) == "function" then
+        LMenu.close(pid)
+
         local okp, errp = pcall(octo.open_openpvp_menu, pid)
         if not okp then
           warn("OctoPVP.open_openpvp_menu failed for", pid, ":", tostring(errp))
         end
+
       else
+        LMenu.close(pid)
         Net.message_player(pid, "(Open PVP not available.)")
       end
+
       return
     end
 
     -- Friends board
     if row.id == "friends" then
-      LMenu.close(pid)
+      LMenu.close(pid, { keep_frozen = true })
 
       if Friends and type(Friends.open_friends_board) == "function" then
-        local okf, errf = pcall(Friends.open_friends_board, pid)
+        local okf, errf = pcall(Friends.open_friends_board, pid, {
+          parent = "lmenu",
+          lock_input = false,
+          open_sfx = false,
+          cancel_sfx = "cancel",
+        })
+
         if not okf then
           warn("Friends.open_friends_board failed:", tostring(errf))
+          if Net and Net.unlock_player_input then
+            pcall(Net.unlock_player_input, pid)
+          end
         end
       else
         Net.message_player(pid, "(Friends menu not available.)")
+        if Net and Net.unlock_player_input then
+          pcall(Net.unlock_player_input, pid)
+        end
       end
+
       return
     end
 
