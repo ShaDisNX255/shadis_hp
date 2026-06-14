@@ -941,7 +941,15 @@ local function text_id_for_key(st, key)
 end
 
 local function clear_profile_details(pid, st)
+  -- Remove the old dynamic mug id if we have one.
+  if st and st.profile_mug_sprite_id then
+    safe_remove(st.profile_mug_sprite_id, pid)
+    st.profile_mug_sprite_id = nil
+  end
+
+  -- Also remove the legacy fixed mug id, just in case it exists from an older draw.
   safe_remove(sprite_id_for_key(st, "profile_mug"), pid)
+
   erase_text(pid, text_id_for_key(st, "profile_title"))
 
   for i = 1, 4 do
@@ -968,10 +976,14 @@ local function redraw_profile_details_only(pid, st)
   local mug_state = profile.mug_state or "UI"
 
   if mug_texture and mug_texture ~= "" then
-    add_sprite(
+    -- Use a new sprite id each profile update so texture swaps do not get cached.
+    st.profile_mug_seq = (tonumber(st.profile_mug_seq) or 0) + 1
+    local mug_key = "profile_mug_" .. tostring(st.profile_mug_seq)
+
+    st.profile_mug_sprite_id = add_sprite(
       pid,
       st,
-      "profile_mug",
+      mug_key,
       mug_texture,
       mug_anim,
       mug_state,
