@@ -651,6 +651,25 @@ local function close_menuapi(pid, reason)
   end
 end
 
+local function close_lmenu_before_request_popup(pid)
+  local LMenu = rawget(_G, "LMenu")
+  if not LMenu or type(LMenu.close) ~= "function" then
+    return false
+  end
+
+  if type(LMenu.is_open_for) == "function" then
+    local ok, is_open = pcall(LMenu.is_open_for, pid)
+    if ok and not is_open then
+      return false
+    end
+  end
+
+  -- Important: keep_frozen=true prevents a brief unlock before the
+  -- request popup takes over input.
+  pcall(LMenu.close, pid, { keep_frozen = true })
+  return true
+end
+
 local function refresh_actor_menu_if_open(pid, target_pid)
   if actor_menu_target_by_pid[pid] ~= target_pid then
     return
@@ -809,11 +828,13 @@ local function send_battle_request(sender, target, mode)
     return true
   end
 
+  close_lmenu_before_request_popup(target)
   MenuAPI.open(target, {
     type = 4,
     title = "Battle Request",
     color = (mode == "wcity") and "red" or "purple",
     open_sfx = "screen_open",
+    lock_input = true,
 
     lines = {
       sender_name .. " sent you",
@@ -939,11 +960,13 @@ local function send_friend_request(sender, target)
     return true
   end
 
+  close_lmenu_before_request_popup(target)
   MenuAPI.open(target, {
     type = 4,
     title = "Friend Request",
     color = "green",
     open_sfx = "screen_open",
+    lock_input = true,
 
     lines = {
       sender_name .. " sent you",
