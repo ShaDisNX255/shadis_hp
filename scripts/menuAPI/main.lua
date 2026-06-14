@@ -940,6 +940,93 @@ local function text_id_for_key(st, key)
   return (st.ui_prefix or "menuapi") .. "_" .. tostring(key)
 end
 
+local function clear_profile_details(pid, st)
+  safe_remove(sprite_id_for_key(st, "profile_mug"), pid)
+  erase_text(pid, text_id_for_key(st, "profile_title"))
+
+  for i = 1, 4 do
+    erase_text(pid, text_id_for_key(st, "profile_line_" .. tostring(i)))
+  end
+end
+
+local function redraw_profile_details_only(pid, st)
+  if not st or st.type ~= 5 then
+    return false
+  end
+
+  local layout = st.layout or {}
+  local profile = st.profile or {}
+
+  local px = st.profile_x or layout.profile_x or 49
+  local py = st.profile_y or layout.profile_y or 4
+  local pz = st.profile_z or layout.profile_z or (st.z or layout.z or 220)
+
+  clear_profile_details(pid, st)
+
+  local mug_texture = profile.mug_texture
+  local mug_anim = profile.mug_anim
+  local mug_state = profile.mug_state or "UI"
+
+  if mug_texture and mug_texture ~= "" then
+    add_sprite(
+      pid,
+      st,
+      "profile_mug",
+      mug_texture,
+      mug_anim,
+      mug_state,
+      px + (layout.mug_x or 8),
+      py + (layout.mug_y or 14),
+      pz + 7,
+      profile.mug_scale or layout.mug_scale or 1.25,
+      profile.mug_scale or layout.mug_scale or 1.25
+    )
+  end
+
+  local profile_title = tostring(profile.title or "")
+  if profile_title ~= "" then
+    draw_text(
+      pid,
+      st,
+      "profile_title",
+      truncate(profile_title, profile.title_max_ch or layout.profile_title_max_ch or 12),
+      px + (layout.profile_title_x or 66),
+      py + (layout.profile_title_y or 3),
+      profile.title_font or layout.profile_title_font or "THICK_BLACK",
+      profile.title_scale or layout.profile_title_scale or 1.25,
+      pz + 9,
+      profile.title_tint or profile.tint or st.title_tint or cfg.title_tint
+    )
+  end
+
+  local lines = profile.lines or {}
+  local text_x = layout.profile_text_x or 66
+  local text_y = profile.text_y or layout.profile_text_y or 14
+  local text_advance = layout.profile_text_advance or 13
+  local max_ch = layout.profile_text_max_ch or 12
+
+  for i = 1, 4 do
+    local text = tostring(lines[i] or "")
+
+    if text ~= "" then
+      draw_text(
+        pid,
+        st,
+        "profile_line_" .. tostring(i),
+        truncate(text, max_ch),
+        px + text_x,
+        py + text_y + ((i - 1) * text_advance),
+        profile.font or layout.profile_font or "THICK",
+        profile.text_scale or layout.profile_text_scale or 1.35,
+        pz + 8,
+        profile.tint or st.row_tint or cfg.row_tint
+      )
+    end
+  end
+
+  return true
+end
+
 local function clear_visible_row_text(pid, st)
   local layout = st.layout or {}
   local visible = tonumber(st.visible_rows) or layout.visible_rows or 4
@@ -1189,7 +1276,7 @@ local MENU_TYPES = {
       profile_anim = nil,
       profile_state = "",
       profile_x = 144,
-      profile_y = 2,
+      profile_y = 20,
       profile_z = 220,
       profile_scale = 2.0,
 
@@ -1214,7 +1301,7 @@ local MENU_TYPES = {
       list_anim = nil,
       list_state = "",
       list_x = 2,
-      list_y = 2,
+      list_y = 20,
       list_z = 10,
       list_scale = 2.0,
 
@@ -1567,6 +1654,16 @@ end
 function MenuAPI.refresh(pid)
   if not state_by_pid[pid] then return false end
   return redraw(pid)
+end
+
+function MenuAPI.set_profile(pid, profile)
+  local st = state_by_pid[pid]
+  if not st or st.type ~= 5 then
+    return false
+  end
+
+  st.profile = profile or {}
+  return redraw_profile_details_only(pid, st)
 end
 
 function MenuAPI.open(pid, spec)

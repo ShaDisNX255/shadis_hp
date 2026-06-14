@@ -248,6 +248,7 @@ end
 
 local FRIENDS_MEM_KEY = "friends_v1"
 local OPEN_FRIEND_MENUS = {}
+local LAST_FRIEND_ROW_ID_BY_PID = {}
 
 local function _friend_mem_by_secret(secret)
   if not (secret and ezmemory and ezmemory.get_player_memory) then
@@ -553,6 +554,35 @@ function Friends.build_friend_rows(pid)
   return rows
 end
 
+local function _row_index_for_id(rows, row_id)
+  if not row_id then return nil end
+
+  for i, row in ipairs(rows or {}) do
+    if row and row.id == row_id then
+      return i, row
+    end
+  end
+
+  return nil
+end
+
+local function _row_index_for_secret(rows, secret)
+  if not secret then return nil end
+  return _row_index_for_id(rows, "__friend:" .. tostring(secret))
+end
+
+local function _selected_from_friend_row(row)
+  if type(row) ~= "table" or not row.friend_secret then
+    return nil
+  end
+
+  return {
+    pid = row.friend_pid,
+    secret = row.friend_secret,
+    name = row.friend_name or row.text,
+  }
+end
+
 function Friends.refresh_open_friend_menu(pid)
   local open = OPEN_FRIEND_MENUS[pid]
   if not open then return false end
@@ -611,11 +641,30 @@ function Friends.open_friends_board(pid, opts)
     return false
   end
 
-  local selected = opts.selected or {
+  local rows = Friends.build_friend_rows(pid)
+
+  local selected = opts.selected
+  local remembered_idx, remembered_row = _row_index_for_id(rows, LAST_FRIEND_ROW_ID_BY_PID[pid])
+
+  if not selected then
+    selected = _selected_from_friend_row(remembered_row)
+  end
+
+  selected = selected or {
     pid = pid,
     secret = _safe_secret(pid),
     name = _player_name(pid),
   }
+
+  local cursor = tonumber(opts.cursor or opts.cursor_index)
+
+  if not cursor and selected.secret then
+    cursor = _row_index_for_secret(rows, selected.secret)
+  end
+
+  if not cursor then
+    cursor = remembered_idx
+  end
 
   local ok = MenuAPI.open(pid, {
     type = 5,
@@ -644,27 +693,47 @@ function Friends.open_friends_board(pid, opts)
     lock_input = opts.lock_input == true,
 
     profile = Friends.build_profile(pid, selected),
-    rows = Friends.build_friend_rows(pid),
+    rows = rows,
+    cursor = cursor,
 
     on_confirm = function(player_id, row)
-      if type(row) ~= "table" or not row.friend_secret then
+      local selected_friend = _selected_from_friend_row(row)
+      if not selected_friend then
         return true
       end
 
-    return Friends.open_friends_board(player_id, {
-      parent = "lmenu",
-      open_sfx = false,
-      cancel_sfx = "cancel",
-      lock_input = false,
-      selected = {
-        pid = row.friend_pid,
-        secret = row.friend_secret,
-        name = row.friend_name or row.text,
-      },
-    })
+      LAST_FRIEND_ROW_ID_BY_PID[player_id] = row.id
+
+      local open = OPEN_FRIEND_MENUS[player_id]
+      if open then
+        open.selected = selected_friend
+      end
+
+      local profile = Friends.build_profile(player_id, selected_friend)
+
+      if MenuAPI and type(MenuAPI.set_profile) == "function" then
+        MenuAPI.set_profile(player_id, profile)
+      else
+        local st = MenuAPI and type(MenuAPI.get_state) == "function" and MenuAPI.get_state(player_id) or nil
+        if st then
+          st.profile = profile
+        end
+
+        if MenuAPI and type(MenuAPI.refresh) == "function" then
+          MenuAPI.refresh(player_id)
+        end
+      end
+
+      return true
     end,
 
-    on_close = function(player_id)
+    on_close = function(player_id, st)
+      local row = st and st.rows and st.cursor and st.rows[st.cursor] or nil
+
+      if row and row.friend_secret and row.id then
+        LAST_FRIEND_ROW_ID_BY_PID[player_id] = row.id
+      end
+
       OPEN_FRIEND_MENUS[player_id] = nil
     end,
   })
