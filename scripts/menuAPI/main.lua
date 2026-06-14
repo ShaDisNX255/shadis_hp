@@ -599,9 +599,12 @@ local function draw_title(pid, st)
   )
 end
 
-local function draw_vertical_rows(pid, st)
+local function draw_vertical_rows(pid, st, skip_title)
   local layout = st.layout or {}
-  draw_title(pid, st)
+
+  if not skip_title then
+    draw_title(pid, st)
+  end
 
   local rows = st.rows or {}
   local top = st.top_index or 1
@@ -927,6 +930,71 @@ local function draw_profile_friends_menu(pid, st)
   draw_scroll(pid, st)
 
   st.x, st.y, st.z = old_x, old_y, old_z
+end
+
+local function sprite_id_for_key(st, key)
+  return (st.ui_prefix or "menuapi") .. "_" .. tostring(key)
+end
+
+local function text_id_for_key(st, key)
+  return (st.ui_prefix or "menuapi") .. "_" .. tostring(key)
+end
+
+local function clear_visible_row_text(pid, st)
+  local layout = st.layout or {}
+  local visible = tonumber(st.visible_rows) or layout.visible_rows or 4
+
+  for i = 1, visible do
+    erase_text(pid, text_id_for_key(st, "row_" .. tostring(i)))
+    erase_text(pid, text_id_for_key(st, "right_" .. tostring(i)))
+  end
+end
+
+local function with_vertical_list_origin(st, fn)
+  if not st then return end
+
+  -- Type 5 draws its selectable list inside the list panel, not at the
+  -- profile card origin. Match draw_profile_friends_menu's temporary origin.
+  if st.type ~= 5 then
+    fn()
+    return
+  end
+
+  local layout = st.layout or {}
+  local old_x, old_y, old_z = st.x, st.y, st.z
+
+  st.x = st.list_x or layout.list_x or 49
+  st.y = st.list_y or layout.list_y or 84
+  st.z = st.list_z or layout.list_z or st.z or layout.z or 220
+
+  local ok, err = pcall(fn)
+
+  st.x, st.y, st.z = old_x, old_y, old_z
+
+  if not ok then
+    error(err)
+  end
+end
+
+local function redraw_cursor_only(pid, st)
+  with_vertical_list_origin(st, function()
+    draw_cursor(pid, st)
+  end)
+end
+
+local function redraw_visible_list_only(pid, st)
+  with_vertical_list_origin(st, function()
+    clear_visible_row_text(pid, st)
+
+    -- Remove these first so stale cursor/scroll sprites cannot linger.
+    safe_remove(sprite_id_for_key(st, "cursor"), pid)
+    safe_remove(sprite_id_for_key(st, "scroll"), pid)
+
+    -- Redraw rows without title/background/window.
+    draw_vertical_rows(pid, st, true)
+    draw_cursor(pid, st)
+    draw_scroll(pid, st)
+  end)
 end
 
 -- ---------------------------------------------------------------------------
@@ -1676,9 +1744,17 @@ local function move_selection(pid, dir)
   end
 
   if cur ~= old then
+    local old_top = st.top_index or 1
+
     st.cursor = cur
     ensure_cursor_visible(st)
-    redraw(pid)
+
+    if (st.top_index or 1) ~= old_top then
+      redraw_visible_list_only(pid, st)
+    else
+      redraw_cursor_only(pid, st)
+    end
+
     play_sfx(pid, cfg.move_sfx)
   end
 
