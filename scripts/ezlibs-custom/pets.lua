@@ -1166,12 +1166,30 @@ function pets.award_armed_pet_battle_xp(pid, amount, expected_uid)
   _safe_save_player_memory(secret, pmem)
   _sync_live_companion_from_owned(p)
 
-  if notify and Net and Net.message_player then
-    local msg = ("Your pet gained %d XP."):format(effective_amount)
-    if skill_gained > 0 then
-      msg = msg .. (" %d skill point%s available."):format(skill_gained, skill_gained == 1 and "" or "s")
+  if notify then
+    local available_after = _pet_free_skill_points_for_pet(p)
+    local shown_gauge = false
+
+    local LPets = rawget(_G, "LPets")
+    if LPets and type(LPets.show_sp_gauge_gain) == "function" then
+      local ok_popup, popup_result = pcall(LPets.show_sp_gauge_gain, pid, {
+        old_xp = current_xp,
+        new_xp = p.xp,
+        xp_per_skill_point = PET_XP_PER_SKILL_POINT,
+        available_skill_points = available_after,
+        skill_points_gained = skill_gained,
+      })
+
+      shown_gauge = ok_popup and popup_result == true
     end
-    pcall(Net.message_player, pid, msg)
+
+    if not shown_gauge and Net and Net.message_player then
+      local msg = ("Your pet gained %d XP."):format(effective_amount)
+      if skill_gained > 0 then
+        msg = msg .. (" %d skill point%s available."):format(skill_gained, skill_gained == 1 and "" or "s")
+      end
+      pcall(Net.message_player, pid, msg)
+    end
   end
 
   return true, p.xp, skill_gained, effective_amount, mood
@@ -2832,16 +2850,41 @@ function pets.list_companion_candidates(owner_or_pid)
     end
 
     if not on_expedition and not in_training then
+      local kind = tostring(p.kind or "mettaur"):lower()
+      local can_fight = BATTLE_PETS[kind] ~= nil
+      local hp = math.max(1, math.floor(tonumber(p.stat_hp) or _default_pet_hp(kind)))
+      local rank = clamp_pet_battle_rank(tonumber(p.stat_attack) or _default_pet_attack(kind))
+      local attack = rank * 5
+      local xp = math.max(0, math.floor(tonumber(p.xp) or 0))
+
+      local attack_points = _coerce_skill_counter(p.attack_points or _pet_attack_points_from_stat(kind, p.stat_attack))
+      local hp_points = _coerce_skill_counter(p.hp_points or _pet_hp_points_from_stat(kind, p.stat_hp))
+      local total_skill_points = _pet_total_skill_points_from_xp(xp)
+      local spent_skill_points = attack_points + hp_points
+      local available_skill_points = math.max(0, total_skill_points - spent_skill_points)
+
       out[#out + 1] = {
         uid = tostring(p.uid or ""),
-        kind = tostring(p.kind or "mettaur"),
+        kind = kind,
         base_name = base_name,
         nickname = nickname,
         display_name = display_name,
+
         mood = tostring(p.mood or "neutral"),
         placed = p.placed == true,
         placement = p.placement,
-        can_fight = BATTLE_PETS[tostring(p.kind or ""):lower()] ~= nil,
+        can_fight = can_fight,
+
+        hp = hp,
+        xp = xp,
+        rank = rank,
+        attack = attack,
+        attack_points = attack_points,
+        hp_points = hp_points,
+        total_skill_points = total_skill_points,
+        spent_skill_points = spent_skill_points,
+        available_skill_points = available_skill_points,
+        xp_to_next_skill_point = _pet_xp_to_next_skill_point(xp),
       }
     end
   end

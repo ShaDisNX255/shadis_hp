@@ -1306,18 +1306,31 @@ local function handle_lmenu_button(pid, btn)
       return
     end
 
-    -- Pets board
+    -- Pets board - MenuAPI
     if row.id == "pets" then
-      LMenu.close(pid)
+      LMenu.close(pid, { keep_frozen = true })
 
       if LPets and type(LPets.open_pets_board) == "function" then
-        local okp, errp = pcall(LPets.open_pets_board, pid)
+        local okp, errp = pcall(LPets.open_pets_board, pid, {
+          parent = "lmenu",
+          lock_input = false,
+          open_sfx = false,
+          cancel_sfx = "cancel",
+        })
+
         if not okp then
           warn("LPets.open_pets_board failed:", tostring(errp))
+          if Net and Net.unlock_player_input then
+            pcall(Net.unlock_player_input, pid)
+          end
         end
       else
         Net.message_player(pid, "(Pet menu not available.)")
+        if Net and Net.unlock_player_input then
+          pcall(Net.unlock_player_input, pid)
+        end
       end
+
       return
     end
 

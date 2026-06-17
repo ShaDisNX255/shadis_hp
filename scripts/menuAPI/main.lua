@@ -77,6 +77,14 @@ local cfg = {
   menu3_anim = nil,
   menu3_state = "",
 
+  menu4_texture = "/server/assets/ui/menuAPI/menu4.png",
+  menu4_anim = nil,
+  menu4_state = "",
+
+  spbar_texture = "/server/assets/ui/menuAPI/SPBar.png",
+  spbar_anim = "/server/assets/ui/menuAPI/SPBar.animation",
+  spbar_state = "sp_01",
+
   title_x = 17,
   title_y = 1,
   title_font = "THICK",
@@ -187,10 +195,12 @@ end
 -- ---------------------------------------------------------------------------
 -- State
 -- ---------------------------------------------------------------------------
+-- Forward Declare 
 
 local state_by_pid = {}
 local next_instance_id = 0
 local message_token_by_key = {}
+local draw_profile_friends_menu
 
 local function next_ui_prefix(pid, menu_type)
   next_instance_id = next_instance_id + 1
@@ -851,11 +861,11 @@ local function draw_profile_card(pid, st)
       mug_texture,
       mug_anim,
       mug_state,
-      px + (layout.mug_x or 8),
-      py + (layout.mug_y or 14),
-      pz + 7,
-      profile.mug_scale or layout.mug_scale or 1.25,
-      profile.mug_scale or layout.mug_scale or 1.25
+      px + (profile.mug_x ~= nil and profile.mug_x or (layout.mug_x or 8)),
+      py + (profile.mug_y ~= nil and profile.mug_y or (layout.mug_y or 14)),
+      pz + (profile.mug_z_offset ~= nil and profile.mug_z_offset or 7),
+      profile.mug_sx or profile.mug_scale or layout.mug_scale or 1.25,
+      profile.mug_sy or profile.mug_scale or layout.mug_scale or 1.25
     )
   end
 
@@ -875,10 +885,12 @@ local function draw_profile_card(pid, st)
     )
   end
   local lines = profile.lines or {}
-  local text_x = layout.profile_text_x or 66
+  local line_tints = profile.line_tints or profile.lines_tint or {}
+
+  local text_x = profile.text_x or layout.profile_text_x or 66
   local text_y = profile.text_y or layout.profile_text_y or 14
-  local text_advance = layout.profile_text_advance or 13
-  local max_ch = layout.profile_text_max_ch or 12
+  local text_advance = profile.text_advance or layout.profile_text_advance or 13
+  local max_ch = profile.text_max_ch or layout.profile_text_max_ch or 12
 
   for i = 1, 4 do
     local text = tostring(lines[i] or "")
@@ -893,13 +905,129 @@ local function draw_profile_card(pid, st)
         profile.font or layout.profile_font or "THICK",
         profile.text_scale or layout.profile_text_scale or 1.35,
         pz + 8,
-        profile.tint or st.row_tint or cfg.row_tint
+        line_tints[i] or profile.tint or st.row_tint or cfg.row_tint
       )
     end
   end
 end
 
-local function draw_profile_friends_menu(pid, st)
+local SP_GAUGE_STATES = 55
+
+local function sp_state_name(index)
+  index = math.floor(tonumber(index) or 1)
+
+  if index < 1 then index = 1 end
+  if index > SP_GAUGE_STATES then index = SP_GAUGE_STATES end
+
+  return string.format("sp_%02d", index)
+end
+
+local function sp_gauge_index_for_xp(xp, xp_per_point)
+  xp = math.max(0, math.floor(tonumber(xp) or 0))
+  xp_per_point = math.max(1, math.floor(tonumber(xp_per_point) or 175))
+
+  local rem = xp % xp_per_point
+
+  -- Exact skill-point boundary means the gauge reset.
+  if rem <= 0 then
+    return 1
+  end
+
+  return math.max(1, math.min(SP_GAUGE_STATES, math.ceil((rem / xp_per_point) * SP_GAUGE_STATES)))
+end
+
+local function sp_gauge_state_for_values(xp, xp_per_point)
+  return sp_state_name(sp_gauge_index_for_xp(xp, xp_per_point))
+end
+
+local function format_sp_points(value)
+  value = math.max(0, math.min(99, math.floor(tonumber(value) or 0)))
+  return string.format("%02d", value)
+end
+
+local function draw_sp_points(pid, st, base_x, base_y, base_z)
+  local layout = st.layout or {}
+
+  local points = st.spbar_available_points
+  if points == nil then
+    points = layout.spbar_available_points
+  end
+
+  points = math.max(0, math.floor(tonumber(points) or 0))
+
+  draw_text(
+    pid,
+    st,
+    "spbar_points",
+    format_sp_points(points),
+    base_x + (st.spbar_points_x ~= nil and st.spbar_points_x or layout.spbar_points_x or 15),
+    base_y + (st.spbar_points_y ~= nil and st.spbar_points_y or layout.spbar_points_y or 61),
+    st.spbar_points_font or layout.spbar_points_font or "GRADIENT_GREEN",
+    st.spbar_points_scale or layout.spbar_points_scale or 1.2,
+    base_z + (st.spbar_points_z_offset ~= nil and st.spbar_points_z_offset or layout.spbar_points_z_offset or 14),
+    st.spbar_points_tint or layout.spbar_points_tint
+  )
+end
+
+local function draw_sp_gauge(pid, st, base_x, base_y, base_z)
+  local layout = st.layout or {}
+
+  local texture = st.spbar_texture or layout.spbar_texture or cfg.spbar_texture
+  if not texture or texture == "" then
+    return
+  end
+
+  local state = st.spbar_state or layout.spbar_state or cfg.spbar_state or "sp_01"
+
+  if st.spbar_xp ~= nil or layout.spbar_xp ~= nil then
+    state = sp_gauge_state_for_values(
+      st.spbar_xp or layout.spbar_xp or 0,
+      st.spbar_xp_per_point or layout.spbar_xp_per_point or 175
+    )
+  end
+
+  add_sprite(
+    pid,
+    st,
+    "spbar",
+    texture,
+    st.spbar_anim or layout.spbar_anim or cfg.spbar_anim,
+    state,
+    base_x + (st.spbar_x ~= nil and st.spbar_x or layout.spbar_x or 6),
+    base_y + (st.spbar_y ~= nil and st.spbar_y or layout.spbar_y or 72),
+    base_z + (st.spbar_z_offset ~= nil and st.spbar_z_offset or layout.spbar_z_offset or 12),
+    st.spbar_scale or layout.spbar_scale or 2.0,
+    st.spbar_scale or layout.spbar_scale or 2.0
+  )
+
+  draw_sp_points(pid, st, base_x, base_y, base_z)
+end
+
+local function draw_profile_friends_sp_menu(pid, st)
+  local layout = st.layout or {}
+
+  draw_profile_friends_menu(pid, st)
+
+  local px = st.profile_x or layout.profile_x or 144
+  local py = st.profile_y or layout.profile_y or 20
+  local pz = st.profile_z or layout.profile_z or (st.z or layout.z or 220)
+
+  draw_sp_gauge(pid, st, px, py, pz)
+end
+
+local function draw_sp_gauge_popup(pid, st)
+  local layout = st.layout or {}
+
+  draw_profile_card(pid, st)
+
+  local px = st.profile_x or layout.profile_x or 144
+  local py = st.profile_y or layout.profile_y or 20
+  local pz = st.profile_z or layout.profile_z or (st.z or layout.z or 220)
+
+  draw_sp_gauge(pid, st, px, py, pz)
+end
+
+function draw_profile_friends_menu(pid, st)
   local layout = st.layout or {}
 
   draw_profile_card(pid, st)
@@ -958,7 +1086,7 @@ local function clear_profile_details(pid, st)
 end
 
 local function redraw_profile_details_only(pid, st)
-  if not st or st.type ~= 5 then
+  if not st or (st.type ~= 5 and st.type ~= 6) then
     return false
   end
 
@@ -987,11 +1115,11 @@ local function redraw_profile_details_only(pid, st)
       mug_texture,
       mug_anim,
       mug_state,
-      px + (layout.mug_x or 8),
-      py + (layout.mug_y or 14),
-      pz + 7,
-      profile.mug_scale or layout.mug_scale or 1.25,
-      profile.mug_scale or layout.mug_scale or 1.25
+      px + (profile.mug_x ~= nil and profile.mug_x or (layout.mug_x or 8)),
+      py + (profile.mug_y ~= nil and profile.mug_y or (layout.mug_y or 14)),
+      pz + (profile.mug_z_offset ~= nil and profile.mug_z_offset or 7),
+      profile.mug_sx or profile.mug_scale or layout.mug_scale or 1.25,
+      profile.mug_sy or profile.mug_scale or layout.mug_scale or 1.25
     )
   end
 
@@ -1012,10 +1140,12 @@ local function redraw_profile_details_only(pid, st)
   end
 
   local lines = profile.lines or {}
-  local text_x = layout.profile_text_x or 66
+  local line_tints = profile.line_tints or profile.lines_tint or {}
+
+  local text_x = profile.text_x or layout.profile_text_x or 66
   local text_y = profile.text_y or layout.profile_text_y or 14
-  local text_advance = layout.profile_text_advance or 13
-  local max_ch = layout.profile_text_max_ch or 12
+  local text_advance = profile.text_advance or layout.profile_text_advance or 13
+  local max_ch = profile.text_max_ch or layout.profile_text_max_ch or 12
 
   for i = 1, 4 do
     local text = tostring(lines[i] or "")
@@ -1031,7 +1161,7 @@ local function redraw_profile_details_only(pid, st)
         profile.font or layout.profile_font or "THICK",
         profile.text_scale or layout.profile_text_scale or 1.35,
         pz + 8,
-        profile.tint or st.row_tint or cfg.row_tint
+        line_tints[i] or profile.tint or st.row_tint or cfg.row_tint
       )
     end
   end
@@ -1054,7 +1184,7 @@ local function with_vertical_list_origin(st, fn)
 
   -- Type 5 draws its selectable list inside the list panel, not at the
   -- profile card origin. Match draw_profile_friends_menu's temporary origin.
-  if st.type ~= 5 then
+  if st.type ~= 5 and st.type ~= 6 then
     fn()
     return
   end
@@ -1354,6 +1484,155 @@ local MENU_TYPES = {
     },
     draw = draw_profile_friends_menu,
   },
+
+  [6] = {
+    name = "profile_card_sp",
+    kind = "vertical",
+    vertical_input = true,
+    cursor_enabled = true,
+    scroll_enabled = true,
+    show_right = true,
+    layout = {
+      profile_texture = cfg.menu4_texture,
+      profile_anim = cfg.menu4_anim,
+      profile_state = cfg.menu4_state,
+      profile_x = 144,
+      profile_y = 20,
+      profile_z = 220,
+      profile_scale = 2.0,
+
+      mug_x = 4,
+      mug_y = 13,
+      mug_scale = 1.0,
+
+      profile_title_x = 17,
+      profile_title_y = 2,
+      profile_title_max_ch = 10,
+      profile_title_font = "THICK",
+      profile_title_scale = 1.8,
+
+      profile_text_x = 40,
+      profile_text_y = 24,
+      profile_text_advance = 10,
+      profile_text_max_ch = 10,
+      profile_font = "THICK",
+      profile_text_scale = 1.5,
+
+      list_texture = "/server/assets/ui/menuAPI/menu1.png",
+      list_anim = nil,
+      list_state = "",
+      list_x = 2,
+      list_y = 20,
+      list_z = 10,
+      list_scale = 2.0,
+
+      title_x = 17,
+      title_y = 1,
+      title_font = "THICK",
+      title_scale = 1.5,
+      title_max_ch = 18,
+
+      row_x = 13,
+      row_y = 16,
+      row_font = "THICK",
+      row_scale = 1.5,
+      row_advance = 13,
+      visible_rows = 8,
+      row_max_ch = 14,
+
+      right_x = 96,
+      right_font = "THICK",
+      right_scale = 1.5,
+      right_max_ch = 6,
+
+      cursor_texture = "/server/assets/ui/menuAPI/cursor.png",
+      cursor_anim = nil,
+      cursor_state = "",
+      cursor_x = 1,
+      cursor_y_offset = -2,
+      cursor_scale = 2.0,
+
+      scroll_texture = "/server/assets/ui/menuAPI/scroll.png",
+      scroll_anim = nil,
+      scroll_state = "",
+      scroll_x = 131,
+      scroll_top_y = 11,
+      scroll_bottom_y = 106,
+      scroll_h = 13,
+      scroll_scale = 2.0,
+
+      spbar_texture = cfg.spbar_texture,
+      spbar_anim = cfg.spbar_anim,
+      spbar_state = "sp_01",
+
+      -- Tweak these to position the SP Gauge on menu4.png.
+      spbar_x = 34,
+      spbar_y = 62,
+      spbar_scale = 2.0,
+      spbar_z_offset = 12,
+
+      -- Unused SP number, drawn to the left of the bar.
+      spbar_points_x = 20,
+      spbar_points_y = 59.5,
+      spbar_points_font = "GRADIENT_GREEN",
+      spbar_points_scale = 1.2,
+      spbar_points_z_offset = 14,
+    },
+    draw = draw_profile_friends_sp_menu,
+  },
+
+  [7] = {
+    name = "sp_gauge_popup",
+    kind = "vertical",
+    vertical_input = false,
+    cursor_enabled = false,
+    scroll_enabled = false,
+    show_right = false,
+    layout = {
+      profile_texture = cfg.menu4_texture,
+      profile_anim = cfg.menu4_anim,
+      profile_state = cfg.menu4_state,
+      profile_x = 144,
+      profile_y = 20,
+      profile_z = 220,
+      profile_scale = 2.0,
+
+      mug_x = 4,
+      mug_y = 13,
+      mug_scale = 1.0,
+
+      profile_title_x = 17,
+      profile_title_y = 2,
+      profile_title_max_ch = 10,
+      profile_title_font = "THICK",
+      profile_title_scale = 1.8,
+
+      profile_text_x = 40,
+      profile_text_y = 24,
+      profile_text_advance = 10,
+      profile_text_max_ch = 10,
+      profile_font = "THICK",
+      profile_text_scale = 1.5,
+
+      spbar_texture = cfg.spbar_texture,
+      spbar_anim = cfg.spbar_anim,
+      spbar_state = "sp_01",
+
+      -- Tweak these to position the SP Gauge on menu4.png.
+      spbar_x = 34,
+      spbar_y = 62,
+      spbar_scale = 2.0,
+      spbar_z_offset = 12,
+
+      -- Unused SP number, drawn to the left of the bar.
+      spbar_points_x = 20,
+      spbar_points_y = 59.5,
+      spbar_points_font = "GRADIENT_GREEN",
+      spbar_points_scale = 1.2,
+      spbar_points_z_offset = 14,
+    },
+    draw = draw_sp_gauge_popup,
+  },
 }
 
 MenuAPI.menu_types = MENU_TYPES
@@ -1422,6 +1701,24 @@ local function apply_layout_overrides(layout, spec)
     yes_x = "type4_yes_x",
     no_x = "type4_no_x",
     choice_max_ch = "type4_choice_max_ch",
+
+    spbar_texture = "spbar_texture",
+    spbar_anim = "spbar_anim",
+    spbar_state = "spbar_state",
+    spbar_x = "spbar_x",
+    spbar_y = "spbar_y",
+    spbar_scale = "spbar_scale",
+    spbar_z_offset = "spbar_z_offset",
+
+    spbar_xp = "spbar_xp",
+    spbar_xp_per_point = "spbar_xp_per_point",
+    spbar_available_points = "spbar_available_points",
+
+    spbar_points_x = "spbar_points_x",
+    spbar_points_y = "spbar_points_y",
+    spbar_points_font = "spbar_points_font",
+    spbar_points_scale = "spbar_points_scale",
+    spbar_points_z_offset = "spbar_points_z_offset",
   }
 
   for dst, src in pairs(map) do
@@ -1474,6 +1771,11 @@ local function build_state(pid, spec, menu_type, def)
     on_confirm = spec.on_confirm,
     on_cancel = spec.on_cancel,
     on_close = spec.on_close,
+
+    -- Optional callback when the highlighted row changes.
+    -- Signature: on_cursor_change(pid, row, st, old_row)
+    on_cursor_change = spec.on_cursor_change or spec.on_cursor or spec.on_highlight,
+
     lock_input = lock_input == true,
     cancel_sfx = spec.cancel_sfx,
 
@@ -1496,6 +1798,18 @@ local function build_state(pid, spec, menu_type, def)
     no_text = spec.no_text or "No",
     choice_selected_tint = spec.choice_selected_tint or spec.type4_selected_tint,
     choice_normal_tint = spec.choice_normal_tint or spec.type4_normal_tint,
+
+    spbar_state = spec.spbar_state,
+    spbar_xp = spec.spbar_xp,
+    spbar_xp_per_point = spec.spbar_xp_per_point,
+    spbar_available_points = spec.spbar_available_points,
+
+    spbar_points_x = spec.spbar_points_x,
+    spbar_points_y = spec.spbar_points_y,
+    spbar_points_font = spec.spbar_points_font,
+    spbar_points_scale = spec.spbar_points_scale,
+    spbar_points_z_offset = spec.spbar_points_z_offset,
+    spbar_points_tint = spec.spbar_points_tint,
   }
 
   if def.kind == "vertical" then
@@ -1670,12 +1984,139 @@ end
 
 function MenuAPI.set_profile(pid, profile)
   local st = state_by_pid[pid]
-  if not st or st.type ~= 5 then
+  if not st or (st.type ~= 5 and st.type ~= 6) then
     return false
   end
 
   st.profile = profile or {}
   return redraw_profile_details_only(pid, st)
+end
+
+function MenuAPI.sp_gauge_state_for_xp(xp, xp_per_point)
+  return sp_gauge_state_for_values(xp, xp_per_point)
+end
+
+function MenuAPI.set_sp_gauge(pid, opts)
+  local st = state_by_pid[pid]
+  if not st then return false end
+  if st.type ~= 6 and st.type ~= 7 then return false end
+
+  opts = opts or {}
+
+  if opts.xp ~= nil then
+    st.spbar_xp = math.max(0, math.floor(tonumber(opts.xp) or 0))
+  end
+
+  if opts.xp_per_point ~= nil then
+    st.spbar_xp_per_point = math.max(1, math.floor(tonumber(opts.xp_per_point) or 175))
+  end
+
+  if opts.available_points ~= nil then
+    st.spbar_available_points = math.max(0, math.floor(tonumber(opts.available_points) or 0))
+  end
+
+  if opts.state ~= nil then
+    st.spbar_state = tostring(opts.state)
+    st.spbar_xp = nil
+  elseif st.spbar_xp ~= nil then
+    st.spbar_state = sp_gauge_state_for_values(st.spbar_xp, st.spbar_xp_per_point or 175)
+  end
+
+  local sprite_id = (st.ui_prefix or "menuapi") .. "_spbar"
+
+  if frame and type(frame.update_ui_element) == "function" and st.spbar_state then
+    pcall(frame.update_ui_element, sprite_id, pid, {
+      animation_state = st.spbar_state,
+    })
+  end
+
+  local layout = st.layout or {}
+  local px = st.profile_x or layout.profile_x or 144
+  local py = st.profile_y or layout.profile_y or 20
+  local pz = st.profile_z or layout.profile_z or (st.z or layout.z or 220)
+
+  draw_sp_points(pid, st, px, py, pz)
+
+  return true
+end
+
+function MenuAPI.animate_sp_gauge(pid, opts)
+  opts = opts or {}
+
+  local from_xp = math.max(0, math.floor(tonumber(opts.from_xp) or 0))
+  local to_xp = math.max(0, math.floor(tonumber(opts.to_xp) or from_xp))
+  local per = math.max(1, math.floor(tonumber(opts.xp_per_point) or 175))
+
+  local gained_points = math.max(0, math.floor(tonumber(opts.skill_points_gained) or 0))
+  local final_points = math.max(0, math.floor(tonumber(opts.available_points) or 0))
+  local points_now = math.max(0, final_points - gained_points)
+
+  local delay = tonumber(opts.delay) or 0.025
+
+  if to_xp < from_xp then
+    to_xp = from_xp
+  end
+
+  local function set_index(index, points)
+    MenuAPI.set_sp_gauge(pid, {
+      state = sp_state_name(index),
+      available_points = points,
+    })
+  end
+
+  if not (type(async) == "function" and Async and Async.sleep) then
+    MenuAPI.set_sp_gauge(pid, {
+      xp = to_xp,
+      xp_per_point = per,
+      available_points = final_points,
+    })
+    return true
+  end
+
+  async(function()
+    local cur = from_xp
+
+    while cur < to_xp do
+      local cur_point = math.floor(cur / per)
+      local next_boundary = (cur_point + 1) * per
+      local target = math.min(to_xp, next_boundary)
+
+      local start_idx = sp_gauge_index_for_xp(cur, per)
+      local end_idx
+
+      if target >= next_boundary and target <= to_xp then
+        end_idx = SP_GAUGE_STATES
+      else
+        end_idx = sp_gauge_index_for_xp(target, per)
+      end
+
+      if end_idx < start_idx then
+        end_idx = start_idx
+      end
+
+      for i = start_idx, end_idx do
+        set_index(i, points_now)
+        await(Async.sleep(delay))
+      end
+
+      cur = target
+
+      -- Crossing a skill-point boundary fills to 55, then resets to 01.
+      if cur == next_boundary and cur < to_xp then
+        points_now = math.min(final_points, points_now + 1)
+        set_index(1, points_now)
+        await(Async.sleep(delay * 2))
+      end
+    end
+
+    MenuAPI.set_sp_gauge(pid, {
+      xp = to_xp,
+      xp_per_point = per,
+      available_points = final_points,
+    })
+  end)
+
+  return true
 end
 
 function MenuAPI.open(pid, spec)
@@ -1707,6 +2148,10 @@ function MenuAPI.open(pid, spec)
   end
 
   redraw(pid)
+  if type(st.on_cursor_change) == "function" and st.kind == "vertical" then
+    local row = st.rows and st.rows[st.cursor] or nil
+    pcall(st.on_cursor_change, pid, row, st, nil)
+  end
   return true
 end
 
@@ -1854,6 +2299,7 @@ local function move_selection(pid, dir)
 
   if cur ~= old then
     local old_top = st.top_index or 1
+    local old_row = st.rows and st.rows[old] or nil
 
     st.cursor = cur
     ensure_cursor_visible(st)
@@ -1862,6 +2308,11 @@ local function move_selection(pid, dir)
       redraw_visible_list_only(pid, st)
     else
       redraw_cursor_only(pid, st)
+    end
+
+    local row = st.rows and st.rows[st.cursor] or nil
+    if type(st.on_cursor_change) == "function" then
+      pcall(st.on_cursor_change, pid, row, st, old_row)
     end
 
     play_sfx(pid, cfg.move_sfx)
