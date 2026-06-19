@@ -451,6 +451,62 @@ local Win_Gamble = {
 }
 eznpcs.add_event(Win_Gamble)
 
+local Win_Reward = {
+    name = "Win_Reward",
+    action = function(npc, player_id, dialogue)
+        return async(function()
+            local props = dialogue.custom_properties or {}
+
+            local amount = math.floor(tonumber(props["Amount"] or 0) or 0)
+            if amount <= 0 then
+                await(Async.message_player(player_id, "No reward amount configured."))
+                return props["Next 2"] or props["Next 1"]
+            end
+
+            local reward_type = tostring(
+                props["Reward Type"]
+                or props["Type"]
+                or props["Currency"]
+                or "money"
+            ):lower()
+
+            local ok = true
+            local message = nil
+
+            if reward_type == "bugfrag"
+                or reward_type == "bugfrags"
+                or reward_type == "frag"
+                or reward_type == "frags"
+                or reward_type == "bf"
+            then
+                if ezmemory.add_player_fragments then
+                    ok = ezmemory.add_player_fragments(player_id, amount)
+                elseif ezmemory.spend_player_fragments then
+                    ok = ezmemory.spend_player_fragments(player_id, -amount)
+                else
+                    ok = false
+                end
+
+                message = "Got " .. tostring(amount) .. " BugFrag" .. (amount == 1 and "!" or "s!")
+
+            else
+                ok = ezmemory.spend_player_money(player_id, -amount)
+                message = "Got " .. tostring(amount) .. "$!"
+            end
+
+            if not ok then
+                await(Async.message_player(player_id, "Reward could not be given."))
+                return props["Next 2"] or props["Next 1"]
+            end
+
+            Net.play_sound_for_player(player_id, sfx.item_get)
+            await(Async.message_player(player_id, message))
+            return props["Next 1"]
+        end)
+    end
+}
+eznpcs.add_event(Win_Reward)
+
 local boss4 = {
     name="boss4",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
@@ -3724,6 +3780,160 @@ end
     end)
   end
 })
+
+----------------------------------------------------------------
+-- Pet stat checker
+-- Dialogue Type: petcheck
+--
+-- Routes:
+--   Next 1 = pet passes all configured checks
+--   Next 2 = no pet / neutral / sad / wrong type / stat too low / stat too high
+--
+-- Optional custom properties:
+--   Mood = happy
+--   Pet Type = mettaur
+--   Min HP = 40
+--   Max HP = 100
+--   Min Attack = 5
+--   Max Attack = 100
+--   Min Attack Rank = 1
+--   Max Attack Rank = 20
+--
+-- Notes:
+--   - Leave a property blank to ignore that check.
+--   - Mood compares happy / neutral / sad.
+--   - Pet Type compares internal kind: mettaur, ratty, swordy, powie, etc.
+--   - Attack is the final displayed battle attack, rank * 5.
+--   - Attack Rank is the pet's internal rank, 1-20.
+----------------------------------------------------------------
+
+local function _petcheck_trim(value)
+  if value == nil then return nil end
+  local text = tostring(value):gsub("^%s+", ""):gsub("%s+$", "")
+  if text == "" then return nil end
+  return text
+end
+
+local function _petcheck_ci(props, key)
+  if type(props) ~= "table" then return nil end
+
+  local wanted = tostring(key or ""):lower()
+  for k, v in pairs(props) do
+    if tostring(k):lower() == wanted then
+      return _petcheck_trim(v)
+    end
+  end
+
+  return nil
+end
+
+local function _petcheck_num(props, key)
+  local v = _petcheck_ci(props, key)
+  if v == nil then return nil end
+  return tonumber(v)
+end
+
+local function _petcheck_bool(props, key, default)
+  local v = _petcheck_ci(props, key)
+  if v == nil then return default end
+
+  v = tostring(v):lower()
+
+  if v == "true" or v == "yes" or v == "1" or v == "on" then
+    return true
+  end
+
+  if v == "false" or v == "no" or v == "0" or v == "off" then
+    return false
+  end
+
+  return default
+end
+
+eznpcs.add_event{
+  name = "petcheck",
+  action = function(npc, player_id, dialogue, relay_object)
+    return async(function()
+      local props = dialogue.custom_properties or {}
+      local next_pass = props["Next 1"]
+      local next_fail = props["Next 2"]
+
+      if not (Pets and type(Pets.get_armed_pet_info) == "function") then
+        return next_fail
+      end
+
+      local ok, info = pcall(Pets.get_armed_pet_info, player_id)
+      if not ok or type(info) ~= "table" then
+        return next_fail
+      end
+
+      local battle_ready = _petcheck_bool(props, "Battle Ready", false)
+      if battle_ready then
+        if info.can_fight ~= true then
+          return next_fail
+        end
+
+        if info.summoned == true then
+          return next_fail
+        end
+      end
+
+      local expected_can_fight = _petcheck_bool(props, "Can Fight", nil)
+      if expected_can_fight ~= nil then
+        if (info.can_fight == true) ~= expected_can_fight then
+          return next_fail
+        end
+      end
+
+      local expected_summoned = _petcheck_bool(props, "Summoned", nil)
+      if expected_summoned ~= nil then
+        if (info.summoned == true) ~= expected_summoned then
+          return next_fail
+        end
+      end
+
+      local expected_mood = _petcheck_ci(props, "Mood")
+      if expected_mood then
+        local actual_mood = tostring(info.mood or "neutral"):lower()
+        if actual_mood ~= expected_mood:lower() then
+          return next_fail
+        end
+      end
+
+      local expected_kind = _petcheck_ci(props, "Pet Type") or _petcheck_ci(props, "Kind")
+      if expected_kind then
+        local actual_kind = tostring(info.kind or ""):lower()
+        expected_kind = expected_kind:gsub("^pet_", ""):lower()
+        if actual_kind ~= expected_kind then
+          return next_fail
+        end
+      end
+
+      local hp = tonumber(info.hp or 0) or 0
+      local min_hp = _petcheck_num(props, "Min HP")
+      local max_hp = _petcheck_num(props, "Max HP")
+
+      if min_hp and hp < min_hp then return next_fail end
+      if max_hp and hp > max_hp then return next_fail end
+
+      local attack = tonumber(info.attack or 0) or 0
+      local min_attack = _petcheck_num(props, "Min Attack")
+      local max_attack = _petcheck_num(props, "Max Attack")
+
+      if min_attack and attack < min_attack then return next_fail end
+      if max_attack and attack > max_attack then return next_fail end
+
+      local rank = tonumber(info.rank or 0) or 0
+      local min_rank = _petcheck_num(props, "Min Attack Rank") or _petcheck_num(props, "Min Rank")
+      local max_rank = _petcheck_num(props, "Max Attack Rank") or _petcheck_num(props, "Max Rank")
+
+      if min_rank and rank < min_rank then return next_fail end
+      if max_rank and rank > max_rank then return next_fail end
+
+      return next_pass
+    end)
+  end
+}
 
 -- Repaint any already-revealed paths when players appear in an area
 Net:on("player_join", function(ev)

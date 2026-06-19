@@ -265,6 +265,94 @@ if not _G.__EZNG_UI_WARMUP_HOOKED then
   end)
 end
 
+----------------------------------------------------------------
+-- Lightweight Tiled-driven quest progress
+-- Separate from ezquests and separate from item inventory.
+----------------------------------------------------------------
+
+local QUEST_PROGRESS_MEM_KEY = "quest_progress_v1"
+
+local function qp_trim(value)
+    if value == nil then return nil end
+    local text = tostring(value)
+    text = text:gsub("^%s+", ""):gsub("%s+$", "")
+    if text == "" then return nil end
+    return text
+end
+
+local function qp_secret(player_id)
+    if helpers and helpers.get_safe_player_secret then
+        local ok, secret = pcall(helpers.get_safe_player_secret, player_id)
+        if ok and secret and secret ~= "" then
+            return tostring(secret)
+        end
+    end
+
+    return tostring(player_id)
+end
+
+local function qp_get_store(player_id)
+    local secret = qp_secret(player_id)
+    local pmem = ezmemory.get_player_memory(secret) or {}
+
+    if type(pmem[QUEST_PROGRESS_MEM_KEY]) ~= "table" then
+        pmem[QUEST_PROGRESS_MEM_KEY] = {}
+    end
+
+    return pmem, pmem[QUEST_PROGRESS_MEM_KEY], secret
+end
+
+local function qp_save(secret, pmem)
+    if ezmemory.set_player_memory then
+        pcall(ezmemory.set_player_memory, secret, pmem)
+    end
+
+    if ezmemory.save_player_memory then
+        pcall(ezmemory.save_player_memory, secret)
+    end
+end
+
+local function qp_get_state(player_id, quest_id)
+    quest_id = qp_trim(quest_id)
+    if not quest_id then return nil end
+
+    local _, store = qp_get_store(player_id)
+    local rec = store[quest_id]
+
+    if type(rec) == "table" then
+        return qp_trim(rec.state)
+    end
+
+    -- Backward-friendly in case we ever stored direct strings during tests.
+    if type(rec) == "string" then
+        return qp_trim(rec)
+    end
+
+    return nil
+end
+
+local function qp_set_state(player_id, quest_id, state)
+    quest_id = qp_trim(quest_id)
+    state = qp_trim(state)
+
+    if not quest_id then
+        return false
+    end
+
+    local pmem, store, secret = qp_get_store(player_id)
+
+    store[quest_id] = store[quest_id] or {}
+    if type(store[quest_id]) ~= "table" then
+        store[quest_id] = { state = tostring(store[quest_id]) }
+    end
+
+    store[quest_id].state = state or "started"
+    store[quest_id].updated_at = os.time()
+
+    qp_save(secret, pmem)
+    return true
+end
+
 
 --Dialogue Types
 local dialogue_types = {
@@ -452,6 +540,60 @@ local dialogue_types = {
                 end
 
                 return next_dialogues[passed and 1 or 2]
+            end)
+        end
+    },
+    qcheck={
+        name = "qcheck",
+        action = function(npc, player_id, dialogue, relay_object)
+            return async(function ()
+                local next_dialogues = helpers.extract_numbered_properties(dialogue, "Next ")
+
+                local quest_id = qp_trim(dialogue.custom_properties["Quest ID"])
+                              or qp_trim(dialogue.custom_properties["Quest Id"])
+                              or qp_trim(dialogue.custom_properties["Quest"])
+
+                local expected_state = qp_trim(dialogue.custom_properties["State"])
+                                    or qp_trim(dialogue.custom_properties["Quest State"])
+
+                if not quest_id then
+                    warn("[eznpcs] qcheck missing Quest ID on dialogue node", dialogue.id)
+                    return next_dialogues[2] or next_dialogues[1]
+                end
+
+                if not expected_state then
+                    warn("[eznpcs] qcheck missing State on dialogue node", dialogue.id)
+                    return next_dialogues[2] or next_dialogues[1]
+                end
+
+                local current_state = qp_get_state(player_id, quest_id)
+                local passed = tostring(current_state or "") == tostring(expected_state)
+
+                return next_dialogues[passed and 1 or 2]
+            end)
+        end
+    },
+
+    qset={
+        name = "qset",
+        action = function(npc, player_id, dialogue, relay_object)
+            return async(function ()
+                local quest_id = qp_trim(dialogue.custom_properties["Quest ID"])
+                              or qp_trim(dialogue.custom_properties["Quest Id"])
+                              or qp_trim(dialogue.custom_properties["Quest"])
+
+                local state = qp_trim(dialogue.custom_properties["State"])
+                           or qp_trim(dialogue.custom_properties["Quest State"])
+                           or "started"
+
+                if not quest_id then
+                    warn("[eznpcs] qset missing Quest ID on dialogue node", dialogue.id)
+                    return dialogue.custom_properties["Next 2"] or dialogue.custom_properties["Next 1"]
+                end
+
+                qp_set_state(player_id, quest_id, state)
+
+                return dialogue.custom_properties["Next 1"]
             end)
         end
     },
