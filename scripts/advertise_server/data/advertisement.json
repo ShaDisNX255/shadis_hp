@@ -7,7 +7,7 @@
             "unique_server_id":"WCityOnline",
             "name":"WCity Online",
             "description":"Formerly known as ShaDisHP. ONB 2.1.4 minimum required. A great place to sit back and relax. We have events, a guild system, customization, a HP decoration system, fishing, virus pets and more. Striving to become a great MMO!",
-            "tags":[],
+            "tags":["pvp", "quests", "mmo", "mini-games", "random-encounters" ],
             "address":"64.23.226.84:3000",
             "data":"",
             "icon":"advertisement.png",
