@@ -516,6 +516,13 @@ local function build_profile(pid, info)
     }
   end
 
+  local PET_PREVIEW_OFFSETS = {
+    -- Positive x moves right. Negative x moves left.
+    -- Positive y moves down. Negative y moves up.
+    kabutank = { x = 4 },
+    fishy    = { x = -4 },
+  }
+
   local texture, anim = pet_visual_paths(info.kind, info.rank)
   provide_pet_visual(pid, texture, anim)
 
@@ -523,6 +530,10 @@ local function build_profile(pid, info)
   local atk = safe_number(info.attack, safe_number(info.rank, 1) * 5)
   local xp = safe_number(info.xp, 0)
   local mood = format_mood(info.mood)
+  local preview_offset = PET_PREVIEW_OFFSETS[tostring(info.kind or ""):lower()] or {}
+  local mug_x = 21 + safe_number(preview_offset.x, 0)
+  local mug_y = 47 + safe_number(preview_offset.y, 0)
+  local mug_scale = tonumber(preview_offset.scale) or 2.0
 
   return {
     title = short(info.display_name or info.base_name or "Pet", 20),
@@ -536,9 +547,9 @@ local function build_profile(pid, info)
     mug_state = "walk_dl",
 
     -- These will work after the small MenuAPI patch below.
-    mug_scale = 2.0,
-    mug_x = 24,
-    mug_y = 45,
+    mug_scale = mug_scale,
+    mug_x = mug_x,
+    mug_y = mug_y,
 
     title_font = "THICK",
     title_scale = 1.05,
@@ -584,7 +595,7 @@ local function build_main_rows(pid, info)
   rows[#rows + 1] = row("__lpets:xp", "Pet Stats", free > 0 and "NEW" or nil)
 
   if info.can_fight == false then
-    rows[#rows + 1] = info_row("__lpets:nofight", "No Battle Pet")
+    rows[#rows + 1] = info_row("__lpets:nofight", "Cannot Battle")
   else
     local chip = info.pet_chip_id and chip_name(info.pet_chip_id) or "None"
     rows[#rows + 1] = row("__lpets:chip", "Pet Chip", short(chip, 6))

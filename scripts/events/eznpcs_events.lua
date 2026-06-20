@@ -17,6 +17,7 @@ local duels  = require('scripts/ezlibs-custom/duels')
 local card_sleeves = require('scripts/ezlibs-custom/card_sleeves')
 local ezquests = require('scripts/ezlibs-scripts/ezquests')
 local whitelist = require('scripts/ezlibs-custom/whitelist')
+local ezrushroads = require('scripts/ezlibs-scripts/ezrushroads')
 
 local Pets = (function()
   local ok, M = pcall(require, 'scripts/ezlibs-custom/pets')
@@ -480,17 +481,35 @@ local Win_Reward = {
                 or reward_type == "bf"
             then
                 if ezmemory.add_player_fragments then
-                    ok = ezmemory.add_player_fragments(player_id, amount)
+                    local ok_call, result = pcall(ezmemory.add_player_fragments, player_id, amount)
+                    ok = ok_call and result ~= false
                 elseif ezmemory.spend_player_fragments then
-                    ok = ezmemory.spend_player_fragments(player_id, -amount)
+                    local ok_call, result = pcall(ezmemory.spend_player_fragments, player_id, -amount)
+                    ok = ok_call and result ~= false
                 else
                     ok = false
                 end
 
                 message = "Got " .. tostring(amount) .. " BugFrag" .. (amount == 1 and "!" or "s!")
 
+            elseif reward_type == "rushfood"
+                or reward_type == "rush_food"
+                or reward_type == "rush food"
+                or reward_type == "rush"
+                or reward_type == "food"
+            then
+                if ezrushroads and ezrushroads.add_food then
+                    local ok_call, new_total = pcall(ezrushroads.add_food, player_id, amount)
+                    ok = ok_call and new_total ~= nil
+                else
+                    ok = false
+                end
+
+                message = "Got " .. tostring(amount) .. " Rush Food!"
+
             else
-                ok = ezmemory.spend_player_money(player_id, -amount)
+                local ok_call, result = pcall(ezmemory.spend_player_money, player_id, -amount)
+                ok = ok_call and result ~= false
                 message = "Got " .. tostring(amount) .. "$!"
             end
 
@@ -499,8 +518,25 @@ local Win_Reward = {
                 return props["Next 2"] or props["Next 1"]
             end
 
+            local direction = nil
+            if Net.get_player_direction then
+                local ok_dir, dir = pcall(Net.get_player_direction, player_id)
+                if ok_dir then
+                    direction = dir
+                end
+            end
+
+            if ezmemory.play_anim_get then
+                pcall(ezmemory.play_anim_get, player_id)
+            end
+
             Net.play_sound_for_player(player_id, sfx.item_get)
             await(Async.message_player(player_id, message))
+
+            if direction and ezmemory.set_direction_anim then
+                pcall(ezmemory.set_direction_anim, player_id, direction)
+            end
+
             return props["Next 1"]
         end)
     end
@@ -3934,6 +3970,59 @@ eznpcs.add_event{
     end)
   end
 }
+
+local pet_quest2 = {
+    name="pet_quest2",
+    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    pet_exp=50,
+    enemies={
+        {name="Fishy",rank=1},
+    },
+    obstacles={
+    },
+    positions={
+        {0,0,0,1,0,0},
+        {0,0,0,0,1,0},
+        {0,0,0,0,0,1},
+    },
+    obstacle_positions={
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+    },
+    player_positions={
+        {0,0,0,0,0,0},
+        {0,1,0,0,0,0},
+        {0,0,0,0,0,0},
+    },
+    tiles={
+        {1,1,1,1,1,1},
+        {1,1,1,1,1,1},
+        {1,1,1,1,1,1},
+    },
+    teams={
+        {2,2,2,1,1,1},
+        {2,2,2,1,1,1},
+        {2,2,2,1,1,1},
+    },
+}
+
+local pet_quest2_fight = {
+    name="Pet Quest2 Fight",
+    action=function (npc,player_id,dialogue,relay_object)
+        return async(function()
+          local stats = await(ezencounters.begin_encounter(player_id, pet_quest2))
+          local flags = _encounter_result_flags(stats)
+
+          if flags.ran or flags.lost then
+              return dialogue.custom_properties["Battle Lost"]
+          else
+              return dialogue.custom_properties["Battle Won"]
+          end
+        end)
+    end
+}
+eznpcs.add_event(pet_quest2_fight)
 
 -- Repaint any already-revealed paths when players appear in an area
 Net:on("player_join", function(ev)

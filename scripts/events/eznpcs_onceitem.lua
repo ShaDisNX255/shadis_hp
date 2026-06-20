@@ -1206,6 +1206,121 @@ local function short_money(n)  -- tiny UI helper like your pack shop
   end
 end
 
+local PETSHOP_PREVIEW = {}
+
+local function _petshop_preview_prop_num(ci, key, fallback)
+  local n = tonumber(_decor_get_prop_ci(ci, key))
+  if n ~= nil then return n end
+  return fallback
+end
+
+local function _petshop_sprite_suffix(text)
+  text = tostring(text or ""):lower()
+  text = text:gsub("%W", "_")
+  if text == "" then text = "pet" end
+  return text
+end
+
+local function _petshop_visual_paths(kind)
+  kind = tostring(kind or ""):lower()
+  if kind == "" then return nil, nil end
+
+  local texture = "/server/assets/pets/" .. kind .. ".png"
+  local anim    = "/server/assets/pets/" .. kind .. ".animation"
+
+  if not _shop_safe_has_asset(texture) then
+    return nil, nil
+  end
+
+  if not _shop_safe_has_asset(anim) then
+    anim = nil
+  end
+
+  return texture, anim
+end
+
+local function _petshop_clear_preview(pid)
+  local st = PETSHOP_PREVIEW[pid]
+  local obj_id = "__petshop_preview_obj"
+
+  if Net and Net.player_erase_sprite then
+    pcall(Net.player_erase_sprite, pid, obj_id)
+  end
+
+  if st and st.sprite_id and Net and Net.player_dealloc_sprite then
+    pcall(Net.player_dealloc_sprite, pid, st.sprite_id)
+  end
+
+  PETSHOP_PREVIEW[pid] = nil
+end
+
+local function _petshop_show_preview(pid, ci, kind)
+  if not (Net and Net.player_alloc_sprite and Net.player_draw_sprite) then
+    return false
+  end
+
+  kind = tostring(kind or ""):lower()
+  if kind == "" then
+    _petshop_clear_preview(pid)
+    return false
+  end
+
+  local texture, anim = _petshop_visual_paths(kind)
+  if not texture then
+    _petshop_clear_preview(pid)
+    return false
+  end
+
+  local state = tostring(_decor_get_prop_ci(ci, "Pet Preview State") or "walk_dl")
+
+  -- Logical UI coords, same idea as the cards UI helper.
+  -- Tweak these from Tiled if the pet is not perfectly centered.
+  local x     = _petshop_preview_prop_num(ci, "Pet Preview X", 185)
+  local y     = _petshop_preview_prop_num(ci, "Pet Preview Y", 65)
+  local z     = _petshop_preview_prop_num(ci, "Pet Preview Z", 360)
+  local scale = _petshop_preview_prop_num(ci, "Pet Preview Scale", 2.0)
+
+  local sprite_id = "__petshop_preview_" .. _petshop_sprite_suffix(kind)
+  local obj_id = "__petshop_preview_obj"
+  local st = PETSHOP_PREVIEW[pid]
+
+  if not st or st.sprite_id ~= sprite_id or st.state ~= state then
+    _petshop_clear_preview(pid)
+
+    _shop_safe_provide(pid, texture)
+    if anim then _shop_safe_provide(pid, anim) end
+
+    local alloc = {
+      texture_path = texture,
+    }
+
+    if anim then
+      alloc.anim_path = anim
+      alloc.anim_state = state
+    end
+
+    pcall(Net.player_alloc_sprite, pid, sprite_id, alloc)
+
+    PETSHOP_PREVIEW[pid] = {
+      sprite_id = sprite_id,
+      kind = kind,
+      state = state,
+    }
+  end
+
+  pcall(Net.player_draw_sprite, pid, sprite_id, {
+    id = obj_id,
+    x = math.floor(x * 2),
+    y = math.floor(y * 2),
+    z = z,
+    sx = scale,
+    sy = scale,
+    anim_state = state,
+  })
+
+  return true
+end
+
 -- Price resolution: first NPC property "Price <id>" (case-insensitive), else entry.price, else default
 local DECOR_DEFAULT_PRICE = 1000
 local function price_for(dialogue, id)
@@ -3641,7 +3756,7 @@ eznpcs.add_event{
 
       local options = {}
       local by_choice_id = {}
-      local icon_by_id = {}
+      local preview_kind_by_id = {}
 
       for _, row in ipairs(sell_rows) do
         local item_id = tostring(row.id)
@@ -3663,8 +3778,7 @@ eznpcs.add_event{
           price = tonumber(price) or 0,
         }
 
-        local preview = _resolve_pet_shop_preview(ci, row.idx, item_id)
-        icon_by_id[id] = preview or DEFAULT_ICON
+        preview_kind_by_id[id] = pet_kind_from_item_id(item_id)
       end
 
       if #options == 0 then
@@ -3680,15 +3794,25 @@ eznpcs.add_event{
       local exit_index = #options
 
       local seen = {}
-      for _, path in pairs(icon_by_id) do
-        if path and not seen[path] then
-          seen[path] = true
-          _shop_safe_provide(player_id, path)
+      for _, kind in pairs(preview_kind_by_id) do
+        local texture, anim = _petshop_visual_paths(kind)
+
+        if texture and not seen[texture] then
+          seen[texture] = true
+          _shop_safe_provide(player_id, texture)
+        end
+
+        if anim and not seen[anim] then
+          seen[anim] = true
+          _shop_safe_provide(player_id, anim)
         end
       end
       await(Async.sleep(0.05))
 
       local layout = TalkPresets.get_vert_menu_layout("prog_prompt_shop") or {}
+      layout.shop_item_intro_enabled = false
+      layout.shop_item_enabled = false
+      layout.shop_item_swap_exit = false
       local talk_cfg = {
         preset = "prog_prompt",
         area_id = area_id,
@@ -3711,7 +3835,7 @@ eznpcs.add_event{
       end
 
       TalkVertMenu.open(player_id, title, talk_cfg, {
-        intro_text = "Which pet would you like?",
+        intro_text = "Which pet would you like to buy?",
         options = options,
         exit_index = exit_index,
         layout = layout,
@@ -3722,9 +3846,19 @@ eznpcs.add_event{
         end,
 
         shop_item_texture_fn = function(choice)
-          if not choice or not choice.id then return DEFAULT_ICON end
-          if tostring(choice.id) == "exit" then return DEFAULT_ICON end
-          return icon_by_id[tostring(choice.id)] or DEFAULT_ICON
+          if not choice or not choice.id or tostring(choice.id) == "exit" then
+            _petshop_clear_preview(player_id)
+            return nil
+          end
+
+          local offer = by_choice_id[tostring(choice.id)]
+          if not offer then
+            _petshop_clear_preview(player_id)
+            return nil
+          end
+
+          _petshop_show_preview(player_id, ci, offer.kind)
+          return nil
         end,
 
         flow = {
@@ -3800,6 +3934,8 @@ eznpcs.add_event{
       while TalkVertMenu.is_busy and TalkVertMenu.is_busy(player_id) do
         await(Async.sleep(0.05))
       end
+
+      _petshop_clear_preview(player_id)
 
       return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
     end)

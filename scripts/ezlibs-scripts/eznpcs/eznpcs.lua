@@ -149,13 +149,18 @@ function create_bot_from_object(area_id, object, player_id)
     local npc_mug_animation_name = object.custom_properties["Mug Animation Name"] or false
     local npc_turns_to_talk = is_property_true(object.custom_properties["Dont Face Player"])
     local direction = object.custom_properties.Direction
+    local speed = tonumber(
+        object.custom_properties["Walk Speed"]
+        or object.custom_properties["Speed"]
+        or 1
+    ) or 1
 
     -- Debug: print asset paths
     printd("Creating NPC with asset:", npc_asset_name, "texture:", npc_asset_folder.."sheet/"..npc_asset_name..".png")
 
     -- Create the bot (initially visible to all)
     local npc = create_npc(area_id, npc_asset_name, x, y, z, direction,
-                           object.name, npc_animation_name, npc_mug_animation_name, npc_turns_to_talk)
+                       object.name, npc_animation_name, npc_mug_animation_name, npc_turns_to_talk, speed)
 
     if not npc then 
         printd("Failed to create bot for", npc_asset_name)
@@ -189,7 +194,7 @@ function create_bot_from_object(area_id, object, player_id)
     return npc
 end
 
-function create_npc(area_id,asset_name,x,y,z,direction,bot_name,animation_name,mug_animation_name,npc_turns_to_talk)
+function create_npc(area_id,asset_name,x,y,z,direction,bot_name,animation_name,mug_animation_name,npc_turns_to_talk,speed)
     local texture_path = npc_asset_folder.."sheet/"..asset_name..".png"
     local animation_path = npc_asset_folder.."sheet/"..asset_name..".animation"
     local mug_animation_path = generic_npc_mug_animation_path
@@ -219,7 +224,7 @@ function create_npc(area_id,asset_name,x,y,z,direction,bot_name,animation_name,m
         direction=direction, 
         solid=true,
         size=0.2,
-        speed=1,
+        speed=tonumber(speed) or 1,
         dont_face_player=npc_turns_to_talk,
         warp_in = true,  -- Explicitly set warp_in to ensure visibility
     }
@@ -321,10 +326,170 @@ function is_anyone_talking_to_npc(npc_id)
     return false
 end
 
+local idle_anim_by_direction = {
+    ["Down Right"] = "IDLE_DR",
+    ["Down Left"]  = "IDLE_DL",
+    ["Up Right"]   = "IDLE_UR",
+    ["Up Left"]    = "IDLE_UL",
+    ["Up"]         = "IDLE_U",
+    ["Down"]       = "IDLE_D",
+    ["Left"]       = "IDLE_L",
+    ["Right"]      = "IDLE_R",
+}
+
+local idle_anim_by_anim_suffix = {
+    DR = "IDLE_DR",
+    DL = "IDLE_DL",
+    UR = "IDLE_UR",
+    UL = "IDLE_UL",
+    U  = "IDLE_U",
+    D  = "IDLE_D",
+    L  = "IDLE_L",
+    R  = "IDLE_R",
+}
+
+local function idle_state_from_animation_state(anim_state)
+    anim_state = tostring(anim_state or "")
+
+    local suffix = anim_state:match("_([UDLR][LR]?)$")
+    if suffix then
+        return idle_anim_by_anim_suffix[suffix]
+    end
+
+    return nil
+end
+
+local function first_nonempty_prop(props, ...)
+    if not props then return nil end
+
+    for i = 1, select("#", ...) do
+        local key = select(i, ...)
+        local value = props[key]
+
+        if value ~= nil and tostring(value) ~= "" then
+            return value
+        end
+    end
+
+    return nil
+end
+
+local function restore_npc_idle_animation(npc)
+    if not npc or not npc.bot_id then return end
+
+    local idle_state = idle_anim_by_direction[npc.direction]
+    if idle_state then
+        pcall(Net.animate_bot, npc.bot_id, idle_state, true)
+    end
+end
+
+local function play_waypoint_animation(npc, waypoint)
+    local props = waypoint and waypoint.custom_properties
+    if not props then return end
+
+    local anim_state = first_nonempty_prop(
+        props,
+        "Animation State",
+        "Waypoint Animation",
+        "Play Animation",
+        "Animation"
+    )
+
+    if not anim_state then return end
+
+    anim_state = tostring(anim_state)
+
+    -- Default is one-shot. Only loops if you explicitly set Animation Loop = true.
+    local loop = is_property_true(first_nonempty_prop(
+        props,
+        "Animation Loop",
+        "Loop Animation"
+    ))
+
+    local anim_wait = tonumber(first_nonempty_prop(
+        props,
+        "Animation Time",
+        "Animation Duration",
+        "Animation Wait Time"
+    ))
+
+    if anim_wait == nil then
+        local wait_time = tonumber(props["Wait Time"])
+        if wait_time and wait_time > 0 then
+            anim_wait = wait_time
+        end
+    end
+
+    if not loop then
+        anim_wait = tonumber(anim_wait) or 0.45
+
+        -- Super tiny waits can make the animation appear skipped.
+        if anim_wait < 0.20 then
+            anim_wait = 0.45
+        end
+    else
+        anim_wait = tonumber(anim_wait) or 0
+    end
+
+    -- Important: force the client out of the previous state first.
+    -- This helps one-shot animations restart reliably.
+    local restart_delay = tonumber(first_nonempty_prop(
+        props,
+        "Animation Restart Delay",
+        "Animation Delay"
+    )) or 0.05
+
+    if restart_delay < 0.03 then
+        restart_delay = 0.05
+    end
+
+    npc.waypoint_anim_token = (tonumber(npc.waypoint_anim_token) or 0) + 1
+    local token = npc.waypoint_anim_token
+
+    if not loop then
+        local idle_state = idle_state_from_animation_state(anim_state)
+
+        if idle_state then
+            pcall(Net.animate_bot, npc.bot_id, idle_state, true)
+        else
+            restore_npc_idle_animation(npc)
+        end
+    end
+
+    npc.wait_time = math.max(tonumber(npc.wait_time) or 0, anim_wait + restart_delay)
+    npc.restore_anim_after_wait = not loop
+
+    async(function()
+        await(Async.sleep(restart_delay))
+
+        if not npc or token ~= npc.waypoint_anim_token then
+            return
+        end
+
+        if Net.is_bot then
+            local ok_exists, exists = pcall(Net.is_bot, npc.bot_id)
+            if ok_exists and not exists then
+                return
+            end
+        end
+
+        local ok, err = pcall(Net.animate_bot, npc.bot_id, anim_state, loop)
+        if not ok then
+            printd("Waypoint animation failed:", tostring(anim_state), tostring(err))
+        end
+    end)
+end
+
 function move_npc(npc,delta_time)
     if is_anyone_talking_to_npc(npc.bot_id) then return end
     if npc.wait_time and npc.wait_time > 0 then
         npc.wait_time = npc.wait_time - delta_time
+
+        if npc.wait_time <= 0 and npc.restore_anim_after_wait then
+            npc.restore_anim_after_wait = nil
+            restore_npc_idle_animation(npc)
+        end
+
         return
     end
 
@@ -340,6 +505,11 @@ function move_npc(npc,delta_time)
     local angle = math.atan(waypoint.y - npc.y, waypoint.x - npc.x)
     local vel_x = math.cos(angle) * npc.speed
     local vel_y = math.sin(angle) * npc.speed
+
+    local move_dir = Direction.from_points(npc, waypoint)
+    if move_dir then
+        npc.direction = move_dir
+    end
 
     local new_pos = {x=0,y=0,z=npc.z,size=npc.size}
 
@@ -358,13 +528,18 @@ function on_npc_reached_waypoint(npc,waypoint)
     if not has_correct_type then
         printd("WARNING Waypoint "..waypoint.id.." at "..waypoint.x..","..waypoint.y.." in "..npc.area_id.." has incorrect type and wont be cached")
     end
-    if waypoint.custom_properties['Wait Time'] ~= nil then
-        npc.wait_time = tonumber(waypoint.custom_properties['Wait Time'])
-        if waypoint.custom_properties['Direction'] ~= nil then
-            npc.direction = waypoint.custom_properties['Direction']
-            Net.set_bot_direction(npc.bot_id, waypoint.custom_properties['Direction'])
-        end
+    local props = waypoint.custom_properties or {}
+
+    if props['Direction'] ~= nil then
+        npc.direction = props['Direction']
+        Net.set_bot_direction(npc.bot_id, props['Direction'])
     end
+
+    if props['Wait Time'] ~= nil then
+        npc.wait_time = tonumber(props['Wait Time']) or 0
+    end
+
+    play_waypoint_animation(npc, waypoint)
     local waypoint_type = "first"
     if waypoint.custom_properties["Waypoint Type"] then
         waypoint_type = waypoint.custom_properties["Waypoint Type"]
