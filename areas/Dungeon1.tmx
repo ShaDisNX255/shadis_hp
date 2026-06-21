@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="57" height="57" tilewidth="64" tileheight="32" infinite="0" nextlayerid="7" nextobjectid="190">
+<map version="1.10" tiledversion="1.12.2" orientation="isometric" renderorder="right-down" width="57" height="57" tilewidth="64" tileheight="32" infinite="0" nextlayerid="7" nextobjectid="194">
  <properties>
   <property name="Amount 1" type="int" value="1"/>
   <property name="Amount 2" type="int" value="1"/>
@@ -279,6 +279,7 @@
   <object id="132" name="Mini Boss Battle" type="Dialogue" x="972" y="108">
    <properties>
     <property name="Already Defeated Message" value="-It will not engage."/>
+    <property name="Battle Won" type="object" value="190"/>
     <property name="Boss Defeated Message" value="The Navi flickers... fragments of its form glitch in and out. It does not acknowledge your presence... Yet it remains, a ghost of data with no will of its own."/>
     <property name="Boss Encounter HP" type="int" value="1400"/>
     <property name="Boss ID" value="MiniBoss1"/>
@@ -305,6 +306,7 @@
   <object id="135" name="MiniBoss2 Battle" type="Dialogue" x="332" y="1338">
    <properties>
     <property name="Already Defeated Message" value="-It will not fight again."/>
+    <property name="Battle Won" type="object" value="192"/>
     <property name="Boss Defeated Message" value="The Navi shudders, pieces of its code unraveling. It freezes mid-step... silent, empty, a ghost of what it was. Though defeated, something about it still remains."/>
     <property name="Boss Encounter HP" type="int" value="1000"/>
     <property name="Boss ID" value="MiniBoss2"/>
@@ -331,6 +333,7 @@
   <object id="138" name="MiniBoss3 Battle" type="Dialogue" x="198.5" y="155.5">
    <properties>
     <property name="Already Defeated Message" value="The energy fades, leaving only fragments of its code behind. -It will not engage again."/>
+    <property name="Battle Won" type="object" value="191"/>
     <property name="Boss Defeated Message" value="The elemental Navi shudders, sparks flickering erratically across its body. It staggers back, its form glitching in and out of place."/>
     <property name="Boss Encounter HP" type="int" value="1300"/>
     <property name="Boss ID" value="MiniBoss3"/>
@@ -346,6 +349,7 @@
   <object id="139" name="MainBoss Battle" type="Dialogue" x="38.5" y="949.5">
    <properties>
     <property name="Already Defeated Message" value="-It will not engage again."/>
+    <property name="Battle Won" type="object" value="193"/>
     <property name="Boss Defeated Message" value="...N-no... this... can't be... I... I... am... not... I... I... CAN'T... EXIST... Heh... heh... hahaha... Fragments... breaking... ...chaos... remains..."/>
     <property name="Boss Encounter HP" type="int" value="600"/>
     <property name="Boss ID" value="MainBoss"/>
@@ -355,6 +359,7 @@
     <property name="Dialogue Type" value="none"/>
     <property name="Encounter Name" value="MainBoss"/>
     <property name="Event Name" value="MainBoss"/>
+    <property name="Pet XP" type="int" value="13"/>
    </properties>
    <point/>
   </object>
@@ -685,6 +690,38 @@
     <property name="Dialogue Type" value="first"/>
     <property name="Direction" value="Down Left"/>
     <property name="Text 1" value="We hold our very own tournaments here. You may not like who you face... or the stakes here hehe..."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="190" name="PetEXP" type="Dialogue" x="914.5" y="87.5">
+   <properties>
+    <property name="Amount" type="int" value="10"/>
+    <property name="Dialogue Type" value="none"/>
+    <property name="Event Name" value="petxp"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="191" name="PetEXP" type="Dialogue" x="150" y="116">
+   <properties>
+    <property name="Amount" type="int" value="10"/>
+    <property name="Dialogue Type" value="none"/>
+    <property name="Event Name" value="petxp"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="192" name="PetEXP" type="Dialogue" x="297.5" y="1348.5">
+   <properties>
+    <property name="Amount" type="int" value="10"/>
+    <property name="Dialogue Type" value="none"/>
+    <property name="Event Name" value="petxp"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="193" name="PetEXP" type="Dialogue" x="25.5" y="996.5">
+   <properties>
+    <property name="Amount" type="int" value="13"/>
+    <property name="Dialogue Type" value="none"/>
+    <property name="Event Name" value="petxp"/>
    </properties>
    <point/>
   </object>

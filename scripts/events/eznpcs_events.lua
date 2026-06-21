@@ -374,7 +374,7 @@ end
 local boss2 = {
     name="boss2",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
-    pet_exp=9,
+    pet_exp=0,
     enemies={
         {name="HeelNavi",rank=1},
     },
@@ -546,7 +546,7 @@ eznpcs.add_event(Win_Reward)
 local boss4 = {
     name="boss4",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
-    pet_exp=10,
+    pet_exp=0,
     enemies={
         {name="ProtomanPoN",rank=1},
     },
@@ -620,7 +620,7 @@ end
 local boss5 = {
     name="boss5",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
-    pet_exp=8,
+    pet_exp=0,
     results_callback = reward_roll1_on_win,
     enemies={
         {name="Roll",rank=2},
@@ -679,7 +679,7 @@ eznpcs.add_event(event5)
 local boss6 = {
     name="boss6",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
-    pet_exp=8,
+    pet_exp=0,
     enemies={
         {name="GutsManPoN",rank=2},
     },
@@ -759,10 +759,10 @@ end
 local boss7 = {
     name="boss7",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
-    pet_exp=11,
+    pet_exp=0,
     results_callback = reward_gutsman_chip_on_win,
     enemies={
-        {name="GutsManEXE3",rank=3},
+        {name="GutsManEXE3",rank=2},
     },
     obstacles={
     },
@@ -818,7 +818,7 @@ eznpcs.add_event(event7)
 local boss8 = {
     name="boss8",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
-    pet_exp=11,
+    pet_exp=0,
     enemies={
         {name="GregarBeast",rank=1},
     },
@@ -3974,7 +3974,7 @@ eznpcs.add_event{
 local pet_quest2 = {
     name="pet_quest2",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
-    pet_exp=50,
+    pet_exp=0,
     enemies={
         {name="Fishy",rank=1},
     },
@@ -4023,6 +4023,157 @@ local pet_quest2_fight = {
     end
 }
 eznpcs.add_event(pet_quest2_fight)
+
+----------------------------------------------------------------
+-- Pet XP Reward
+-- Dialogue Type: petxp
+--
+-- Custom properties:
+--   Amount = 9
+--   Pet XP = 9
+--   XP = 9
+--
+-- Optional:
+--   Next 1 = success next dialogue
+--   Next 2 = fail next dialogue
+--   Dont Notify = true
+--   Expected PET ID = pet-...
+--
+-- Notes:
+--   - Put this at the end of a Tiled dialogue chain.
+--   - Remove pet_exp from scripted battle encounter tables to avoid double XP.
+----------------------------------------------------------------
+
+local function _petxp_prop(props, ...)
+  if type(props) ~= "table" then return nil end
+
+  for i = 1, select("#", ...) do
+    local wanted = tostring(select(i, ...)):lower()
+
+    for k, v in pairs(props) do
+      if tostring(k):lower() == wanted then
+        if v ~= nil and tostring(v) ~= "" then
+          return v
+        end
+      end
+    end
+  end
+
+  return nil
+end
+
+local function _get_menuapi_for_petxp()
+  local M = rawget(_G, "MenuAPI")
+
+  if not (M and type(M.is_open) == "function") then
+    local ok, mod = pcall(require, "scripts/menuAPI/main")
+    if ok and type(mod) == "table" then
+      M = mod
+    end
+  end
+
+  return M
+end
+
+local function _get_lpets_for_petxp()
+  local L = rawget(_G, "LPets")
+
+  if not (L and type(L.show_sp_gauge_gain) == "function") then
+    local ok, mod = pcall(require, "scripts/ezlibs-custom/lpets")
+    if ok and type(mod) == "table" then
+      L = mod
+    end
+  end
+
+  return L
+end
+
+eznpcs.add_event({
+  name = "petxp",
+  action = function(npc, player_id, dialogue, relay_object)
+    return async(function()
+      local props = dialogue.custom_properties or {}
+
+      if not (Pets and type(Pets.award_armed_pet_battle_xp) == "function") then
+        return props["Next 2"] or props["Next 1"]
+      end
+
+      local amount = tonumber(_petxp_prop(props, "Amount", "Pet XP", "XP") or 0) or 0
+      amount = math.max(0, math.floor(amount))
+
+      if amount <= 0 then
+        return props["Next 2"] or props["Next 1"]
+      end
+
+      local before = nil
+      if type(Pets.get_armed_pet_info) == "function" then
+        local ok_before, info = pcall(Pets.get_armed_pet_info, player_id)
+        if ok_before and type(info) == "table" then
+          before = info
+        end
+      end
+
+      local old_xp = before and math.max(0, math.floor(tonumber(before.xp) or 0)) or 0
+
+      local expected_uid = _petxp_prop(props, "Expected PET ID", "Expected Pet ID", "Expected UID", "Pet ID")
+
+      local ok, new_xp, skill_gained, effective_amount, mood = Pets.award_armed_pet_battle_xp(
+        player_id,
+        amount,
+        {
+          expected_uid = expected_uid,
+          notify = false,
+        }
+      )
+
+      if not ok or effective_amount <= 0 then
+        return props["Next 2"] or props["Next 1"]
+      end
+
+      local after = nil
+      if type(Pets.get_armed_pet_info) == "function" then
+        local ok_after, info = pcall(Pets.get_armed_pet_info, player_id)
+        if ok_after and type(info) == "table" then
+          after = info
+        end
+      end
+
+      local notify = tostring(props["Dont Notify"] or ""):lower() ~= "true"
+
+      if notify then
+        local LPets = _get_lpets_for_petxp()
+
+        if LPets and type(LPets.show_sp_gauge_gain) == "function" then
+          pcall(LPets.show_sp_gauge_gain, player_id, {
+            old_xp = old_xp,
+            new_xp = math.max(0, math.floor(tonumber(new_xp) or old_xp)),
+            xp_per_skill_point = after and after.xp_per_skill_point or 175,
+            available_skill_points = after and after.available_skill_points or 0,
+            skill_points_gained = skill_gained or 0,
+          })
+
+          -- Wait until MenuAPI type 7 finishes before allowing the dialogue
+          -- chain to continue or fully close.
+          local MenuAPI = _get_menuapi_for_petxp()
+          if MenuAPI and type(MenuAPI.is_open) == "function" then
+            local guard = 0
+
+            while MenuAPI.is_open(player_id) and guard < 400 do
+              await(Async.sleep(0.05))
+              guard = guard + 1
+            end
+          else
+            await(Async.sleep(2.0))
+          end
+        elseif Net and Net.message_player then
+          await(Async.message_player(player_id, "Your pet gained " .. tostring(effective_amount) .. " XP."))
+        end
+      end
+
+      return props["Next 1"]
+    end)
+  end
+})
 
 -- Repaint any already-revealed paths when players appear in an area
 Net:on("player_join", function(ev)

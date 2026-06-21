@@ -400,7 +400,7 @@ local MiniBoss1 = {
     name="MiniBoss1",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     weight=0,
-    pet_exp=10,
+    pet_exp=0,
     skip_shared_area_rewards = true,
     enemies={
         {name="HeelNavi",rank=4},
@@ -440,7 +440,7 @@ local MiniBoss2 = {
     name="MiniBoss2",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     weight=0,
-    pet_exp=10,
+    pet_exp=0,
     skip_shared_area_rewards = true,
     enemies={
         {name="Noir",rank=1},
@@ -481,7 +481,7 @@ local MiniBoss3 = {
     name="MiniBoss3",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     weight=0,
-    pet_exp=10,
+    pet_exp=0,
     skip_shared_area_rewards = true,
     enemies={
         {name="ElementMan",rank=5},
@@ -522,7 +522,7 @@ local MainBoss = {
     name="MainBoss",
     path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
     weight=0,
-    pet_exp=12,
+    pet_exp=0,
     skip_shared_area_rewards = true,
     enemies={
         {name="MegaBunny",rank=1},

@@ -848,7 +848,7 @@ local function _try_award_bugfrag(pid)
   return nil
 end
 
-local function _eject_player_after_message(pid, fallback_area_id, message)
+local function _eject_player_after_message(pid, fallback_area_id, message, before_transfer)
   local area_id = Net.get_player_area(pid)
   local exit = _resolve_exit_from_area(area_id) or (fallback_area_id and _resolve_exit_from_area(fallback_area_id))
   if not exit then return end
@@ -863,6 +863,17 @@ local function _eject_player_after_message(pid, fallback_area_id, message)
     async(function()
       pcall(Net.lock_player_input, pid)
       await(Async.message_player(pid, message))
+
+      if type(before_transfer) == "function" then
+        local ok_cb, result = pcall(before_transfer, pid)
+
+        if ok_cb and result ~= nil then
+          await(result)
+        elseif not ok_cb then
+          print("[dungeon] before transfer callback error:", tostring(result))
+        end
+      end
+
       pcall(Net.unlock_player_input, pid)
       Net.transfer_player(pid, exit.area_id, true, exit.x, exit.y, exit.z, exit.dir)
     end)
@@ -873,9 +884,79 @@ local function _eject_player_after_message(pid, fallback_area_id, message)
   end
 end
 
+local function _mainboss_award_pet_xp_before_transfer(pid, amount)
+  amount = math.max(0, math.floor(tonumber(amount) or 0))
+  if amount <= 0 then return end
+
+  local ok_pets, Pets = pcall(require, "scripts/ezlibs-custom/pets")
+  if not ok_pets then Pets = rawget(_G, "Pets") end
+
+  local ok_lpets, LPets = pcall(require, "scripts/ezlibs-custom/lpets")
+  if not ok_lpets then LPets = rawget(_G, "LPets") end
+
+  if not (Pets and type(Pets.award_armed_pet_battle_xp) == "function") then
+    return
+  end
+
+  local before = nil
+  if type(Pets.get_armed_pet_info) == "function" then
+    local ok_before, info = pcall(Pets.get_armed_pet_info, pid)
+    if ok_before and type(info) == "table" then
+      before = info
+    end
+  end
+
+  local old_xp = before and math.max(0, math.floor(tonumber(before.xp) or 0)) or 0
+
+  local ok_award, awarded, new_xp, skill_gained = pcall(
+    Pets.award_armed_pet_battle_xp,
+    pid,
+    amount,
+    { notify = false }
+  )
+
+  if not ok_award or not awarded then
+    return
+  end
+
+  local after = nil
+  if type(Pets.get_armed_pet_info) == "function" then
+    local ok_after, info = pcall(Pets.get_armed_pet_info, pid)
+    if ok_after and type(info) == "table" then
+      after = info
+    end
+  end
+
+  if LPets and type(LPets.show_sp_gauge_gain) == "function" then
+    pcall(LPets.show_sp_gauge_gain, pid, {
+      old_xp = old_xp,
+      new_xp = math.max(0, math.floor(tonumber(new_xp) or old_xp)),
+      xp_per_skill_point = after and after.xp_per_skill_point or 175,
+      available_skill_points = after and after.available_skill_points or 0,
+      skill_points_gained = skill_gained or 0,
+    })
+
+    local MenuAPI = rawget(_G, "MenuAPI")
+    if not (MenuAPI and type(MenuAPI.is_open) == "function") then
+      local ok_menu, mod = pcall(require, "scripts/menuAPI/main")
+      if ok_menu then MenuAPI = mod end
+    end
+
+    if MenuAPI and type(MenuAPI.is_open) == "function" and Async and Async.sleep then
+      local guard = 0
+
+      while MenuAPI.is_open(pid) and guard < 400 do
+        await(Async.sleep(0.05))
+        guard = guard + 1
+      end
+    end
+  end
+end
+
 local _MAINBOSS_RESET_LOCK = {} -- [mem_area]=true
 
-local function _handle_mainboss_defeated(seed_area_id, mem_area, defeated_message)
+local function _handle_mainboss_defeated(seed_area_id, mem_area, defeated_message, opts)
+  opts = opts or {}
   mem_area = _trim(mem_area)
   if mem_area == "" then mem_area = seed_area_id end
   if _MAINBOSS_RESET_LOCK[mem_area] then return end
@@ -917,7 +998,13 @@ local function _handle_mainboss_defeated(seed_area_id, mem_area, defeated_messag
           msg = msg .. "\n" .. table.concat(lines, "\n")
         end
 
-        _eject_player_after_message(pid, seed_area_id, msg)
+        local before_transfer = nil
+
+        if opts.before_transfer_by_pid and type(opts.before_transfer_by_pid[pid]) == "function" then
+          before_transfer = opts.before_transfer_by_pid[pid]
+        end
+
+        _eject_player_after_message(pid, seed_area_id, msg, before_transfer)
       end)
     end
   end, _safe_traceback)
@@ -1397,10 +1484,31 @@ local MAIN_BOSS_DIALOGUE_EVENT = {
         return props["Battle Ran"] or props["Next 1"]
       end
 
-      -- If defeated NOW -> broadcast, reset pools, re-show gates, reward, kick all dungeon players
+      -- If defeated NOW -> broadcast, reset pools, re-show gates, reward, kick all dungeon players.
+      -- Optional final pet XP happens after the dungeon-complete message, before transfer.
       if out.defeated_now then
         local defeated_msg = props["Boss Defeated Message"] or "Boss defeated!"
-        _handle_mainboss_defeated(area_id, mem_area, defeated_msg)
+        local final_pet_xp = math.floor(tonumber(
+          props["Final Pet XP"]
+          or props["Pet XP"]
+          or props["XP"]
+          or 0
+        ) or 0)
+
+        local before_transfer_by_pid = nil
+
+        if final_pet_xp > 0 then
+          before_transfer_by_pid = {
+            [player_id] = function(pid)
+              _mainboss_award_pet_xp_before_transfer(pid, final_pet_xp)
+            end,
+          }
+        end
+
+        _handle_mainboss_defeated(area_id, mem_area, defeated_msg, {
+          before_transfer_by_pid = before_transfer_by_pid,
+        })
+
         return nil
       end
 

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="50" height="50" tilewidth="64" tileheight="32" infinite="0" nextlayerid="10" nextobjectid="112">
+<map version="1.10" tiledversion="1.12.2" orientation="isometric" renderorder="right-down" width="50" height="50" tilewidth="64" tileheight="32" infinite="0" nextlayerid="10" nextobjectid="114">
  <properties>
   <property name="Background" value="custom"/>
   <property name="Background Animation" value="/server/assets/custom/backgrounds/wcity/01-generic1.animation"/>
@@ -395,7 +395,7 @@
   <object id="20" name="victory" type="Dialogue" x="1124" y="506.5">
    <properties>
     <property name="Dialogue Type" value="first"/>
-    <property name="Next 1" type="object" value="21"/>
+    <property name="Next 1" type="object" value="112"/>
     <property name="Text 1" value="You're actually pretty good, I'll keep my eye on you."/>
    </properties>
    <point/>
@@ -606,6 +606,7 @@
    <properties>
     <property name="Dialogue Type" value="item"/>
     <property name="Item 1" type="object" value="51"/>
+    <property name="Next 1" type="object" value="113"/>
    </properties>
    <point/>
   </object>
@@ -998,6 +999,24 @@
     <property name="2 Name" value="TechLab2"/>
     <property name="2 Type" value="Area"/>
     <property name="Train" value="ShaDisHP"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="112" name="PetXP" type="Dialogue" x="1127" y="507">
+   <properties>
+    <property name="Amount" type="int" value="10"/>
+    <property name="Dialogue Type" value="none"/>
+    <property name="Event Name" value="petxp"/>
+    <property name="Next 1" type="object" value="21"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="113" name="PetXP" type="Dialogue" x="769.5" y="780.5">
+   <properties>
+    <property name="Amount" type="int" value="15"/>
+    <property name="Dialogue Type" value="none"/>
+    <property name="Event Name" value="petxp"/>
+    <property name="Next 1" type="object" value="126"/>
    </properties>
    <point/>
   </object>

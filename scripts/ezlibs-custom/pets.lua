@@ -1092,6 +1092,12 @@ function pets.award_owned_pet_xp(owner_or_pid, uid, amount)
 end
 
 function pets.award_armed_pet_battle_xp(pid, amount, expected_uid)
+  local opts = {}
+
+  if type(expected_uid) == "table" then
+    opts = expected_uid
+    expected_uid = opts.expected_uid
+  end
   local secret = helpers.get_safe_player_secret(pid)
   if not secret or secret == "" then
     return false, 0, 0, 0, "neutral"
@@ -1154,6 +1160,10 @@ function pets.award_armed_pet_battle_xp(pid, amount, expected_uid)
   end
 
   local notify = _pet_xp_notifications_enabled_from_pmem(pmem)
+
+  if opts.notify == false or opts.silent == true or opts.show_popup == false then
+    notify = false
+  end
   local old_total = _pet_total_skill_points_from_xp(p.xp)
 
   p.xp = math.min(PET_MAX_XP, math.max(0, math.floor(tonumber(p.xp or 0) or 0) + effective_amount))
