@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.12.2" orientation="isometric" renderorder="right-down" width="50" height="50" tilewidth="64" tileheight="32" infinite="0" nextlayerid="9" nextobjectid="270">
+<map version="1.10" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="50" height="50" tilewidth="64" tileheight="32" infinite="0" nextlayerid="9" nextobjectid="270">
  <properties>
   <property name="Background" value="custom"/>
   <property name="Background Animation" value="/server/assets/custom/backgrounds/wcity/01-generic1.animation"/>
@@ -1063,7 +1063,7 @@
   </object>
   <object id="148" name="give moneyz" type="Dialogue" x="1045.5" y="900.5">
    <properties>
-    <property name="Amount" type="int" value="10000"/>
+    <property name="Amount" type="int" value="6500"/>
     <property name="Dialogue Type" value="none"/>
     <property name="Event Name" value="Win_Gamble"/>
     <property name="Next 1" type="object" value="266"/>

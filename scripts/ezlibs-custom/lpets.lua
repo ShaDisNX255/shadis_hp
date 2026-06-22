@@ -126,26 +126,32 @@ local function play_error(pid)
   end
 end
 
-local function message(pid, text)
+local function message(pid, text, opts)
   text = tostring(text or "")
-  if text == "" then return end
+  if text == "" then return false end
+
+  opts = opts or {}
 
   local M = get_menuapi()
   if M and type(M.show_message) == "function" then
     local ok, shown = pcall(M.show_message, pid, text, {
-      box_id = "lpets_message",
-      speed = 80,
-      z = 300,
+      box_id = opts.box_id or "lpets_message",
+      speed = opts.speed or 80,
+      z = opts.z or 300,
+      on_close = opts.on_close,
+      modal = opts.modal,
+      page_advance = opts.page_advance,
+      confirm_during_typing = opts.confirm_during_typing,
     })
 
     if ok and shown then
-      return
+      return true
     end
   end
 
-  if Net and Net.message_player then
-    pcall(Net.message_player, pid, text)
-  end
+  -- LPets intentionally does not fall back to Net.message_player.
+  -- These messages should live inside MenuAPI so they do not fight engine textboxes.
+  return false
 end
 
 local function row(id, text, right, opts)
@@ -321,8 +327,8 @@ local function apply_sp_gauge_spec(spec, info)
   end
 
   spec.spbar_state = nil
-  spec.spbar_xp = safe_number(info.xp, 0)
-  spec.spbar_xp_per_point = math.max(1, safe_number(info.xp_per_skill_point, 175))
+  spec.spbar_xp = safe_number(info.spbar_xp or info.xp, 0)
+  spec.spbar_xp_per_point = math.max(1, safe_number(info.spbar_xp_per_point or info.xp_per_skill_point, 175))
   spec.spbar_available_points = safe_number(info.available_skill_points, 0)
 
   return spec
@@ -1403,7 +1409,24 @@ open_confirm = function(pid, opts, spec)
         end
       end
 
-      if not success then play_error(player_id) end
+      if not success then
+        play_error(player_id)
+
+        if msg and msg ~= "" then
+          message(player_id, msg, {
+            on_close = function(close_pid)
+              if type(spec.after) == "function" then
+                spec.after(close_pid, success, msg)
+              else
+                LPets.open_pets_board(close_pid, opts)
+              end
+            end,
+          })
+
+          return true
+        end
+      end
+
       if msg and msg ~= "" then
         message(player_id, msg)
       end
@@ -1429,7 +1452,12 @@ function LPets.show_sp_gauge_gain(pid, data)
 
   local old_xp = safe_number(data.old_xp, 0)
   local new_xp = safe_number(data.new_xp, old_xp)
-  local per = math.max(1, safe_number(data.xp_per_skill_point, 175))
+
+  -- Lifetime XP is used for the text message.
+  -- SP bar XP is current-segment progress under the curve.
+  local old_bar_xp = safe_number(data.old_spbar_xp or data.spbar_old_xp or data.old_xp, old_xp)
+  local new_bar_xp = safe_number(data.new_spbar_xp or data.spbar_new_xp or data.new_xp, new_xp)
+  local per = math.max(1, safe_number(data.spbar_xp_per_point or data.xp_per_skill_point, 175))
   local available = safe_number(data.available_skill_points, 0)
   local gained = safe_number(data.skill_points_gained, 0)
   local xp_gained = math.max(0, new_xp - old_xp)
@@ -1467,8 +1495,8 @@ function LPets.show_sp_gauge_gain(pid, data)
 
     if type(MenuAPI.animate_sp_gauge) == "function" then
       MenuAPI.animate_sp_gauge(pid, {
-        from_xp = old_xp,
-        to_xp = new_xp,
+        from_xp = old_bar_xp,
+        to_xp = new_bar_xp,
         xp_per_point = per,
         available_points = available,
         skill_points_gained = gained,
@@ -1496,7 +1524,7 @@ function LPets.show_sp_gauge_gain(pid, data)
 
     profile = build_profile(pid, get_armed_info(pid)),
 
-    spbar_xp = old_xp,
+    spbar_xp = old_bar_xp,
     spbar_xp_per_point = per,
     spbar_available_points = start_points,
 

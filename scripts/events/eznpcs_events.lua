@@ -4147,7 +4147,12 @@ eznpcs.add_event({
           pcall(LPets.show_sp_gauge_gain, player_id, {
             old_xp = old_xp,
             new_xp = math.max(0, math.floor(tonumber(new_xp) or old_xp)),
+
+            old_spbar_xp = before and before.spbar_xp,
+            new_spbar_xp = after and after.spbar_xp,
+            spbar_xp_per_point = after and after.spbar_xp_per_point,
             xp_per_skill_point = after and after.xp_per_skill_point or 175,
+
             available_skill_points = after and after.available_skill_points or 0,
             skill_points_gained = skill_gained or 0,
           })

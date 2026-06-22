@@ -346,13 +346,23 @@ end
 
 local PET_BATTLE_XP_DEFAULT    = 5
 local PET_EXPEDITION_XP        = PET_BATTLE_XP_DEFAULT * 15
-local PET_XP_PER_SKILL_POINT   = PET_BATTLE_XP_DEFAULT * 35 -- 175 XP = 35 normal wins
+
+-- Average XP per SP. The curve still totals to this * max skill points.
+local PET_XP_PER_SKILL_POINT   = PET_BATTLE_XP_DEFAULT * 35 -- 175 average XP per SP
+
+-- Curved SP growth:
+-- 1.0 = flat
+-- 1.4 = early SP cheaper, late SP more expensive, same total max XP
+local PET_XP_CURVE_EXPONENT    = 1.4
+
 local PLAYER_PET_XP_NOTIFY_KEY = "pet_xp_notify_v1"
-local PET_BATTLES_PER_FATIGUE  = 15
+local PET_BATTLES_PER_FATIGUE  = 8
 local PET_HAPPY_XP_BONUS       = 1
 local PET_SAD_XP_PENALTY       = -1
+
 local PET_MAX_SKILL_POINTS = 31  -- 12 for HP (40->100) + 19 for Attack (5->100)
-local PET_MAX_XP = PET_MAX_SKILL_POINTS * PET_XP_PER_SKILL_POINT  -- 7750
+local PET_MAX_XP = PET_MAX_SKILL_POINTS * PET_XP_PER_SKILL_POINT  -- 5425
+
 local PET_TRAINING_XP      = 75
 local PET_TRAINING_MEM_KEY = "pet_training_v1"
 
@@ -370,8 +380,55 @@ local function _pet_hp_points_from_stat(kind, stat_hp)
   return math.max(0, math.floor(((tonumber(stat_hp) or base) - base) / 5))
 end
 
+local function _round_nearest(n)
+  return math.floor((tonumber(n) or 0) + 0.5)
+end
+
+local function _pet_cumulative_xp_for_skill_point(points)
+  points = math.floor(tonumber(points) or 0)
+
+  if points <= 0 then
+    return 0
+  end
+
+  if points >= PET_MAX_SKILL_POINTS then
+    return PET_MAX_XP
+  end
+
+  local ratio = points / PET_MAX_SKILL_POINTS
+  return _round_nearest(PET_MAX_XP * (ratio ^ PET_XP_CURVE_EXPONENT))
+end
+
 local function _pet_total_skill_points_from_xp(xp)
-  return math.max(0, math.floor((tonumber(xp) or 0) / PET_XP_PER_SKILL_POINT))
+  local cur = math.max(0, math.floor(tonumber(xp) or 0))
+
+  if cur >= PET_MAX_XP then
+    return PET_MAX_SKILL_POINTS
+  end
+
+  for points = PET_MAX_SKILL_POINTS, 1, -1 do
+    if cur >= _pet_cumulative_xp_for_skill_point(points) then
+      return points
+    end
+  end
+
+  return 0
+end
+
+local function _pet_current_spbar_values(xp)
+  local cur = math.max(0, math.floor(tonumber(xp) or 0))
+
+  if cur >= PET_MAX_XP then
+    return 0, 1
+  end
+
+  local points = _pet_total_skill_points_from_xp(cur)
+  local floor_xp = _pet_cumulative_xp_for_skill_point(points)
+  local next_xp = _pet_cumulative_xp_for_skill_point(points + 1)
+  local needed = math.max(1, next_xp - floor_xp)
+  local progress = math.max(0, cur - floor_xp)
+
+  return progress, needed
 end
 
 local function _pet_free_skill_points_for_pet(p)
@@ -385,13 +442,15 @@ end
 
 local function _pet_xp_to_next_skill_point(xp)
   local cur = math.max(0, math.floor(tonumber(xp) or 0))
-  local rem = cur % PET_XP_PER_SKILL_POINT
 
-  if rem == 0 then
-    return PET_XP_PER_SKILL_POINT
+  if cur >= PET_MAX_XP then
+    return 0
   end
 
-  return PET_XP_PER_SKILL_POINT - rem
+  local points = _pet_total_skill_points_from_xp(cur)
+  local next_xp = _pet_cumulative_xp_for_skill_point(points + 1)
+
+  return math.max(0, next_xp - cur)
 end
 
 local function _pet_xp_notifications_enabled_from_pmem(pmem)
@@ -1038,6 +1097,7 @@ function pets.get_armed_pet_info(owner_or_pid)
   local total_skill_points = _pet_total_skill_points_from_xp(xp)
   local spent_skill_points = attack_points + hp_points
   local available_skill_points = math.max(0, total_skill_points - spent_skill_points)
+  local spbar_xp, spbar_xp_per_point = _pet_current_spbar_values(xp)
 
   return {
     uid = uid,
@@ -1059,7 +1119,10 @@ function pets.get_armed_pet_info(owner_or_pid)
     spent_skill_points = spent_skill_points,
     available_skill_points = available_skill_points,
     xp_to_next_skill_point = _pet_xp_to_next_skill_point(xp),
-    xp_per_skill_point = PET_XP_PER_SKILL_POINT,
+    -- Current curved gauge segment.
+    spbar_xp = spbar_xp,
+    spbar_xp_per_point = spbar_xp_per_point,
+    xp_per_skill_point = spbar_xp_per_point,
     xp_notifications_enabled = _pet_xp_notifications_enabled_from_pmem(pmem),
     pet_chip_id = chip_id,
     pet_chip_amount = chip_amount,
@@ -1164,10 +1227,12 @@ function pets.award_armed_pet_battle_xp(pid, amount, expected_uid)
   if opts.notify == false or opts.silent == true or opts.show_popup == false then
     notify = false
   end
+  local old_spbar_xp, old_spbar_xp_per_point = _pet_current_spbar_values(p.xp)
   local old_total = _pet_total_skill_points_from_xp(p.xp)
 
   p.xp = math.min(PET_MAX_XP, math.max(0, math.floor(tonumber(p.xp or 0) or 0) + effective_amount))
 
+  local new_spbar_xp, new_spbar_xp_per_point = _pet_current_spbar_values(p.xp)
   local new_total = _pet_total_skill_points_from_xp(p.xp)
   local skill_gained = math.max(0, new_total - old_total)
 
@@ -1185,7 +1250,13 @@ function pets.award_armed_pet_battle_xp(pid, amount, expected_uid)
       local ok_popup, popup_result = pcall(LPets.show_sp_gauge_gain, pid, {
         old_xp = current_xp,
         new_xp = p.xp,
-        xp_per_skill_point = PET_XP_PER_SKILL_POINT,
+
+        -- Curved gauge data.
+        old_spbar_xp = old_spbar_xp,
+        new_spbar_xp = new_spbar_xp,
+        spbar_xp_per_point = new_spbar_xp_per_point,
+        xp_per_skill_point = new_spbar_xp_per_point,
+
         available_skill_points = available_after,
         skill_points_gained = skill_gained,
       })
@@ -2873,6 +2944,8 @@ function pets.list_companion_candidates(owner_or_pid)
       local spent_skill_points = attack_points + hp_points
       local available_skill_points = math.max(0, total_skill_points - spent_skill_points)
 
+      local spbar_xp, spbar_xp_per_point = _pet_current_spbar_values(xp)
+
       out[#out + 1] = {
         uid = tostring(p.uid or ""),
         kind = kind,
@@ -2895,6 +2968,11 @@ function pets.list_companion_candidates(owner_or_pid)
         spent_skill_points = spent_skill_points,
         available_skill_points = available_skill_points,
         xp_to_next_skill_point = _pet_xp_to_next_skill_point(xp),
+
+        -- Current curved gauge segment.
+        spbar_xp = spbar_xp,
+        spbar_xp_per_point = spbar_xp_per_point,
+        xp_per_skill_point = spbar_xp_per_point,
       }
     end
   end
@@ -3058,11 +3136,11 @@ if stat_name == "hp" then
     end
 
     if current_rank >= 19 and p.stat_hp < 100 then
-      return false, "Raise HP to 100 before pushing Attack to Rank 20."
+      return false, "Raise HP to 100 before pushing Attack to 100."
     end
 
     if current_rank >= 10 and p.stat_hp < 70 then
-      return false, "Raise HP to 70 before pushing Attack past Rank 10."
+      return false, "Raise HP to 70 before pushing Attack past 50."
     end
 
     p.attack_points = p.attack_points + 1
