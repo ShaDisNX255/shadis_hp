@@ -1253,7 +1253,11 @@ function pets.award_armed_pet_battle_xp(pid, amount, expected_uid)
 
         -- Curved gauge data.
         old_spbar_xp = old_spbar_xp,
+        old_spbar_xp_per_point = old_spbar_xp_per_point,
+
         new_spbar_xp = new_spbar_xp,
+        new_spbar_xp_per_point = new_spbar_xp_per_point,
+
         spbar_xp_per_point = new_spbar_xp_per_point,
         xp_per_skill_point = new_spbar_xp_per_point,
 

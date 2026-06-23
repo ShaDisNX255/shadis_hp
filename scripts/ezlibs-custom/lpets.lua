@@ -1457,7 +1457,22 @@ function LPets.show_sp_gauge_gain(pid, data)
   -- SP bar XP is current-segment progress under the curve.
   local old_bar_xp = safe_number(data.old_spbar_xp or data.spbar_old_xp or data.old_xp, old_xp)
   local new_bar_xp = safe_number(data.new_spbar_xp or data.spbar_new_xp or data.new_xp, new_xp)
-  local per = math.max(1, safe_number(data.spbar_xp_per_point or data.xp_per_skill_point, 175))
+
+  local new_per = math.max(1, safe_number(
+    data.new_spbar_xp_per_point
+    or data.spbar_xp_per_point
+    or data.xp_per_skill_point,
+    175
+  ))
+
+  local old_per = math.max(1, safe_number(
+    data.old_spbar_xp_per_point
+    or data.spbar_old_xp_per_point
+    or data.old_xp_per_skill_point,
+    new_per
+  ))
+
+  local per = new_per
   local available = safe_number(data.available_skill_points, 0)
   local gained = safe_number(data.skill_points_gained, 0)
   local xp_gained = math.max(0, new_xp - old_xp)
@@ -1465,19 +1480,13 @@ function LPets.show_sp_gauge_gain(pid, data)
   local start_points = math.max(0, available - gained)
   local already_started = false
 
-  local function close_popup_later()
-    if type(async) == "function" and Async and Async.sleep then
-      async(function()
-        await(Async.sleep(1.0))
-
-        local MenuAPI = get_menuapi()
-        if MenuAPI and type(MenuAPI.close) == "function" then
-          MenuAPI.close(pid, {
-            keep_frozen = false,
-            reason = "sp_gauge_done",
-          })
-        end
-      end)
+  local function close_popup_now()
+    local MenuAPI = get_menuapi()
+    if MenuAPI and type(MenuAPI.close) == "function" then
+      MenuAPI.close(pid, {
+        keep_frozen = false,
+        reason = "sp_gauge_done",
+      })
     end
   end
 
@@ -1493,24 +1502,98 @@ function LPets.show_sp_gauge_gain(pid, data)
       return
     end
 
-    if type(MenuAPI.animate_sp_gauge) == "function" then
-      MenuAPI.animate_sp_gauge(pid, {
-        from_xp = old_bar_xp,
-        to_xp = new_bar_xp,
-        xp_per_point = per,
-        available_points = available,
-        skill_points_gained = gained,
-        delay = 0.025,
-      })
-    elseif type(MenuAPI.set_sp_gauge) == "function" then
-      MenuAPI.set_sp_gauge(pid, {
-        xp = new_xp,
-        xp_per_point = per,
-        available_points = available,
-      })
+    local delay = 0.025
+    local start_points_for_bar = start_points
+
+    local function set_bar(xp, xp_per_point, points)
+      if type(MenuAPI.set_sp_gauge) == "function" then
+        MenuAPI.set_sp_gauge(pid, {
+          xp = xp,
+          xp_per_point = xp_per_point,
+          available_points = points,
+        })
+      end
     end
 
-    close_popup_later()
+    if not (type(async) == "function" and Async and Async.sleep) then
+      set_bar(new_bar_xp, new_per, available)
+      close_popup_now()
+      return
+    end
+
+    async(function()
+      local function wait(seconds)
+        await(Async.sleep(math.max(0, tonumber(seconds) or 0)))
+      end
+
+      local function phase_wait(from_xp, to_xp, xp_per_point)
+        from_xp = math.max(0, tonumber(from_xp) or 0)
+        to_xp = math.max(from_xp, tonumber(to_xp) or from_xp)
+        xp_per_point = math.max(1, tonumber(xp_per_point) or 1)
+
+        local pct = math.max(0, math.min(1, (to_xp - from_xp) / xp_per_point))
+        local frames = math.max(2, math.ceil(55 * pct))
+
+        return frames * delay + 0.08
+      end
+
+      local function animate_phase(from_xp, to_xp, xp_per_point, points)
+        from_xp = math.max(0, math.floor(tonumber(from_xp) or 0))
+        to_xp = math.max(from_xp, math.floor(tonumber(to_xp) or from_xp))
+        xp_per_point = math.max(1, math.floor(tonumber(xp_per_point) or 1))
+
+        if type(MenuAPI.animate_sp_gauge) == "function" and to_xp > from_xp then
+          MenuAPI.animate_sp_gauge(pid, {
+            from_xp = from_xp,
+            to_xp = to_xp,
+            xp_per_point = xp_per_point,
+            available_points = points,
+            skill_points_gained = 0,
+            delay = delay,
+          })
+
+          wait(phase_wait(from_xp, to_xp, xp_per_point))
+        else
+          set_bar(to_xp, xp_per_point, points)
+          wait(delay * 2)
+        end
+      end
+
+      if gained > 0 then
+        local points_now = start_points_for_bar
+
+        -- Phase 1: fill the old curved segment to full.
+        animate_phase(old_bar_xp, old_per, old_per, points_now)
+
+        -- Phase 2: reset once per gained SP.
+        for i = 1, gained do
+          points_now = math.min(available, points_now + 1)
+
+          set_bar(0, new_per, points_now)
+          wait(delay * 4)
+
+          -- If multiple SP were gained, show full intermediate fills.
+          if i < gained then
+            animate_phase(0, new_per, new_per, points_now)
+            set_bar(0, new_per, points_now)
+            wait(delay * 4)
+          end
+        end
+
+        -- Phase 3: fill the new segment progress after the reset.
+        if new_bar_xp > 0 then
+          animate_phase(0, new_bar_xp, new_per, available)
+        else
+          set_bar(0, new_per, available)
+        end
+      else
+        -- Normal same-segment gain.
+        animate_phase(old_bar_xp, new_bar_xp, new_per, available)
+      end
+
+      wait(0.75)
+      close_popup_now()
+    end)
   end
 
   local ok = M.open(pid, {
@@ -1525,7 +1608,7 @@ function LPets.show_sp_gauge_gain(pid, data)
     profile = build_profile(pid, get_armed_info(pid)),
 
     spbar_xp = old_bar_xp,
-    spbar_xp_per_point = per,
+    spbar_xp_per_point = old_per,
     spbar_available_points = start_points,
 
     bg_tint = { r = 135, g = 205, b = 150, color_mode = 2 },

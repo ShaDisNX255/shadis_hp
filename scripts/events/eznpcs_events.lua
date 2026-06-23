@@ -4149,7 +4149,11 @@ eznpcs.add_event({
             new_xp = math.max(0, math.floor(tonumber(new_xp) or old_xp)),
 
             old_spbar_xp = before and before.spbar_xp,
+            old_spbar_xp_per_point = before and before.spbar_xp_per_point,
+
             new_spbar_xp = after and after.spbar_xp,
+            new_spbar_xp_per_point = after and after.spbar_xp_per_point,
+
             spbar_xp_per_point = after and after.spbar_xp_per_point,
             xp_per_skill_point = after and after.xp_per_skill_point or 175,
 
