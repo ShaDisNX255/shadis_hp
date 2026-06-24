@@ -4088,6 +4088,101 @@ local function _get_lpets_for_petxp()
   return L
 end
 
+eznpcs.add_event({
+  name = "petxp",
+  action = function(npc, player_id, dialogue, relay_object)
+    return async(function()
+      local props = dialogue.custom_properties or {}
+
+      if not (Pets and type(Pets.award_armed_pet_battle_xp) == "function") then
+        return props["Next 2"] or props["Next 1"]
+      end
+
+      local amount = tonumber(_petxp_prop(props, "Amount", "Pet XP", "XP") or 0) or 0
+      amount = math.max(0, math.floor(amount))
+
+      if amount <= 0 then
+        return props["Next 2"] or props["Next 1"]
+      end
+
+      local before = nil
+      if type(Pets.get_armed_pet_info) == "function" then
+        local ok_before, info = pcall(Pets.get_armed_pet_info, player_id)
+        if ok_before and type(info) == "table" then
+          before = info
+        end
+      end
+
+      local old_xp = before and math.max(0, math.floor(tonumber(before.xp) or 0)) or 0
+      local expected_uid = _petxp_prop(props, "Expected PET ID", "Expected Pet ID", "Expected UID", "Pet ID")
+
+      local ok, new_xp, skill_gained, effective_amount, mood = Pets.award_armed_pet_battle_xp(
+        player_id,
+        amount,
+        {
+          expected_uid = expected_uid,
+          notify = false,
+        }
+      )
+
+      effective_amount = math.max(0, math.floor(tonumber(effective_amount) or 0))
+
+      if not ok or effective_amount <= 0 then
+        return props["Next 2"] or props["Next 1"]
+      end
+
+      local after = nil
+      if type(Pets.get_armed_pet_info) == "function" then
+        local ok_after, info = pcall(Pets.get_armed_pet_info, player_id)
+        if ok_after and type(info) == "table" then
+          after = info
+        end
+      end
+
+      local notify = tostring(props["Dont Notify"] or ""):lower() ~= "true"
+
+      if notify then
+        local LPets = _get_lpets_for_petxp()
+
+        if LPets and type(LPets.show_sp_gauge_gain) == "function" then
+          pcall(LPets.show_sp_gauge_gain, player_id, {
+            old_xp = old_xp,
+            new_xp = math.max(0, math.floor(tonumber(new_xp) or old_xp)),
+
+            old_spbar_xp = before and before.spbar_xp,
+            old_spbar_xp_per_point = before and before.spbar_xp_per_point,
+
+            new_spbar_xp = after and after.spbar_xp,
+            new_spbar_xp_per_point = after and after.spbar_xp_per_point,
+
+            spbar_xp_per_point = after and after.spbar_xp_per_point,
+            xp_per_skill_point = after and after.xp_per_skill_point or 175,
+            available_skill_points = after and after.available_skill_points or 0,
+            skill_points_gained = skill_gained or 0,
+          })
+
+          -- Wait until MenuAPI type 7 finishes before allowing the dialogue
+          -- chain to continue or fully close.
+          local MenuAPI = _get_menuapi_for_petxp()
+          if MenuAPI and type(MenuAPI.is_open) == "function" then
+            local guard = 0
+            while MenuAPI.is_open(player_id) and guard < 400 do
+              await(Async.sleep(0.05))
+              guard = guard + 1
+            end
+          else
+            await(Async.sleep(2.0))
+          end
+        elseif Net and Net.message_player then
+          await(Async.message_player(player_id, "Your pet gained " .. tostring(effective_amount) .. " XP."))
+        end
+      end
+
+      return props["Next 1"]
+    end)
+  end
+})
+
 -- ============================================================
 -- Tour private bot session state
 -- ============================================================
