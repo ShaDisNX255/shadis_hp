@@ -955,8 +955,8 @@ open_companion_picker = function(pid, allow_replace, opts)
           local data = selected_row and selected_row.data or nil
           if type(data) == "table" then
             M.set_sp_gauge(player_id, {
-              xp = safe_number(data.xp, 0),
-              xp_per_point = math.max(1, safe_number(data.xp_per_skill_point, 175)),
+              xp = safe_number(data.spbar_xp or data.xp, 0),
+              xp_per_point = math.max(1, safe_number(data.spbar_xp_per_point or data.xp_per_skill_point, 175)),
               available_points = safe_number(data.available_skill_points, 0),
             })
           else
