@@ -644,6 +644,12 @@ local function is_real_player(pid)
   return pid and Net and Net.is_player and Net.is_player(pid)
 end
 
+local function is_tour_active(pid)
+  local sessions = rawget(_G, "__TOUR_SESSIONS__")
+  local s = type(sessions) == "table" and sessions[pid] or nil
+  return type(s) == "table" and s.active == true
+end
+
 local function close_menuapi(pid, reason)
   local MenuAPI = get_menuapi()
   if MenuAPI and type(MenuAPI.close) == "function" then
@@ -1104,6 +1110,27 @@ open_actor_interaction_menuapi = function(player_id, actor_id, opts)
 
   local player_area = Net.get_player_area(player_id)
   local mode = get_area_mode(player_area)
+
+  if is_tour_active(player_id) then
+    return false
+  end
+
+  if is_tour_active(actor_id) then
+    local MenuAPI = get_menuapi()
+
+    if MenuAPI and type(MenuAPI.show_message) == "function" then
+      MenuAPI.show_message(player_id, "They're taking a tour right now.", {
+        box_id = "tour_busy",
+        modal = false,
+        duration = 1.2,
+        speed = 1000,
+      })
+    else
+      Net.message_player(player_id, "They're taking a tour right now.")
+    end
+
+    return false
+  end
 
   bbs_type[player_id] = nil
   bbs_mode[player_id] = mode

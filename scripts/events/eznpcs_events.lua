@@ -4088,101 +4088,611 @@ local function _get_lpets_for_petxp()
   return L
 end
 
-eznpcs.add_event({
-  name = "petxp",
+-- ============================================================
+-- Tour private bot session state
+-- ============================================================
+
+local TOUR_SONG_PATH = "/server/assets/Wcity Tour.ogg"
+local TOUR_RESTORE_SONG_PATH = "/server/assets/ChillCafe.ogg"
+
+local TOUR_SESSIONS = rawget(_G, "__TOUR_SESSIONS__")
+if type(TOUR_SESSIONS) ~= "table" then
+  TOUR_SESSIONS = {}
+  _G.__TOUR_SESSIONS__ = TOUR_SESSIONS
+end
+
+local function tour_all_players()
+  local out = {}
+
+  if not (Net and Net.list_areas and Net.list_players) then
+    return out
+  end
+
+  for _, area_id in ipairs(Net.list_areas() or {}) do
+    for _, pid in ipairs(Net.list_players(area_id) or {}) do
+      out[#out + 1] = pid
+    end
+  end
+
+  return out
+end
+
+local function start_tour_song_for_player(player_id)
+  if not TOUR_SONG_PATH or TOUR_SONG_PATH == "" then
+    return false
+  end
+
+  if Net.provide_asset_for_player then
+    pcall(Net.provide_asset_for_player, player_id, TOUR_SONG_PATH)
+  end
+
+  if Net.set_song_for_player then
+    local ok = pcall(Net.set_song_for_player, player_id, TOUR_SONG_PATH)
+    return ok == true
+  end
+
+  return false
+end
+
+local function cleanup_tour_session(player_id)
+  local s = TOUR_SESSIONS[player_id]
+  if not s then return end
+
+  s.active = false
+
+  if s.tour_song_started then
+    -- Do not use Net.stop_song_for_player here.
+    -- It stops the tour song, but can also leave the area BGM stopped.
+    if Net.set_song_for_player and TOUR_RESTORE_SONG_PATH and TOUR_RESTORE_SONG_PATH ~= "" then
+      pcall(Net.provide_asset_for_player, player_id, TOUR_RESTORE_SONG_PATH)
+      pcall(Net.set_song_for_player, player_id, TOUR_RESTORE_SONG_PATH)
+    end
+  end
+
+  if s.private_bot_id then
+    pcall(Net.remove_bot, s.private_bot_id)
+  end
+
+  if s.original_bot_id then
+    pcall(Net.include_actor_for_player, player_id, s.original_bot_id)
+  end
+
+  pcall(Net.unlock_player_input, player_id)
+
+  TOUR_SESSIONS[player_id] = nil
+end
+
+if not rawget(_G, "__TOUR_SESSION_HOOKED__") then
+  _G.__TOUR_SESSION_HOOKED__ = true
+
+  Net:on("player_disconnect", function(event)
+    if event and event.player_id then
+      cleanup_tour_session(event.player_id)
+    end
+  end)
+
+  -- If someone joins while a tour is active, hide all private tour bots from them.
+  Net:on("player_join", function(event)
+    local joined_id = event and event.player_id
+    if not joined_id then return end
+
+    for owner_id, s in pairs(TOUR_SESSIONS) do
+      if s and s.active and s.private_bot_id and joined_id ~= owner_id then
+        pcall(Net.exclude_actor_for_player, joined_id, s.private_bot_id)
+      end
+    end
+  end)
+end
+
+eznpcs.add_event{
+  name = "tour",
   action = function(npc, player_id, dialogue, relay_object)
     return async(function()
+      local area_id = Net.get_player_area(player_id)
+      local mug = eznpcs.get_dialogue_mugshot(npc, player_id, dialogue)
       local props = dialogue.custom_properties or {}
 
-      if not (Pets and type(Pets.award_armed_pet_battle_xp) == "function") then
-        return props["Next 2"] or props["Next 1"]
+      local original_bot_id = npc and npc.bot_id
+      if not original_bot_id then
+        await(Async.message_player(player_id, "Tour guide is missing a bot id."))
+        return props["Next 1"]
       end
 
-      local amount = tonumber(_petxp_prop(props, "Amount", "Pet XP", "XP") or 0) or 0
-      amount = math.max(0, math.floor(amount))
+      -- Tweak this if the guide lags slightly behind the player.
+      local GUIDE_SPEED_MULT = tonumber(props["Guide Speed Mult"] or props["GuideSpeedMult"] or 2.1) or 2.1
 
-      if amount <= 0 then
-        return props["Next 2"] or props["Next 1"]
-      end
+      -- Safety: if this player somehow already had a tour bot, remove it first.
+      cleanup_tour_session(player_id)
 
-      local before = nil
-      if type(Pets.get_armed_pet_info) == "function" then
-        local ok_before, info = pcall(Pets.get_armed_pet_info, player_id)
-        if ok_before and type(info) == "table" then
-          before = info
+      local session = {
+        active = true,
+        original_bot_id = original_bot_id,
+        private_bot_id = nil,
+        tour_song_started = false,
+      }
+
+      TOUR_SESSIONS[player_id] = session
+      session.tour_song_started = start_tour_song_for_player(player_id)
+
+      local DIR_SUFFIX = {
+        ["Down Right"] = "DR",
+        ["Down Left"]  = "DL",
+        ["Up Right"]   = "UR",
+        ["Up Left"]    = "UL",
+      }
+
+      local VALID_DIR = {
+        ["Down Right"] = true,
+        ["Down Left"]  = true,
+        ["Up Right"]   = true,
+        ["Up Left"]    = true,
+      }
+
+      local function normalize_direction(dir, fallback)
+        dir = tostring(dir or "")
+
+        if VALID_DIR[dir] then
+          return dir
         end
+
+        return fallback or "Down Right"
       end
 
-      local old_xp = before and math.max(0, math.floor(tonumber(before.xp) or 0)) or 0
-
-      local expected_uid = _petxp_prop(props, "Expected PET ID", "Expected Pet ID", "Expected UID", "Pet ID")
-
-      local ok, new_xp, skill_gained, effective_amount, mood = Pets.award_armed_pet_battle_xp(
-        player_id,
-        amount,
-        {
-          expected_uid = expected_uid,
-          notify = false,
-        }
-      )
-
-      if not ok or effective_amount <= 0 then
-        return props["Next 2"] or props["Next 1"]
+      local function anim_state(prefix, dir)
+        return prefix .. "_" .. (DIR_SUFFIX[dir] or "DR")
       end
 
-      local after = nil
-      if type(Pets.get_armed_pet_info) == "function" then
-        local ok_after, info = pcall(Pets.get_armed_pet_info, player_id)
-        if ok_after and type(info) == "table" then
-          after = info
-        end
-      end
+      local function direction_from_delta(dx, dy)
+        dx = tonumber(dx) or 0
+        dy = tonumber(dy) or 0
 
-      local notify = tostring(props["Dont Notify"] or ""):lower() ~= "true"
-
-      if notify then
-        local LPets = _get_lpets_for_petxp()
-
-        if LPets and type(LPets.show_sp_gauge_gain) == "function" then
-          pcall(LPets.show_sp_gauge_gain, player_id, {
-            old_xp = old_xp,
-            new_xp = math.max(0, math.floor(tonumber(new_xp) or old_xp)),
-
-            old_spbar_xp = before and before.spbar_xp,
-            old_spbar_xp_per_point = before and before.spbar_xp_per_point,
-
-            new_spbar_xp = after and after.spbar_xp,
-            new_spbar_xp_per_point = after and after.spbar_xp_per_point,
-
-            spbar_xp_per_point = after and after.spbar_xp_per_point,
-            xp_per_skill_point = after and after.xp_per_skill_point or 175,
-
-            available_skill_points = after and after.available_skill_points or 0,
-            skill_points_gained = skill_gained or 0,
-          })
-
-          -- Wait until MenuAPI type 7 finishes before allowing the dialogue
-          -- chain to continue or fully close.
-          local MenuAPI = _get_menuapi_for_petxp()
-          if MenuAPI and type(MenuAPI.is_open) == "function" then
-            local guard = 0
-
-            while MenuAPI.is_open(player_id) and guard < 400 do
-              await(Async.sleep(0.05))
-              guard = guard + 1
-            end
+        if math.abs(dx) >= math.abs(dy) then
+          if dx >= 0 then
+            return "Down Right"
           else
-            await(Async.sleep(2.0))
+            return "Up Left"
           end
-        elseif Net and Net.message_player then
-          await(Async.message_player(player_id, "Your pet gained " .. tostring(effective_amount) .. " XP."))
+        else
+          if dy >= 0 then
+            return "Down Left"
+          else
+            return "Up Right"
+          end
         end
       end
+
+      local function get_prop(obj, ...)
+        local obj_props = obj and obj.custom_properties or nil
+        if not obj_props then return nil end
+
+        for i = 1, select("#", ...) do
+          local key = select(i, ...)
+          local value = obj_props[key]
+
+          if value ~= nil and tostring(value) ~= "" then
+            return value
+          end
+        end
+
+        return nil
+      end
+
+      local function get_marker(name)
+        local marker = Net.get_object_by_name(area_id, name)
+        if not marker then
+          error("[tour] Missing marker object: " .. tostring(name))
+        end
+        return marker
+      end
+
+      local function player_still_here()
+        if not session.active then return false end
+
+        local ok, cur_area = pcall(Net.get_player_area, player_id)
+        return ok and cur_area == area_id
+      end
+
+      local function guide_says(text)
+        if not player_still_here() then
+          return Async.sleep(0)
+        end
+
+        return Async.message_player(
+          player_id,
+          text,
+          mug.texture_path,
+          mug.animation_path
+        )
+      end
+
+      local function get_player_pos()
+        local pos = Net.get_player_position(player_id) or {}
+        return {
+          x = tonumber(pos.x) or 0,
+          y = tonumber(pos.y) or 0,
+          z = tonumber(pos.z) or 0,
+        }
+      end
+
+      local function create_private_guide()
+        local start_dir = normalize_direction(npc.direction, "Down Right")
+        local start_anim = anim_state("IDLE", start_dir)
+
+        local texture_path = npc.texture_path
+        local animation_path = npc.animation_path
+
+        if texture_path and texture_path ~= "" then
+          pcall(Net.provide_asset, area_id, texture_path)
+        end
+
+        if animation_path and animation_path ~= "" then
+          pcall(Net.provide_asset, area_id, animation_path)
+        end
+
+        local bot_data = {
+          name = tostring(npc.name or "Tour Guide"),
+          area_id = area_id,
+
+          x = tonumber(npc.x) or 0,
+          y = tonumber(npc.y) or 0,
+          z = tonumber(npc.z) or 0,
+
+          direction = start_dir,
+          solid = false,
+          size = tonumber(npc.size) or 0.2,
+          speed = tonumber(npc.speed) or 1,
+
+          texture_path = texture_path,
+          animation_path = animation_path,
+          animation = start_anim,
+
+          -- Avoid a visible warp-in for the private copy.
+          warp_in = false,
+        }
+
+        local private_bot_id = nil
+
+        local ok_create, created = pcall(Net.create_bot, bot_data)
+        if ok_create then
+          private_bot_id = created
+        end
+
+        if not private_bot_id then
+          error("[tour] Failed to create private tour guide bot.")
+        end
+
+        -- Hide the private guide from everyone except this player.
+        for _, pid in ipairs(tour_all_players()) do
+          if pid ~= player_id then
+            pcall(Net.exclude_actor_for_player, pid, private_bot_id)
+          end
+        end
+
+        pcall(Net.include_actor_for_player, player_id, private_bot_id)
+        pcall(Net.set_bot_direction, private_bot_id, start_dir)
+        pcall(Net.animate_bot, private_bot_id, start_anim, true)
+
+        session.private_bot_id = private_bot_id
+
+        return {
+          bot_id = private_bot_id,
+          x = bot_data.x,
+          y = bot_data.y,
+          z = bot_data.z,
+          direction = start_dir,
+        }
+      end
+
+      -- Hide the real NPC only for this player.
+      -- Other players can still talk to the original NPC and get their own private guide.
+      pcall(Net.exclude_actor_for_player, player_id, original_bot_id)
+
+      local guide = create_private_guide()
+
+      local function marker_dirs(guide_marker, player_marker, guide_walk_dir, player_walk_dir)
+        -- For guide:
+        -- Preferred: TourGuide marker has Direction.
+        -- Optional: TourGuide marker has Guide Direction.
+        local guide_dir = normalize_direction(
+          get_prop(guide_marker, "Guide Direction", "Direction", "Face Direction", "Final Direction")
+          or get_prop(player_marker, "Guide Direction"),
+          guide_walk_dir
+        )
+
+        -- For player:
+        -- Preferred: TourPlayer marker has Direction.
+        -- Optional: TourGuide marker has Player Direction.
+        local player_dir = normalize_direction(
+          get_prop(player_marker, "Player Direction", "Direction", "Face Direction", "Final Direction")
+          or get_prop(guide_marker, "Player Direction"),
+          player_walk_dir
+        )
+
+        return guide_dir, player_dir
+      end
+
+      local function move_pair(guide_marker_name, player_marker_name, duration)
+        if not player_still_here() then return end
+
+        duration = tonumber(duration or 1.5) or 1.5
+
+        local guide_marker = get_marker(guide_marker_name)
+        local player_marker = get_marker(player_marker_name)
+
+        -- Allow per-point duration from either marker if desired.
+        local marker_duration =
+          tonumber(get_prop(guide_marker, "Duration", "Move Duration", "Walk Duration") or "")
+          or tonumber(get_prop(player_marker, "Duration", "Move Duration", "Walk Duration") or "")
+
+        if marker_duration and marker_duration > 0 then
+          duration = marker_duration
+        end
+
+        local player_pos = get_player_pos()
+
+        local px1 = tonumber(player_pos.x) or 0
+        local py1 = tonumber(player_pos.y) or 0
+        local px2 = tonumber(player_marker.x) or px1
+        local py2 = tonumber(player_marker.y) or py1
+
+        local gx1 = tonumber(guide.x) or 0
+        local gy1 = tonumber(guide.y) or 0
+        local gz1 = tonumber(guide.z) or 0
+
+        local gx2 = tonumber(guide_marker.x) or gx1
+        local gy2 = tonumber(guide_marker.y) or gy1
+        local gz2 = tonumber(guide_marker.z) or gz1
+
+        local player_walk_dir = direction_from_delta(px2 - px1, py2 - py1)
+        local guide_walk_dir  = direction_from_delta(gx2 - gx1, gy2 - gy1)
+
+        local guide_final_dir, player_final_dir =
+          marker_dirs(guide_marker, player_marker, guide_walk_dir, player_walk_dir)
+
+        local player_walk = anim_state("WALK", player_walk_dir)
+        local player_idle = anim_state("IDLE", player_final_dir)
+
+        local guide_walk = anim_state("WALK", guide_walk_dir)
+        local guide_idle = anim_state("IDLE", guide_final_dir)
+
+        print("[tour] moving guide to", guide_marker_name, gx2, gy2, gz2, "dir", guide_final_dir)
+        print("[tour] moving player to", player_marker_name, px2, py2, player_marker.z, "dir", player_final_dir)
+
+        -- Player uses the cutscene-style movement.
+        Net.animate_player_properties(player_id, {
+          {
+            properties = {
+              {
+                property = "X",
+                value = px1
+              },
+              {
+                property = "Y",
+                value = py1
+              },
+              {
+                property = "Animation",
+                value = player_walk
+              }
+            },
+          },
+          {
+            properties = {
+              {
+                property = "X",
+                ease = "Linear",
+                value = px2
+              },
+              {
+                property = "Y",
+                ease = "Linear",
+                value = py2
+              }
+            },
+            duration = duration
+          },
+          {
+            properties = {
+              {
+                property = "Animation",
+                value = player_idle
+              }
+            },
+            duration = 0.0
+          }
+        })
+
+        -- Guide uses real movement with Net.move_bot, waypoint-style.
+        guide.direction = guide_walk_dir
+        pcall(Net.set_bot_direction, guide.bot_id, guide_walk_dir)
+        pcall(Net.animate_bot, guide.bot_id, guide_walk, true)
+
+        local guide_duration = duration / GUIDE_SPEED_MULT
+        if guide_duration < 0.05 then
+          guide_duration = 0.05
+        end
+
+        local elapsed = 0
+        local step_time = 1 / 30
+
+        while elapsed < guide_duration do
+          if not player_still_here() then return end
+
+          local t = elapsed / guide_duration
+          if t < 0 then t = 0 end
+          if t > 1 then t = 1 end
+
+          local x = gx1 + ((gx2 - gx1) * t)
+          local y = gy1 + ((gy2 - gy1) * t)
+          local z = gz1 + ((gz2 - gz1) * t)
+
+          Net.move_bot(guide.bot_id, x, y, z)
+
+          guide.x = x
+          guide.y = y
+          guide.z = z
+
+          await(Async.sleep(step_time))
+          elapsed = elapsed + step_time
+        end
+
+        if not player_still_here() then return end
+
+        -- Final exact position.
+        Net.move_bot(guide.bot_id, gx2, gy2, gz2)
+
+        guide.x = gx2
+        guide.y = gy2
+        guide.z = gz2
+        guide.direction = guide_final_dir
+
+        pcall(Net.set_bot_direction, guide.bot_id, guide_final_dir)
+        pcall(Net.animate_bot, guide.bot_id, guide_idle, true)
+
+        -- Wait out the rest of the player's movement.
+        local remaining = duration - guide_duration
+        if remaining > 0 then
+          await(Async.sleep(remaining))
+        end
+
+        if not player_still_here() then return end
+
+        -- Final facing after both actors have finished.
+        pcall(Net.animate_player, player_id, player_idle, true)
+        pcall(Net.set_bot_direction, guide.bot_id, guide_final_dir)
+        pcall(Net.animate_bot, guide.bot_id, guide_idle, true)
+      end
+
+      local function walk_path(points)
+        for _, p in ipairs(points or {}) do
+          if not player_still_here() then return end
+
+          move_pair(
+            p[1] or p.guide,
+            p[2] or p.player,
+            p[3] or p.duration or 1.5
+          )
+        end
+      end
+
+      local blocks = {}
+
+      local function add_block(fn)
+        blocks[#blocks + 1] = fn
+      end
+
+      ------------------------------------------------------------
+      -- TOUR SCRIPT STARTS HERE
+      ------------------------------------------------------------
+
+      add_block(function()
+        walk_path({
+          { "TourGuide1", "TourPlayer1", 1.5 },
+        })
+
+        await(guide_says("This is our first stop, TeamsHQ."))
+        await(guide_says("Every month, you can join a team and earn RP through different server events."))
+        await(guide_says("At the end of the month, the team with the most RP wins. If you earn enough RP, you can also win good money and sometimes unique prizes."))
+      end)
+
+      add_block(function()
+        walk_path({
+          { "TourGuide2", "TourPlayer2", 1.8 },
+        })
+
+        await(guide_says("This is the JobBBS board."))
+        await(guide_says("You can accept daily jobs here and complete them for money."))
+        await(guide_says("You can also open your Left Trigger menu anytime to check your current job progress."))
+      end)
+
+      add_block(function()
+        walk_path({
+          { "TourGuide3", "TourPlayer3", 1.8 },
+        })
+
+        await(guide_says("Our third stop is the ice rink and fishing area."))
+        await(guide_says("Ice puzzles are great for new players. Clearing each one for the first time gives an extra money bonus."))
+        await(guide_says("Fishing is another easy way to earn money. It does not need any investment, just start catching fish and get money based on its weight."))
+        await(guide_says("The ice rinks also have their own ice fishing variant with different difficulty."))
+      end)
+
+      add_block(function()
+        walk_path({
+          { "TourGuide4", "TourPlayer4", 1.8 },
+        })
+
+        await(guide_says("This is the General BBS and tournament board area."))
+        await(guide_says("The General BBS is where players can leave messages and chat freely."))
+        await(guide_says("Tournament boards host hourly tournaments that anyone can join."))
+        await(guide_says("Any empty tournament slots are filled by NetNavis, so you can still play even if there are not enough players."))
+        await(guide_says("Winning tournament matches can earn you money and RP."))
+      end)
+
+      add_block(function()
+        walk_path({
+          { "TourGuide5", "TourPlayer5", 1.8 },
+        })
+
+        await(guide_says("This is the train station."))
+        await(guide_says("From here, you can visit servers made by other creators."))
+        await(guide_says("I recommend checking out the Web Browser server, where your Navi can explore the real internet."))
+        await(guide_says("Just remember, progress does not transfer between servers. Some servers may also have their own Navi or chip rules, but that is rare."))
+      end)
+
+      add_block(function()
+        walk_path({
+          { "TourGuide6A", "TourPlayer6A", 0.5 },
+          { "TourGuide6B", "TourPlayer6B", 0.5 },
+          { "TourGuide6C", "TourPlayer6C", 0.5 },
+          { "TourGuide6",  "TourPlayer6",  1.0 },
+        })
+
+        await(guide_says("This is the YGO hangout."))
+        await(guide_says("This server has a YGO card collection and duel mini-game."))
+        await(guide_says("You can open packs, collect cards, build a deck, and duel with the cards you find."))
+        await(guide_says("Card collecting isn't everyone's cup of tea so don't feel like you have to buy cards"))
+      end)
+
+      add_block(function()
+        walk_path({
+          { "TourGuide7A", "TourPlayer7A", 1.4 },
+          { "TourGuide7",  "TourPlayer7",  1.3 },
+        })
+
+        await(guide_says("This path leads to the WCity adventure areas."))
+        await(guide_says("Beyond this point, only approved NetNavis, BattleChips, and NCPs are allowed."))
+        await(guide_says("Once you enter, you build your folder using chips earned through battles."))
+        await(guide_says("Check the pinned BBS posts to see where to download the allowed Navis, chips, and Navi Customizer programs."))
+        await(guide_says("WCity has story quests and gets new quests regularly. You can adventure alone or bring a friend."))
+        await(guide_says("The password for this block is Welcome"))
+      end)
+
+      ------------------------------------------------------------
+      -- TOUR SCRIPT ENDS HERE
+      ------------------------------------------------------------
+
+      Net.lock_player_input(player_id)
+
+      local ok, err = pcall(function()
+        for _, block in ipairs(blocks) do
+          if not player_still_here() then return end
+          block()
+        end
+      end)
+
+      if not ok then
+        print("[tour] error:", err)
+        if player_still_here() then
+          await(Async.message_player(player_id, "The tour broke. Tell an admin."))
+        end
+      end
+
+      cleanup_tour_session(player_id)
 
       return props["Next 1"]
     end)
   end
-})
+}
 
 -- Repaint any already-revealed paths when players appear in an area
 Net:on("player_join", function(ev)

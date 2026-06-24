@@ -111,8 +111,15 @@ local function is_menuapi_open(pid)
   return false
 end
 
+local function is_tour_active(pid)
+  local sessions = rawget(_G, "__TOUR_SESSIONS__")
+  local s = type(sessions) == "table" and sessions[pid] or nil
+  return type(s) == "table" and s.active == true
+end
+
 local function is_modal_open(pid)
-  return is_slots_open(pid)
+  return is_tour_active(pid)
+      or is_slots_open(pid)
       or is_blackjack_open(pid)
       or is_duel_open(pid)
       or is_lobby_open(pid)
