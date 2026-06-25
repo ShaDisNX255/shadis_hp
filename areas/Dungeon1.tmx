@@ -359,7 +359,7 @@
     <property name="Dialogue Type" value="none"/>
     <property name="Encounter Name" value="MainBoss"/>
     <property name="Event Name" value="MainBoss"/>
-    <property name="Pet XP" type="int" value="13"/>
+    <property name="Pet XP" type="int" value="30"/>
    </properties>
    <point/>
   </object>
@@ -695,7 +695,7 @@
   </object>
   <object id="190" name="PetEXP" type="Dialogue" x="914.5" y="87.5">
    <properties>
-    <property name="Amount" type="int" value="10"/>
+    <property name="Amount" type="int" value="15"/>
     <property name="Dialogue Type" value="none"/>
     <property name="Event Name" value="petxp"/>
    </properties>
@@ -703,7 +703,7 @@
   </object>
   <object id="191" name="PetEXP" type="Dialogue" x="150" y="116">
    <properties>
-    <property name="Amount" type="int" value="10"/>
+    <property name="Amount" type="int" value="15"/>
     <property name="Dialogue Type" value="none"/>
     <property name="Event Name" value="petxp"/>
    </properties>
@@ -711,7 +711,7 @@
   </object>
   <object id="192" name="PetEXP" type="Dialogue" x="297.5" y="1348.5">
    <properties>
-    <property name="Amount" type="int" value="10"/>
+    <property name="Amount" type="int" value="15"/>
     <property name="Dialogue Type" value="none"/>
     <property name="Event Name" value="petxp"/>
    </properties>
@@ -719,7 +719,7 @@
   </object>
   <object id="193" name="PetEXP" type="Dialogue" x="25.5" y="996.5">
    <properties>
-    <property name="Amount" type="int" value="13"/>
+    <property name="Amount" type="int" value="20"/>
     <property name="Dialogue Type" value="none"/>
     <property name="Event Name" value="petxp"/>
    </properties>
