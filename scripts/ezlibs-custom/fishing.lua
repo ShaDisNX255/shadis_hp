@@ -755,73 +755,54 @@ local function _spawn_or_update_bite(pid)
     return
   end
 
-  local base_gid   = gid_base(raw_gid)
-  local fh, fv, fr = resolve_preview_flip_flags(area_id, FISHING.TEMPLATE_LAYER, base_gid, false, false, false)
-  local w, h       = _resolve_bite_dims(area_id, base_gid)
+  -- If the bite icon already exists, do not move/update/recreate it.
+  -- Android debug/perf: avoid dirtying the map every waiting tick.
+  if s.bite_oid then
+    return
+  end
 
-  local forward    = (FISHING.BITE and FISHING.BITE.FORWARD) or 0.0
-  local side       = (FISHING.BITE and FISHING.BITE.SIDE)
-  local x, y, z    = get_offset_point(pid, forward, side or 0, 0)
+  local base_gid = gid_base(raw_gid)
+
+  local forward = (FISHING.BITE and FISHING.BITE.FORWARD) or 0.0
+  local side = (FISHING.BITE and FISHING.BITE.SIDE) or 0.0
+  local x, y, z = get_offset_point(pid, forward, side, 0)
   if not x then return end
-  do
-    local sh = (FISHING.BITE and FISHING.BITE.SCREEN_SHIFT) or {}
-    x = x + (sh.x or 0); y = y + (sh.y or 0); z = z + (sh.z or 0)
-  end
 
-  if FISHING.DEBUG then
-    print(("[fishing] bite spawn/update: state=%s gid=%d dims=%.3fx%.3f pos=(%.2f,%.2f,%.2f)")
-      :format(state, base_gid, w, h, x, y, z))
-  end
+  local sh = (FISHING.BITE and FISHING.BITE.SCREEN_SHIFT) or {}
+  x = x + (sh.x or 0)
+  y = y + (sh.y or 0)
+  z = z + (sh.z or 0)
 
-  local data = { type = "tile", gid = base_gid, flipped_horizontally = fh, flipped_vertically = fv, rotated = fr }
-  local spec = {
-    name = "",
+  -- Use expected/forced pixel size directly.
+  -- This skips resolve_object_dims(), prototype lookups, TMX size guessing, etc.
+  local dims =
+    (FISHING.BITE and FISHING.BITE.FORCE_DIMS_PX)
+    or (FISHING.BITE and FISHING.BITE.EXPECTED_DIMS_PX)
+    or { w = 16, h = 16 }
+
+  local w, h = _px_to_tiles(area_id, dims.w or 16, dims.h or 16)
+
+  local ok, oid = pcall(Net.create_object, area_id, {
     class = "FishingBite",
-    visible = true,
     x = x,
     y = y,
     z = z,
     width = w,
     height = h,
-    rotation = 0,
-    data = data,
-    custom_properties = { fishing_bite = "true", fishing_pid = tostring(pid or "") }
-  }
+    data = {
+      type = "tile",
+      gid = base_gid,
+    },
+    custom_properties = {
+      fishing_bite = "true",
+      fishing_pid = tostring(pid or ""),
+    },
+  })
 
-  local must_recreate = false
-  if not s.bite_oid then
-    must_recreate = true
-  else
-    local cur = Net.get_object_by_id(area_id, s.bite_oid)
-    if not cur then
-      must_recreate = true
-    else
-      local cw = tonumber(cur.width) or 0; local ch = tonumber(cur.height) or 0
-      if math.abs(cw - w) > 0.001 or math.abs(ch - h) > 0.001 then must_recreate = true end
-    end
-  end
-
-  if must_recreate then
-    if s.bite_oid then pcall(function() Net.remove_object(area_id, s.bite_oid) end) end
-    local ok, res = pcall(Net.create_object, area_id, spec)
-    if not ok then
-      -- retry on template layer
-      spec.layer = FISHING.TEMPLATE_LAYER
-      ok, res = pcall(Net.create_object, area_id, spec)
-      if not ok then
-        if FISHING.DEBUG then
-          print("[fishing] bite create failed twice (check GID/tileset/layer).")
-        end
-        return
-      end
-    end
-    s.bite_oid = res
-  else
-    local ok1 = pcall(Net.move_object, area_id, s.bite_oid, x, y, z)
-    local ok2 = pcall(Net.set_object_data, area_id, s.bite_oid, data)
-    if FISHING.DEBUG and (not ok1 or not ok2) then
-      print("[fishing] bite update failed (move/data).")
-    end
+  if ok then
+    s.bite_oid = oid
+  elseif FISHING.DEBUG then
+    print("[fishing] bite create failed")
   end
 end
 
