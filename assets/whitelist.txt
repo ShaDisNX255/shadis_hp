@@ -10,6 +10,17 @@ d3bf619937ed1b05977effd8741f39e5 com.OFC.card.EXEPoN-001-Cannon
 29211b7981416b4bf524b77bb14c30aa com.alrysc.card.BusterUp
 a262213f7337daee32e1aa38c158f820 com.keristero.card.Vulcan1
 c81aaf22631981e586578c8d9b308e22 com.keristero.k1rbyat1na.card.EXE6-058-MiniBomb
+16bdaa2872b00a25116bd8bde50d60f0 com.Dawn.k1rbyat1na.card.EXE6-088-CrackShoot
+6021b0c3147bbf6f5a8c03ba87a19385 com.OFC.card.EXE6-004-AirShoot
+92e19baff1be8b640a10f91a2b6eaf08 com.OFC.card.EXE6-156-Recovery10
+a6b920c33f9ac3d7354a1761bbc822a9 com.OFC.card.EXE6-165-AreaSteal
+af691b89c59cfefa83f6f4f925df1dac com.OFC.card.EXE6-196-Attack+10
+30057b23701f419f2bcdc84adc6d7dc0 com.OFC.card.EXEPoN-001-Cannon
+696f27fceb8373d38b658d99d22c4fb8 com.OFC.card.EXEPoN-038-Sword
+466ed0418aaec04d2837873dae8344cc com.OFC.card.EXEPoN-039-WideSword
+e98589a9c8188c8d65b76ea72ef80e9e com.alrysc.card.BusterUp
+1f0e3af298b2bc2785c3f565adbcf136 com.keristero.card.Vulcan1
+f966e76688d0103206c99ed9f0830216 com.keristero.k1rbyat1na.card.EXE6-058-MiniBomb
 
 caeadd1449e436ef19ce148895b5d06e Barr10.Unified.Library.92
 1ea2339e8b3e8ce1d21b0dfb9f4df8ee com.OFC.card.EXE6-009-SpreadGun1
@@ -49,10 +60,49 @@ b45ba712c91161f3b0aba2f8ff41da74 com.rune.k1rbyat1na.card.EXE6-060-EnergyBomb
 269d50448aea1c9e50d7ce9ebe6de185 com.rune.k1rbyat1na.card.EXE6-061-MegaEnergyBomb
 c976d03fa4ce445ae67e7ab6bf2ee4b3 hoov.cards.wavearm1
 aae8420ea8025b457b587388d5d49e44 rune.legacy.bubbler
+a21201c232ee5a12fd6f07a30f6cd8b4 Barr10.Unified.Library.92
+2f023319979cec2153ca090d01d59e2d com.OFC.card.EXE6-009-SpreadGun1
+9e95974a294ca793940afa9ae5a06b06 com.OFC.card.EXE6-010-SpreadGun2
+f714e9947f56a23b68e139dc1b9ed659 com.OFC.card.EXE6-015-GunDelSol1
+f3547fa2bd866e5e151bb1b0d6dbf26c com.OFC.card.EXE6-018-YoYo
+a04cbcb625147b0d5c8abc309111bfd0 com.OFC.card.EXE6-019-HellsBurner1
+2b685be1b162e7a3fef1c9d5d3697438 com.OFC.card.EXE6-029-ThunderBall
+7474bd31b116a03ee6345d9163148aee com.OFC.card.EXE6-055-MachineGun1
+e94072bfa7b33b48373b00a168a4102e com.OFC.card.EXE6-056-MachineGun2
+99819292f2013bccc838c80febcb5221 com.OFC.card.EXE6-091-ReflecMet1
+e19cfd34c43771bc19d8f437f4c743ae com.OFC.card.EXE6-116-KillerSensor1
+ad29287156d8a8c2bcedc06d3bf5c47c com.OFC.card.EXE6-117-KillerSensor2
+80b15c32cd991ab6a66cc6e56804d51c com.OFC.card.EXE6-134-Toppuu
+8afac4c5e5feeb588e3d2c4718c972f1 com.OFC.card.EXE6-138-StoneCube
+0ed88e60de9f7309a402b4bce340c8b3 com.OFC.card.EXE6-157-Recovery30
+52b47392533e1ffb18d69e1a73caedbb com.OFC.card.EXE6-158-Recovery50
+60b90156097cc05e551098f8ea609703 com.OFC.card.EXEPoN-002-HighCannon
+087cde3108ffe686b20214f7c6a4c6a4 com.OFC.card.EXEPoN-014-HeatShot
+08e7320f1d753e71d43ca264efe31bc8 com.OFC.card.EXEPoN-017-RabiRing1
+d725cb38f0d812585acea686c7972c84 com.OFC.card.EXEPoN-018-RabiRing2
+4a39a4fd774bdd715606bc698bba7b37 com.OFC.card.EXEPoN-031-Ratton1
+2d849d353ce2d6928ff1b1db124d7655 com.OFC.card.EXEPoN-032-Ratton2
+83177b0083f487fafec68c4e9563f608 com.OFC.card.EXEPoN-040-LongSword
+f51f3c4ba868019b81de9786b2e7897a com.OFC.card.EXEPoN-051-ShockWave
+4250e41b6d72652752722a474026566a com.OFC.card.EXEPoN-052-SonicWave
+350f3241ca4a6a4ecb9db4972dffcccf com.OFC.card.EXEPoN-066-Boomerang1
+ad8f833c1f15103b093106f33fa34d1f com.OFC.card.EXEPoN-067-Boomerang2
+4b34d8b68e16431bacc6536443a8d75c com.OFC.card.EXEPoN-121-Attack+20
+0cf58529707dbf2363dc93704ed6b49f com.Thor.card.GrassStg
+5e682e1e9922da63c63464c6738841a7 com.k1rbyat1na.card.EXE6-222-Roll
+fe6feef0cf83d117a3406147d6d13b54 com.keristero.card.Vulcan2
+27ccdfa5f6cdcac011e240a2a1194fe9 com.keristero.card.Vulcan3
+1351fa4d867c0680b8caf037361307b7 com.louise.card.dashattck
+443836163de44785882de06720cc9f5c com.louise.card.gutsmanv1
+66b5395dfc9d22dcf4f2a978eff5166b com.rune.k1rbyat1na.card.EXE6-060-EnergyBomb
+a77c80ffc19529cf0fc3e40ebba7e2db com.rune.k1rbyat1na.card.EXE6-061-MegaEnergyBomb
+16c39a80350ef351aa622f739241caab hoov.cards.wavearm1
+a55e1c244496d6c638f32cc4a72932b1 rune.legacy.bubbler
 
 ............................class BlockPackageManager............................
 2e6bd07f5f9614f8fce403bdea369392 com.OFC.block.EXE6-013-UnderShirt
 f7fdaa7ff00df8719942580daf4c7581 com.shadishp.block.duov2.blue
+3623b6c3af96741369785e25f616a3a9 com.OFC.block.EXE6-013-UnderShirt
 
 ...........................class PlayerPackageManager............................
 926948c190aed4bd4b8320d981dec325 com.Loui.player.Elecman.basic
@@ -80,5 +130,16 @@ b0285b99f6524972761ae712f9fffd2f Discord_FenrirWyrmblood_Basic_BlazingFlizard
 4b5a0b2f3fa3192e8cfa1be527b613f2 com.darkware.navi.megamanstfpvp
 36424a4f5c28020af7228d7b3a1c06b2 com.shadis.navi.shockdos.basic
 edff2fd0b66d804b898e90d0138ae394 com.silva&darkware.navi.itsdefinitelynotzarypvp
+cb0c890ab53b7b8fc9e0826a2d88f6bc 61.Mannerek.Unified.Library
+2b5f3fc788a92ab5e1cfc1362b8ce557 com.Loui.player.Elecman.basic
+5d0043f43a9bea70435557975b23ba72 com.beaned.navi.megamanbn6.basic
+c6731ff629db89f5fd14cde3f945a84a com.darkware.navi.djangopvp
+c61933b89e62fb12b256684c85eb5668 com.darkware.navi.sabatapvp
+d4c69c39d35013b6dacb1b6d3c72b1d3 com.discord.imagiknight#0510.player.OreoEXEB
+c6b5dcb9f1c0be6a7178992ee4382597 com.drawcie.navi.darkmegaPVP
+7c5ecae7029bcbcf71080975dfe38633 com.ijuinpersonalterminalcompany.enzan.player.bluesnotproto
+0a65ea32d9e9bb84298ad0741c0112fa com.scilabs.cossack.player.fortepvp.basic
+e47d577ebb4efab216fad49a6351dd3f com.shadis.navi.adventure.Luigi.basic
+5d1a2f7e81a4be1146ad1784f793ca1b com.silva.navi.zarymura.adventure
 
 
