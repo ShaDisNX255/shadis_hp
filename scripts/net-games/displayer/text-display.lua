@@ -77,31 +77,6 @@ local function _normalize_loops(v)
     return nil
 end
 
-
---=====================================================
--- Marquee sprite safety
---=====================================================
--- Moving text is redrawn frequently. To avoid erase+draw races on the
--- same object id, marquee characters rotate through a few object ids.
-local MARQUEE_FRAME_SLOTS = 4
-local MARQUEE_REDRAW_INTERVAL = 0.05 -- 20 FPS. Raise to 0.08 if Android still struggles.
-local MARQUEE_CLEANUP_REPEATS = 8
-local MARQUEE_CLEANUP_DELAY = 0.05
-
-local function marquee_char_id(text_id, i, slot)
-  if slot then
-    return tostring(text_id) .. "_char_" .. tostring(i) .. "_s" .. tostring(slot)
-  end
-
-  -- legacy unsuffixed id
-  return tostring(text_id) .. "_char_" .. tostring(i)
-end
-
-local function safe_erase_sprite(player_id, obj_id)
-  if not obj_id then return end
-  pcall(Net.player_erase_sprite, player_id, obj_id)
-end
-
 --=====================================================
 -- Markup parsing
 -- Supports:
@@ -315,9 +290,9 @@ function TextDisplay:init()
 
     -- Marquee speed definitions (pixels per second)
     self.marquee_speeds = {
-        slow = 30,    -- 30 pixels per second
-        medium = 60,  -- 60 pixels per second
-        quick = 120   -- 120 pixels per second
+        slow = 10,    -- 30 pixels per second
+        medium = 15,  -- 60 pixels per second
+        quick = 20   -- 120 pixels per second
     }
 
     -- Screen dimensions
@@ -401,62 +376,6 @@ function TextDisplay:cleanupPlayerTextDisplays(player_id)
     end
 end
 
-local function erase_marquee_chars(player_id, text_id, text_data)
-  local max_i = tonumber(text_data and text_data.max_char_slots) or 0
-
-  for obj_id, _ in pairs((text_data and text_data._active_char_ids) or {}) do
-    safe_erase_sprite(player_id, obj_id)
-  end
-
-  for i, char_data in ipairs((text_data and text_data.individual_chars) or {}) do
-    if i > max_i then
-      max_i = i
-    end
-
-    if char_data.obj_id then
-      safe_erase_sprite(player_id, char_data.obj_id)
-      char_data.obj_id = nil
-    end
-  end
-
-  for i = 1, max_i do
-    -- old pre-rotating-pool id
-    safe_erase_sprite(player_id, marquee_char_id(text_id, i))
-
-    -- rotating-pool ids
-    for slot = 1, MARQUEE_FRAME_SLOTS do
-      safe_erase_sprite(player_id, marquee_char_id(text_id, i, slot))
-    end
-  end
-
-  if text_data then
-    text_data._active_char_ids = nil
-  end
-end
-
-local function repeat_marquee_cleanup(player_id, text_id, max_slots)
-  max_slots = tonumber(max_slots or 160) or 160
-
-  erase_marquee_chars(player_id, text_id, {
-    max_char_slots = max_slots,
-    individual_chars = {},
-  })
-
-  if not (Async and Async.sleep) then
-    return
-  end
-
-  for n = 1, MARQUEE_CLEANUP_REPEATS do
-    Async.sleep(MARQUEE_CLEANUP_DELAY * n).and_then(function()
-      erase_marquee_chars(player_id, text_id, {
-        max_char_slots = max_slots,
-        individual_chars = {},
-      })
-      safe_erase_sprite(player_id, tostring(text_id) .. "_backdrop")
-    end)
-  end
-end
-
 --=====================================================
 -- Remove text
 --=====================================================
@@ -470,7 +389,12 @@ function TextDisplay:removeText(player_id, text_id)
 
     -- Remove text display
     if text_data.type == "marquee" then
-      erase_marquee_chars(player_id, text_id, text_data)
+        -- Remove individual characters
+        for _, char_data in ipairs(text_data.individual_chars or {}) do
+            if char_data.obj_id then
+                Net.player_erase_sprite(player_id, char_data.obj_id)
+            end
+        end
     else
         if text_data.display_id then
             self.font_system:eraseTextDisplay(player_id, text_data.display_id)
@@ -2457,21 +2381,6 @@ function TextDisplay:drawMarqueeText(player_id, marquee_id, text, y, font_name, 
     local player_data = self.player_texts[player_id]
     if not player_data then return nil end
 
-    -- If this marquee_id is already active, remove it before replacing its state.
-    -- Otherwise old moving character sprites can become orphaned.
-    if player_data.active_texts[marquee_id] then
-      self:removeText(player_id, marquee_id)
-    else
-      -- Belt-and-suspenders cleanup for stale chars from older buggy sessions.
-      -- Keep this immediate only. Repeated cleanup here would erase the new
-      -- marquee because it uses the same ids.
-      erase_marquee_chars(player_id, marquee_id, {
-        max_char_slots = tonumber(backdrop and backdrop.cleanup_slots) or 160,
-        individual_chars = {},
-      })
-      safe_erase_sprite(player_id, tostring(marquee_id) .. "_backdrop")
-    end
-
     local text_width = self.font_system:getTextWidth(text, font_name, scale)
     local speed_value = self.marquee_speeds[speed] or self.marquee_speeds.medium
 
@@ -2534,12 +2443,17 @@ function TextDisplay:drawMarqueeText(player_id, marquee_id, text, y, font_name, 
         on_finish       = backdrop and backdrop.on_finish,
         keep_backdrop   = backdrop and backdrop.keep_backdrop or false,
 
+        -- After visible finite loops finish, run blank erase-only loops.
+        -- Set cleanup_loops = 0 in backdrop opts to disable.
+        cleanup_active = false,
+        cleanup_loops = math.max(0, math.floor(tonumber(backdrop and backdrop.cleanup_loops or 1) or 1)),
+        visible_text = tostring(text or ""),
+
         _backdrop_allocated = false,
-        _redraw_timer = 0,
-        _redraw_interval = tonumber(backdrop and backdrop.redraw_interval) or MARQUEE_REDRAW_INTERVAL,
-        _force_redraw = true,
-        _frame_slot = 0,
-        backdrop_id = nil
+        backdrop_id = nil,
+
+        _last_draw_x = nil,
+        _force_draw = true
     }
 
     self:setupMarqueeCharacters(marquee_data)
@@ -2589,13 +2503,12 @@ function TextDisplay:setMarqueePosition(player_id, marquee_id, x, y)
     end
 
     marquee_data.current_x = marquee_data.bounds_right
-    marquee_data._redraw_timer = 0
-    marquee_data._force_redraw = false
+    marquee_data._last_draw_x = nil
+    marquee_data._force_draw = true
     self:drawMarqueeCharacters(player_id, marquee_id, marquee_data)
 end
 
 function TextDisplay:setupMarqueeCharacters(marquee_data)
-  local previous_max_char_slots = tonumber(marquee_data.max_char_slots or 0) or 0
   local font_name = marquee_data.font
   local char_widths = self.font_system.char_widths[font_name] or self.font_system.char_widths.THICK
   local scale = marquee_data.scale
@@ -2607,6 +2520,10 @@ function TextDisplay:setupMarqueeCharacters(marquee_data)
 
   local total_text_width = 0
   local n = #marquee_data.text
+  marquee_data.max_char_slots = math.max(
+    tonumber(marquee_data.max_char_slots or 0) or 0,
+    n
+  )
 
   for i = 1, n do
     local raw = marquee_data.text:sub(i, i)
@@ -2638,66 +2555,122 @@ function TextDisplay:setupMarqueeCharacters(marquee_data)
   end
 
   marquee_data.total_text_width = total_text_width
-  marquee_data.max_char_slots = math.max(previous_max_char_slots, #marquee_data.individual_chars)
 end
 
+local function erase_marquee_chars(player_id, text_id, text_data)
+    local max_i = tonumber(text_data and text_data.max_char_slots or 0) or 0
 
-function TextDisplay:drawMarqueeCharacters(player_id, marquee_id, marquee_data)
-    local previous_active = marquee_data._active_char_ids or {}
-    local now_active = {}
-
-    marquee_data._frame_slot = ((tonumber(marquee_data._frame_slot or 0) or 0) % MARQUEE_FRAME_SLOTS) + 1
-    local active_slot = marquee_data._frame_slot
-
-    for i, char_data in ipairs(marquee_data.individual_chars) do
-        local char_x = marquee_data.current_x + char_data.relative_x
-
-        local is_visible =
-            (char_x + char_data.width >= marquee_data.bounds_left and char_x <= marquee_data.bounds_right)
-
-        -- Always clean old legacy ids, from before the rotating pool existed.
-        safe_erase_sprite(player_id, marquee_char_id(marquee_id, i))
-
-        -- Erase every non-active slot. Do not erase the active slot in the same
-        -- tick we draw it; that was causing chunkier leftovers on some clients.
-        for slot = 1, MARQUEE_FRAME_SLOTS do
-            if slot ~= active_slot then
-                safe_erase_sprite(player_id, marquee_char_id(marquee_id, i, slot))
-            end
+    for i, char_data in ipairs((text_data and text_data.individual_chars) or {}) do
+        if i > max_i then
+            max_i = i
         end
 
-        if is_visible and char_data.anim_state then
-            local char_obj_id = marquee_char_id(marquee_id, i, active_slot)
-
-            Net.player_draw_sprite(
-                player_id,
-                marquee_data.font,
-                {
-                    id = char_obj_id,
-                    x = math.floor(char_x + 0.5),
-                    y = math.floor(marquee_data.y + 0.5),
-                    z = marquee_data.z_order,
-                    sx = marquee_data.scale,
-                    sy = marquee_data.scale,
-                    anim_state = char_data.anim_state
-                }
-            )
-
-            char_data.obj_id = char_obj_id
-            now_active[char_obj_id] = true
-        else
+        if char_data.obj_id then
+            Net.player_erase_sprite(player_id, char_data.obj_id)
             char_data.obj_id = nil
         end
     end
 
-    -- Clean up anything that was visible last redraw but is no longer visible now.
-    for obj_id, _ in pairs(previous_active) do
-        if not now_active[obj_id] then
-            safe_erase_sprite(player_id, obj_id)
+    -- Deterministic fallback: erase every possible marquee char id.
+    for i = 1, max_i do
+        Net.player_erase_sprite(player_id, tostring(text_id) .. "_char_" .. tostring(i))
+    end
+end
+
+function TextDisplay:startMarqueeCleanupLoop(player_id, text_id, text_data)
+    text_data.cleanup_active = true
+
+    local slots = math.max(
+        1,
+        tonumber(text_data.max_char_slots or 0) or 0,
+        #tostring(text_data.visible_text or text_data.text or "")
+    )
+
+    text_data.text = string.rep(" ", slots)
+    text_data.loops_remaining = math.max(1, math.floor(tonumber(text_data.cleanup_loops or 1) or 1))
+    text_data.current_x = text_data.bounds_right
+
+    if text_data.backdrop_id then
+        Net.player_erase_sprite(player_id, text_data.backdrop_id)
+        text_data.backdrop_id = nil
+    end
+
+    self:setupMarqueeCharacters(text_data)
+    self:drawMarqueeCharacters(player_id, text_id, text_data)
+end
+
+local function finish_marquee(self, player_id, text_id, text_data)
+    erase_marquee_chars(player_id, text_id, text_data)
+
+    if text_data.backdrop_id then
+        Net.player_erase_sprite(player_id, text_data.backdrop_id)
+        text_data.backdrop_id = nil
+    end
+
+    local pd = self.player_texts[player_id]
+    if pd then
+        pd.active_texts[text_id] = nil
+    end
+
+    if type(text_data.on_finish) == "function" then
+        pcall(text_data.on_finish, player_id, text_id)
+    end
+end
+
+function TextDisplay:drawMarqueeCharacters(player_id, marquee_id, marquee_data)
+    local base_x = math.floor((tonumber(marquee_data.current_x) or 0) + 0.5)
+
+    for i, char_data in ipairs(marquee_data.individual_chars) do
+        local char_x = base_x + char_data.relative_x
+
+        if marquee_data.cleanup_active then
+            local char_obj_id = tostring(marquee_id) .. "_char_" .. tostring(i)
+            Net.player_erase_sprite(player_id, char_obj_id)
+            char_data.obj_id = nil
+        else
+            local is_visible = (char_x + char_data.width >= marquee_data.bounds_left and char_x <= marquee_data.bounds_right)
+
+            if is_visible and char_data.anim_state then
+                if char_data.obj_id then
+                    Net.player_draw_sprite(
+                        player_id,
+                        marquee_data.font,
+                        {
+                            id = char_data.obj_id,
+                            x = char_x,
+                            y = marquee_data.y,
+                            z = marquee_data.z_order,
+                            sx = marquee_data.scale,
+                            sy = marquee_data.scale,
+                            anim_state = char_data.anim_state
+                        }
+                    )
+                else
+                    local char_obj_id = marquee_id .. "_char_" .. i
+                    Net.player_draw_sprite(
+                        player_id,
+                        marquee_data.font,
+                        {
+                            id = char_obj_id,
+                            x = char_x,
+                            y = marquee_data.y,
+                            z = marquee_data.z_order,
+                            sx = marquee_data.scale,
+                            sy = marquee_data.scale,
+                            anim_state = char_data.anim_state
+                        }
+                    )
+                    char_data.obj_id = char_obj_id
+                end
+            else
+                if char_data.obj_id then
+                    Net.player_erase_sprite(player_id, char_data.obj_id)
+                    char_data.obj_id = nil
+                end
+            end
         end
     end
 
-    marquee_data._active_char_ids = now_active
 end
 
 -- Draw backdrop (lazy + safe no-op)
@@ -2766,19 +2739,12 @@ function TextDisplay:updateMarquee(player_id, text_id, text_data, delta)
             text_data.current_x = text_data.bounds_right
         else
             if text_data.loops_remaining <= 1 then
-                erase_marquee_chars(player_id, text_id, text_data)
-                repeat_marquee_cleanup(player_id, text_id, text_data.max_char_slots)
-
-                if not text_data.keep_backdrop and text_data.backdrop_id then
-                    safe_erase_sprite(player_id, text_data.backdrop_id)
+                if not text_data.cleanup_active and (tonumber(text_data.cleanup_loops or 0) or 0) > 0 then
+                    self:startMarqueeCleanupLoop(player_id, text_id, text_data)
+                    return
                 end
 
-                local pd = self.player_texts[player_id]
-                if pd then pd.active_texts[text_id] = nil end
-
-                if type(text_data.on_finish) == "function" then
-                    pcall(text_data.on_finish, player_id, text_id)
-                end
+                finish_marquee(self, player_id, text_id, text_data)
                 return
             else
                 text_data.loops_remaining = text_data.loops_remaining - 1
@@ -2787,14 +2753,11 @@ function TextDisplay:updateMarquee(player_id, text_id, text_data, delta)
         end
     end
 
-    text_data._redraw_timer = (tonumber(text_data._redraw_timer or 0) or 0) + (tonumber(delta or 0) or 0)
+    local draw_x = math.floor((tonumber(text_data.current_x) or 0) + 0.5)
 
-    local redraw_interval =
-      tonumber(text_data._redraw_interval or MARQUEE_REDRAW_INTERVAL) or MARQUEE_REDRAW_INTERVAL
-
-    if text_data._force_redraw or text_data._redraw_timer >= redraw_interval then
-        text_data._redraw_timer = 0
-        text_data._force_redraw = false
+    if text_data.cleanup_active or text_data._force_draw or text_data._last_draw_x ~= draw_x then
+        text_data._force_draw = false
+        text_data._last_draw_x = draw_x
         self:drawMarqueeCharacters(player_id, text_id, text_data)
     end
 end
@@ -2807,7 +2770,11 @@ function TextDisplay:updateText(player_id, text_id, new_text)
     if not text_data then return end
 
     if text_data.type == "marquee" then
-      erase_marquee_chars(player_id, text_id, text_data)
+        for _, char_data in ipairs(text_data.individual_chars or {}) do
+            if char_data.obj_id then
+                Net.player_erase_sprite(player_id, char_data.obj_id)
+            end
+        end
     else
         if text_data.display_id then
             self.font_system:eraseTextDisplay(player_id, text_data.display_id)
@@ -2831,8 +2798,6 @@ function TextDisplay:updateText(player_id, text_id, new_text)
             text_data.bounds_width = text_data.bounds_right - text_data.bounds_left
         end
 
-        text_data._redraw_timer = 0
-        text_data._force_redraw = true
         self:setupMarqueeCharacters(text_data)
     end
 
