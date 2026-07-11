@@ -1172,6 +1172,30 @@
    </properties>
    <point/>
   </object>
+  <object id="206" name="???" type="DeferredNPC" x="1392" y="992">
+   <properties>
+    <property name="Asset Name" value="ranked-navi-bn3"/>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Direction" value="Down Right"/>
+    <property name="Next 1" type="object" value="208"/>
+    <property name="Text 1" value="..."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="208" type="Dialogue" x="1360" y="976">
+   <properties>
+    <property name="Dialogue Type" value="none"/>
+    <property name="Event Name" value="raid"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="209" name="RaidBBS" type="RaidBBS" gid="432" x="1360" y="1024" width="48" height="69" visible="0">
+   <properties>
+    <property name="Color" type="color" value="#ffff0000"/>
+    <property name="Name" value="RaidBBS"/>
+    <property name="Raid ID" value="Mettaur1"/>
+   </properties>
+  </object>
   <object id="212" name="Green NormalNavi" type="NPC" x="1521.5" y="882.5">
    <properties>
     <property name="Asset Name" value="normal-navi-bn4_green"/>

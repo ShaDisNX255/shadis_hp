@@ -50,10 +50,7 @@ local LOGIN_ANNOUNCE_MEM_AREA  = nil          -- e.g. "WCity1"; nil = default / 
 
 -- Limit which raids are allowed to show on the login announcer.
 -- Any raid_id not in this table is ignored by the auto-detect logic.
-local LOGIN_ANNOUNCE_ALLOWED_RAIDS = {
-  Mettaur1 = true,
-  Swordy1  = true,
-}
+local LOGIN_ANNOUNCE_ALLOWED_RAIDS = nil
 
 -- Peek current raid store for an area without creating anything
 local function _peek_store(area_id)
@@ -64,6 +61,12 @@ end
 -- true if a raid is “active” (has actually started)
 local function _is_active(s)
   if not s then return false end
+
+  -- Timed raids are considered active as soon as they spawn, even before
+  -- anyone has earned the first point.
+  if type(s.timed) == "table" and s.timed.enabled == true then
+    return s.timed.phase == "available" or s.timed.phase == "active"
+  end
 
   -- If the raid has been flagged as defeated, it's no longer active
   if s.defeated then
@@ -146,10 +149,29 @@ if not _G.__RAIDS_ONLINE_WIRED then
 end
 -- ==== /Online tracking ====
 
-local CFG_DEFAULTS  = (Config and Config.get_defaults and Config.get_defaults("default")) or {}
-local RAID_MEM_AREA = CFG_DEFAULTS.raid_memory_area
+local PRIMARY_RAID_ID = (Config and Config.get_primary_raid_id and Config.get_primary_raid_id()) or nil
+local PRIMARY_RAID_CFG = (PRIMARY_RAID_ID and Config and Config.get_raid and Config.get_raid(PRIMARY_RAID_ID)) or nil
+local RAID_MEM_AREA = PRIMARY_RAID_CFG and (PRIMARY_RAID_CFG.memory_area or PRIMARY_RAID_CFG.area_id) or nil
 
 local Raids = {}
+
+-- =========================
+-- ===== Timed raids ========
+-- =========================
+
+local TIMED_RAIDS = {} -- [physical_area .. "|" .. raid_id] = runtime config
+local TIMED_VISIBILITY_CACHE = {} -- [pid][timed_key] = visibility signature
+
+local TIMED_STATE_VERSION = 3
+local TIMED_SPAWN_CATCHUP_SECONDS = 120
+
+print("[RAIDS TIMED] unified config build 2026-07-11-v5 loaded")
+
+-- Timed raid NPCs use eznpcs DeferredNPC placeholders. Hidden raids have
+-- no bot at all; visible raids explicitly create one.
+local function _timed_key(area_id, raid_id)
+  return tostring(area_id or "") .. "|" .. tostring(raid_id or PRIMARY_RAID_ID)
+end
 
 -- =========================
 -- ===== Utilities =========
@@ -185,6 +207,65 @@ end
 
 local function _safe_secret(pid)
   return helpers.get_safe_player_secret and helpers.get_safe_player_secret(pid) or tostring(pid)
+end
+
+local function _trim(value)
+  local s = tostring(value or "")
+  return (s:gsub("^%s+", ""):gsub("%s+$", ""))
+end
+
+local function _is_true(value)
+  if value == true then return true end
+  if type(value) == "number" then return value ~= 0 end
+  if type(value) == "string" then
+    value = value:lower()
+    return value == "true" or value == "1" or value == "yes" or value == "on"
+  end
+  return false
+end
+
+
+local function _positive_int(value, fallback, minimum, maximum)
+  local n = math.floor(tonumber(value) or tonumber(fallback) or 0)
+  if minimum and n < minimum then n = minimum end
+  if maximum and n > maximum then n = maximum end
+  return n
+end
+
+local function _object_id(value)
+  if value == nil or value == "" then return nil end
+  local n = tonumber(value)
+  return n and tostring(math.floor(n)) or tostring(value)
+end
+
+local function _day_key(now)
+  return os.date("%Y-%m-%d", now or _now())
+end
+
+local function _day_bounds(now)
+  local dt = os.date("*t", now or _now())
+  local start_time = os.time({
+    year = dt.year, month = dt.month, day = dt.day,
+    hour = 0, min = 0, sec = 0,
+  })
+  local next_time = os.time({
+    year = dt.year, month = dt.month, day = dt.day + 1,
+    hour = 0, min = 0, sec = 0,
+  })
+  return start_time, next_time
+end
+
+local function _stable_hash(text_value)
+  local h = 5381
+  local s = tostring(text_value or "")
+  for i = 1, #s do
+    h = (h * 33 + s:byte(i)) % 2147483647
+  end
+  return h
+end
+
+local function _format_minutes(seconds)
+  return math.max(0, math.ceil((tonumber(seconds) or 0) / 60))
 end
 
 local function _result_flags(stats)
@@ -607,79 +688,95 @@ end
 -- ===== State =========
 -- =========================
 
-local function _ensure_state(area_id, raid_id, overrides)
+local function _copy_raid_config(raid_id)
+  if not (Config and Config.get_raid) then
+    error("scripts/raids/config.lua does not expose Config.get_raid")
+  end
+
+  local src_cfg = Config.get_raid(raid_id)
+  if type(src_cfg) ~= "table" then
+    error("Unknown raid id in scripts/raids/config.lua: " .. tostring(raid_id))
+  end
+
+  local cfg = {}
+  for k, v in pairs(src_cfg) do cfg[k] = v end
+  return cfg
+end
+
+local function _apply_state_config(s, raid_id)
+  local cfg = _copy_raid_config(raid_id)
+
+  local old_boss_max = tonumber(s.boss_pool_max or 0) or 0
+  local new_boss_max = tonumber(cfg.boss_pool_max or 10000) or 10000
+
+  s.raid_id               = raid_id
+  s.style                 = cfg.style or "Repeat"
+  s.wave2_points_required = tonumber(cfg.wave2_points_required or 50) or 50
+  s.wave3_points_required = tonumber(cfg.wave3_points_required or 35) or 35
+  s.boss_pool_max         = new_boss_max
+  s.boss_win_damage       = tonumber(cfg.boss_win_damage or 500) or 500
+  s.boss_encounter_hp     = tonumber(cfg.boss_encounter_hp or 0) or 0
+  s.boss_id_match         = tostring(cfg.boss_id_match or "")
+  s.repeat_cooldown_secs  = tonumber(cfg.repeat_cooldown_secs or 1800) or 1800
+  s.money_wave1           = tonumber(cfg.money_wave1 or 0) or 0
+  s.money_wave2           = tonumber(cfg.money_wave2 or 0) or 0
+  s.money_boss            = tonumber(cfg.money_boss or 0) or 0
+
+  -- Config edits apply after restart without healing an already damaged boss.
+  if s.boss_pool_hp == nil or old_boss_max <= 0 then
+    s.boss_pool_hp = new_boss_max
+  elseif tonumber(s.boss_pool_hp) == old_boss_max and old_boss_max ~= new_boss_max then
+    s.boss_pool_hp = new_boss_max
+  end
+end
+
+local function _ensure_state(area_id, raid_id)
   local mem, store = _safe_area_mem(area_id)
   local s = store[raid_id]
-  if not s then
-    local cfg = Config.get_defaults(raid_id)
-    -- Apply overrides (from Dialogue custom properties)
-    if overrides then
-      if overrides.style then
-        cfg.style = overrides.style
-      end
-      if overrides.wave2 then
-        cfg.wave2_points_required = tonumber(overrides.wave2) or cfg.wave2_points_required
-      end
-      if overrides.wave3 then
-        cfg.wave3_points_required = tonumber(overrides.wave3) or cfg.wave3_points_required
-      end
-      if overrides.boss_hp then
-        cfg.boss_pool_max = tonumber(overrides.boss_hp) or cfg.boss_pool_max
-      end
-      if overrides.boss_win_damage then
-        cfg.boss_win_damage = tonumber(overrides.boss_win_damage) or cfg.boss_win_damage
-      end
-      if overrides.repeat_cooldown_secs then
-        cfg.repeat_cooldown_secs = tonumber(overrides.repeat_cooldown_secs) or cfg.repeat_cooldown_secs
-      end
+  local created = false
 
-      -- NEW: per-wave money overrides
-      if overrides.money_wave1 then
-        cfg.money_wave1 = tonumber(overrides.money_wave1) or cfg.money_wave1
-      end
-      if overrides.money_wave2 then
-        cfg.money_wave2 = tonumber(overrides.money_wave2) or cfg.money_wave2
-      end
-      if overrides.money_boss then
-        cfg.money_boss = tonumber(overrides.money_boss) or cfg.money_boss
-      end
-    end
+  if not s then
+    created = true
     s = {
-      raid_id              = raid_id,
-      style                = cfg.style or "Repeat",
-      wave                 = 1,
-      wave1_points         = 0,
-      wave2_points         = 0,
-      wave2_points_required= tonumber(cfg.wave2_points_required or 50),
-      wave3_points_required= tonumber(cfg.wave3_points_required or 35),
-      boss_pool_max        = tonumber(cfg.boss_pool_max or 10000),
-      boss_pool_hp         = tonumber(cfg.boss_pool_max or 10000),
-      boss_win_damage      = tonumber(cfg.boss_win_damage or 500),
-      boss_encounter_hp    = tonumber(cfg.boss_encounter_hp or 0),
-      boss_id_match        = tostring(cfg.boss_id_match or ""),
-      defeated             = false,
-      defeated_at          = nil,
-      contributions        = {},   -- [secret] = { points = n, wins = n, boss_dmg = n }
-      claims               = { wave1 = {}, wave2 = {}, boss = {} }, -- for reward hooks (opt-in)
-      repeat_cooldown_secs  = tonumber(cfg.repeat_cooldown_secs or 1800),
-      cooldown_until        = nil,
-      money_wave1           = tonumber(cfg.money_wave1 or 0),
-      money_wave2           = tonumber(cfg.money_wave2 or 0),
-      money_boss            = tonumber(cfg.money_boss  or 0),
+      raid_id       = raid_id,
+      wave          = 1,
+      wave1_points  = 0,
+      wave2_points  = 0,
+      defeated      = false,
+      defeated_at   = nil,
+      contributions = {},
+      claims         = { wave1 = {}, wave2 = {}, boss = {} },
+      cooldown_until = nil,
     }
-    -- Apply overrides from Dialogue custom properties (if present)
-    if overrides then
-      if overrides.boss_encounter_hp then
-        s.boss_encounter_hp = tonumber(overrides.boss_encounter_hp) or s.boss_encounter_hp
-      end
-      if overrides.boss_id_match and overrides.boss_id_match ~= "" then
-        s.boss_id_match = tostring(overrides.boss_id_match)
-      end
-    end
     store[raid_id] = s
+  end
+
+  s.wave = tonumber(s.wave or 1) or 1
+  s.wave1_points = tonumber(s.wave1_points or 0) or 0
+  s.wave2_points = tonumber(s.wave2_points or 0) or 0
+  s.contributions = s.contributions or {}
+  _ensure_claims(s)
+  _apply_state_config(s, raid_id)
+
+  if created then
     ezmemory.save_area_memory(area_id)
   end
+
   return s, mem, store
+end
+
+local function _reset_progress(s)
+  -- Keep pending claims. They may belong to offline players and must survive
+  -- repeat/timed resets until those players log in and receive payment.
+  _ensure_claims(s)
+  s.wave = 1
+  s.wave1_points = 0
+  s.wave2_points = 0
+  s.boss_pool_hp = tonumber(s.boss_pool_max or 0) or 0
+  s.defeated = false
+  s.defeated_at = nil
+  s.cooldown_until = nil
+  s.contributions = {}
 end
 
 local function _maybe_advance_wave(s)
@@ -690,15 +787,7 @@ end
 
 local function _try_reset_if_repeat(s)
   if s.style == "Repeat" and s.defeated then
-    -- Reset to fresh raid
-    s.wave           = 1
-    s.wave1_points   = 0
-    s.wave2_points   = 0
-    s.boss_pool_hp   = s.boss_pool_max
-    s.defeated       = false
-    s.defeated_at    = nil
-    s.contributions  = {}
-    s.claims         = { wave1 = {}, wave2 = {}, boss = {} }
+    _reset_progress(s)
   end
 end
 
@@ -716,7 +805,7 @@ end
 -- Optional manual hooks:
 function Raids.report_points(pid, amount, raid_id)
   local area_id = Net.get_player_area(pid)
-  local s = _ensure_state(area_id, raid_id or "default")
+  local s = _ensure_state(area_id, raid_id or PRIMARY_RAID_ID)
   amount = math.max(0, math.floor(tonumber(amount) or 0))
   if amount <= 0 then return end
   local secret = _safe_secret(pid)
@@ -731,7 +820,7 @@ end
 
 function Raids.report_boss_damage(pid, damage, raid_id)
   local area_id = Net.get_player_area(pid)
-  local s = _ensure_state(area_id, raid_id or "default")
+  local s = _ensure_state(area_id, raid_id or PRIMARY_RAID_ID)
   damage = math.max(0, math.floor(tonumber(damage) or 0))
   if damage <= 0 then return end
   local secret = _safe_secret(pid)
@@ -739,6 +828,657 @@ function Raids.report_boss_damage(pid, damage, raid_id)
   c.boss_dmg = (c.boss_dmg or 0) + damage
   s.contributions[secret] = c
   s.boss_pool_hp = math.max(0, (s.boss_pool_hp or 0) - damage)
+end
+
+-- =========================
+-- ===== Timed lifecycle ====
+-- =========================
+
+local function _timed_visible(s)
+  local t = s and s.timed
+  if type(t) ~= "table" or t.enabled ~= true then return true end
+  return t.phase == "available" or t.phase == "active" or t.phase == "results"
+end
+
+local function _make_daily_schedule(cfg, now)
+  local count = _positive_int(cfg.spawns_per_day, 4, 1, 24)
+  local day_start, next_day = _day_bounds(now)
+  local day_length = math.max(1, next_day - day_start)
+  local times = {}
+  local key = _day_key(now)
+
+  for i = 1, count do
+    local window_start = day_start + math.floor(day_length * (i - 1) / count)
+    local window_end = day_start + math.floor(day_length * i / count)
+    local span = math.max(1, window_end - window_start)
+    local margin = (span > 1200) and 300 or math.floor(span * 0.10)
+    local usable = math.max(1, span - (margin * 2))
+    local hash = _stable_hash(tostring(i) .. "|" .. tostring(cfg.key) .. "|" .. key)
+    times[i] = window_start + margin + (hash % usable)
+  end
+
+  return times
+end
+
+local function _print_schedule(cfg, times)
+  local out = {}
+  for i, ts in ipairs(times or {}) do
+    out[#out + 1] = os.date("%H:%M", ts)
+  end
+  print(("[RAIDS TIMED] %s daily schedule: %s")
+    :format(tostring(cfg.key), table.concat(out, ", ")))
+end
+
+local function _start_timed_day(cfg, s, now)
+  local t = s.timed or {}
+  s.timed = t
+
+  t.version = TIMED_STATE_VERSION
+  t.enabled = true
+  t.day_key = _day_key(now)
+  t.phase = "hidden"
+  t.used_spawns = {}
+
+  if cfg.test_mode then
+    t.spawn_times = {}
+    t.schedule_count = 0
+    cfg._test_next_spawn_at = now + cfg.test_spawn_interval_seconds
+    print(("[RAIDS TIMED] TEST schedule %s every %d min; next=%s")
+      :format(cfg.key, math.floor(cfg.test_spawn_interval_seconds / 60),
+        os.date("%H:%M:%S", cfg._test_next_spawn_at)))
+  else
+    t.spawn_times = _make_daily_schedule(cfg, now)
+    t.schedule_count = cfg.spawns_per_day
+    _print_schedule(cfg, t.spawn_times)
+  end
+
+  t.defeats_today = 0
+  t.losses_today = 0
+  t.spawned_at = nil
+  t.engaged_at = nil
+  t.deadline = nil
+  t.results_until = nil
+  t.current_spawn_index = nil
+  t.run_id = math.floor(tonumber(t.run_id or 0) or 0) + 1
+
+  _reset_progress(s)
+end
+
+local function _ensure_timed_state(cfg, s, now)
+  now = now or _now()
+  local changed = false
+
+  if type(s.timed) ~= "table" or s.timed.version ~= TIMED_STATE_VERSION then
+    s.timed = {
+      version = TIMED_STATE_VERSION,
+      enabled = true,
+      phase = "hidden",
+      run_id = 0,
+    }
+    _start_timed_day(cfg, s, now)
+    changed = true
+  end
+
+  local t = s.timed
+  t.enabled = true
+  t.phase = t.phase or "hidden"
+  t.run_id = math.floor(tonumber(t.run_id or 0) or 0)
+  t.defeats_today = math.floor(tonumber(t.defeats_today or 0) or 0)
+  t.losses_today = math.floor(tonumber(t.losses_today or 0) or 0)
+  t.used_spawns = t.used_spawns or {}
+
+  -- Store current tunables in memory for inspection/debugging. Runtime logic still
+  -- reads cfg, so config edits take effect without deleting the raid state.
+  t.spawns_per_day = cfg.spawns_per_day
+  t.defeats_per_day = cfg.defeats_per_day
+  t.spawn_seconds = cfg.spawn_seconds
+  t.active_seconds = cfg.active_seconds
+  t.results_seconds = cfg.results_seconds
+  t.test_mode = cfg.test_mode == true
+  t.test_spawn_interval_seconds = cfg.test_spawn_interval_seconds
+
+  local today = _day_key(now)
+  if (not t.day_key) or (t.day_key ~= today and t.phase == "hidden") then
+    _start_timed_day(cfg, s, now)
+    changed = true
+  elseif (not cfg.test_mode) and t.day_key == today and (
+      type(t.spawn_times) ~= "table" or
+      t.schedule_count ~= cfg.spawns_per_day
+    ) and t.phase == "hidden" then
+    t.spawn_times = _make_daily_schedule(cfg, now)
+    t.schedule_count = cfg.spawns_per_day
+    t.used_spawns = {}
+    _print_schedule(cfg, t.spawn_times)
+    changed = true
+  end
+
+  return t, changed
+end
+
+
+local function _resolve_timed_bot_id(cfg)
+  if not (cfg and cfg.npc_object_id and eznpcs and eznpcs.get_bot_id_for_placeholder) then
+    return nil
+  end
+
+  local ok, bot_id = pcall(
+    eznpcs.get_bot_id_for_placeholder,
+    cfg.area_id,
+    cfg.npc_object_id
+  )
+
+  if ok then return bot_id end
+  return nil
+end
+
+
+local function _set_timed_board_global_visibility(cfg, visible, force)
+  if not (cfg and cfg.bbs_object_id and Net.set_object_visibility) then
+    return
+  end
+
+  local signature = visible and "visible" or "hidden"
+  if not force and cfg._board_visibility_signature == signature then
+    return
+  end
+
+  local object_id = tonumber(cfg.bbs_object_id) or cfg.bbs_object_id
+  local ok, err = pcall(
+    Net.set_object_visibility,
+    cfg.area_id,
+    object_id,
+    visible == true
+  )
+
+  if ok then
+    cfg._board_visibility_signature = signature
+  else
+    print(("[RAIDS TIMED] Failed to set BBS visibility key=%s visible=%s err=%s")
+      :format(tostring(cfg.key), tostring(visible), tostring(err)))
+  end
+end
+
+local function _set_timed_bot_global_presence(cfg, visible, force)
+  if not cfg then return nil end
+
+  local object_id = tonumber(cfg.npc_object_id) or cfg.npc_object_id
+
+  if visible then
+    local existing_bot_id = _resolve_timed_bot_id(cfg)
+    local signature = existing_bot_id and ("visible:" .. tostring(existing_bot_id)) or nil
+
+    if not force and signature and cfg._bot_presence_signature == signature then
+      return existing_bot_id
+    end
+
+    if not (eznpcs and eznpcs.spawn_deferred_npc) then
+      print(("[RAIDS TIMED] eznpcs.spawn_deferred_npc unavailable for %s")
+        :format(tostring(cfg.key)))
+      return nil
+    end
+
+    local ok_spawn, bot_id = pcall(
+      eznpcs.spawn_deferred_npc,
+      cfg.area_id,
+      object_id
+    )
+
+    if not ok_spawn or not bot_id then
+      print(("[RAIDS TIMED] Failed to spawn deferred NPC key=%s object=%s err=%s")
+        :format(tostring(cfg.key), tostring(cfg.npc_object_id),
+          tostring(ok_spawn and "no bot returned" or bot_id)))
+      cfg._bot_presence_signature = nil
+      return nil
+    end
+
+    cfg._last_bot_id = bot_id
+    cfg._bot_presence_signature = "visible:" .. tostring(bot_id)
+    print(("[RAIDS TIMED] NPC spawned key=%s bot=%s")
+      :format(tostring(cfg.key), tostring(bot_id)))
+    return bot_id
+  end
+
+  local existing_bot_id = _resolve_timed_bot_id(cfg)
+  if not force and not existing_bot_id and cfg._bot_presence_signature == "hidden" then
+    return nil
+  end
+
+  if not (eznpcs and eznpcs.despawn_deferred_npc) then
+    print(("[RAIDS TIMED] eznpcs.despawn_deferred_npc unavailable for %s")
+      :format(tostring(cfg.key)))
+    return existing_bot_id
+  end
+
+  local ok_remove, removed = pcall(
+    eznpcs.despawn_deferred_npc,
+    cfg.area_id,
+    object_id
+  )
+
+  if not ok_remove then
+    print(("[RAIDS TIMED] Failed to despawn deferred NPC key=%s object=%s err=%s")
+      :format(tostring(cfg.key), tostring(cfg.npc_object_id), tostring(removed)))
+    return existing_bot_id
+  end
+
+  cfg._last_bot_id = nil
+  cfg._bot_presence_signature = "hidden"
+
+  if removed or existing_bot_id then
+    print(("[RAIDS TIMED] NPC despawned key=%s bot=%s")
+      :format(tostring(cfg.key), tostring(existing_bot_id)))
+  end
+
+  return nil
+end
+
+local function _set_timed_visibility_for_player(pid, cfg, s, force)
+  if not (pid and cfg and s) then return end
+
+  local ok_area, player_area = pcall(Net.get_player_area, pid)
+  if not ok_area or tostring(player_area or "") ~= tostring(cfg.area_id or "") then
+    return
+  end
+
+  local visible = _timed_visible(s)
+  local bot_id = _resolve_timed_bot_id(cfg)
+
+  TIMED_VISIBILITY_CACHE[pid] = TIMED_VISIBILITY_CACHE[pid] or {}
+  local signature = table.concat({
+    visible and "1" or "0",
+    tostring(bot_id or ""),
+    tostring(cfg.bbs_object_id or ""),
+  }, ":")
+
+  if not force and TIMED_VISIBILITY_CACHE[pid][cfg.key] == signature then
+    return
+  end
+
+  -- Keep per-player visibility in addition to the global BBS visibility. This
+  -- prevents stale client state when somebody enters the area after a phase change.
+  if cfg.bbs_object_id then
+    local object_id = tonumber(cfg.bbs_object_id) or cfg.bbs_object_id
+    if visible and Net.include_object_for_player then
+      pcall(Net.include_object_for_player, pid, object_id)
+    elseif (not visible) and Net.exclude_object_for_player then
+      pcall(Net.exclude_object_for_player, pid, object_id)
+    end
+  end
+
+  if bot_id then
+    if visible and Net.include_actor_for_player then
+      pcall(Net.include_actor_for_player, pid, bot_id)
+    elseif (not visible) and Net.exclude_actor_for_player then
+      pcall(Net.exclude_actor_for_player, pid, bot_id)
+    end
+  end
+
+  TIMED_VISIBILITY_CACHE[pid][cfg.key] = signature
+end
+
+local function _sync_timed_visibility(cfg, s, force)
+  local visible = _timed_visible(s)
+
+  -- These two operations are global and must happen even when nobody is
+  -- currently standing in the raid area.
+  _set_timed_board_global_visibility(cfg, visible, force)
+  _set_timed_bot_global_presence(cfg, visible, force)
+
+  for _, pid in ipairs(_all_pids(cfg.area_id)) do
+    _set_timed_visibility_for_player(pid, cfg, s, force)
+  end
+end
+
+local function _sync_player_timed_visibility(pid, force)
+  TIMED_VISIBILITY_CACHE[pid] = TIMED_VISIBILITY_CACHE[pid] or {}
+  for _, cfg in pairs(TIMED_RAIDS) do
+    local s = _ensure_state(cfg.mem_area, cfg.raid_id)
+
+    -- Retry global presence here in case the DeferredNPC registry completed
+    -- after raids.lua first registered the config entry.
+    _set_timed_board_global_visibility(cfg, _timed_visible(s), force)
+    _set_timed_bot_global_presence(cfg, _timed_visible(s), force)
+    _set_timed_visibility_for_player(pid, cfg, s, force)
+  end
+end
+
+local function _timed_cfg_for_dialogue(area_id, dialogue_id)
+  area_id = tostring(area_id or "")
+  dialogue_id = _object_id(dialogue_id)
+
+  for _, cfg in pairs(TIMED_RAIDS) do
+    if tostring(cfg.area_id) == area_id
+      and _object_id(cfg.dialogue_id) == dialogue_id
+    then
+      return cfg
+    end
+  end
+
+  return nil
+end
+
+local function _timed_cfg_for_bbs(area_id, bbs_object_id)
+  area_id = tostring(area_id or "")
+  bbs_object_id = _object_id(bbs_object_id)
+
+  for _, cfg in pairs(TIMED_RAIDS) do
+    if tostring(cfg.area_id) == area_id
+      and _object_id(cfg.bbs_object_id) == bbs_object_id
+    then
+      return cfg
+    end
+  end
+
+  return nil
+end
+
+-- Register one complete raid definition from scripts/raids/config.lua.
+-- There is no Tiled discovery fallback: config.lua is the only source of
+-- scheduling, progression, placement IDs, and rewards.
+local function _register_configured_raid(raid_id, source)
+  if type(source) ~= "table" or source.enabled == false then
+    return nil
+  end
+
+  raid_id = tostring(raid_id or "")
+  local area_id = _trim(source.area_id)
+
+  if raid_id == "" then
+    print("[RAIDS TIMED] Ignored config entry with an empty raid id")
+    return nil
+  end
+
+  if area_id == "" then
+    print(("[RAIDS TIMED] Config raid %s is missing area_id")
+      :format(raid_id))
+    return nil
+  end
+
+  local dialogue_id = _object_id(source.dialogue_object_id)
+  local npc_object_id = _object_id(source.npc_object_id)
+  local bbs_object_id = _object_id(source.bbs_object_id)
+
+  if not dialogue_id then
+    print(("[RAIDS TIMED] Config raid %s is missing dialogue_object_id")
+      :format(raid_id))
+    return nil
+  end
+
+  if not npc_object_id then
+    print(("[RAIDS TIMED] Config raid %s is missing npc_object_id")
+      :format(raid_id))
+    return nil
+  end
+
+  if not bbs_object_id then
+    print(("[RAIDS TIMED] Config raid %s is missing bbs_object_id")
+      :format(raid_id))
+    return nil
+  end
+
+  local schedule_mode = tostring(source.schedule_mode or "production"):lower()
+  local test_mode = schedule_mode == "test"
+  local production = type(source.production) == "table" and source.production or {}
+  local test = type(source.test) == "table" and source.test or {}
+  local active_schedule = test_mode and test or production
+
+  local key = _timed_key(area_id, raid_id)
+  local cfg = TIMED_RAIDS[key] or { key = key }
+  local first_registration = TIMED_RAIDS[key] == nil
+
+  cfg.key = key
+  cfg.area_id = area_id
+  cfg.raid_id = raid_id
+  cfg.dialogue_id = dialogue_id
+  cfg.npc_object_id = npc_object_id
+  cfg.bbs_object_id = bbs_object_id
+  cfg.mem_area = tostring(source.memory_area or area_id)
+  cfg.display_name = _trim(source.display_name or raid_id)
+  cfg.done_message = tostring(source.done_message or "The raid has already been cleared.")
+
+  cfg.test_mode = test_mode
+  cfg.spawns_per_day = _positive_int(production.spawns_per_day, 4, 1, 144)
+  cfg.defeats_per_day = _positive_int(production.defeats_per_day, 1, 1, 144)
+  cfg.test_spawn_interval_seconds =
+    _positive_int(test.spawn_interval_minutes, 10, 1, 1440) * 60
+
+  cfg.spawn_seconds =
+    _positive_int(active_schedule.spawn_minutes, test_mode and 1 or 15, 1, 1440) * 60
+  cfg.active_seconds =
+    _positive_int(active_schedule.active_minutes, test_mode and 2 or 45, 1, 1440) * 60
+  cfg.results_seconds =
+    _positive_int(active_schedule.results_minutes, test_mode and 1 or 30, 1, 1440) * 60
+  cfg.spawn_on_boot = _is_true(active_schedule.spawn_on_boot)
+
+  if first_registration and cfg.spawn_on_boot then
+    cfg._boot_spawn_pending = true
+  end
+
+  if first_registration or cfg._registered_test_interval ~= cfg.test_spawn_interval_seconds then
+    cfg._registered_test_interval = cfg.test_spawn_interval_seconds
+    cfg._test_next_spawn_at = _now() + cfg.test_spawn_interval_seconds
+  end
+
+  TIMED_RAIDS[key] = cfg
+  RAID_MEM_AREAS[cfg.mem_area] = true
+
+  local s = _ensure_state(cfg.mem_area, cfg.raid_id)
+  local _, changed = _ensure_timed_state(cfg, s, _now())
+  if changed then ezmemory.save_area_memory(cfg.mem_area) end
+  _sync_timed_visibility(cfg, s, first_registration)
+
+  print(("[RAIDS TIMED] Registered raid=%s area=%s dialogue=%s npc=%s bbs=%s mode=%s")
+    :format(
+      cfg.raid_id,
+      cfg.area_id,
+      tostring(cfg.dialogue_id),
+      tostring(cfg.npc_object_id),
+      tostring(cfg.bbs_object_id),
+      cfg.test_mode and "test" or "production"
+    ))
+
+  return cfg
+end
+
+local function _register_configured_raids()
+  if not (Config and Config.get_raids) then
+    error("scripts/raids/config.lua does not expose Config.get_raids")
+  end
+
+  local configured = Config.get_raids() or {}
+  local found = 0
+
+  for raid_id, source in pairs(configured) do
+    if _register_configured_raid(raid_id, source) then
+      found = found + 1
+    end
+  end
+
+  return found
+end
+
+local function _hide_and_reset_timed_raid(cfg, s, now)
+  local t = s.timed
+  t.phase = "hidden"
+  t.spawned_at = nil
+  t.engaged_at = nil
+  t.deadline = nil
+  t.results_until = nil
+  t.current_spawn_index = nil
+  t.run_id = math.floor(tonumber(t.run_id or 0) or 0) + 1
+  _reset_progress(s)
+  ezmemory.save_area_memory(cfg.mem_area)
+  _sync_timed_visibility(cfg, s, true)
+end
+
+local function _spawn_timed_raid(cfg, s, spawn_index, now)
+  local t = s.timed
+  _reset_progress(s)
+  t.phase = "available"
+  t.spawned_at = now
+  t.engaged_at = nil
+  t.deadline = now + cfg.spawn_seconds
+  t.results_until = nil
+  t.current_spawn_index = spawn_index
+  t.run_id = math.floor(tonumber(t.run_id or 0) or 0) + 1
+
+  ezmemory.save_area_memory(cfg.mem_area)
+  _sync_timed_visibility(cfg, s, true)
+
+  _announce_all(("RAID SPAWNED - %s appeared in %s!")
+    :format(cfg.display_name, cfg.area_id),
+    { loops = 2 })
+  print(("[RAIDS TIMED] Spawned %s slot=%s run=%s")
+    :format(cfg.key, tostring(spawn_index), tostring(t.run_id)))
+end
+
+local function _engage_timed_raid(cfg, s, now)
+  local t = s.timed
+  now = now or _now()
+
+  if t.phase == "active" then
+    return true
+  end
+  if t.phase ~= "available" then
+    return false, "This raid is no longer available."
+  end
+  if t.deadline and now >= t.deadline then
+    return false, "The raid disappeared before it could be engaged."
+  end
+
+  t.phase = "active"
+  t.engaged_at = now
+  t.deadline = now + cfg.active_seconds
+  ezmemory.save_area_memory(cfg.mem_area)
+  _sync_timed_visibility(cfg, s, true)
+
+  _announce_all(("RAID STARTED - %s - %d minutes left!")
+    :format(cfg.display_name, _format_minutes(cfg.active_seconds)),
+    { loops = 2 })
+  print(("[RAIDS TIMED] Engaged %s run=%s")
+    :format(cfg.key, tostring(t.run_id)))
+  return true
+end
+
+local function _enter_timed_results(cfg, s, now)
+  local t = s.timed
+  t.phase = "results"
+  t.defeats_today = math.floor(tonumber(t.defeats_today or 0) or 0) + 1
+  t.deadline = nil
+  t.results_until = now + cfg.results_seconds
+  -- Invalidate all other battles that were started during this run.
+  t.run_id = math.floor(tonumber(t.run_id or 0) or 0) + 1
+  s.cooldown_until = nil
+  _sync_timed_visibility(cfg, s, true)
+end
+
+local function _timed_battle_is_current(cfg, s, battle_run_id)
+  if not (cfg and s and type(s.timed) == "table") then return true end
+  local t = s.timed
+  return t.enabled == true
+     and t.phase == "active"
+     and tonumber(t.run_id) == tonumber(battle_run_id)
+     and (not t.deadline or _now() < t.deadline)
+end
+
+local function _process_timed_raid(cfg, now)
+  local s = _ensure_state(cfg.mem_area, cfg.raid_id)
+  local t, changed = _ensure_timed_state(cfg, s, now)
+
+  if t.phase == "available" and t.deadline and now >= t.deadline then
+    t.losses_today = math.floor(tonumber(t.losses_today or 0) or 0) + 1
+    _announce_all(("RAID LOST - %s disapeared")
+      :format(cfg.display_name), { loops = 2 })
+    print("[RAIDS TIMED] Available timeout " .. cfg.key)
+    _hide_and_reset_timed_raid(cfg, s, now)
+    return
+  elseif t.phase == "active" and t.deadline and now >= t.deadline then
+    t.losses_today = math.floor(tonumber(t.losses_today or 0) or 0) + 1
+    _announce_all(("RAID FAILED - %s was not defeated in time.")
+      :format(cfg.display_name), { loops = 2 })
+    print("[RAIDS TIMED] Active timeout " .. cfg.key)
+    _hide_and_reset_timed_raid(cfg, s, now)
+    return
+  elseif t.phase == "results" and t.results_until and now >= t.results_until then
+    print("[RAIDS TIMED] Results expired " .. cfg.key)
+    _hide_and_reset_timed_raid(cfg, s, now)
+    return
+  end
+
+  -- A raid that crosses midnight is allowed to finish its current lifecycle.
+  -- Once hidden, the next tick creates the new day's schedule.
+  if t.phase == "hidden" and t.day_key ~= _day_key(now) then
+    _start_timed_day(cfg, s, now)
+    changed = true
+  end
+
+  if cfg._boot_spawn_pending then
+    cfg._boot_spawn_pending = false
+    if t.phase == "hidden"
+      and (cfg.test_mode or t.defeats_today < cfg.defeats_per_day)
+    then
+      _spawn_timed_raid(cfg, s, cfg.test_mode and "test-boot" or nil, now)
+      return
+    end
+  end
+
+  -- Test mode uses a fixed interval from server startup instead of the
+  -- randomized daily schedule. It never creates overlapping raids: if the
+  -- previous raid is still available, active, or showing results, that test
+  -- slot is skipped and the next one remains ten minutes later.
+  if cfg.test_mode then
+    local interval = math.max(60, tonumber(cfg.test_spawn_interval_seconds) or 600)
+    local next_spawn_at = tonumber(cfg._test_next_spawn_at)
+
+    if not next_spawn_at then
+      next_spawn_at = now + interval
+      cfg._test_next_spawn_at = next_spawn_at
+    end
+
+    if now >= next_spawn_at then
+      repeat
+        next_spawn_at = next_spawn_at + interval
+      until next_spawn_at > now
+      cfg._test_next_spawn_at = next_spawn_at
+
+      if t.phase == "hidden" then
+        _spawn_timed_raid(cfg, s, "test", now)
+        print(("[RAIDS TIMED] TEST next %s at %s")
+          :format(cfg.key, os.date("%H:%M:%S", cfg._test_next_spawn_at)))
+        return
+      end
+
+      print(("[RAIDS TIMED] TEST slot skipped %s phase=%s next=%s")
+        :format(cfg.key, tostring(t.phase),
+          os.date("%H:%M:%S", cfg._test_next_spawn_at)))
+    end
+
+    if changed then ezmemory.save_area_memory(cfg.mem_area) end
+    _sync_timed_visibility(cfg, s, false)
+    return
+  end
+
+  local candidate = nil
+  for i, ts in ipairs(t.spawn_times or {}) do
+    if not t.used_spawns[i] and now >= tonumber(ts or 0) then
+      t.used_spawns[i] = true
+      changed = true
+      if (now - tonumber(ts or 0)) <= TIMED_SPAWN_CATCHUP_SECONDS then
+        candidate = i
+      end
+    end
+  end
+
+  if candidate
+    and t.phase == "hidden"
+    and t.defeats_today < cfg.defeats_per_day
+  then
+    _spawn_timed_raid(cfg, s, candidate, now)
+    return
+  end
+
+  if changed then ezmemory.save_area_memory(cfg.mem_area) end
+  _sync_timed_visibility(cfg, s, false)
 end
 
 -- =========================
@@ -780,6 +1520,23 @@ local function _open_raid_board(pid, area_id, raid_id)
   local N  = 10
 
   local posts = {}
+
+  if type(s.timed) == "table" and s.timed.enabled == true then
+    local t = s.timed
+    local status = tostring(t.phase or "hidden")
+    local remaining = nil
+    if t.phase == "available" or t.phase == "active" then
+      remaining = t.deadline and _format_minutes(t.deadline - _now()) or nil
+    elseif t.phase == "results" then
+      remaining = t.results_until and _format_minutes(t.results_until - _now()) or nil
+    end
+    if remaining then status = status .. " - " .. tostring(remaining) .. "m" end
+    posts[#posts+1] = {
+      id="__raidbbs:status", read=true,
+      title="Status: " .. status,
+      author=""
+    }
+  end
 
   posts[#posts+1] = {
     id="__raidbbs:h1", read=true,
@@ -836,10 +1593,21 @@ if not _G.__RAIDS_BBS_WIRED then
     local area_id = Net.get_player_area(pid)
     local obj = area_id and Net.get_object_by_id(area_id, ev.object_id)
     if not obj then return end
-    if obj.type == "RaidBBS" then
-      local raid_id = (obj.custom_properties and (obj.custom_properties["Raid ID"] or obj.custom_properties["Raid"]))
-                      or "default"
-      _open_raid_board(pid, area_id, tostring(raid_id))
+    local object_kind = tostring(obj.class or obj.type or "")
+    if object_kind == "RaidBBS" then
+      local cfg = _timed_cfg_for_bbs(area_id, ev.object_id)
+      if not cfg then
+        Net.message_player(pid, "This RaidBBS is not configured in scripts/raids/config.lua.")
+        return
+      end
+
+      local s = _ensure_state(cfg.mem_area, cfg.raid_id)
+      if not _timed_visible(s) then
+        Net.message_player(pid, "The raid is not currently available.")
+        return
+      end
+
+      _open_raid_board(pid, cfg.mem_area, cfg.raid_id)
     end
   end)
   Net:on("post_selection", function(ev)
@@ -878,63 +1646,36 @@ end
 
 local function _raid_action(npc, pid, dialogue, relay_object)
   return async(function()
-    -- Resolve raid settings
-    local raid_id   = (dialogue.custom_properties and (dialogue.custom_properties["Raid ID"] or dialogue.custom_properties["Raid"])) or "default"
-    local style     = (dialogue.custom_properties and dialogue.custom_properties["Raid Style"]) or nil
-    local wave2_pt  = dialogue.custom_properties and tonumber(dialogue.custom_properties["Wave2 Points"])
-    local wave3_pt  = dialogue.custom_properties and tonumber(dialogue.custom_properties["Wave3 Points"])
-    local boss_hp   = dialogue.custom_properties and tonumber(dialogue.custom_properties["Boss Pool HP"])
-    local boss_win  = dialogue.custom_properties and tonumber(dialogue.custom_properties["Boss Win Damage"])
-    local mem_area  = (dialogue.custom_properties and (dialogue.custom_properties["Memory Area"] or dialogue.custom_properties["Raid Area"])) or Net.get_player_area(pid)
-    local done_msg  = (dialogue.custom_properties and dialogue.custom_properties["Raid Done Msg"]) or "The raid has already been cleared."
-    local boss_enc_hp = dialogue.custom_properties and tonumber(dialogue.custom_properties["Boss Encounter HP"])
-    local boss_match  = dialogue.custom_properties and dialogue.custom_properties["Boss ID Match"]
-    local repeat_cd   = dialogue.custom_properties and tonumber(dialogue.custom_properties["Repeat Cooldown Secs"])
-    local money_w1 = dialogue.custom_properties and tonumber(dialogue.custom_properties["Wave1 Money"])
-    local money_w2 = dialogue.custom_properties and tonumber(dialogue.custom_properties["Wave2 Money"])
-    local money_b  = dialogue.custom_properties and tonumber(dialogue.custom_properties["Boss Money"])
+    local physical_area = Net.get_player_area(pid)
+    local timed_cfg = _timed_cfg_for_dialogue(physical_area, dialogue and dialogue.id)
 
-    raid_id = tostring(raid_id or "default")
-    mem_area = tostring(mem_area or Net.get_player_area(pid))
-    local overrides = {
-      style = style,
-      wave2 = wave2_pt,
-      wave3 = wave3_pt,
-      boss_hp = boss_hp,
-      boss_win_damage = boss_win,
-      boss_encounter_hp = boss_enc_hp,
-      boss_id_match = boss_match,
-      repeat_cooldown_secs = repeat_cd,
-      money_wave1          = money_w1,
-      money_wave2          = money_w2,
-      money_boss           = money_b,
-    }
-    local s, mem, store = _ensure_state(mem_area, raid_id, overrides)
-
-    -- Repeat cooldown gate
-    if s.style == "Repeat" and s.defeated then
-      local now = _now()
-      if s.cooldown_until and now < s.cooldown_until then
-        local mins = math.ceil((s.cooldown_until - now)/60)
-        await(Async.message_player(pid, ("Raid inactive. Try again in %d min."):format(mins)))
-        return nil
-      else
-        -- cooldown elapsed -> reset now
-        s.cooldown_until = nil
-        s.defeated = false
-        s.defeated_at = nil
-        s.wave = 1
-        s.wave1_points, s.wave2_points = 0, 0
-        s.boss_pool_hp = s.boss_pool_max
-        s.contributions = {}
-        _ensure_claims(s)
-        ezmemory.save_area_memory(mem_area)
-      end
+    if not timed_cfg then
+      await(Async.message_player(
+        pid,
+        "This raid dialogue is not configured in scripts/raids/config.lua."
+      ))
+      return nil
     end
 
-    if s.style == "Once" and s.defeated then
-      await(Async.message_player(pid, done_msg))
-      return nil
+    local raid_id = timed_cfg.raid_id
+    local mem_area = timed_cfg.mem_area
+    local done_msg = timed_cfg.done_message
+    local s, mem, store = _ensure_state(mem_area, raid_id)
+
+    if timed_cfg then
+      local t = _ensure_timed_state(timed_cfg, s, _now())
+      if t.phase == "hidden" then
+        await(Async.message_player(pid, "The raid is not currently available."))
+        return nil
+      elseif t.phase == "results" then
+        local mins = t.results_until and _format_minutes(t.results_until - _now()) or 0
+        await(Async.message_player(pid,
+          done_msg .. ((mins > 0) and (" Results remain for " .. mins .. " min.") or "")))
+        return nil
+      elseif t.phase ~= "available" and t.phase ~= "active" then
+        await(Async.message_player(pid, "The raid is not currently available."))
+        return nil
+      end
     end
 
     _maybe_advance_wave(s)
@@ -950,6 +1691,12 @@ local function _raid_action(npc, pid, dialogue, relay_object)
         status = ("W2: %d/%d"):format(s.wave2_points or 0, s.wave3_points_required or 0)
       else
         status = ("Boss: %d/%d"):format(s.boss_pool_hp or 0, s.boss_pool_max or 0)
+      end
+      if timed_cfg and s.timed then
+        local deadline = (s.timed.phase == "results") and s.timed.results_until or s.timed.deadline
+        if deadline then
+          status = status .. (" - %dm left"):format(_format_minutes(deadline - _now()))
+        end
       end
       await(Async.message_player(pid, status))
       return nil
@@ -975,8 +1722,25 @@ local function _raid_action(npc, pid, dialogue, relay_object)
       spec.results_callback = _persist_health_and_emotion
     end
 
+    local battle_run_id = nil
+    if timed_cfg then
+      local ok_engage, engage_message = _engage_timed_raid(timed_cfg, s, _now())
+      if not ok_engage then
+        await(Async.message_player(pid, engage_message or "The raid is no longer available."))
+        return nil
+      end
+      battle_run_id = s.timed and s.timed.run_id or nil
+    end
+
     -- Begin encounter and await result
     local stats = await(ezencounters.begin_encounter(pid, spec))
+
+    -- The raid may have expired, been defeated by someone else, or reset while
+    -- this player was still battling. Never apply a stale result to a new run.
+    if timed_cfg and not _timed_battle_is_current(timed_cfg, s, battle_run_id) then
+      await(Async.message_player(pid, "The raid ended before your battle was completed."))
+      return nil
+    end
 
 -- ==== RAID DEBUG (enhanced: full, flattened, typed) ====
 do
@@ -1122,7 +1886,7 @@ end
         ezmemory.save_area_memory(mem_area)
 
         -- Announce brand-new raid started
-        if first_points then
+        if first_points and not timed_cfg then
           local msg = string.format(
             "RAID STARTED - Wave 1 %d/%d",
             tonumber(s.wave1_points or 0) or 0,
@@ -1322,9 +2086,11 @@ end
           end
         end
 
-        s.defeated   = true
-        s.defeated_at= _now()
-        if s.style == "Repeat" then
+        s.defeated    = true
+        s.defeated_at = _now()
+        if timed_cfg then
+          _enter_timed_results(timed_cfg, s, _now())
+        elseif s.style == "Repeat" then
           local cd = tonumber(s.repeat_cooldown_secs or 1800); if not cd or cd <= 0 then cd = 1800 end
           s.cooldown_until = _now() + cd
         end
@@ -1336,9 +2102,19 @@ end
         -- ANNOUNCE top boss damage dealers
         local contribs = _contrib_list(s, "boss_dmg", 6)
         local end_msg = "RAID CLEARED - Top Damage: " .. (contribs ~= "" and contribs or "(no data)")
+        if timed_cfg then
+          end_msg = end_msg .. (" - Results remain for %d min.")
+            :format(_format_minutes(timed_cfg.results_seconds))
+        end
         _announce_all(end_msg, { loops = 2 })
 		print("[RAID DBG] Boss defeated")
-        await(Async.message_player(pid, "Boss defeated!"))
+        if timed_cfg then
+          await(Async.message_player(pid,
+            ("Boss defeated! Results remain for %d min.")
+              :format(_format_minutes(timed_cfg.results_seconds))))
+        else
+          await(Async.message_player(pid, "Boss defeated!"))
+        end
         ezmemory.save_area_memory(mem_area)
       else
         ezmemory.save_area_memory(mem_area)
@@ -1356,6 +2132,71 @@ eznpcs.add_event({
   name   = "raid",
   action = _raid_action,
 })
+
+-- Register every raid from the unified config table before wiring the scheduler.
+local configured_raid_count = _register_configured_raids()
+print("[RAIDS TIMED] configured raids=" .. tostring(configured_raid_count))
+
+if not _G.__RAIDS_TIMED_WIRED then
+  _G.__RAIDS_TIMED_WIRED = true
+
+  local timed_tick_accum = 0
+
+  Net:on("tick", function(ev)
+    local dt = 0
+
+    if type(ev) == "number" then
+      dt = tonumber(ev) or 0
+    elseif type(ev) == "table" then
+      dt = tonumber(ev.delta_time or ev.delta or ev.dt or 0) or 0
+    end
+
+    -- Beta builds normally provide delta_time. This fallback keeps the raid
+    -- scheduler alive if a build emits a tick table without that field.
+    if dt <= 0 then dt = 1 / 60 end
+
+    timed_tick_accum = timed_tick_accum + dt
+    if timed_tick_accum < 1.0 then return end
+    timed_tick_accum = timed_tick_accum - 1.0
+
+    local now = _now()
+    for _, cfg in pairs(TIMED_RAIDS) do
+      local ok, err = pcall(_process_timed_raid, cfg, now)
+      if not ok then
+        print(("[RAIDS TIMED] tick error %s: %s")
+          :format(tostring(cfg.key), tostring(err)))
+      end
+    end
+  end)
+
+  Net:on("player_join", function(ev)
+    local pid = ev.player_id
+    TIMED_VISIBILITY_CACHE[pid] = nil
+    pcall(_sync_player_timed_visibility, pid, true)
+
+    if Async and Async.sleep then
+      Async.sleep(0.25).and_then(function()
+        pcall(_sync_player_timed_visibility, pid, true)
+      end)
+    end
+  end)
+
+  Net:on("player_area_transfer", function(ev)
+    local pid = ev.player_id
+    TIMED_VISIBILITY_CACHE[pid] = nil
+    pcall(_sync_player_timed_visibility, pid, true)
+
+    if Async and Async.sleep then
+      Async.sleep(0.10).and_then(function()
+        pcall(_sync_player_timed_visibility, pid, true)
+      end)
+    end
+  end)
+
+  Net:on("player_disconnect", function(ev)
+    TIMED_VISIBILITY_CACHE[ev.player_id] = nil
+  end)
+end
 
 if not _G.__RAIDS_LOGIN_ANNOUNCE then
   _G.__RAIDS_LOGIN_ANNOUNCE = true
@@ -1443,7 +2284,15 @@ if not _G.__RAIDS_LOGIN_ANNOUNCE then
 
     -- Build the status string from the selected state
     local msg
-    if s.wave == 1 then
+    if type(s.timed) == "table" and s.timed.enabled == true and s.timed.phase == "available" then
+      local raid_cfg = Config.get_raid(rid) or {}
+
+      msg = string.format(
+        "RAID SPAWNED - %s appeared in %s!",
+        raid_cfg.display_name or rid,
+        raid_cfg.area_id or area_for_state
+      )
+    elseif s.wave == 1 then
       msg = string.format("RAID IN PROGRESS - %s - W1 %d/%d",
         rid, s.wave1_points or 0, s.wave2_points_required or 0)
     elseif s.wave == 2 then
@@ -1452,6 +2301,12 @@ if not _G.__RAIDS_LOGIN_ANNOUNCE then
     else
       msg = string.format("RAID IN PROGRESS - %s - Boss %d/%d",
         rid, s.boss_pool_hp or 0, s.boss_pool_max or 0)
+    end
+
+    if type(s.timed) == "table" and s.timed.enabled == true
+      and s.timed.phase == "active" and s.timed.deadline then
+      msg = msg .. string.format(" - %d min left",
+        _format_minutes(s.timed.deadline - _now()))
     end
 
     local ok, err = pcall(_marquee, pid, msg, { loops = 2 })

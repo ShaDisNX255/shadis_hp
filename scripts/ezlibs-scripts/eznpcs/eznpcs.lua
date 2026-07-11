@@ -12,6 +12,10 @@ local placeholder_to_botid = {}          -- area_id -> placeholder_id -> global 
 local exclusive_npcs = {}                -- player_id -> { placeholder_id = bot_id }
 local exclusive_placeholders = {}        -- list of { area_id, object_id } for all exclusive NPC placeholders
 
+-- Deferred NPC placeholders are registered at map load but do not create bots.
+-- Systems such as timed raids explicitly spawn/despawn them through the public API.
+local deferred_placeholders = {}         -- area_id -> placeholder_id -> true
+
 -- NEW: Quest‑exclusive NPC data
 local quest_exclusive_placeholders = {}  -- list of { area_id, object_id, quest_name, required_state }
 local quest_exclusive_npcs = {}           -- player_id -> { placeholder_id = bot_id }
@@ -27,6 +31,7 @@ local events = require('scripts/ezlibs-scripts/eznpcs/dialogue_types')
 local npc_required_properties = {"Direction","Asset Name"}
 if ezcache.add_cacheable_type then
     ezcache.add_cacheable_type("NPC")
+    ezcache.add_cacheable_type("DeferredNPC")
     ezcache.add_cacheable_type("Waypoint")
     ezcache.add_cacheable_type("Dialogue")
     ezcache.add_cacheable_type("Shop Item")
@@ -149,18 +154,13 @@ function create_bot_from_object(area_id, object, player_id)
     local npc_mug_animation_name = object.custom_properties["Mug Animation Name"] or false
     local npc_turns_to_talk = is_property_true(object.custom_properties["Dont Face Player"])
     local direction = object.custom_properties.Direction
-    local speed = tonumber(
-        object.custom_properties["Walk Speed"]
-        or object.custom_properties["Speed"]
-        or 1
-    ) or 1
 
     -- Debug: print asset paths
     printd("Creating NPC with asset:", npc_asset_name, "texture:", npc_asset_folder.."sheet/"..npc_asset_name..".png")
 
     -- Create the bot (initially visible to all)
     local npc = create_npc(area_id, npc_asset_name, x, y, z, direction,
-                       object.name, npc_animation_name, npc_mug_animation_name, npc_turns_to_talk, speed)
+                           object.name, npc_animation_name, npc_mug_animation_name, npc_turns_to_talk)
 
     if not npc then 
         printd("Failed to create bot for", npc_asset_name)
@@ -194,7 +194,7 @@ function create_bot_from_object(area_id, object, player_id)
     return npc
 end
 
-function create_npc(area_id,asset_name,x,y,z,direction,bot_name,animation_name,mug_animation_name,npc_turns_to_talk,speed)
+function create_npc(area_id,asset_name,x,y,z,direction,bot_name,animation_name,mug_animation_name,npc_turns_to_talk)
     local texture_path = npc_asset_folder.."sheet/"..asset_name..".png"
     local animation_path = npc_asset_folder.."sheet/"..asset_name..".animation"
     local mug_animation_path = generic_npc_mug_animation_path
@@ -224,7 +224,7 @@ function create_npc(area_id,asset_name,x,y,z,direction,bot_name,animation_name,m
         direction=direction, 
         solid=true,
         size=0.2,
-        speed=tonumber(speed) or 1,
+        speed=1,
         dont_face_player=npc_turns_to_talk,
         warp_in = true,  -- Explicitly set warp_in to ensure visibility
     }
@@ -337,28 +337,6 @@ local idle_anim_by_direction = {
     ["Right"]      = "IDLE_R",
 }
 
-local idle_anim_by_anim_suffix = {
-    DR = "IDLE_DR",
-    DL = "IDLE_DL",
-    UR = "IDLE_UR",
-    UL = "IDLE_UL",
-    U  = "IDLE_U",
-    D  = "IDLE_D",
-    L  = "IDLE_L",
-    R  = "IDLE_R",
-}
-
-local function idle_state_from_animation_state(anim_state)
-    anim_state = tostring(anim_state or "")
-
-    local suffix = anim_state:match("_([UDLR][LR]?)$")
-    if suffix then
-        return idle_anim_by_anim_suffix[suffix]
-    end
-
-    return nil
-end
-
 local function first_nonempty_prop(props, ...)
     if not props then return nil end
 
@@ -447,13 +425,7 @@ local function play_waypoint_animation(npc, waypoint)
     local token = npc.waypoint_anim_token
 
     if not loop then
-        local idle_state = idle_state_from_animation_state(anim_state)
-
-        if idle_state then
-            pcall(Net.animate_bot, npc.bot_id, idle_state, true)
-        else
-            restore_npc_idle_animation(npc)
-        end
+        restore_npc_idle_animation(npc)
     end
 
     npc.wait_time = math.max(tonumber(npc.wait_time) or 0, anim_wait + restart_delay)
@@ -505,11 +477,6 @@ function move_npc(npc,delta_time)
     local angle = math.atan(waypoint.y - npc.y, waypoint.x - npc.x)
     local vel_x = math.cos(angle) * npc.speed
     local vel_y = math.sin(angle) * npc.speed
-
-    local move_dir = Direction.from_points(npc, waypoint)
-    if move_dir then
-        npc.direction = move_dir
-    end
 
     local new_pos = {x=0,y=0,z=npc.z,size=npc.size}
 
@@ -634,6 +601,19 @@ object_registry.register_handler("NPC", function(area_id, object)
     end
 end)
 
+
+-- DeferredNPC objects are intentionally not created during map preload.
+-- Their Tiled object remains the source of position, asset, dialogue, and direction.
+object_registry.register_handler("DeferredNPC", function(area_id, object)
+    area_id = tostring(area_id)
+    local placeholder_id = tostring(object.id)
+
+    deferred_placeholders[area_id] = deferred_placeholders[area_id] or {}
+    deferred_placeholders[area_id][placeholder_id] = true
+
+    printd("Registered deferred NPC placeholder", placeholder_id, "in", area_id)
+end)
+
 -- Public API
 function eznpcs.load_npcs()
     local areas = Net.list_areas()
@@ -682,6 +662,108 @@ function eznpcs.add_event(event_object)
     end
     events[event_object.name] = event_object
     printd('added event '..event_object.name)
+end
+
+-- Spawn a DeferredNPC placeholder as a normal global eznpcs bot.
+-- Returns the bot ID, or nil when the placeholder cannot be created.
+function eznpcs.spawn_deferred_npc(area_id, object_id)
+    area_id = tostring(area_id)
+    local placeholder_id = tostring(object_id)
+
+    placeholder_to_botid[area_id] = placeholder_to_botid[area_id] or {}
+
+    local existing_bot_id = placeholder_to_botid[area_id][placeholder_id]
+    if existing_bot_id then
+        if not Net.is_bot then
+            return existing_bot_id
+        end
+
+        local ok_exists, exists = pcall(Net.is_bot, existing_bot_id)
+        if not ok_exists or exists then
+            return existing_bot_id
+        end
+
+        -- Clear stale bookkeeping if the engine already removed the bot.
+        placeholder_to_botid[area_id][placeholder_id] = nil
+        npcs[existing_bot_id] = nil
+    end
+
+    local object = ezcache.get_object_by_id_cached(area_id, object_id)
+    if not object then
+        printd("Unable to spawn deferred NPC: object not found", placeholder_id, "in", area_id)
+        return nil
+    end
+
+    local object_kind = tostring(object.class or object.type or "")
+    if object_kind ~= "DeferredNPC" then
+        printd("Unable to spawn deferred NPC: placeholder", placeholder_id,
+               "has type", object_kind, "instead of DeferredNPC")
+        return nil
+    end
+
+    deferred_placeholders[area_id] = deferred_placeholders[area_id] or {}
+    deferred_placeholders[area_id][placeholder_id] = true
+
+    local npc = create_bot_from_object(area_id, object)
+    if not npc then
+        return nil
+    end
+
+    printd("Spawned deferred NPC", placeholder_id, "as bot", npc.bot_id, "in", area_id)
+    return npc.bot_id
+end
+
+-- Remove a spawned DeferredNPC completely.
+-- Because the bot no longer exists, it cannot render, collide, or receive interaction.
+function eznpcs.despawn_deferred_npc(area_id, object_id)
+    area_id = tostring(area_id)
+    local placeholder_id = tostring(object_id)
+
+    local area_mapping = placeholder_to_botid[area_id]
+    local bot_id = area_mapping and area_mapping[placeholder_id] or nil
+    if not bot_id then
+        return false
+    end
+
+    -- Safely end any dialogue that was still attached to this bot.
+    local talking_players = {}
+    for player_id, conversation_bot_id in pairs(current_player_conversation) do
+        if conversation_bot_id == bot_id then
+            talking_players[#talking_players + 1] = player_id
+        end
+    end
+    for _, player_id in ipairs(talking_players) do
+        clear_player_conversation(player_id)
+    end
+
+    if Net.remove_bot then
+        local ok_remove, remove_err = pcall(Net.remove_bot, bot_id)
+        if not ok_remove then
+            printd("Failed to despawn deferred NPC", placeholder_id,
+                   "bot", bot_id, "error", tostring(remove_err))
+            return false
+        end
+    end
+
+    npcs[bot_id] = nil
+    area_mapping[placeholder_id] = nil
+
+    printd("Despawned deferred NPC", placeholder_id, "bot", bot_id, "from", area_id)
+    return true
+end
+
+function eznpcs.is_deferred_npc_spawned(area_id, object_id)
+    area_id = tostring(area_id)
+    local placeholder_id = tostring(object_id)
+    local bot_id = placeholder_to_botid[area_id]
+        and placeholder_to_botid[area_id][placeholder_id]
+        or nil
+
+    if not bot_id then return false end
+    if not Net.is_bot then return true end
+
+    local ok_exists, exists = pcall(Net.is_bot, bot_id)
+    return (not ok_exists) or exists == true
 end
 
 function eznpcs.create_npc_from_object(area_id,object_id)
