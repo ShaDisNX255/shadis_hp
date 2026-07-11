@@ -1539,6 +1539,17 @@ eznpcs.add_event{
         await(_tick())
       end
 
+      -- Deck construction failed before the duel could begin.
+      if result and result.reason == "init_failed" then
+        await(Async.message_player(
+          player_id,
+          "You don't have enough cards to build a valid 10-card deck.",
+          mug.texture_path,
+          mug.animation_path
+        ))
+        return nil
+      end
+
       if result and result.player_won then
         return dialogue.custom_properties["Battle Won"]
       else

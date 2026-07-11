@@ -269,7 +269,13 @@ function PromptInstance:new(player_id, opts)
 
 
   o.ready_for_input = false
-  o.selection = 1
+  local default_selection = tonumber(opts and opts.default_selection) or 1
+
+  if default_selection ~= 1 and default_selection ~= 2 then
+    default_selection = 1
+  end
+
+  o.selection = default_selection
   o.cursor_id = o.box_id .. "_selcursor"
   o.cursor_phase = 0
   o.cursor_base_x = nil
@@ -555,8 +561,23 @@ function PromptInstance:update(dt)
     end
   end
 
-  if Input.pop(player_id, "left") or Input.pop(player_id, "right") then
-    self.selection = (self.selection == 1) and 2 or 1
+  local moved = false
+
+  if Input.pop(player_id, "left") then
+    if self.selection ~= 1 then
+      self.selection = 1
+      moved = true
+    end
+  end
+
+  if Input.pop(player_id, "right") then
+    if self.selection ~= 2 then
+      self.selection = 2
+      moved = true
+    end
+  end
+
+  if moved then
     play_cursor_move_sfx(player_id)
     self:render_cursor()
     return

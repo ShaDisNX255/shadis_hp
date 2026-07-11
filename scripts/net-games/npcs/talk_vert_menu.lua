@@ -269,6 +269,7 @@ local function ensure_tick()
           ui = ui,
           reuse_existing_box = true,
           question = q,
+          default_selection = tonumber(flow.confirm.default_selection) or 2,
 
           on_yes = function()
             play_sfx(player_id, flow.sfx.confirm)

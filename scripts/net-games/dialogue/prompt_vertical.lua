@@ -1915,13 +1915,13 @@ function PromptMenuInstance:update(_dt)
     return
   end
 
-  -- Goal_1_5: when locked, the menu remains visible but MUST NOT accept MENU input.
+    -- Goal_1_5: when locked, the menu remains visible but MUST NOT accept MENU input.
     -- IMPORTANT: do NOT swallow confirm/cancel here, or sub-prompts / dialogue can never be confirmed.
     if self.locked then
+      -- The parent vertical menu owns Up/Down.
+      -- Leave Left/Right available for nested prompts such as Yes/No.
       Input.pop(player_id, "up")
       Input.pop(player_id, "down")
-      Input.pop(player_id, "left")
-      Input.pop(player_id, "right")
       return
     end
 
