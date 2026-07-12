@@ -373,7 +373,7 @@ end
 
 local boss2 = {
     name="boss2",
-    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    path="/server/assets/ezlibs-assets/ezencounters/optimized/events.zip",
     pet_exp=0,
     enemies={
         {name="HeelNavi",rank=1},
@@ -545,7 +545,7 @@ eznpcs.add_event(Win_Reward)
 
 local boss4 = {
     name="boss4",
-    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    path="/server/assets/ezlibs-assets/ezencounters/optimized/events.zip",
     pet_exp=0,
     enemies={
         {name="ProtomanPoN",rank=1},
@@ -619,7 +619,7 @@ end
 
 local boss5 = {
     name="boss5",
-    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    path="/server/assets/ezlibs-assets/ezencounters/optimized/events.zip",
     pet_exp=0,
     results_callback = reward_roll1_on_win,
     enemies={
@@ -678,7 +678,7 @@ eznpcs.add_event(event5)
 
 local boss6 = {
     name="boss6",
-    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    path="/server/assets/ezlibs-assets/ezencounters/optimized/events.zip",
     pet_exp=0,
     enemies={
         {name="GutsManPoN",rank=2},
@@ -758,7 +758,7 @@ end
 
 local boss7 = {
     name="boss7",
-    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    path="/server/assets/ezlibs-assets/ezencounters/optimized/events.zip",
     pet_exp=0,
     results_callback = reward_gutsman_chip_on_win,
     enemies={
@@ -817,7 +817,7 @@ eznpcs.add_event(event7)
 
 local boss8 = {
     name="boss8",
-    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    path="/server/assets/ezlibs-assets/ezencounters/optimized/events.zip",
     pet_exp=0,
     enemies={
         {name="GregarBeast",rank=1},
@@ -2903,7 +2903,7 @@ eznpcs.add_event{
 
 local echo_boss = {
     name="echo_boss",
-    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    path="/server/assets/ezlibs-assets/ezencounters/optimized/events.zip",
     enemies={
         {name="FireManPoN",rank=3},
     },
@@ -3984,7 +3984,7 @@ eznpcs.add_event{
 
 local pet_quest2 = {
     name="pet_quest2",
-    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    path="/server/assets/ezlibs-assets/ezencounters/optimized/events.zip",
     pet_exp=0,
     enemies={
         {name="Fishy",rank=1},
@@ -4101,6 +4101,7 @@ end
 
 eznpcs.add_event({
   name = "petxp",
+
   action = function(npc, player_id, dialogue, relay_object)
     return async(function()
       local props = dialogue.custom_properties or {}
@@ -4109,7 +4110,10 @@ eznpcs.add_event({
         return props["Next 2"] or props["Next 1"]
       end
 
-      local amount = tonumber(_petxp_prop(props, "Amount", "Pet XP", "XP") or 0) or 0
+      local amount = tonumber(
+        _petxp_prop(props, "Amount", "Pet XP", "XP") or 0
+      ) or 0
+
       amount = math.max(0, math.floor(amount))
 
       if amount <= 0 then
@@ -4117,40 +4121,65 @@ eznpcs.add_event({
       end
 
       local before = nil
+
       if type(Pets.get_armed_pet_info) == "function" then
-        local ok_before, info = pcall(Pets.get_armed_pet_info, player_id)
+        local ok_before, info = pcall(
+          Pets.get_armed_pet_info,
+          player_id
+        )
+
         if ok_before and type(info) == "table" then
           before = info
         end
       end
 
-      local old_xp = before and math.max(0, math.floor(tonumber(before.xp) or 0)) or 0
-      local expected_uid = _petxp_prop(props, "Expected PET ID", "Expected Pet ID", "Expected UID", "Pet ID")
+      local old_xp =
+        before
+        and math.max(0, math.floor(tonumber(before.xp) or 0))
+        or 0
 
-      local ok, new_xp, skill_gained, effective_amount, mood = Pets.award_armed_pet_battle_xp(
-        player_id,
-        amount,
-        {
-          expected_uid = expected_uid,
-          notify = false,
-        }
+      local expected_uid = _petxp_prop(
+        props,
+        "Expected PET ID",
+        "Expected Pet ID",
+        "Expected UID",
+        "Pet ID"
       )
 
-      effective_amount = math.max(0, math.floor(tonumber(effective_amount) or 0))
+      local ok, new_xp, skill_gained, effective_amount, mood =
+        Pets.award_armed_pet_battle_xp(
+          player_id,
+          amount,
+          {
+            expected_uid = expected_uid,
+            notify = false,
+          }
+        )
+
+      effective_amount = math.max(
+        0,
+        math.floor(tonumber(effective_amount) or 0)
+      )
 
       if not ok or effective_amount <= 0 then
         return props["Next 2"] or props["Next 1"]
       end
 
       local after = nil
+
       if type(Pets.get_armed_pet_info) == "function" then
-        local ok_after, info = pcall(Pets.get_armed_pet_info, player_id)
+        local ok_after, info = pcall(
+          Pets.get_armed_pet_info,
+          player_id
+        )
+
         if ok_after and type(info) == "table" then
           after = info
         end
       end
 
-      local notify = tostring(props["Dont Notify"] or ""):lower() ~= "true"
+      local notify =
+        tostring(props["Dont Notify"] or ""):lower() ~= "true"
 
       if notify then
         local LPets = _get_lpets_for_petxp()
@@ -4158,25 +4187,41 @@ eznpcs.add_event({
         if LPets and type(LPets.show_sp_gauge_gain) == "function" then
           pcall(LPets.show_sp_gauge_gain, player_id, {
             old_xp = old_xp,
-            new_xp = math.max(0, math.floor(tonumber(new_xp) or old_xp)),
+            new_xp = math.max(
+              0,
+              math.floor(tonumber(new_xp) or old_xp)
+            ),
 
-            old_spbar_xp = before and before.spbar_xp,
-            old_spbar_xp_per_point = before and before.spbar_xp_per_point,
+            old_spbar_xp =
+              before and before.spbar_xp,
 
-            new_spbar_xp = after and after.spbar_xp,
-            new_spbar_xp_per_point = after and after.spbar_xp_per_point,
+            old_spbar_xp_per_point =
+              before and before.spbar_xp_per_point,
 
-            spbar_xp_per_point = after and after.spbar_xp_per_point,
-            xp_per_skill_point = after and after.xp_per_skill_point or 175,
-            available_skill_points = after and after.available_skill_points or 0,
-            skill_points_gained = skill_gained or 0,
+            new_spbar_xp =
+              after and after.spbar_xp,
+
+            new_spbar_xp_per_point =
+              after and after.spbar_xp_per_point,
+
+            spbar_xp_per_point =
+              after and after.spbar_xp_per_point,
+
+            xp_per_skill_point =
+              after and after.xp_per_skill_point or 175,
+
+            available_skill_points =
+              after and after.available_skill_points or 0,
+
+            skill_points_gained =
+              skill_gained or 0,
           })
 
-          -- Wait until MenuAPI type 7 finishes before allowing the dialogue
-          -- chain to continue or fully close.
           local MenuAPI = _get_menuapi_for_petxp()
+
           if MenuAPI and type(MenuAPI.is_open) == "function" then
             local guard = 0
+
             while MenuAPI.is_open(player_id) and guard < 400 do
               await(Async.sleep(0.05))
               guard = guard + 1
@@ -4184,8 +4229,14 @@ eznpcs.add_event({
           else
             await(Async.sleep(2.0))
           end
+
         elseif Net and Net.message_player then
-          await(Async.message_player(player_id, "Your pet gained " .. tostring(effective_amount) .. " XP."))
+          await(Async.message_player(
+            player_id,
+            "Your pet gained "
+              .. tostring(effective_amount)
+              .. " XP."
+          ))
         end
       end
 

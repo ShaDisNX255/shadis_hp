@@ -51,6 +51,12 @@ if not object_registry_ok then
   print("[tournaments] WARNING: object_registry could not be loaded; scheduled tournament announcements require board interaction first")
 end
 
+local package_registry_ok, package_registry = pcall(require, "scripts/ezlibs-scripts/ezencounters/package_registry")
+if not package_registry_ok then
+  package_registry = nil
+  print("[tournaments] WARNING: encounter package registry unavailable; tournament fallback validation disabled")
+end
+
 local function require_visual_module(label, path)
   local ok, mod = pcall(require, path)
   if not ok then
@@ -84,7 +90,7 @@ local FALLBACK_MUG_TEXTURE = "/server/assets/tourney/npc-navis-testing/mug.png"
 -- Change this to any guaranteed-good mug you already have.
 local LAST_RESORT_MUG_TEXTURE = "/server/assets/tourney/npc-navis-testing/gutsman/mug.png"
 local TOURNAMENT_PVP_HP = 1000
-local EZENCOUNTERS_PACKAGE_PATH = "/server/assets/ezlibs-assets/ezencounters/ezencounters.zip"
+local EZENCOUNTERS_PACKAGE_PATH = "/server/assets/ezlibs-assets/ezencounters/optimized/tournaments.zip"
 
 local TOURNAMENT_DEFAULT_PLAYER_POSITIONS = {
   {0,0,0,0,0,0},
@@ -3115,6 +3121,18 @@ local function run_player_vs_player(match, tournament)
   end)
 end
 
+local function tournament_grid_has_nonzero(grid)
+  if type(grid) ~= "table" then return false end
+  for _, row in ipairs(grid) do
+    if type(row) == "table" then
+      for _, value in ipairs(row) do
+        if tonumber(value or 0) ~= 0 then return true end
+      end
+    end
+  end
+  return false
+end
+
 local function build_npc_encounter_payload(npc)
   local data = shallow_copy(npc.encounter_data or {})
   data.path = data.path or npc.path
@@ -3156,7 +3174,51 @@ local function run_player_vs_npc(player_participant, npc_participant, tournament
     end
 
     local data = build_npc_encounter_payload(npc_participant)
-    local battle_promise = Async.initiate_encounter(player_id, npc_participant.path, data)
+
+    -- Tournaments deliberately bypass ezencounters.begin_encounter() so pets and
+    -- normal area rewards remain disabled. Validate the optimized wrapper here
+    -- using only the lightweight registry, avoiding a circular module require.
+    if package_registry then
+      local path = tostring(data.path or "")
+      local package_info = package_registry.get(path)
+      local fallback_reason = nil
+
+      if not package_info
+        and path:sub(1, #package_registry.PACKAGE_PREFIX) == package_registry.PACKAGE_PREFIX
+      then
+        fallback_reason = "unregistered optimized package path " .. path
+      elseif package_info then
+        for _, enemy_info in ipairs(data.enemies or {}) do
+          local alias = tostring(enemy_info and enemy_info.name or "")
+          if alias == "" or not package_info.aliases[alias] then
+            fallback_reason = "package " .. tostring(package_info.name)
+              .. " missing enemy alias " .. alias
+            break
+          end
+        end
+
+        if not fallback_reason
+          and package_info.supports_obstacles == false
+          and tournament_grid_has_nonzero(data.obstacle_positions)
+        then
+          fallback_reason = "package " .. tostring(package_info.name)
+            .. " does not contain obstacle assets"
+        end
+
+        if not fallback_reason and package_info.supports_music == false and data.music ~= nil then
+          fallback_reason = "package " .. tostring(package_info.name)
+            .. " does not contain packaged music"
+        end
+      end
+
+      if fallback_reason then
+        print("[tournaments] optimized package fallback: " .. fallback_reason)
+        data.path = package_registry.FALLBACK_PATH
+        data._ezencounters_fallback_reason = fallback_reason
+      end
+    end
+
+    local battle_promise = Async.initiate_encounter(player_id, data.path or npc_participant.path, data)
 
     -- If the encounter eventually finishes after a timeout, still unlock input.
     if battle_promise and battle_promise.and_then then

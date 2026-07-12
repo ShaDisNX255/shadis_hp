@@ -21,7 +21,7 @@ end
 
 local E1 = {
     name="E1",
-    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    path="/server/assets/ezlibs-assets/ezencounters/optimized/raids.zip",
     weight=10,
     pet_exp=1,
     enemies={
@@ -64,7 +64,7 @@ local E1 = {
 
 local E2 = {
     name="E2",
-    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    path="/server/assets/ezlibs-assets/ezencounters/optimized/raids.zip",
     weight=10,
     pet_exp=1,
     enemies={
@@ -108,7 +108,7 @@ local E2 = {
 
 local E3 = {
     name="E3",
-    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    path="/server/assets/ezlibs-assets/ezencounters/optimized/raids.zip",
     weight=10,
     pet_exp=1,
     enemies={
@@ -150,7 +150,7 @@ local E3 = {
 
 local E4 = {
     name="E4",
-    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    path="/server/assets/ezlibs-assets/ezencounters/optimized/raids.zip",
     weight=10,
     pet_exp=4,
     enemies={
@@ -190,7 +190,7 @@ local E4 = {
 
 local E5 = {
     name="E5",
-    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    path="/server/assets/ezlibs-assets/ezencounters/optimized/raids.zip",
     weight=10,
     pet_exp=4,
     enemies={
@@ -232,7 +232,7 @@ local E5 = {
 
 local E6 = {
     name="E6",
-    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    path="/server/assets/ezlibs-assets/ezencounters/optimized/raids.zip",
     weight=10,
     pet_exp=4,
     enemies={
@@ -273,7 +273,7 @@ local E6 = {
 
 local boss = {
     name="boss",
-    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    path="/server/assets/ezlibs-assets/ezencounters/optimized/raids.zip",
     pet_exp=7,
     weight=10,
     enemies={
@@ -312,7 +312,7 @@ local boss = {
 
 local S1 = {
     name="S1",
-    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    path="/server/assets/ezlibs-assets/ezencounters/optimized/raids.zip",
     pet_exp=7,
     weight=10,
     enemies={
@@ -350,7 +350,7 @@ local S1 = {
 
 local S2 = {
     name="S2",
-    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    path="/server/assets/ezlibs-assets/ezencounters/optimized/raids.zip",
     pet_exp=7,
     weight=10,
     enemies={
@@ -387,7 +387,7 @@ local S2 = {
 
 local S3 = {
     name="S3",
-    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    path="/server/assets/ezlibs-assets/ezencounters/optimized/raids.zip",
     pet_exp=7,
     weight=10,
     enemies={
@@ -426,7 +426,7 @@ local S3 = {
 
 local S4 = {
     name="S4",
-    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    path="/server/assets/ezlibs-assets/ezencounters/optimized/raids.zip",
     pet_exp=8,
     weight=10,
     enemies={
@@ -465,7 +465,7 @@ local S4 = {
 
 local S5 = {
     name="S5",
-    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    path="/server/assets/ezlibs-assets/ezencounters/optimized/raids.zip",
     pet_exp=8,
     weight=10,
     enemies={
@@ -504,7 +504,7 @@ local S5 = {
 
 local S6 = {
     name="S6",
-    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    path="/server/assets/ezlibs-assets/ezencounters/optimized/raids.zip",
     pet_exp=8,
     weight=10,
     enemies={
@@ -543,7 +543,7 @@ local S6 = {
 
 local boss2 = {
     name="boss2",
-    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    path="/server/assets/ezlibs-assets/ezencounters/optimized/raids.zip",
     pet_exp=14,
     weight=10,
     enemies={

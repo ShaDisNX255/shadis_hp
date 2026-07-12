@@ -398,7 +398,7 @@ end
 
 local MiniBoss1 = {
     name="MiniBoss1",
-    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    path="/server/assets/ezlibs-assets/ezencounters/optimized/dungeon1.zip",
     weight=0,
     pet_exp=0,
     skip_shared_area_rewards = true,
@@ -438,7 +438,7 @@ local MiniBoss1 = {
 
 local MiniBoss2 = {
     name="MiniBoss2",
-    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    path="/server/assets/ezlibs-assets/ezencounters/optimized/dungeon1.zip",
     weight=0,
     pet_exp=0,
     skip_shared_area_rewards = true,
@@ -479,7 +479,7 @@ local MiniBoss2 = {
 
 local MiniBoss3 = {
     name="MiniBoss3",
-    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    path="/server/assets/ezlibs-assets/ezencounters/optimized/dungeon1.zip",
     weight=0,
     pet_exp=0,
     skip_shared_area_rewards = true,
@@ -520,7 +520,7 @@ local MiniBoss3 = {
 
 local MainBoss = {
     name="MainBoss",
-    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    path="/server/assets/ezlibs-assets/ezencounters/optimized/dungeon1.zip",
     weight=0,
     pet_exp=0,
     skip_shared_area_rewards = true,
@@ -641,7 +641,7 @@ return {
 
     random_encounters = {
         enabled = true,
-        package_path = "/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+        package_path = "/server/assets/ezlibs-assets/ezencounters/optimized/dungeon1.zip",
 
         source_weights = {
             static = 0,

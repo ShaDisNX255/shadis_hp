@@ -5,6 +5,7 @@ local eztriggers = require('scripts/ezlibs-scripts/eztriggers')
 local object_registry = require('scripts/ezlibs-scripts/object_registry')
 local ezbus = require('scripts/ezlibs-scripts/ezbus')
 local ezconfig = require('scripts/ezlibs-scripts/ezconfig')
+local package_registry = require('scripts/ezlibs-scripts/ezencounters/package_registry')
 local PetsOK, Pets = pcall(require, "scripts/ezlibs-custom/pets")
 if not PetsOK then
     Pets = nil
@@ -710,7 +711,6 @@ local function _pick_encounter_for_area(area_id, area_table)
 end
 
 -- ====================== Battle Pet Injection ======================
-local PET_ENCOUNTER_PATH = "/server/assets/ezlibs-assets/ezencounters/ezencounters.zip"
 local PLAYER_ARMED_PET_KEY = "armed_pet_v1"
 
 local function clamp_pet_attack_rank(rank)
@@ -737,9 +737,17 @@ local function _inject_armed_pet(player_id, encounter_info)
         return encounter_info
     end
 
-    local enc_path = tostring(encounter_info.path or "")
-    if enc_path ~= PET_ENCOUNTER_PATH then
-        print("[PET INJECT SKIP] path mismatch:", enc_path)
+    if encounter_info.allow_battle_pets == false
+        or encounter_info._no_pets == true
+        or encounter_info._tournament == true
+    then
+        print("[PET INJECT SKIP] encounter disables battle pets")
+        return encounter_info
+    end
+
+    local package_info = package_registry.get(encounter_info.path)
+    if package_info and package_info.allow_battle_pets == false then
+        print("[PET INJECT SKIP] package disables battle pets:", tostring(encounter_info.path))
         return encounter_info
     end
 
@@ -861,6 +869,107 @@ print("[PET INJECT OK]",
     table.remove(ei.enemies, pet_id)
     return encounter_info
 end
+
+local function _grid_has_nonzero(grid)
+    if type(grid) ~= "table" then return false end
+    for _, row in ipairs(grid) do
+        if type(row) == "table" then
+            for _, value in ipairs(row) do
+                if tonumber(value or 0) ~= 0 then return true end
+            end
+        end
+    end
+    return false
+end
+
+local function _fallback_copy(encounter_info, reason)
+    local out = helpers.deep_copy(encounter_info or {})
+    out.path = package_registry.FALLBACK_PATH
+    out._ezencounters_fallback_reason = tostring(reason or "unknown")
+    print(string.format(
+        "[ezencounters] optimized package fallback: %s (requested=%s)",
+        tostring(reason or "unknown"),
+        tostring(encounter_info and encounter_info.path or "<nil>")
+    ))
+    return out
+end
+
+local function _resolve_package_for_encounter(encounter_info)
+    if type(encounter_info) ~= "table" then
+        return _fallback_copy({}, "encounter_info was not a table")
+    end
+
+    local path = tostring(encounter_info.path or "")
+    if path == "" then
+        return _fallback_copy(encounter_info, "missing package path")
+    end
+
+    if path == package_registry.FALLBACK_PATH then
+        return encounter_info
+    end
+
+    local package_info = package_registry.get(path)
+    if not package_info then
+        -- A typo or forgotten registry entry inside our optimized folder should
+        -- never turn into a broken battle. Unknown third-party packages outside
+        -- this folder are still left untouched.
+        if path:sub(1, #package_registry.PACKAGE_PREFIX) == package_registry.PACKAGE_PREFIX then
+            return _fallback_copy(encounter_info, "unregistered optimized package path " .. path)
+        end
+        return encounter_info
+    end
+
+    for _, enemy_info in ipairs(encounter_info.enemies or {}) do
+        local alias = tostring(enemy_info and enemy_info.name or "")
+        if alias == "" or not package_info.aliases[alias] then
+            return _fallback_copy(encounter_info, "package " .. tostring(package_info.name) .. " missing enemy alias " .. alias)
+        end
+    end
+
+    if package_info.supports_obstacles == false and _grid_has_nonzero(encounter_info.obstacle_positions) then
+        return _fallback_copy(encounter_info, "package " .. tostring(package_info.name) .. " does not contain obstacle assets")
+    end
+
+    if package_info.supports_music == false and encounter_info.music ~= nil then
+        return _fallback_copy(encounter_info, "package " .. tostring(package_info.name) .. " does not contain packaged music")
+    end
+
+    return encounter_info
+end
+
+ezencounters.resolve_package_for_encounter = function(encounter_info)
+    return _resolve_package_for_encounter(encounter_info)
+end
+
+local function _find_download_area()
+    local preferred = tostring(package_registry.DOWNLOAD_AREA or "")
+    local areas = Net.list_areas() or {}
+    for _, area_id in ipairs(areas) do
+        if tostring(area_id) == preferred then return area_id end
+    end
+    return areas[1]
+end
+
+local function _provide_split_packages()
+    local area_id = _find_download_area()
+    if not area_id then
+        print("[ezencounters] WARNING: no area available for encounter package provisioning")
+        return
+    end
+
+    local paths = { package_registry.FALLBACK_PATH }
+    for _, path in ipairs(package_registry.list_paths()) do paths[#paths + 1] = path end
+
+    for _, path in ipairs(paths) do
+        if not provided_encounter_assets[path] then
+            print("[ezencounters] pre-providing encounter package " .. tostring(path) .. " through " .. tostring(area_id))
+            Net.provide_asset(area_id, path)
+            provided_encounter_assets[path] = true
+        end
+    end
+end
+
+_provide_split_packages()
 
 local load_encounters_for_areas = function ()
     local areas = Net.list_areas()
@@ -1057,6 +1166,7 @@ ezencounters.begin_encounter = function (player_id,encounter_info,trigger_object
         end
 
         local final_encounter_info = _inject_armed_pet(player_id, encounter_info)
+        final_encounter_info = _resolve_package_for_encounter(final_encounter_info)
 
         players_in_encounters[player_id] = {
             encounter_info = encounter_info,

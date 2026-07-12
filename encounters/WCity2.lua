@@ -123,7 +123,7 @@ return {
 
   random_encounters = {
     enabled = true,
-    package_path = "/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    package_path = "/server/assets/ezlibs-assets/ezencounters/optimized/wcity2.zip",
 
     source_weights = {
       static = 0,

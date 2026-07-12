@@ -2,7 +2,7 @@
 local encounter1 = {
   name               = "Encounter1",
   weight             = 10,
-  path               = "/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+  path               = "/server/assets/ezlibs-assets/ezencounters/optimized/fishing.zip",
   enemies            = {
     { name = "Shrimpy", rank = 6 },
     { name = "Shrimpy", rank = 7 },
@@ -43,7 +43,7 @@ local encounter1 = {
 local encounter2 = {
   name               = "Encounter2",
   weight             = 10,
-  path               = "/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+  path               = "/server/assets/ezlibs-assets/ezencounters/optimized/fishing.zip",
   enemies            = {
     { name = "Piranha",  rank = 4 },
     { name = "ColdHead", rank = 1 },
@@ -83,7 +83,7 @@ local encounter2 = {
 local encounter3 = {
   name               = "Encounter3",
   weight             = 10,
-  path               = "/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+  path               = "/server/assets/ezlibs-assets/ezencounters/optimized/fishing.zip",
   enemies            = {
     { name = "SwordyEl", rank = 5 },
     { name = "SwordyEl", rank = 2 },
@@ -119,7 +119,7 @@ local encounter3 = {
 
 local encounter4 = {
     name="Encounter4",
-    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    path="/server/assets/ezlibs-assets/ezencounters/optimized/fishing.zip",
     weight=1,
     enemies={
         {name="IceManPoN",rank=4},
@@ -155,7 +155,7 @@ local encounter4 = {
 
 local encounter5 = {
     name="Encounter5",
-    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    path="/server/assets/ezlibs-assets/ezencounters/optimized/fishing.zip",
     weight=20,
     enemies={
         {name="Tark",rank=1},
@@ -193,7 +193,7 @@ local encounter5 = {
 
 local encounter6 = {
     name="Encounter6",
-    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    path="/server/assets/ezlibs-assets/ezencounters/optimized/fishing.zip",
     weight=1,
     enemies={
         {name="ElementMan",rank=1},
@@ -230,7 +230,7 @@ local encounter6 = {
 
 local encounter7 = {
     name="Encounter7",
-    path="/server/assets/ezlibs-assets/ezencounters/ezencounters.zip",
+    path="/server/assets/ezlibs-assets/ezencounters/optimized/fishing.zip",
     weight=20,
     enemies={
         {name="Swordy",rank=3},
