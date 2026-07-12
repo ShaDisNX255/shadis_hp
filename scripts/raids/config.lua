@@ -57,8 +57,8 @@ local RAIDS = {
     schedule_mode = "production",
 
     production = {
-      spawns_per_day  = 4,
-      defeats_per_day = 2,
+      spawns_per_day  = 8,
+      defeats_per_day = 4,
 
       -- How long the NPC waits before somebody selects Fight.
       spawn_minutes = 15,

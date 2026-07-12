@@ -141,5 +141,5 @@ c6b5dcb9f1c0be6a7178992ee4382597 com.drawcie.navi.darkmegaPVP
 0a65ea32d9e9bb84298ad0741c0112fa com.scilabs.cossack.player.fortepvp.basic
 e47d577ebb4efab216fad49a6351dd3f com.shadis.navi.adventure.Luigi.basic
 5d1a2f7e81a4be1146ad1784f793ca1b com.silva.navi.zarymura.adventure
-
+e3f43516c75e29fb501e244aaca907ce Crow_Basic
 
