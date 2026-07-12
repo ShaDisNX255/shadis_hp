@@ -919,13 +919,6 @@ local function _resolve_package_for_encounter(encounter_info)
         return encounter_info
     end
 
-    for _, enemy_info in ipairs(encounter_info.enemies or {}) do
-        local alias = tostring(enemy_info and enemy_info.name or "")
-        if alias == "" or not package_info.aliases[alias] then
-            return _fallback_copy(encounter_info, "package " .. tostring(package_info.name) .. " missing enemy alias " .. alias)
-        end
-    end
-
     if package_info.supports_obstacles == false and _grid_has_nonzero(encounter_info.obstacle_positions) then
         return _fallback_copy(encounter_info, "package " .. tostring(package_info.name) .. " does not contain obstacle assets")
     end

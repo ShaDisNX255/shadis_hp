@@ -3188,19 +3188,10 @@ local function run_player_vs_npc(player_participant, npc_participant, tournament
       then
         fallback_reason = "unregistered optimized package path " .. path
       elseif package_info then
-        for _, enemy_info in ipairs(data.enemies or {}) do
-          local alias = tostring(enemy_info and enemy_info.name or "")
-          if alias == "" or not package_info.aliases[alias] then
-            fallback_reason = "package " .. tostring(package_info.name)
-              .. " missing enemy alias " .. alias
-            break
-          end
-        end
 
-        if not fallback_reason
-          and package_info.supports_obstacles == false
-          and tournament_grid_has_nonzero(data.obstacle_positions)
-        then
+          if package_info.supports_obstacles == false
+              and tournament_grid_has_nonzero(data.obstacle_positions)
+          then
           fallback_reason = "package " .. tostring(package_info.name)
             .. " does not contain obstacle assets"
         end
