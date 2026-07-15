@@ -42,7 +42,7 @@ registry.packages = {
         name = "Dungeon1" ,
         package_id = "com.shadishp.mob.ezencounters.dungeon1" ,
         allow_battle_pets = true,
-        supports_obstacles = false,
+        supports_obstacles = true,
         supports_music = false,
     },
     [registry.EVENTS_PATH] = {
@@ -50,20 +50,20 @@ registry.packages = {
         package_id = "com.shadishp.mob.ezencounters.events" ,
         allow_battle_pets = true,
         supports_obstacles = false,
-        supports_music = false,
+        supports_music = true,
     },
     [registry.FISHING_PATH] = {
         name = "Fishing" ,
         package_id = "com.shadishp.mob.ezencounters.fishing" ,
         allow_battle_pets = true,
-        supports_obstacles = false,
+        supports_obstacles = true,
         supports_music = false,
     },
     [registry.RAIDS_PATH] = {
         name = "Raids" ,
         package_id = "com.shadishp.mob.ezencounters.raids" ,
         allow_battle_pets = true,
-        supports_obstacles = false,
+        supports_obstacles = true,
         supports_music = false,
     },
     [registry.TOURNAMENTS_PATH] = {
