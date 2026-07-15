@@ -138,6 +138,7 @@ local ONCEHUB_CATALOG = {
   { id = "pet_piranha",  name = "Pet: Piranha" },
   { id = "pet_bunny",  name = "Pet: Bunny" },
   { id = "pet_brushman",  name = "Pet: Brushman" },
+  { id = "pet_spikey",  name = "Pet: Spikey" },
 }
 
 

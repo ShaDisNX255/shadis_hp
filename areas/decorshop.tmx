@@ -358,25 +358,13 @@
    <properties>
     <property name="Event Name" value="petshop"/>
     <property name="Price 1" type="int" value="100000"/>
-    <property name="Price 10" type="int" value="100000"/>
     <property name="Price 2" type="int" value="100000"/>
     <property name="Price 3" type="int" value="100000"/>
     <property name="Price 4" type="int" value="100000"/>
-    <property name="Price 5" type="int" value="100000"/>
-    <property name="Price 6" type="int" value="100000"/>
-    <property name="Price 7" type="int" value="100000"/>
-    <property name="Price 8" type="int" value="100000"/>
-    <property name="Price 9" type="int" value="100000"/>
     <property name="Sell 1" value="pet_mettaur"/>
-    <property name="Sell 10" value="pet_brushman"/>
     <property name="Sell 2" value="pet_ratty"/>
     <property name="Sell 3" value="pet_powie"/>
     <property name="Sell 4" value="pet_swordy"/>
-    <property name="Sell 5" value="pet_moloko"/>
-    <property name="Sell 6" value="pet_bunny"/>
-    <property name="Sell 7" value="pet_volgear"/>
-    <property name="Sell 8" value="pet_magtect"/>
-    <property name="Sell 9" value="pet_fishy"/>
    </properties>
    <point/>
   </object>

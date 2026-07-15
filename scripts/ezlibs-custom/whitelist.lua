@@ -17,17 +17,39 @@ local ENFORCED_AREAS = {
 
 local BASE_WHITELIST_DISK_PATH = "./assets/whitelist.txt"
 local GENERATED_WHITELIST_DIR = "/server/assets/generated_whitelists"
-local PLAYER_UNLOCKS_MEM_KEY = "__player_mod_unlocks_v1"
+local BLANK_WHITELIST_ASSET_PATH = "/server/assets/blank_whitelist.txt"
 
+-- v1 stored ownership by package ID.
+-- v2 stores cards/programs by permanent whitelist keys instead.
+local LEGACY_PLAYER_UNLOCKS_MEM_KEY = "__player_mod_unlocks_v1"
+local PLAYER_UNLOCKS_MEM_KEY = "__player_mod_unlocks_v2"
+
+local DEBUG_WHITELIST = false
+
+local function printd(...)
+  if not DEBUG_WHITELIST then return end
+  print("[whitelist]", ...)
+end
+
+-- Stable non-card package definitions.
+-- Keep the table key permanent even if package_id changes again later.
+whitelist.PACKAGE_DEFS = {
+  undershirt = {
+    package_id = "com.OFC.block.EXE6-013-UnderShirt",
+  },
+}
+
+-- Backwards-compatible public table used by existing scripts.
 whitelist.PACKAGES = {
-  undershirt = "com.OFC.block.EXE6-013-UnderShirt",
+  undershirt = whitelist.PACKAGE_DEFS.undershirt.package_id,
 }
 
 whitelist.CARDS = {
   reflecmet1 = {
-    package_id = "com.OFC.card.EXE6-091-ReflecMet1",
+    package_id = "com.wcity.OFC.card.EXE6-091-ReflecMet1",
+    legacy_package_ids = { "com.OFC.card.EXE6-091-ReflecMet1" },
     asset_path = "/server/assets/chips/EXE6-Reflect.zip",
-    code = "*",
+    code = "A",
   },
 
   shockwave = {
@@ -55,59 +77,70 @@ whitelist.CARDS = {
   },
 
   bubbler = {
-    package_id = "rune.legacy.bubbler",
+    package_id = "rune.wcity.legacy.bubbler",
+    legacy_package_ids = { "rune.legacy.bubbler" },
     asset_path = "/server/assets/chips/EXE3-Bubbler.zip",
-    code = "*",
+    code = "P",
   },
   yoyo1 = {
-    package_id = "com.OFC.card.EXE6-018-YoYo",
+    package_id = "com.wcity.OFC.card.EXE6-018-YoYo",
+    legacy_package_ids = { "com.OFC.card.EXE6-018-YoYo" },
     asset_path = "/server/assets/chips/EXE6-YoYo.zip",
-    code = "*",
+    code = "L",
   },
   HellsBurner1 = {
-    package_id = "com.OFC.card.EXE6-019-HellsBurner1",
+    package_id = "com.wcity.OFC.card.EXE6-019-HellsBurner1",
+    legacy_package_ids = { "com.OFC.card.EXE6-019-HellsBurner1" },
     asset_path = "/server/assets/chips/EXE6-HellsBurner1.zip",
-    code = "*",
+    code = "H",
   },
   MachineGun1 = {
-    package_id = "com.OFC.card.EXE6-055-MachineGun1",
+    package_id = "com.wcity.OFC.card.EXE6-055-MachineGun1",
+    legacy_package_ids = { "com.OFC.card.EXE6-055-MachineGun1" },
     asset_path = "/server/assets/chips/EXE6-MachineGun1.zip",
-    code = "*",
+    code = "T",
   },
   MachineGun2 = {
-    package_id = "com.OFC.card.EXE6-056-MachineGun2",
+    package_id = "com.wcity.OFC.card.EXE6-056-MachineGun2",
+    legacy_package_ids = { "com.OFC.card.EXE6-056-MachineGun2" },
     asset_path = "/server/assets/chips/EXE6-MachineGun2.zip",
-    code = "*",
+    code = "T",
   },
   KillerSensor1 = {
-    package_id = "com.OFC.card.EXE6-116-KillerSensor1",
+    package_id = "com.wcity.OFC.card.EXE6-116-KillerSensor1",
+    legacy_package_ids = { "com.OFC.card.EXE6-116-KillerSensor1" },
     asset_path = "/server/assets/chips/EXE6-KillerSensor1.zip",
-    code = "*",
+    code = "J",
   },
   KillerSensor2 = {
-    package_id = "com.OFC.card.EXE6-117-KillerSensor2",
+    package_id = "com.wcity.OFC.card.EXE6-117-KillerSensor2",
+    legacy_package_ids = { "com.OFC.card.EXE6-117-KillerSensor2" },
     asset_path = "/server/assets/chips/EXE6-KillerSensor2.zip",
-    code = "*",
+    code = "N",
   },
   RabiRing1 = {
-    package_id = "com.OFC.card.EXEPoN-017-RabiRing1",
+    package_id = "com.wcity.OFC.card.EXEPoN-017-RabiRing1",
+    legacy_package_ids = { "com.OFC.card.EXEPoN-017-RabiRing1" },
     asset_path = "/server/assets/chips/EXEPoN-RabiRing1.zip",
-    code = "*",
+    code = "A",
   },
   RabiRing2 = {
-    package_id = "com.OFC.card.EXEPoN-018-RabiRing2",
+    package_id = "com.wcity.OFC.card.EXEPoN-018-RabiRing2",
+    legacy_package_ids = { "com.OFC.card.EXEPoN-018-RabiRing2" },
     asset_path = "/server/assets/chips/EXEPoN-RabiRing2.zip",
-    code = "*",
+    code = "B",
   },
   Ratton2 = {
-    package_id = "com.OFC.card.EXEPoN-032-Ratton2",
+    package_id = "com.wcity.OFC.card.EXEPoN-032-Ratton2",
+    legacy_package_ids = { "com.OFC.card.EXEPoN-032-Ratton2" },
     asset_path = "/server/assets/chips/EXEPoN-Ratton2.zip",
-    code = "*",
+    code = "A",
   },
   sonicwave = {
-    package_id = "com.OFC.card.EXEPoN-052-SonicWave",
+    package_id = "com.wcity.OFC.card.EXEPoN-052-SonicWave",
+    legacy_package_ids = { "com.OFC.card.EXEPoN-052-SonicWave" },
     asset_path = "/server/assets/chips/EXEPoN-SonicWave.zip",
-    code = "*",
+    code = "G",
   },
   spreadgun1 = {
     package_id = "com.OFC.card.EXE6-009-SpreadGun1",
@@ -115,101 +148,95 @@ whitelist.CARDS = {
     code = "*",
   },
   spreadgun2 = {
-    package_id = "com.OFC.card.EXE6-010-SpreadGun2",
+    package_id = "com.wcity.OFC.card.EXE6-010-SpreadGun2",
+    legacy_package_ids = { "com.OFC.card.EXE6-010-SpreadGun2" },
     asset_path = "/server/assets/chips/EXE6-SpreadGun2.zip",
-    code = "*",
+    code = "A",
   },
   thunderball = {
-    package_id = "com.OFC.card.EXE6-029-ThunderBall",
+    package_id = "com.wcity.OFC.card.EXE6-029-ThunderBall",
+    legacy_package_ids = { "com.OFC.card.EXE6-029-ThunderBall" },
     asset_path = "/server/assets/chips/EXE6-ThunderBall.zip",
     code = "*",
   },
   roll1 = {
-    package_id = "com.k1rbyat1na.card.EXE6-222-Roll",
+    package_id = "com.wcity.k1rbyat1na.card.EXE6-222-Roll",
+    legacy_package_ids = { "com.k1rbyat1na.card.EXE6-222-Roll" },
     asset_path = "/server/assets/chips/EXE6-Roll1.zip",
-    code = "*",
+    code = "R",
   },
   gutsman1 = {
-    package_id = "com.louise.card.gutsmanv1",
+    package_id = "com.wcity.louise.card.gutsmanv1",
+    legacy_package_ids = { "com.louise.card.gutsmanv1" },
     asset_path = "/server/assets/chips/EXE3-Gutsman1.zip",
-    code = "*",
+    code = "G",
   },
   rec30 = {
-    package_id = "com.OFC.card.EXE6-157-Recovery30",
+    package_id = "com.wcity.OFC.card.EXE6-157-Recovery30",
+    legacy_package_ids = { "com.OFC.card.EXE6-157-Recovery30" },
     asset_path = "/server/assets/chips/EXE6-Rec30.zip",
-    code = "*",
-  },
-  rec50 = {
-    package_id = "com.OFC.card.EXE6-158-Recovery50",
-    asset_path = "/server/assets/chips/EXE6-Rec50.zip",
-    code = "*",
-  },
-  vulcan2 = {
-    package_id = "com.keristero.card.Vulcan2",
-    asset_path = "/server/assets/chips/EXE6-Vulcan2.zip",
-    code = "*",
-  },
-  vulcan3 = {
-    package_id = "com.keristero.card.Vulcan3",
-    asset_path = "/server/assets/chips/EXE6-Vulcan3.zip",
-    code = "*",
+    code = "Q",
   },
   heatshot = {
-    package_id = "com.OFC.card.EXEPoN-014-HeatShot",
+    package_id = "com.wcity.OFC.card.EXEPoN-014-HeatShot",
+    legacy_package_ids = { "com.OFC.card.EXEPoN-014-HeatShot" },
     asset_path = "/server/assets/chips/EXEPoN-HeatShot.zip",
     code = "*",
   },
-  grassstage = {
-    package_id = "com.Thor.card.GrassStg",
-    asset_path = "/server/assets/chips/EXE3-GrassStage.zip",
-    code = "*",
-  },
   dashatk = {
-    package_id = "com.louise.card.dashattck",
+    package_id = "com.wcity.louise.card.dashattck",
+    legacy_package_ids = { "com.louise.card.dashattck" },
     asset_path = "/server/assets/chips/BN3-DashAtk.zip",
-    code = "*",
+    code = "C",
   },
 
   wavearm = {
-    package_id = "hoov.cards.wavearm1",
+    package_id = "hoov.wcity1.cards.wavearm1",
+    legacy_package_ids = { "hoov.cards.wavearm1" },
     asset_path = "/server/assets/chips/BN6-Wavearm1.zip",
-    code = "*",
+    code = "G",
   },
 
   boomerang1 = {
-    package_id = "com.OFC.card.EXEPoN-066-Boomerang1",
+    package_id = "com.wcity.OFC.card.EXEPoN-066-Boomerang1",
+    legacy_package_ids = { "com.OFC.card.EXEPoN-066-Boomerang1" },
     asset_path = "/server/assets/chips/EXEPoN-Boomerang1.zip",
-    code = "*",
+    code = "L",
   },
 
   boomerang2 = {
-    package_id = "com.OFC.card.EXEPoN-067-Boomerang2",
+    package_id = "com.wcity.OFC.card.EXEPoN-067-Boomerang2",
+    legacy_package_ids = { "com.OFC.card.EXEPoN-067-Boomerang2" },
     asset_path = "/server/assets/chips/EXEPoN-Boomerang2.zip",
-    code = "*",
+    code = "O",
   },
 
   highcannon = {
-    package_id = "com.OFC.card.EXEPoN-002-HighCannon",
+    package_id = "com.wcity.OFC.card.EXEPoN-002-HighCannon",
+    legacy_package_ids = { "com.OFC.card.EXEPoN-002-HighCannon" },
     asset_path = "/server/assets/chips/EXEPoN-HighCannon.zip",
-    code = "*",
+    code = "C",
   },
 
   gundelsol1 = {
-    package_id = "com.OFC.card.EXE6-015-GunDelSol1",
+    package_id = "com.wcity.OFC.card.EXE6-015-GunDelSol1",
+    legacy_package_ids = { "com.OFC.card.EXE6-015-GunDelSol1" },
     asset_path = "/server/assets/chips/EXE6-GunDelSol1.zip",
     code = "*",
   },
 
   energybomb = {
-    package_id = "com.rune.k1rbyat1na.card.EXE6-060-EnergyBomb",
+    package_id = "com.wcity.rune.k1rbyat1na.card.EXE6-060-EnergyBomb",
+    legacy_package_ids = { "com.rune.k1rbyat1na.card.EXE6-060-EnergyBomb" },
     asset_path = "/server/assets/chips/EXE6-EnergyBomb.zip",
     code = "*",
   },
 
   megaenergybomb = {
-    package_id = "com.rune.k1rbyat1na.card.EXE6-061-MegaEnergyBomb",
+    package_id = "com.wcity.rune.k1rbyat1na.card.EXE6-061-MegaEnergyBomb",
+    legacy_package_ids = { "com.rune.k1rbyat1na.card.EXE6-061-MegaEnergyBomb" },
     asset_path = "/server/assets/chips/EXE6-MegaEnergyBomb.zip",
-    code = "*",
+    code = "O",
   },
 
   stonecube = {
@@ -219,34 +246,97 @@ whitelist.CARDS = {
   },
 
   attack20 = {
-    package_id = "com.OFC.card.EXEPoN-121-Attack+20",
+    package_id = "com.wcity.OFC.card.EXEPoN-121-Attack+20",
+    legacy_package_ids = { "com.OFC.card.EXEPoN-121-Attack+20" },
     asset_path = "/server/assets/chips/EXEPoN-Attack20.zip",
     code = "*",
   },
   barrier = {
-    package_id = "Barr10.Unified.Library.92",
+    package_id = "Barr10.wcity.Library.92",
+    legacy_package_ids = { "Barr10.Unified.Library.92" },
     asset_path = "/server/assets/chips/EXE6-Barrier.zip",
     code = "*",
   },
 }
 
+-- Current and legacy package-ID indexes.
+-- Legacy IDs resolve ownership/migrations, but are never authorized in a
+-- generated whitelist. Only current package IDs are authorized.
 local card_by_package_id = {}
-for _, card_def in pairs(whitelist.CARDS) do
-  if card_def.package_id then
+local card_key_by_package_id = {}
+local current_card_key_by_package_id = {}
+
+local package_key_by_package_id = {}
+local current_package_key_by_package_id = {}
+
+local function register_unique(index, package_id, stable_key, label)
+  package_id = tostring(package_id or "")
+  if package_id == "" then return end
+
+  local existing = index[package_id]
+  if existing and existing ~= stable_key then
+    print(string.format(
+      "[whitelist] ERROR: duplicate %s package ID '%s' for '%s' and '%s'",
+      tostring(label),
+      package_id,
+      tostring(existing),
+      tostring(stable_key)
+    ))
+    return
+  end
+
+  index[package_id] = stable_key
+end
+
+for card_key, card_def in pairs(whitelist.CARDS) do
+  card_def.card_key = card_key
+
+  if card_def.package_id and card_def.package_id ~= "" then
+    register_unique(card_key_by_package_id, card_def.package_id, card_key, "card")
+    register_unique(current_card_key_by_package_id, card_def.package_id, card_key, "current card")
     card_by_package_id[card_def.package_id] = card_def
+  end
+
+  for _, legacy_package_id in ipairs(card_def.legacy_package_ids or {}) do
+    register_unique(card_key_by_package_id, legacy_package_id, card_key, "legacy card")
+    card_by_package_id[legacy_package_id] = card_def
   end
 end
 
--- Anything listed here is locked until the player unlocks it.
--- Future chips/programs just get added here by package_id.
-local LOCKED_BY_DEFAULT = {
-  [whitelist.PACKAGES.undershirt] = true,
-}
+for package_key, package_def in pairs(whitelist.PACKAGE_DEFS) do
+  package_def.package_key = package_key
+
+  if package_def.package_id and package_def.package_id ~= "" then
+    register_unique(package_key_by_package_id, package_def.package_id, package_key, "package")
+    register_unique(current_package_key_by_package_id, package_def.package_id, package_key, "current package")
+  end
+
+  for _, legacy_package_id in ipairs(package_def.legacy_package_ids or {}) do
+    register_unique(package_key_by_package_id, legacy_package_id, package_key, "legacy package")
+  end
+end
+
+-- Anything listed here is omitted unless the current package ID is unlocked.
+-- Legacy IDs are deliberately locked too, preventing old hashes from becoming
+-- public if they temporarily remain in assets/whitelist.txt during rollout.
+local LOCKED_BY_DEFAULT = {}
+
+local function lock_package_definition(def)
+  if def.package_id and def.package_id ~= "" then
+    LOCKED_BY_DEFAULT[def.package_id] = true
+  end
+
+  for _, legacy_package_id in ipairs(def.legacy_package_ids or {}) do
+    LOCKED_BY_DEFAULT[legacy_package_id] = true
+  end
+end
+
+for _, package_def in pairs(whitelist.PACKAGE_DEFS) do
+  lock_package_definition(package_def)
+end
 
 for _, card_def in pairs(whitelist.CARDS) do
-  if card_def.package_id then
-    LOCKED_BY_DEFAULT[card_def.package_id] = true
-  end
+  lock_package_definition(card_def)
 end
 
 local cached_whitelist = {}
@@ -286,13 +376,6 @@ local function whitelist_text_hash(text)
   return tostring(h)
 end
 
-local DEBUG_WHITELIST = false
-
-local function printd(...)
-  if not DEBUG_WHITELIST then return end
-  print("[whitelist]", ...)
-end
-
 local function read_text_file(path)
   local f = io.open(path, "rb")
   if not f then return nil end
@@ -305,16 +388,208 @@ local function get_safe_secret(player_id)
   return helpers.get_safe_player_secret(player_id)
 end
 
+local function resolve_unlock_target(key_or_package_id)
+  local value = tostring(key_or_package_id or "")
+  if value == "" then
+    return nil, nil
+  end
+
+  if whitelist.CARDS[value] then
+    return "card", value
+  end
+
+  if whitelist.PACKAGE_DEFS[value] then
+    return "package", value
+  end
+
+  local card_key = card_key_by_package_id[value]
+  if card_key then
+    return "card", card_key
+  end
+
+  local package_key = package_key_by_package_id[value]
+  if package_key then
+    return "package", package_key
+  end
+
+  return "raw_package", value
+end
+
+local function unlocks_contain(unlocks, kind, key)
+  if kind == "card" then
+    return unlocks.cards[key] == true
+  end
+
+  if kind == "package" then
+    return unlocks.packages[key] == true
+  end
+
+  if kind == "raw_package" then
+    return unlocks.raw_packages[key] == true
+  end
+
+  return false
+end
+
+local function set_unlock(unlocks, kind, key)
+  if kind == "card" then
+    unlocks.cards[key] = true
+    return true
+  end
+
+  if kind == "package" then
+    unlocks.packages[key] = true
+    return true
+  end
+
+  if kind == "raw_package" then
+    unlocks.raw_packages[key] = true
+    return true
+  end
+
+  return false
+end
+
+local function normalize_unlock_memory(player_memory)
+  local unlocks = player_memory[PLAYER_UNLOCKS_MEM_KEY]
+
+  if type(unlocks) ~= "table" then
+    unlocks = {}
+    player_memory[PLAYER_UNLOCKS_MEM_KEY] = unlocks
+  end
+
+  if type(unlocks.cards) ~= "table" then
+    unlocks.cards = {}
+  end
+
+  if type(unlocks.packages) ~= "table" then
+    unlocks.packages = {}
+  end
+
+  if type(unlocks.raw_packages) ~= "table" then
+    unlocks.raw_packages = {}
+  end
+
+  return unlocks
+end
+
+-- Handles an accidental/intermediate flat v2 table safely, if one ever existed.
+local function migrate_flat_v2_unlocks(unlocks)
+  local changed = false
+  local reserved = {
+    cards = true,
+    packages = true,
+    raw_packages = true,
+  }
+
+  local flat_keys = {}
+  for key, value in pairs(unlocks) do
+    if not reserved[key] and value == true then
+      flat_keys[#flat_keys + 1] = key
+    end
+  end
+
+  for _, old_key in ipairs(flat_keys) do
+    local kind, stable_key = resolve_unlock_target(old_key)
+    if kind and stable_key then
+      if not unlocks_contain(unlocks, kind, stable_key) then
+        set_unlock(unlocks, kind, stable_key)
+      end
+      unlocks[old_key] = nil
+      changed = true
+    end
+  end
+
+  return changed
+end
+
+-- Imports old v1 package-ID ownership into stable v2 keys.
+-- It is intentionally idempotent and leaves v1 untouched as a rollback copy.
+local function import_legacy_unlocks(player_memory, unlocks)
+  local legacy = player_memory[LEGACY_PLAYER_UNLOCKS_MEM_KEY]
+  if type(legacy) ~= "table" then
+    return false
+  end
+
+  local changed = false
+
+  for legacy_package_id, is_unlocked in pairs(legacy) do
+    if is_unlocked == true then
+      local kind, stable_key = resolve_unlock_target(legacy_package_id)
+
+      if kind and stable_key and not unlocks_contain(unlocks, kind, stable_key) then
+        set_unlock(unlocks, kind, stable_key)
+        changed = true
+        printd("migrated v1 unlock", legacy_package_id, "->", kind, stable_key)
+      end
+    end
+  end
+
+  return changed
+end
+
+-- If an unknown raw package later becomes registered, move it into its stable key.
+local function migrate_registered_raw_unlocks(unlocks)
+  local changed = false
+  local raw_ids = {}
+
+  for package_id, is_unlocked in pairs(unlocks.raw_packages) do
+    if is_unlocked == true then
+      raw_ids[#raw_ids + 1] = package_id
+    end
+  end
+
+  for _, package_id in ipairs(raw_ids) do
+    local kind, stable_key = resolve_unlock_target(package_id)
+
+    if kind and kind ~= "raw_package" and stable_key then
+      if not unlocks_contain(unlocks, kind, stable_key) then
+        set_unlock(unlocks, kind, stable_key)
+      end
+
+      unlocks.raw_packages[package_id] = nil
+      changed = true
+    end
+  end
+
+  return changed
+end
+
 local function get_player_unlocks(player_id)
   if ezmemory.is_loaded and not ezmemory.is_loaded() then
     return nil, nil
   end
 
   local safe_secret = get_safe_secret(player_id)
-  local player_memory = ezmemory.get_player_memory(safe_secret)
+  if not safe_secret or safe_secret == "" then
+    return nil, nil
+  end
 
-  player_memory[PLAYER_UNLOCKS_MEM_KEY] = player_memory[PLAYER_UNLOCKS_MEM_KEY] or {}
-  return player_memory[PLAYER_UNLOCKS_MEM_KEY], safe_secret
+  local player_memory = ezmemory.get_player_memory(safe_secret)
+  if type(player_memory) ~= "table" then
+    return nil, safe_secret
+  end
+
+  local unlocks = normalize_unlock_memory(player_memory)
+  local changed = false
+
+  if migrate_flat_v2_unlocks(unlocks) then
+    changed = true
+  end
+
+  if import_legacy_unlocks(player_memory, unlocks) then
+    changed = true
+  end
+
+  if migrate_registered_raw_unlocks(unlocks) then
+    changed = true
+  end
+
+  if changed then
+    ezmemory.save_player_memory(safe_secret)
+  end
+
+  return unlocks, safe_secret
 end
 
 local function normalize_busting_level(score)
@@ -352,9 +627,9 @@ function whitelist.provide_unlocked_assets_for_player(player_id)
     return false
   end
 
-  for package_id, is_unlocked in pairs(unlocks) do
+  for card_key, is_unlocked in pairs(unlocks.cards) do
     if is_unlocked then
-      local card_def = card_by_package_id[package_id]
+      local card_def = whitelist.CARDS[card_key]
       if card_def then
         provide_card_asset_for_player(player_id, card_def)
       end
@@ -372,9 +647,9 @@ function whitelist.queue_unlocked_card_rewards_for_player(player_id)
 
   local rewards = {}
 
-  for package_id, is_unlocked in pairs(unlocks) do
+  for card_key, is_unlocked in pairs(unlocks.cards) do
     if is_unlocked then
-      local card_def = card_by_package_id[package_id]
+      local card_def = whitelist.CARDS[card_key]
       if card_def then
         provide_card_asset_for_player(player_id, card_def)
         rewards[#rewards + 1] = build_card_reward_entry(card_def)
@@ -464,7 +739,7 @@ function whitelist.try_grant_area_battle_chip(player_id, cards_cfg, encounter_in
     return nil
   end
 
-  if whitelist.player_has_package_unlocked(player_id, card_def.package_id) then
+  if whitelist.player_has_card_unlocked(player_id, chosen.card_key) then
     local duplicate_money = tonumber(chosen.duplicate_money or 0) or 0
 
     if duplicate_money <= 0 then
@@ -493,7 +768,7 @@ function whitelist.try_grant_area_battle_chip(player_id, cards_cfg, encounter_in
   end
 
   provide_card_asset_for_player(player_id, card_def)
-  whitelist.unlock_package(player_id, card_def.package_id)
+  whitelist.unlock_package(player_id, chosen.card_key)
 
   table.insert(rewards, 1, build_card_reward_entry(card_def, chosen.code))
 
@@ -507,6 +782,23 @@ function whitelist.try_grant_area_battle_chip(player_id, cards_cfg, encounter_in
     score = score,
     delay_ticks = POSTWIN_REWARD_DELAY_TICKS,
   }
+end
+
+-- Only current package IDs can be authorized in generated whitelist files.
+-- Legacy IDs remain usable for migration/API lookup, but old whitelist lines
+-- are intentionally excluded even for players who owned the chip.
+local function is_current_package_id_unlocked(unlocks, package_id)
+  local card_key = current_card_key_by_package_id[package_id]
+  if card_key then
+    return unlocks.cards[card_key] == true
+  end
+
+  local package_key = current_package_key_by_package_id[package_id]
+  if package_key then
+    return unlocks.packages[package_key] == true
+  end
+
+  return unlocks.raw_packages[package_id] == true
 end
 
 local function build_player_whitelist_text(player_id)
@@ -526,10 +818,12 @@ local function build_player_whitelist_text(player_id)
   for line in (base_text .. "\n"):gmatch("(.-)\n") do
     local _, package_id = line:match("^%s*(%S+)%s+(%S+)%s*$")
 
-    -- Keep section headers / blank lines / anything non-package-looking
+    -- Keep section headers / blank lines / anything non-package-looking.
     if not package_id then
       table.insert(out_lines, line)
-    elseif not LOCKED_BY_DEFAULT[package_id] or unlocks[package_id] then
+    elseif not LOCKED_BY_DEFAULT[package_id]
+        or is_current_package_id_unlocked(unlocks, package_id)
+    then
       table.insert(out_lines, line)
     end
   end
@@ -568,13 +862,18 @@ function whitelist.is_enforced_area(area_id)
   return ENFORCED_AREAS[area_id] == true
 end
 
-function whitelist.player_has_package_unlocked(player_id, package_id)
+function whitelist.player_has_package_unlocked(player_id, key_or_package_id)
   local unlocks = select(1, get_player_unlocks(player_id))
-  return unlocks ~= nil and unlocks[package_id] == true
+  if not unlocks then
+    return false
+  end
+
+  local kind, stable_key = resolve_unlock_target(key_or_package_id)
+  return unlocks_contain(unlocks, kind, stable_key)
 end
 
-function whitelist.unlock_package(player_id, package_id)
-  if not package_id or package_id == "" then
+function whitelist.unlock_package(player_id, key_or_package_id)
+  if not key_or_package_id or key_or_package_id == "" then
     return false, "missing_package_id"
   end
 
@@ -583,27 +882,57 @@ function whitelist.unlock_package(player_id, package_id)
     return false, "memory_not_ready"
   end
 
-  if unlocks[package_id] then
+  local kind, stable_key = resolve_unlock_target(key_or_package_id)
+  if not kind or not stable_key then
+    return false, "missing_package_id"
+  end
+
+  if unlocks_contain(unlocks, kind, stable_key) then
     whitelist.apply_for_player(player_id)
     return false, "already_unlocked"
   end
 
-  unlocks[package_id] = true
+  set_unlock(unlocks, kind, stable_key)
   ezmemory.save_player_memory(safe_secret)
 
-  -- Re-apply immediately in case the player is already in an enforced area
+  -- Re-apply immediately in case the player is already in an enforced area.
   whitelist.apply_for_player(player_id)
   return true
 end
 
 function whitelist.unlock_undershirt(player_id)
-  return whitelist.unlock_package(player_id, whitelist.PACKAGES.undershirt)
+  return whitelist.unlock_package(player_id, "undershirt")
+end
+
+local function apply_blank_whitelist_for_player(player_id)
+  Net.provide_asset_for_player(
+    player_id,
+    BLANK_WHITELIST_ASSET_PATH
+  )
+
+  Net.set_mod_whitelist_for_player(
+    player_id,
+    BLANK_WHITELIST_ASSET_PATH
+  )
+
+  printd(
+    "cleared whitelist for unrestricted area",
+    player_id,
+    BLANK_WHITELIST_ASSET_PATH
+  )
+
+  return true
 end
 
 function whitelist.apply_for_player(player_id)
   local area_id = Net.get_player_area(player_id)
-  if not area_id or not whitelist.is_enforced_area(area_id) then
+  if not area_id then
     return false
+  end
+
+  -- Anything outside the protected area list is "anything goes."
+  if not whitelist.is_enforced_area(area_id) then
+    return apply_blank_whitelist_for_player(player_id)
   end
 
   local asset_path = rebuild_player_whitelist_asset(player_id)
@@ -613,7 +942,14 @@ function whitelist.apply_for_player(player_id)
 
   Net.provide_asset_for_player(player_id, asset_path)
   Net.set_mod_whitelist_for_player(player_id, asset_path)
-  printd("applied whitelist", player_id, asset_path)
+
+  printd(
+    "applied restricted whitelist",
+    player_id,
+    area_id,
+    asset_path
+  )
+
   return true
 end
 
@@ -628,20 +964,25 @@ end
 
 function whitelist.player_has_card_unlocked(player_id, card_key_or_package_id)
   local card_def = whitelist.get_card_def(card_key_or_package_id)
-  if not card_def then
-    return false, nil
+  if not card_def or not card_def.card_key then
+    return false, card_def
   end
 
-  return whitelist.player_has_package_unlocked(player_id, card_def.package_id), card_def
+  local unlocks = select(1, get_player_unlocks(player_id))
+  if not unlocks then
+    return false, card_def
+  end
+
+  return unlocks.cards[card_def.card_key] == true, card_def
 end
 
 function whitelist.unlock_card(player_id, card_key_or_package_id, code, delay_ticks)
   local card_def = whitelist.get_card_def(card_key_or_package_id)
-  if not card_def then
+  if not card_def or not card_def.card_key then
     return false, "missing_card_def", nil
   end
 
-  if whitelist.player_has_package_unlocked(player_id, card_def.package_id) then
+  if whitelist.player_has_card_unlocked(player_id, card_def.card_key) then
     return false, "already_unlocked", card_def
   end
 
@@ -650,7 +991,7 @@ function whitelist.unlock_card(player_id, card_key_or_package_id, code, delay_ti
     return false, asset_err or "provide_failed", card_def
   end
 
-  local ok_unlock, reason = whitelist.unlock_package(player_id, card_def.package_id)
+  local ok_unlock, reason = whitelist.unlock_package(player_id, card_def.card_key)
   if not ok_unlock and reason ~= "already_unlocked" then
     return false, reason, card_def
   end
