@@ -14,11 +14,6 @@
 
 local helpers  = require('scripts/ezlibs-scripts/helpers')
 local ezmemory = require('scripts/ezlibs-scripts/ezmemory')
-local Pets = (function()
-  local ok, M = pcall(require, 'scripts/ezlibs-custom/pets')
-  if ok and M then return M end
-  return nil
-end)()
 
 local JobBBS = {}
 
@@ -331,7 +326,6 @@ local function ensure_daily_reset(pid)
 end
 
 local JOB_PET_XP = 15
-
 -- ===== Rewards =====
 local REWARDS = {
   visit3         = { money=1500 },
@@ -446,20 +440,24 @@ end
 
 local function give_pet_xp(pid, amount)
   amount = math.max(0, math.floor(tonumber(amount) or 0))
-
   if amount <= 0 then return false end
 
-  if not (Pets and type(Pets.award_armed_pet_battle_xp) == "function") then
+  local loaded = package and package.loaded
+  local Pets = loaded and loaded["scripts/ezlibs-custom/pets"] or nil
+
+  if type(Pets) ~= "table"
+    or type(Pets.award_armed_pet_battle_xp) ~= "function"
+  then
     return false
   end
 
-  local ok_call, awarded = pcall(
+  local ok, awarded = pcall(
     Pets.award_armed_pet_battle_xp,
     pid,
     amount
   )
 
-  return ok_call and awarded == true
+  return ok and awarded == true
 end
 
 JobBBS.on_claim_reward = function(pid, job)
