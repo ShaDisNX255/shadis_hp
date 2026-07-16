@@ -14,6 +14,11 @@
 
 local helpers  = require('scripts/ezlibs-scripts/helpers')
 local ezmemory = require('scripts/ezlibs-scripts/ezmemory')
+local Pets = (function()
+  local ok, M = pcall(require, 'scripts/ezlibs-custom/pets')
+  if ok and M then return M end
+  return nil
+end)()
 
 local JobBBS = {}
 
@@ -325,6 +330,8 @@ local function ensure_daily_reset(pid)
   end
 end
 
+local JOB_PET_XP = 15
+
 -- ===== Rewards =====
 local REWARDS = {
   visit3         = { money=1500 },
@@ -437,9 +444,30 @@ local function give_item(pid, item_id, qty)
   Net.message_player(pid, string.format('Received item %s x%d', tostring(item_id), qty))
 end
 
+local function give_pet_xp(pid, amount)
+  amount = math.max(0, math.floor(tonumber(amount) or 0))
+
+  if amount <= 0 then return false end
+
+  if not (Pets and type(Pets.award_armed_pet_battle_xp) == "function") then
+    return false
+  end
+
+  local ok_call, awarded = pcall(
+    Pets.award_armed_pet_battle_xp,
+    pid,
+    amount
+  )
+
+  return ok_call and awarded == true
+end
+
 JobBBS.on_claim_reward = function(pid, job)
   local spec = REWARDS[job.id] or { money = 200 }
-  if spec.money then give_money(pid, spec.money) end
+  if spec.money then
+    give_money(pid, spec.money)
+    give_pet_xp(pid, spec.pet_xp or JOB_PET_XP)
+  end
   if spec.item then
     if type(spec.item) == 'table' then
       for _, t in ipairs(spec.item) do give_item(pid, t.id, t.qty or 1) end
@@ -992,23 +1020,33 @@ local function jobs_pool()
   -- Big Fish (HowlerMan) - N: 10,15,20 (single catch)
   local function _big_single_check(pid, st, base_key, need_lb)
     st.prog.fish = st.prog.fish or {}
-    local base = (st.prog.baseline and st.prog.baseline[base_key]
+
+    local base = (st.prog.baseline
+                 and st.prog.baseline[base_key]
                  and st.prog.baseline[base_key].fish) or {}
 
-    local F         = st.prog.fish
-    local cur_max   = tonumber(F.max_single or 0) or 0
-    local base_max  = tonumber(base.max_single or 0) or 0
-    local cur_c     = tonumber(F.catches or 0)     or 0
-    local base_c    = tonumber(base.catches or 0)  or 0
-    local last_w    = tonumber(F.last_w or 0)      or 0
+    local F = st.prog.fish
 
-    -- “complete” if you’ve met the threshold, AND either:
-    -- (1) you beat your snapshot lifetime best, OR
-    -- (2) you’ve made at least one catch since accepting and that catch hit the threshold
-    local met_since_accept = (cur_c > base_c) and (last_w >= need_lb)
-    local done = (cur_max >= need_lb) and ((cur_max > base_max) or met_since_accept)
+    local cur_c  = tonumber(F.catches or 0) or 0
+    local base_c = tonumber(base.catches or 0) or 0
+    local last_w = tonumber(F.last_w or 0) or 0
 
-    local prog = math.min(cur_max, need_lb)
+    local marker_key = "single_" .. tostring(need_lb) .. "_at"
+    local qualified_at = tonumber(F[marker_key] or 0) or 0
+
+    -- Marker handles new catches permanently.
+    -- The last_w fallback lets currently accepted jobs made before this
+    -- update still complete when the latest catch qualifies.
+    local done =
+      qualified_at > base_c
+      or ((cur_c > base_c) and (last_w >= need_lb))
+
+    -- Do not display an old pre-acceptance lifetime record as progress.
+    local caught_since_accept = cur_c > base_c
+    local prog = done
+      and need_lb
+      or (caught_since_accept and math.min(last_w, need_lb) or 0)
+
     return done, prog, need_lb
   end
   J('fish_single_10lb', 'Big Fish', 'HowlerMan', 'Me hungry! Catch fish that weighs more than 10 lbs, ook!',
@@ -2077,6 +2115,12 @@ function JobBBS.on_fish_catch(pid, info)
   local F = st.prog.fish
   local w = tonumber(info and (info.weight or info.weight_lb or info.w)) or 0
   F.catches    = (F.catches or 0) + 1
+  -- Remember the catch number of the latest qualifying Big Fish catch.
+  -- This lets jobs prove the fish was caught after acceptance and keeps
+  -- the job completed even if a smaller fish is caught afterward.
+  if w >= 10 then F.single_10_at = F.catches end
+  if w >= 15 then F.single_15_at = F.catches end
+  if w >= 20 then F.single_20_at = F.catches end
   F.total_lb   = (F.total_lb or 0) + w
   if w > (F.max_single or 0) then F.max_single = w end
   F.last_w     = w
