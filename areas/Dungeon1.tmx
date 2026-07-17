@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.12.2" orientation="isometric" renderorder="right-down" width="57" height="57" tilewidth="64" tileheight="32" infinite="0" nextlayerid="7" nextobjectid="194">
+<map version="1.10" tiledversion="1.12.2" orientation="isometric" renderorder="right-down" width="57" height="57" tilewidth="64" tileheight="32" infinite="0" nextlayerid="7" nextobjectid="196">
  <properties>
   <property name="Amount 1" type="int" value="1"/>
   <property name="Amount 2" type="int" value="1"/>
@@ -43,6 +43,7 @@
  <tileset firstgid="363" source="../assets/ezlibs-assets/ezcheckpoints/bn5cubegreen_tile.tsx"/>
  <tileset firstgid="367" source="../assets/ezlibs-assets/ezmystery/BlueMysteryData.tsx"/>
  <tileset firstgid="375" source="../assets/tiles/TBS.tsx"/>
+ <tileset firstgid="376" source="../assets/tiles/bn3-bbs.tsx"/>
  <layer id="1" name="Tile Layer 0" width="57" height="57">
   <data encoding="csv">
 0,0,0,0,0,0,0,0,23,24,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -131,7 +132,7 @@
   <object id="90" gid="2147483961" x="1006.5" y="339.5" width="64" height="64"/>
   <object id="91" gid="2147483961" x="1229.5" y="208.5" width="64" height="64"/>
   <object id="92" gid="314" x="1233.5" y="526.5" width="64" height="64"/>
-  <object id="93" gid="313" x="1265.5" y="814.5" width="64" height="64"/>
+  <object id="93" gid="313" x="1264" y="784" width="64" height="64"/>
   <object id="94" gid="2147483961" x="1425.5" y="846.5" width="64" height="64"/>
   <object id="95" gid="2147483961" x="1233.5" y="1006.5" width="64" height="64"/>
   <object id="96" gid="313" x="1209" y="1459" width="64" height="64"/>
@@ -722,6 +723,20 @@
     <property name="Amount" type="int" value="20"/>
     <property name="Dialogue Type" value="none"/>
     <property name="Event Name" value="petxp"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="194" name="HunterBBS" type="HunterBBS" gid="378" x="1168" y="816" width="80" height="96">
+   <properties>
+    <property name="Name" value="Hunter BBS"/>
+   </properties>
+  </object>
+  <object id="195" name="Official NetNavi" type="NPC" x="1232" y="816">
+   <properties>
+    <property name="Asset Name" value="official-navi-exe4_orange"/>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Direction" value="Down Left"/>
+    <property name="Text 1" value="Attention! We've received multiple reports of virus outbreaks coming out of this area. We're doing our best to control these outbreaks. Want to help? Take a look at that board and start deleting some viruses listed there. We will reward you for your hard work after you reach our daily goals!"/>
    </properties>
    <point/>
   </object>

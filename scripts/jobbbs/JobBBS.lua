@@ -17,6 +17,15 @@ local ezmemory = require('scripts/ezlibs-scripts/ezmemory')
 
 local JobBBS = {}
 
+-- Optional HunterBBS integration. HunterBBS owns its own board, persistence,
+-- battle tracking, and monthly leaderboard. JobBBS only includes its rows in
+-- the LMenu Job Progress viewer.
+local HunterBBS = (function()
+  local ok, M = pcall(require, 'scripts/jobbbs/HunterBBS')
+  if ok and M then return M end
+  return nil
+end)()
+
 -- Debug toggle
 local DEBUG = true
 local function dbg(...)
@@ -1555,6 +1564,7 @@ function JobBBS.build_menuapi_progress_rows(pid)
     end
   end
 
+  -- Sort regular accepted jobs first.
   table.sort(rows, function(a, b)
     local ad = a.job_done and 1 or 0
     local bd = b.job_done and 1 or 0
@@ -1564,6 +1574,19 @@ function JobBBS.build_menuapi_progress_rows(pid)
     local bt = tostring(b.job_title or b.text or "")
     return at < bt
   end)
+
+  -- Hunter progress is intentionally absent until the player defeats at least
+  -- one virus from today's Hunter pool inside Dungeon1.
+  if HunterBBS and type(HunterBBS.build_menuapi_progress_rows) == "function" then
+    local ok, hunter_rows = pcall(HunterBBS.build_menuapi_progress_rows, pid)
+    if ok and type(hunter_rows) == "table" then
+      for _, row in ipairs(hunter_rows) do
+        rows[#rows + 1] = row
+      end
+    elseif not ok then
+      dbg("HunterBBS progress rows failed", tostring(hunter_rows))
+    end
+  end
 
   if #rows == 0 then
     rows[#rows + 1] = {
@@ -1579,6 +1602,13 @@ function JobBBS.build_menuapi_progress_rows(pid)
 end
 
 function JobBBS.handle_menuapi_progress_confirm(pid, row, menu_state, opts)
+  if type(row) == "table" and row.hunter_bounty == true then
+    if HunterBBS and type(HunterBBS.handle_menuapi_progress_confirm) == "function" then
+      return HunterBBS.handle_menuapi_progress_confirm(pid, row, menu_state, opts)
+    end
+    return true
+  end
+
   if type(row) ~= "table" or not row.job_id then
     return true
   end
@@ -1941,6 +1971,12 @@ if _G.Net and Net.on then
     if cls == 'JobBBS' or typ == 'JobBBS' then
       local board_name = tostring(obj.name or DEFAULT_BOARD_TITLE)
       JobBBS.open(pid, board_name)
+      return
+    end
+
+    -- HunterBBS owns this interaction through its own listener. Do not count
+    -- the Hunter board itself as a generic object inspection for JobBBS jobs.
+    if cls == 'HunterBBS' or typ == 'HunterBBS' then
       return
     end
 

@@ -17,6 +17,12 @@ local JobBBS = (function()
   return ok and M or nil
 end)()
 
+local HunterBBS = (function()
+  local ok, M = pcall(require, 'scripts/jobbbs/HunterBBS')
+  if ok and M then return M end
+  return nil
+end)()
+
 local function _result_flags(stats)
   -- If dungeon.lua exposes a classifier, use that
   if dungeon then
@@ -331,6 +337,19 @@ local give_result_awards = function (player_id, encounter_info, stats)
 
   local final_stats = { health = final_hp, emotion = stats.emotion }
   persist_health_and_emotion(player_id, encounter_info, final_stats)
+end
+
+-- Generated random Dungeon1 encounters report their exact spawned enemy list
+-- to HunterBBS before the existing dungeon reward handler runs.
+local function random_encounter_results(player_id, encounter_info, stats)
+  if HunterBBS and type(HunterBBS.on_encounter_result) == "function" then
+    local ok, err = pcall(HunterBBS.on_encounter_result, player_id, encounter_info, stats)
+    if not ok then
+      print("[hunterbbs] Dungeon1 result callback failed: " .. tostring(err))
+    end
+  end
+
+  return give_result_awards(player_id, encounter_info, stats)
 end
 
 local mini_boss_rewards = function (player_id, encounter_info, stats)
@@ -673,7 +692,7 @@ return {
         },
 
         -- Preserve your existing dungeon reward/death/run handling for random battles.
-        results_callback = give_result_awards,
+        results_callback = random_encounter_results,
 
         pool = {
             -- Dungeon-exclusive chase drops
