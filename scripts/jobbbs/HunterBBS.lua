@@ -96,15 +96,27 @@ local function trunc(text, max_ch)
   return text:sub(1, max_ch - 3) .. "..."
 end
 
-local function bounty_key(name, rank)
-  return tostring(name or "") .. ":" .. tostring(math.floor(tonumber(rank) or 1))
+-- Bounties are now tracked by virus species only.
+local function bounty_key(name)
+  return tostring(name or "")
+end
+
+-- Individual rank definitions still use name + rank so each rank
+-- can retain its own money and leaderboard-point values.
+local function definition_key(name, rank)
+  return tostring(name or "")
+    .. ":"
+    .. tostring(math.floor(tonumber(rank) or 1))
 end
 
 local DEF_BY_KEY = {}
 local DEFS_BY_NAME = {}
+
 for _, def in ipairs(HUNTER_DEFS) do
-  def.id = bounty_key(def.name, def.rank)
+  def.id = definition_key(def.name, def.rank)
+
   DEF_BY_KEY[def.id] = def
+
   DEFS_BY_NAME[def.name] = DEFS_BY_NAME[def.name] or {}
   DEFS_BY_NAME[def.name][#DEFS_BY_NAME[def.name] + 1] = def
 end
@@ -253,31 +265,28 @@ end
 
 local function roll_daily_bounties()
   local names = {}
+
   for name in pairs(DEFS_BY_NAME) do
     names[#names + 1] = name
   end
+
   shuffle(names)
 
   local out = {}
   local count = math.min(DAILY_BOUNTY_COUNT, #names)
 
   for i = 1, count do
-    local variants = DEFS_BY_NAME[names[i]]
-    local def = variants[math.random(#variants)]
+    local name = names[i]
 
     out[#out + 1] = {
-      id = def.id,
-      name = def.name,
-      rank = def.rank,
-      money_per_kill = def.money_per_kill,
-      leaderboard_points = def.leaderboard_points,
+      id = bounty_key(name),
+      name = name,
       required = math.random(REQUIRED_MIN, REQUIRED_MAX),
     }
   end
 
   table.sort(out, function(a, b)
-    if a.name ~= b.name then return a.name < b.name end
-    return a.rank < b.rank
+    return tostring(a.name) < tostring(b.name)
   end)
 
   return out
@@ -327,6 +336,49 @@ local function ensure_global_state()
     }
     changed = true
     dbg("rolled daily bounties for", slot.daily.day_key)
+  end
+
+  -- Convert today's existing rank-specific bounties into species bounties
+  -- without rerolling the list or changing their current requirements.
+  --
+  -- The legacy fields remain attached until tomorrow so players who have not
+  -- logged in yet can migrate their personal progress when they return.
+  for _, bounty in ipairs(slot.daily.bounties or {}) do
+    local species_id = bounty_key(bounty.name)
+    local old_id = tostring(bounty.id or "")
+
+    if old_id ~= species_id or bounty.rank ~= nil then
+      if old_id ~= "" and old_id ~= species_id then
+        bounty.legacy_id = bounty.legacy_id or old_id
+      end
+
+      if bounty.legacy_money_per_kill == nil then
+        local legacy_def = bounty.legacy_id
+          and DEF_BY_KEY[bounty.legacy_id]
+          or nil
+
+        bounty.legacy_money_per_kill =
+          tonumber(bounty.money_per_kill)
+          or tonumber(legacy_def and legacy_def.money_per_kill)
+          or 0
+      end
+
+      bounty.id = species_id
+
+      -- These values now come from the actual defeated enemy rank.
+      bounty.rank = nil
+      bounty.money_per_kill = nil
+      bounty.leaderboard_points = nil
+
+      changed = true
+
+      dbg(
+        "migrated daily bounty",
+        old_id,
+        "->",
+        species_id
+      )
+    end
   end
 
   if changed then
@@ -386,6 +438,7 @@ local function ensure_player_state(pid, global_slot)
     st.day_key = global_slot.daily.day_key
     st.kills = {}
     st.claimed = {}
+    st.reward_money = {}
     st.claims_today = 0
     st.revealed = false
     changed = true
@@ -393,8 +446,84 @@ local function ensure_player_state(pid, global_slot)
 
   st.kills = st.kills or {}
   st.claimed = st.claimed or {}
+  st.reward_money = st.reward_money or {}
   st.claims_today = math.max(0, math.floor(tonumber(st.claims_today) or 0))
   st.revealed = st.revealed == true
+
+  -- Migrate today's rank-specific player progress.
+  --
+  -- Under the old system, only the selected rank could have counted, so the
+  -- migrated money can safely use that old rank's configured value.
+  for _, bounty in ipairs(global_slot.daily.bounties or {}) do
+    local legacy_id = bounty.legacy_id
+    local new_id = bounty.id
+
+    if legacy_id and legacy_id ~= new_id then
+      local had_legacy_data =
+        st.kills[legacy_id] ~= nil
+        or st.claimed[legacy_id] ~= nil
+        or st.reward_money[legacy_id] ~= nil
+
+      local old_count = math.max(
+        0,
+        math.floor(tonumber(st.kills[legacy_id]) or 0)
+      )
+
+      local current_count = math.max(
+        0,
+        math.floor(tonumber(st.kills[new_id]) or 0)
+      )
+
+      local required = math.max(
+        1,
+        math.floor(tonumber(bounty.required) or 1)
+      )
+
+      local transferable = math.min(
+        old_count,
+        math.max(0, required - current_count)
+      )
+
+      if transferable > 0 then
+        st.kills[new_id] = current_count + transferable
+
+        local legacy_def = DEF_BY_KEY[legacy_id]
+
+        local old_money_per_kill =
+          tonumber(bounty.legacy_money_per_kill)
+          or tonumber(legacy_def and legacy_def.money_per_kill)
+          or 0
+
+        st.reward_money[new_id] =
+          math.max(
+            0,
+            math.floor(tonumber(st.reward_money[new_id]) or 0)
+          )
+          + transferable * old_money_per_kill
+      end
+
+      if st.claimed[legacy_id] == true then
+        st.claimed[new_id] = true
+      end
+
+      st.kills[legacy_id] = nil
+      st.claimed[legacy_id] = nil
+      st.reward_money[legacy_id] = nil
+
+      if had_legacy_data then
+        changed = true
+
+        dbg(
+          "migrated player bounty",
+          legacy_id,
+          "->",
+          new_id,
+          "kills",
+          transferable
+        )
+      end
+    end
+  end
 
   -- Keep an existing monthly leaderboard display name current.
   local current = global_slot.leaderboard and global_slot.leaderboard.current
@@ -442,31 +571,59 @@ function HunterBBS.on_encounter_result(pid, encounter_info, stats)
   if not st then return false end
 
   local daily_by_key = bounty_map(global_slot)
-  local spawned_counts = {}
-
-  for _, enemy in ipairs(encounter_info.enemies or {}) do
-    if type(enemy) == "table" then
-      local key = bounty_key(enemy.name, enemy.rank)
-      if daily_by_key[key] then
-        spawned_counts[key] = (spawned_counts[key] or 0) + 1
-      end
-    end
-  end
 
   local total_counted = 0
   local total_points = 0
+  local total_money = 0
 
-  for key, spawned in pairs(spawned_counts) do
-    local bounty = daily_by_key[key]
-    local old_count = math.max(0, math.floor(tonumber(st.kills[key]) or 0))
-    local required = math.max(1, math.floor(tonumber(bounty.required) or 1))
-    local remaining = math.max(0, required - old_count)
-    local counted = math.min(math.max(0, math.floor(tonumber(spawned) or 0)), remaining)
+  -- Process every enemy entry separately.
+  -- Two Gunners in the encounter therefore count as two bounty kills.
+  for _, enemy in ipairs(encounter_info.enemies or {}) do
+    if type(enemy) == "table" then
+      local species_id = bounty_key(enemy.name)
+      local bounty = daily_by_key[species_id]
 
-    if counted > 0 then
-      st.kills[key] = old_count + counted
-      total_counted = total_counted + counted
-      total_points = total_points + counted * math.max(0, math.floor(tonumber(bounty.leaderboard_points) or 0))
+      local def = DEF_BY_KEY[
+        definition_key(enemy.name, enemy.rank)
+      ]
+
+      if bounty and def then
+        local old_count = math.max(
+          0,
+          math.floor(tonumber(st.kills[species_id]) or 0)
+        )
+
+        local required = math.max(
+          1,
+          math.floor(tonumber(bounty.required) or 1)
+        )
+
+        -- Stop counting this species once today's requirement is reached.
+        if old_count < required then
+          local money = math.max(
+            0,
+            math.floor(tonumber(def.money_per_kill) or 0)
+          )
+
+          local points = math.max(
+            0,
+            math.floor(tonumber(def.leaderboard_points) or 0)
+          )
+
+          st.kills[species_id] = old_count + 1
+
+          st.reward_money[species_id] =
+            math.max(
+              0,
+              math.floor(tonumber(st.reward_money[species_id]) or 0)
+            )
+            + money
+
+          total_counted = total_counted + 1
+          total_money = total_money + money
+          total_points = total_points + points
+        end
+      end
     end
   end
 
@@ -479,7 +636,16 @@ function HunterBBS.on_encounter_result(pid, encounter_info, stats)
   save_player_memory(pid, mem, secret)
   save_area_slot()
 
-  dbg("counted", total_counted, "kills and", total_points, "points for", player_name(pid))
+  dbg(
+    "counted",
+    total_counted,
+    "kills,",
+    total_points,
+    "points and $",
+    total_money,
+    "for",
+    player_name(pid)
+  )
   return true, total_counted, total_points
 end
 
@@ -557,7 +723,10 @@ local function claim_bounty(pid, bounty_id)
     return false, string.format("Progress: %d/%d", cur, required)
   end
 
-  local reward = required * math.max(0, math.floor(tonumber(bounty.money_per_kill) or 0))
+  local reward = math.max(
+    0,
+    math.floor(tonumber(st.reward_money[bounty_id]) or 0)
+  )
 
   -- Persist the claim before paying so repeated input cannot redeem twice.
   st.claimed[bounty_id] = true
@@ -601,16 +770,38 @@ local function bounty_status(st, bounty)
   return cur, required, claimed, ready
 end
 
+local function rank_value_lines(name)
+  local lines = {}
+
+  for _, def in ipairs(DEFS_BY_NAME[name] or {}) do
+    lines[#lines + 1] = string.format(
+      "R%d: $%d, %dpt",
+      math.floor(tonumber(def.rank) or 1),
+      math.floor(tonumber(def.money_per_kill) or 0),
+      math.floor(tonumber(def.leaderboard_points) or 0)
+    )
+  end
+
+  return lines
+end
+
 local function bounty_detail_text(st, bounty)
   local cur, required, claimed, ready = bounty_status(st, bounty)
-  local total_reward = required * math.max(0, math.floor(tonumber(bounty.money_per_kill) or 0))
+
+  local reward_earned = math.max(
+    0,
+    math.floor(tonumber(st.reward_money[bounty.id]) or 0)
+  )
+
   local lines = {
-    string.format("%s Rank %d", bounty.name, bounty.rank),
+    tostring(bounty.name),
     string.format("Progress: %d/%d", cur, required),
-    string.format("Value: $%d each", bounty.money_per_kill),
-    string.format("Reward: $%d", total_reward),
-    string.format("Hunter points: %d each", bounty.leaderboard_points),
+    string.format("Reward earned: $%d", reward_earned),
   }
+
+  for _, line in ipairs(rank_value_lines(bounty.name)) do
+    lines[#lines + 1] = line
+  end
 
   if claimed then
     lines[#lines + 1] = "Status: Claimed"
@@ -665,10 +856,9 @@ local function open_main_board(pid, board_title)
     id = "__hunter:bounty:" .. bounty.id,
     read = true,
     title = string.format(
-      "%s %s R%d %d/%d",
+      "%s %s %d/%d",
       token,
       bounty.name,
-      bounty.rank,
       cur,
       required
     ),
@@ -915,21 +1105,32 @@ function HunterBBS.build_menuapi_progress_rows(pid)
 
     rows[#rows + 1] = {
       id = "__hunterprog:bounty:" .. bounty.id,
-      text = trunc(string.format("%s R%d", bounty.name, bounty.rank), 20),
-      right = claimed and "Done" or (ready and "Ready" or string.format("%d/%d", cur, required)),
+      text = trunc(tostring(bounty.name), 20),
+
+      right = claimed
+        and "Done"
+        or (
+          ready
+          and "Ready"
+          or string.format("%d/%d", cur, required)
+        ),
+
       tint = menuapi_tint(tint_name, "row_tint"),
       right_tint = menuapi_tint(tint_name, "right_tint"),
+
       hunter_bounty = true,
       hunter_bounty_id = bounty.id,
       hunter_name = bounty.name,
-      hunter_rank = bounty.rank,
       hunter_cur = cur,
       hunter_required = required,
       hunter_claimed = claimed,
       hunter_ready = ready,
-      hunter_money_per_kill = bounty.money_per_kill,
-      hunter_reward = required * bounty.money_per_kill,
-      hunter_points_per_kill = bounty.leaderboard_points,
+
+      hunter_reward = math.max(
+        0,
+        math.floor(tonumber(st.reward_money[bounty.id]) or 0)
+      ),
+
       hunter_claims_today = st.claims_today,
       hunter_claim_limit = MAX_DAILY_CLAIMS,
     }
@@ -944,52 +1145,132 @@ function HunterBBS.handle_menuapi_progress_confirm(pid, row, menu_state, opts)
   end
 
   opts = opts or {}
+
+  local cur = math.max(
+    0,
+    math.floor(tonumber(row.hunter_cur) or 0)
+  )
+
+  local required = math.max(
+    0,
+    math.floor(tonumber(row.hunter_required) or 0)
+  )
+
+  local reward = math.max(
+    0,
+    math.floor(tonumber(row.hunter_reward) or 0)
+  )
+
+  local status
+
+  if row.hunter_claimed then
+    status = string.format("Claimed: %d/%d", cur, required)
+  elseif row.hunter_ready then
+    status = string.format("Ready: %d/%d", cur, required)
+  else
+    status = string.format("Progress: %d/%d", cur, required)
+  end
+
+  local value_lines = rank_value_lines(row.hunter_name)
+
   local MenuAPI = get_menuapi()
+
   if not (MenuAPI and type(MenuAPI.open) == "function") then
-    Net.message_player(pid, string.format(
-      "%s R%d\nProgress: %d/%d\nValue: $%d each\nReward: $%d\nHunter points: %d each",
-      tostring(row.hunter_name),
-      tonumber(row.hunter_rank) or 1,
-      tonumber(row.hunter_cur) or 0,
-      tonumber(row.hunter_required) or 0,
-      tonumber(row.hunter_money_per_kill) or 0,
-      tonumber(row.hunter_reward) or 0,
-      tonumber(row.hunter_points_per_kill) or 0
-    ))
+    local lines = {
+      tostring(row.hunter_name or "Bounty"),
+      status,
+      string.format("Reward earned: $%d", reward),
+    }
+
+    for _, line in ipairs(value_lines) do
+      lines[#lines + 1] = line
+    end
+
+    Net.message_player(
+      pid,
+      table.concat(lines, string.char(10))
+    )
+
     return true
   end
 
-  local status
-  if row.hunter_claimed then
-    status = "Status: Claimed"
-  elseif row.hunter_ready then
-    status = "Status: Ready"
-  else
-    status = string.format("Progress: %d/%d", row.hunter_cur or 0, row.hunter_required or 0)
+  local status_tint = menuapi_tint(
+    (row.hunter_claimed or row.hunter_ready)
+      and "green"
+      or "gold",
+    "row_tint"
+  )
+
+  local gray_tint = menuapi_tint("gray", "row_tint")
+  local detail_rows = {}
+
+  detail_rows[#detail_rows + 1] = {
+    id = "__hunterdetail:status",
+    text = status,
+    selectable = false,
+    disabled_prefix = false,
+    tint = status_tint,
+    show_right = false,
+  }
+
+  detail_rows[#detail_rows + 1] = {
+    id = "__hunterdetail:reward",
+    text = string.format("Reward earned: $%d", reward),
+    selectable = false,
+    disabled_prefix = false,
+    tint = gray_tint,
+    show_right = false,
+  }
+
+  for i, line in ipairs(value_lines) do
+    detail_rows[#detail_rows + 1] = {
+      id = "__hunterdetail:rank:" .. tostring(i),
+      text = line,
+      selectable = false,
+      disabled_prefix = false,
+      tint = gray_tint,
+      show_right = false,
+    }
   end
 
-  local status_tint = menuapi_tint((row.hunter_claimed or row.hunter_ready) and "green" or "gold", "row_tint")
-  local gray_tint = menuapi_tint("gray", "row_tint")
+  detail_rows[#detail_rows + 1] = {
+    id = "__hunterdetail:claims",
+    text = string.format(
+      "Claims: %d/%d",
+      row.hunter_claims_today or 0,
+      row.hunter_claim_limit or MAX_DAILY_CLAIMS
+    ),
+    selectable = false,
+    disabled_prefix = false,
+    tint = gray_tint,
+    show_right = false,
+  }
 
   MenuAPI.open(pid, {
     type = 2,
-    title = trunc(string.format("%s R%d", row.hunter_name or "Bounty", row.hunter_rank or 1), 18),
-    color = (row.hunter_claimed or row.hunter_ready) and "green" or "gold",
+    title = trunc(
+      tostring(row.hunter_name or "Bounty"),
+      18
+    ),
+
+    color = (row.hunter_claimed or row.hunter_ready)
+      and "green"
+      or "gold",
+
     open_sfx = false,
     lock_input = false,
     cursor_enabled = false,
     scroll_enabled = false,
     show_right = false,
-    rows = {
-      { id = "__hunterdetail:status", text = status, selectable = false, disabled_prefix = false, tint = status_tint, show_right = false },
-      { id = "__hunterdetail:value", text = string.format("Value: $%d each", row.hunter_money_per_kill or 0), selectable = false, disabled_prefix = false, tint = gray_tint, show_right = false },
-      { id = "__hunterdetail:reward", text = string.format("Reward: $%d", row.hunter_reward or 0), selectable = false, disabled_prefix = false, tint = gray_tint, show_right = false },
-      { id = "__hunterdetail:points", text = string.format("Points: %d each", row.hunter_points_per_kill or 0), selectable = false, disabled_prefix = false, tint = gray_tint, show_right = false },
-      { id = "__hunterdetail:claims", text = string.format("Claims: %d/%d", row.hunter_claims_today or 0, row.hunter_claim_limit or MAX_DAILY_CLAIMS), selectable = false, disabled_prefix = false, tint = gray_tint, show_right = false },
-    },
+    rows = detail_rows,
+
     parent = function(player_id)
-      local JobBBS = package.loaded["scripts/jobbbs/JobBBS"]
-      if JobBBS and type(JobBBS.open_menuapi_progress) == "function" then
+      local JobBBS =
+        package.loaded["scripts/jobbbs/JobBBS"]
+
+      if JobBBS
+        and type(JobBBS.open_menuapi_progress) == "function"
+      then
         JobBBS.open_menuapi_progress(player_id, {
           parent = opts.parent or "lmenu",
           color = opts.color or "blue",
