@@ -644,6 +644,24 @@ local function is_real_player(pid)
   return pid and Net and Net.is_player and Net.is_player(pid)
 end
 
+local function safe_player_secret(pid)
+  if Friends and type(Friends.secret_for_player) == "function" then
+    local ok, secret = pcall(Friends.secret_for_player, pid)
+    if ok and secret and secret ~= "" then
+      return tostring(secret)
+    end
+  end
+
+  if pid and Net and Net.get_player_secret then
+    local ok, secret = pcall(Net.get_player_secret, pid)
+    if ok and secret and secret ~= "" then
+      return tostring(secret)
+    end
+  end
+
+  return nil
+end
+
 local function is_tour_active(pid)
   local sessions = rawget(_G, "__TOUR_SESSIONS__")
   local s = type(sessions) == "table" and sessions[pid] or nil
@@ -735,7 +753,13 @@ local function cleanup_requests_for_player(player_id)
   for sender, target in pairs(friend_requests) do
     if target == player_id then
       if Friends then
-        pcall(Friends.reject_request, target, sender)
+        local sender_secret = safe_player_secret(sender)
+
+        if Friends.reject_request_by_secret and sender_secret then
+          pcall(Friends.reject_request_by_secret, target, sender_secret)
+        else
+          pcall(Friends.reject_request, target, sender)
+        end
       end
 
       friend_requests[sender] = nil
@@ -932,14 +956,28 @@ local function send_friend_request(sender, target)
     return true
   end
 
-  if status == "outgoing" then
+  local key = request_key(sender, target)
+
+  if friend_requests[sender] == target or friend_request_cooldowns[key] then
     Net.message_player(sender, "Friend request already sent.")
     return true
   end
 
-  local key = request_key(sender, target)
-  if friend_requests[sender] == target or friend_request_cooldowns[key] then
-    return true
+  local sender_secret = safe_player_secret(sender)
+  local target_secret = safe_player_secret(target)
+  local sender_name_full = Net.get_player_name(sender) or "Player"
+  local sender_name = short_name(sender_name_full, 16)
+
+  -- If a saved outgoing request exists but no live popup/cooldown exists,
+  -- clear the stale saved request and create a fresh popup.
+  if status == "outgoing" then
+    if Friends.reject_request_by_secret and target_secret then
+      pcall(Friends.reject_request_by_secret, sender, target_secret, {
+        skip_refresh = true,
+      })
+    else
+      pcall(Friends.reject_request, sender, target)
+    end
   end
 
   local sent_ok = Friends.send_request(sender, target)
@@ -949,8 +987,6 @@ local function send_friend_request(sender, target)
   end
 
   friend_requests[sender] = target
-
-  local sender_name = short_name(Net.get_player_name(sender), 16)
 
   if Net.exclusive_player_emote then
     pcall(Net.exclusive_player_emote, target, sender, 12)
@@ -989,16 +1025,30 @@ local function send_friend_request(sender, target)
       close_friend_request(sender, target_pid, "friend_request_answer")
 
       if choice == "yes" then
-        local ok = Friends.accept_request(target_pid, sender)
+        local ok, err
+
+        if Friends.accept_request_by_secret and sender_secret then
+          ok, err = Friends.accept_request_by_secret(target_pid, sender_secret, sender_name_full)
+        else
+          ok, err = Friends.accept_request(target_pid, sender)
+        end
 
         if ok then
           Net.message_player(target_pid, "Friend added!")
-          Net.message_player(sender, Net.get_player_name(target_pid) .. " accepted your friend request.")
+
+          if is_real_player(sender) then
+            Net.message_player(sender, Net.get_player_name(target_pid) .. " accepted your friend request.")
+          end
         else
           Net.message_player(target_pid, "Couldn't add friend.")
+          print("[octo] friend accept failed:", tostring(err))
         end
       else
-        Friends.reject_request(target_pid, sender)
+        if Friends.reject_request_by_secret and sender_secret then
+          Friends.reject_request_by_secret(target_pid, sender_secret)
+        else
+          Friends.reject_request(target_pid, sender)
+        end
       end
 
       refresh_actor_menu_if_open(sender, target_pid)
@@ -1008,7 +1058,12 @@ local function send_friend_request(sender, target)
     end,
 
     on_cancel = function(target_pid)
-      Friends.reject_request(target_pid, sender)
+      if Friends.reject_request_by_secret and sender_secret then
+        Friends.reject_request_by_secret(target_pid, sender_secret)
+      else
+        Friends.reject_request(target_pid, sender)
+      end
+
       close_friend_request(sender, target_pid, "friend_request_cancel")
 
       refresh_actor_menu_if_open(sender, target_pid)
@@ -1067,12 +1122,14 @@ local function build_actor_rows(player_id, actor_id)
   elseif friend_status == "incoming" then
     friend_text = "Accept Friend"
     friend_selectable = true
-  elseif friend_status == "outgoing"
-    or friend_requests[player_id] == actor_id
+  elseif friend_requests[player_id] == actor_id
     or friend_request_cooldowns[request_key(player_id, actor_id)]
   then
     friend_text = "Friend Sent"
     friend_selectable = false
+  elseif friend_status == "outgoing" then
+    friend_text = "Send Again"
+    friend_selectable = true
   end
 
   return {

@@ -197,10 +197,53 @@ end
 -- ---------------------------------------------------------------------------
 -- Forward Declare 
 
-local state_by_pid = {}
+local state_by_pid = {}  -- top-of-stack alias for backwards compatibility
+local stack_by_pid = {}  -- [pid] = { menu_state_1, menu_state_2, ... }
+local input_locked_by_pid = {}
+
 local next_instance_id = 0
 local message_token_by_key = {}
 local draw_profile_friends_menu
+
+local function get_stack(pid, create)
+  local stack = stack_by_pid[pid]
+  if not stack and create then
+    stack = {}
+    stack_by_pid[pid] = stack
+  end
+  return stack
+end
+
+local function sync_active_state(pid)
+  local stack = stack_by_pid[pid]
+  if stack and #stack > 0 then
+    state_by_pid[pid] = stack[#stack]
+  else
+    stack_by_pid[pid] = nil
+    state_by_pid[pid] = nil
+  end
+  return state_by_pid[pid]
+end
+
+local function set_stack_focus(st, focused)
+  if not st then return end
+
+  if focused then
+    if st._stack_saved_cursor_enabled ~= nil then
+      st.cursor_enabled = st._stack_saved_cursor_enabled
+      st._stack_saved_cursor_enabled = nil
+    end
+    st._stack_focused = true
+  else
+    if st._stack_saved_cursor_enabled == nil then
+      st._stack_saved_cursor_enabled = st.cursor_enabled
+    end
+    st.cursor_enabled = false
+    st.hold_btn = nil
+    st.next_scroll_ts = 0
+    st._stack_focused = false
+  end
+end
 
 local function next_ui_prefix(pid, menu_type)
   next_instance_id = next_instance_id + 1
@@ -854,10 +897,15 @@ local function draw_profile_card(pid, st)
   local mug_state = profile.mug_state or "UI"
 
   if mug_texture and mug_texture ~= "" then
-    add_sprite(
+    -- Use a fresh mug sprite id on full profile redraws too.
+    -- Reusing "profile_mug" can keep the old texture cached.
+    st.profile_mug_seq = (tonumber(st.profile_mug_seq) or 0) + 1
+    local mug_key = "profile_mug_" .. tostring(st.profile_mug_seq)
+
+    st.profile_mug_sprite_id = add_sprite(
       pid,
       st,
-      "profile_mug",
+      mug_key,
       mug_texture,
       mug_anim,
       mug_state,
@@ -1104,7 +1152,8 @@ local function redraw_profile_details_only(pid, st)
   local mug_state = profile.mug_state or "UI"
 
   if mug_texture and mug_texture ~= "" then
-    -- Use a new sprite id each profile update so texture swaps do not get cached.
+    -- Use a fresh mug sprite id on full profile redraws too.
+    -- Reusing "profile_mug" can keep the old texture cached.
     st.profile_mug_seq = (tonumber(st.profile_mug_seq) or 0) + 1
     local mug_key = "profile_mug_" .. tostring(st.profile_mug_seq)
 
@@ -1819,8 +1868,8 @@ local function build_state(pid, spec, menu_type, def)
   return st
 end
 
-local function redraw(pid)
-  local st = state_by_pid[pid]
+local function redraw(pid, st_override)
+  local st = st_override or state_by_pid[pid]
   if not st then return false end
 
   local def = MENU_TYPES[st.type]
@@ -1829,6 +1878,27 @@ local function redraw(pid)
   clear_registered_ui(pid, st)
   def.draw(pid, st)
   return true
+end
+
+local function call_initial_cursor_change(pid, st)
+  if type(st.on_cursor_change) == "function" and st.kind == "vertical" then
+    local row = st.rows and st.rows[st.cursor] or nil
+    pcall(st.on_cursor_change, pid, row, st, nil)
+  end
+end
+
+local function build_state_for_open(pid, spec)
+  spec = spec or {}
+
+  local menu_type = resolve_menu_type(spec.type or 1)
+  local def = MENU_TYPES[menu_type]
+
+  if not def then
+    log("Unsupported menu type", tostring(spec.type), "for", tostring(pid))
+    return nil, "unsupported_type"
+  end
+
+  return build_state(pid, spec, menu_type, def)
 end
 
 -- ---------------------------------------------------------------------------
@@ -1897,15 +1967,52 @@ end
 -- ---------------------------------------------------------------------------
 
 function MenuAPI.is_open(pid)
-  return state_by_pid[pid] ~= nil
+  local stack = stack_by_pid[pid]
+  return (stack and #stack > 0) or state_by_pid[pid] ~= nil
+end
+
+function MenuAPI.stack_size(pid)
+  local stack = stack_by_pid[pid]
+  return stack and #stack or (state_by_pid[pid] and 1 or 0)
 end
 
 _G.menuapi_ui_is_open = function(pid)
-  return state_by_pid[pid] ~= nil
+  return MenuAPI.is_open(pid)
 end
 
 function MenuAPI.get_state(pid)
   return state_by_pid[pid]
+end
+
+local function hide_message_for_state(pid, st, box_id_override)
+  local box_id = box_id_override or (st and st.message_box_id) or cfg.message_box_id
+  local on_close = st and st.message_on_close
+
+  if Displayer and Displayer.Text then
+    if Displayer.Text.closeTextBox then
+      pcall(Displayer.Text.closeTextBox, pid, box_id, {
+        caller = "MenuAPI",
+        reason = "hide_message",
+        close_seconds = cfg.message_backdrop and cfg.message_backdrop.close_seconds or 0.12,
+      })
+    end
+
+    if Displayer.Text.removeTextBox then
+      pcall(Displayer.Text.removeTextBox, pid, box_id)
+    end
+  end
+
+  if st and (not box_id_override or st.message_box_id == box_id_override) then
+    st.message_open = false
+    st.message_box_id = nil
+    st.message_on_close = nil
+  end
+
+  if type(on_close) == "function" then
+    pcall(on_close, pid)
+  end
+
+  return true
 end
 
 function MenuAPI.close(pid, opts)
@@ -1920,18 +2027,84 @@ function MenuAPI.close(pid, opts)
   local on_close = st.on_close
   local lock_input = st.lock_input == true
 
-  MenuAPI.hide_message(pid)
+  hide_message_for_state(pid, st)
   clear_registered_ui(pid, st)
-  state_by_pid[pid] = nil
+
+  local stack = get_stack(pid, false)
+  if stack and #stack > 0 then
+    if stack[#stack] == st then
+      stack[#stack] = nil
+    else
+      for i = #stack, 1, -1 do
+        if stack[i] == st then
+          table.remove(stack, i)
+          break
+        end
+      end
+    end
+  end
 
   if type(on_close) == "function" then
     pcall(on_close, pid, st, reason)
   end
 
+  local previous = sync_active_state(pid)
+  if previous then
+    set_stack_focus(previous, true)
+    redraw(pid, previous)
+    return true
+  end
+
   if reopen_parent then
     reopen_parent_later(pid, parent)
-  elseif lock_input and not keep_frozen and Net and Net.unlock_player_input then
+  elseif (input_locked_by_pid[pid] or lock_input) and not keep_frozen and Net and Net.unlock_player_input then
+    input_locked_by_pid[pid] = nil
     pcall(Net.unlock_player_input, pid)
+  end
+
+  return true
+end
+
+function MenuAPI.close_all(pid, opts)
+  opts = opts or {}
+
+  local stack = get_stack(pid, false)
+  if (not stack or #stack == 0) and state_by_pid[pid] then
+    stack = { state_by_pid[pid] }
+  end
+
+  if not stack or #stack == 0 then
+    return false
+  end
+
+  local reason = opts.reason or "closed_all"
+  local keep_frozen = opts.keep_frozen == true
+  local should_unlock = false
+
+  for i = #stack, 1, -1 do
+    local st = stack[i]
+    if st then
+      hide_message_for_state(pid, st)
+      clear_registered_ui(pid, st)
+
+      if st.lock_input == true then
+        should_unlock = true
+      end
+
+      if type(st.on_close) == "function" then
+        pcall(st.on_close, pid, st, reason)
+      end
+    end
+  end
+
+  stack_by_pid[pid] = nil
+  state_by_pid[pid] = nil
+
+  if (input_locked_by_pid[pid] or should_unlock) and not keep_frozen and Net and Net.unlock_player_input then
+    input_locked_by_pid[pid] = nil
+    pcall(Net.unlock_player_input, pid)
+  elseif not keep_frozen then
+    input_locked_by_pid[pid] = nil
   end
 
   return true
@@ -2119,25 +2292,36 @@ function MenuAPI.animate_sp_gauge(pid, opts)
   return true
 end
 
-function MenuAPI.open(pid, spec)
+local function open_internal(pid, spec, opts)
   spec = spec or {}
+  opts = opts or {}
 
-  local menu_type = resolve_menu_type(spec.type or 1)
-  local def = MENU_TYPES[menu_type]
+  local push_mode = opts.push == true
+  local previous = state_by_pid[pid]
 
-  if not def then
-    log("Unsupported menu type", tostring(spec.type), "for", tostring(pid))
-    return false, "unsupported_type"
+  if push_mode and previous then
+    set_stack_focus(previous, false)
+    redraw(pid, previous)
+
+    if spec.z == nil then
+      local copy = table_copy(spec)
+      copy.z = (tonumber(previous.z) or 220) + 20
+      spec = copy
+    end
+  elseif not push_mode then
+    MenuAPI.close_all(pid, { keep_frozen = true, reason = "replace" })
   end
 
-  if state_by_pid[pid] then
-    MenuAPI.close(pid, { keep_frozen = true, reason = "replace" })
-  end
+  local st, err = build_state_for_open(pid, spec)
+  if not st then return false, err end
 
-  local st = build_state(pid, spec, menu_type, def)
+  local stack = get_stack(pid, true)
+  stack[#stack + 1] = st
   state_by_pid[pid] = st
+  set_stack_focus(st, true)
 
   if st.lock_input and Net and Net.lock_player_input then
+    input_locked_by_pid[pid] = true
     pcall(Net.lock_player_input, pid)
   end
 
@@ -2147,44 +2331,27 @@ function MenuAPI.open(pid, spec)
     play_sfx(pid, open_sfx)
   end
 
-  redraw(pid)
-  if type(st.on_cursor_change) == "function" and st.kind == "vertical" then
-    local row = st.rows and st.rows[st.cursor] or nil
-    pcall(st.on_cursor_change, pid, row, st, nil)
-  end
+  redraw(pid, st)
+  call_initial_cursor_change(pid, st)
   return true
 end
 
+function MenuAPI.open(pid, spec)
+  -- Backwards-compatible behavior: replace the whole MenuAPI stack.
+  return open_internal(pid, spec, { push = false })
+end
+
+function MenuAPI.push(pid, spec)
+  -- New behavior: draw this menu over the existing MenuAPI window and focus it.
+  return open_internal(pid, spec, { push = true })
+end
+
+function MenuAPI.open_child(pid, spec)
+  return MenuAPI.push(pid, spec)
+end
+
 function MenuAPI.hide_message(pid, box_id_override)
-  local st = state_by_pid[pid]
-  local box_id = box_id_override or (st and st.message_box_id) or cfg.message_box_id
-  local on_close = st and st.message_on_close
-
-  if Displayer and Displayer.Text then
-    if Displayer.Text.closeTextBox then
-      pcall(Displayer.Text.closeTextBox, pid, box_id, {
-        caller = "MenuAPI",
-        reason = "hide_message",
-        close_seconds = cfg.message_backdrop and cfg.message_backdrop.close_seconds or 0.12,
-      })
-    end
-
-    if Displayer.Text.removeTextBox then
-      pcall(Displayer.Text.removeTextBox, pid, box_id)
-    end
-  end
-
-  if st and (not box_id_override or st.message_box_id == box_id_override) then
-    st.message_open = false
-    st.message_box_id = nil
-    st.message_on_close = nil
-  end
-
-  if type(on_close) == "function" then
-    pcall(on_close, pid)
-  end
-
-  return true
+  return hide_message_for_state(pid, state_by_pid[pid], box_id_override)
 end
 
 function MenuAPI.advance_message(pid)
@@ -2522,7 +2689,7 @@ if Net and Net.on then
 
   Net:on("player_disconnect", function(event)
     if event and event.player_id then
-      MenuAPI.close(event.player_id, { keep_frozen = true, reason = "disconnect" })
+      MenuAPI.close_all(event.player_id, { keep_frozen = true, reason = "disconnect" })
     end
   end)
 end

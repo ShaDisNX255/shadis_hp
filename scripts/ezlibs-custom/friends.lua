@@ -295,6 +295,10 @@ local function _player_info(pid)
   }
 end
 
+function Friends.secret_for_player(pid)
+  return _safe_secret(pid)
+end
+
 local function _friend_record_name(rec, fallback)
   if type(rec) == "table" and rec.name and rec.name ~= "" then
     return tostring(rec.name)
@@ -465,6 +469,160 @@ function Friends.reject_request(receiver_pid, sender_pid)
   return true
 end
 
+function Friends.accept_request_by_secret(receiver_pid, sender_secret, sender_name_hint, opts)
+  opts = opts or {}
+
+  local receiver = _player_info(receiver_pid)
+  sender_secret = sender_secret and tostring(sender_secret) or nil
+
+  if not (receiver and sender_secret and sender_secret ~= "") then
+    return false, "missing_player"
+  end
+
+  if receiver.secret == sender_secret then
+    return false, "self"
+  end
+
+  local receiver_mem, receiver_slot = _friend_mem_by_secret(receiver.secret)
+  local sender_mem, sender_slot = _friend_mem_by_secret(sender_secret)
+
+  if not (receiver_mem and receiver_slot and sender_mem and sender_slot) then
+    return false, "memory_unavailable"
+  end
+
+  local incoming_rec = receiver_slot.incoming[sender_secret]
+  local outgoing_rec = sender_slot.outgoing[receiver.secret]
+
+  -- Be forgiving: if one side exists, let the accept repair the relationship.
+  if not incoming_rec and not outgoing_rec then
+    return false, "request_missing"
+  end
+
+  local sender_pid = _online_pid_for_secret(sender_secret)
+  local sender_name = sender_pid and _player_name(sender_pid)
+    or _friend_record_name(incoming_rec, sender_name_hint or "Friend")
+
+  local now = os.time()
+
+  receiver_slot.friends[sender_secret] = {
+    name = sender_name,
+    added_at = now,
+  }
+
+  sender_slot.friends[receiver.secret] = {
+    name = receiver.name,
+    added_at = now,
+  }
+
+  receiver_slot.incoming[sender_secret] = nil
+  receiver_slot.outgoing[sender_secret] = nil
+
+  sender_slot.incoming[receiver.secret] = nil
+  sender_slot.outgoing[receiver.secret] = nil
+
+  _save_friend_mem(receiver.secret, receiver_mem)
+  _save_friend_mem(sender_secret, sender_mem)
+
+  if opts.skip_refresh ~= true then
+    Friends.refresh_all_open_friend_menus()
+  end
+
+  return true
+end
+
+function Friends.reject_request_by_secret(receiver_pid, sender_secret, opts)
+  opts = opts or {}
+
+  local receiver = _player_info(receiver_pid)
+  sender_secret = sender_secret and tostring(sender_secret) or nil
+
+  if not (receiver and sender_secret and sender_secret ~= "") then
+    return false, "missing_player"
+  end
+
+  if receiver.secret == sender_secret then
+    return false, "self"
+  end
+
+  local receiver_mem, receiver_slot = _friend_mem_by_secret(receiver.secret)
+  local sender_mem, sender_slot = _friend_mem_by_secret(sender_secret)
+
+  local changed = false
+
+  if receiver_mem and receiver_slot then
+    if receiver_slot.incoming[sender_secret] ~= nil then changed = true end
+    if receiver_slot.outgoing[sender_secret] ~= nil then changed = true end
+
+    receiver_slot.incoming[sender_secret] = nil
+    receiver_slot.outgoing[sender_secret] = nil
+
+    _save_friend_mem(receiver.secret, receiver_mem)
+  end
+
+  if sender_mem and sender_slot then
+    if sender_slot.incoming[receiver.secret] ~= nil then changed = true end
+    if sender_slot.outgoing[receiver.secret] ~= nil then changed = true end
+
+    sender_slot.incoming[receiver.secret] = nil
+    sender_slot.outgoing[receiver.secret] = nil
+
+    _save_friend_mem(sender_secret, sender_mem)
+  end
+
+  if opts.skip_refresh ~= true then
+    Friends.refresh_all_open_friend_menus()
+  end
+
+  return true, changed
+end
+
+function Friends.remove_friend(pid, target_secret, opts)
+  opts = opts or {}
+
+  local mine = _player_info(pid)
+  target_secret = target_secret and tostring(target_secret) or nil
+
+  if not (mine and target_secret and target_secret ~= "") then
+    return false, "missing_player"
+  end
+
+  if mine.secret == target_secret then
+    return false, "self"
+  end
+
+  local my_mem, my_slot = _friend_mem_by_secret(mine.secret)
+
+  if not (my_mem and my_slot) then
+    return false, "memory_unavailable"
+  end
+
+  local old_rec = my_slot.friends[target_secret]
+  if not old_rec then
+    return false, "not_friends"
+  end
+
+  -- Remove from my side.
+  my_slot.friends[target_secret] = nil
+  my_slot.incoming[target_secret] = nil
+  my_slot.outgoing[target_secret] = nil
+  _save_friend_mem(mine.secret, my_mem)
+
+  -- Remove from their side too, so the friendship is truly mutual-deleted.
+  local other_mem, other_slot = _friend_mem_by_secret(target_secret)
+  if other_mem and other_slot then
+    other_slot.friends[mine.secret] = nil
+    other_slot.incoming[mine.secret] = nil
+    other_slot.outgoing[mine.secret] = nil
+    _save_friend_mem(target_secret, other_mem)
+  end
+
+  if opts.skip_refresh ~= true then
+    Friends.refresh_all_open_friend_menus()
+  end
+
+  return true, old_rec
+end
+
 function Friends.build_profile(viewer_pid, target)
   target = target or {}
 
@@ -583,6 +741,177 @@ local function _selected_from_friend_row(row)
   }
 end
 
+local function _self_selection(pid)
+  return {
+    pid = pid,
+    secret = _safe_secret(pid),
+    name = _player_name(pid),
+  }
+end
+
+local function _first_friend_selection(rows)
+  for _, row in ipairs(rows or {}) do
+    local selected = _selected_from_friend_row(row)
+    if selected then
+      return selected
+    end
+  end
+
+  return nil
+end
+
+local function _refresh_after_friend_removed(pid)
+  local rows = Friends.build_friend_rows(pid)
+  local selected = _first_friend_selection(rows) or _self_selection(pid)
+
+  OPEN_FRIEND_MENUS[pid] = OPEN_FRIEND_MENUS[pid] or {}
+  OPEN_FRIEND_MENUS[pid].selected = selected
+
+  if selected and selected.secret and selected.secret ~= _safe_secret(pid) then
+    LAST_FRIEND_ROW_ID_BY_PID[pid] = "__friend:" .. tostring(selected.secret)
+  else
+    LAST_FRIEND_ROW_ID_BY_PID[pid] = nil
+  end
+
+  Friends.refresh_open_friend_menu(pid)
+end
+
+function Friends.open_remove_friend_confirm(pid, friend)
+  if not (MenuAPI and type(MenuAPI.push) == "function") then
+    return false
+  end
+
+  friend = friend or {}
+  local friend_name = _short(friend.name or "Friend", 12)
+
+  return MenuAPI.push(pid, {
+    type = 4,
+    title = "Remove?",
+    color = "red",
+
+    x = 49,
+    y = 54,
+    z = 280,
+
+    open_sfx = false,
+    cancel_sfx = "cancel",
+    lock_input = false,
+
+    lines = {
+      "Remove " .. friend_name .. "?",
+      "This affects both sides.",
+    },
+
+    default_choice = "no",
+    yes_text = "Yes",
+    no_text = "No",
+
+    on_confirm = function(player_id, row)
+      local choice = row and row.choice or "no"
+
+      if choice ~= "yes" then
+        MenuAPI.close(player_id, {
+          keep_frozen = true,
+          reason = "remove_friend_cancelled",
+        })
+        return true
+      end
+
+      local ok, err = Friends.remove_friend(player_id, friend.secret, {
+        skip_refresh = true,
+      })
+
+      -- Close confirm, then close the action menu below it.
+      MenuAPI.close(player_id, {
+        keep_frozen = true,
+        reason = "remove_friend_confirm_closed",
+      })
+
+      MenuAPI.close(player_id, {
+        keep_frozen = true,
+        reason = "friend_actions_closed",
+      })
+
+      if ok then
+        _refresh_after_friend_removed(player_id)
+        Friends.refresh_all_open_friend_menus()
+
+        if MenuAPI.show_message then
+          MenuAPI.show_message(player_id, "Removed " .. friend_name .. ".", {
+            box_id = "friends_message",
+            duration = 1.20,
+            modal = false,
+            z = 300,
+          })
+        end
+      else
+        Friends.refresh_open_friend_menu(player_id)
+
+        if MenuAPI.show_message then
+          MenuAPI.show_message(player_id, "Could not remove friend.", {
+            box_id = "friends_message",
+            duration = 1.20,
+            modal = false,
+            z = 300,
+          })
+        end
+
+        warn("remove_friend failed", tostring(err))
+      end
+
+      return true
+    end,
+  })
+end
+
+function Friends.open_friend_actions(pid, friend)
+  if not (MenuAPI and type(MenuAPI.push) == "function") then
+    return false
+  end
+
+  friend = friend or {}
+  local friend_name = _short(friend.name or "Friend", 10)
+
+  return MenuAPI.push(pid, {
+    type = 3,
+    title = friend_name,
+    color = "red",
+
+    x = 49,
+    y = 54,
+    z = 260,
+
+    open_sfx = "screen_open",
+    cancel_sfx = "cancel",
+    lock_input = false,
+
+    rows = {
+      {
+        id = "remove",
+        text = "Remove Friend",
+      },
+      {
+        id = "cancel",
+        text = "Cancel",
+      },
+    },
+
+    on_confirm = function(player_id, row)
+      if row and row.id == "remove" then
+        Friends.open_remove_friend_confirm(player_id, friend)
+        return true
+      end
+
+      MenuAPI.close(player_id, {
+        keep_frozen = true,
+        reason = "friend_actions_cancel",
+      })
+
+      return true
+    end,
+  })
+end
+
 function Friends.refresh_open_friend_menu(pid)
   local open = OPEN_FRIEND_MENUS[pid]
   if not open then return false end
@@ -592,7 +921,18 @@ function Friends.refresh_open_friend_menu(pid)
   end
 
   local st = MenuAPI.get_state(pid)
-  if not st or st.type ~= 5 then
+  if not st then
+    OPEN_FRIEND_MENUS[pid] = nil
+    return false
+  end
+
+  -- If a child window is stacked on top of the Friends menu, do not clear
+  -- the Friends session record. The parent list is still alive underneath.
+  if st.type ~= 5 then
+    if MenuAPI.stack_size and MenuAPI.stack_size(pid) > 1 then
+      return false
+    end
+
     OPEN_FRIEND_MENUS[pid] = nil
     return false
   end
@@ -724,6 +1064,7 @@ function Friends.open_friends_board(pid, opts)
         end
       end
 
+      Friends.open_friend_actions(player_id, selected_friend)
       return true
     end,
 
