@@ -92,6 +92,14 @@ fba316bdbd222bde78a193da8525e829 com.wcity.louise.card.gutsmanv1
 63f2f7e2ae21a78571a7a2ad7ba1fe41 hoov.wcity.cards.wavearm1
 6d54151caecff93a66ee5e1025d55c68 rune.wcity.legacy.bubbler
 
+48da282359df4cc3e6c1ece357bbdf8f com.OFC.card.EXE4-132-DarkHole
+1b26e647d692790aa6321b0bdc43353e com.OFC.card.EXE5-012-PulseBeam1
+b09483bac1d32aeefca347e40009889d com.OFC.card.EXE5-262-ShadeMan
+2c1b3994da94def02559b594719deb6f com.darkware.card.EXE5-Poltergeist
+1dcd0b96e2328e97b44a5754928006a9 com.wcity.OFC.card.EXE5-093-MeteorEarth1
+20dad8674e1b55e60c18375d3296fddc com.wcity.OFC.card.EXE6-153-WaraNingyou
+421b2e83fc7410f5e9a3b96855584f85 com.wcity.k1rbyat1na.card.EXE6-276-Hakushaku
+
 ............................class BlockPackageManager............................
 2e6bd07f5f9614f8fce403bdea369392 com.OFC.block.EXE6-013-UnderShirt
 f7fdaa7ff00df8719942580daf4c7581 com.shadishp.block.duov2.blue
