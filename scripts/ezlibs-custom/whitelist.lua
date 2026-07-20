@@ -266,6 +266,10 @@ whitelist.CARDS = {
     package_id = "com.OFC.card.EXE5-012-PulseBeam1",
     asset_path = "/server/assets/chips/EXE5-Pulsebeam1.zip",
     code = "P",
+
+    display_name = "PulseBeam1",
+    preview_key = "pulsebeam1",
+    folder_card = "regular",
   },
   shademan1 = {
     package_id = "com.OFC.card.EXE5-262-ShadeMan",
@@ -281,16 +285,28 @@ whitelist.CARDS = {
     package_id = "com.wcity.OFC.card.EXE5-093-MeteorEarth1",
     asset_path = "/server/assets/chips/EXE5-MeteorEarth1.zip",
     code = "A",
+
+    display_name = "MeteorEarth1",
+    preview_key = "meteorearth1",
+    folder_card = "regular",
   },
   strawdoll = {
     package_id = "com.wcity.OFC.card.EXE6-153-WaraNingyou",
     asset_path = "/server/assets/chips/EXE6-StrawDoll.zip",
     code = "*",
+
+    display_name = "StrawDoll",
+    preview_key = "strawdoll",
+    folder_card = "regular",
   },
   count1 = {
     package_id = "com.wcity.k1rbyat1na.card.EXE6-276-Hakushaku",
     asset_path = "/server/assets/chips/EXE6-Count.zip",
     code = "H",
+
+    display_name = "Count",
+    preview_key = "count1",
+    folder_card = "mega",
   },
 }
 

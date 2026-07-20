@@ -542,7 +542,7 @@ local MainBoss = {
     path="/server/assets/ezlibs-assets/ezencounters/optimized/dungeon1.zip",
     weight=0,
     pet_exp=0,
-    skip_shared_area_rewards = true,
+    skip_shared_area_rewards = false,
     enemies={
         {name="MegaBunny",rank=1},
         {name="ShadeMan",rank=1},
@@ -631,6 +631,11 @@ return {
             enabled = true,
             duplicate_fallback_score_multiplier = 180,
             drops = {
+                ShadeMan = {
+                    ["1"] = {
+                        chip_drop("shademan1", DUNGEON_VERY_RARE_DROP),
+                    },
+                },
                 Yort = {
                     ["1"] = {
                         chip_drop("yoyo1", DUNGEON_RARE_DROP),

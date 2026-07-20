@@ -41,6 +41,7 @@ dungeon.is_dungeon_area = is_dungeon_area
 ----------------------------------------------------------------
 local _DUNGEON_MEMBERS = {}         -- [dungeon_key] = { [pid]=true }
 local _DUNGEON_KEY_FOR_PLAYER = {}  -- [pid] = dungeon_key|nil
+local _DUNGEON_COMPLETION_PENDING = {} -- [pid]=true while processing final rewards
 
 local function _dungeon_key_from_area(area_id)
   if not area_id then return nil end
@@ -75,9 +76,13 @@ end
 local function _list_live_dungeon_players(dungeon_key)
   local out = {}
   local set = _DUNGEON_MEMBERS[dungeon_key] or {}
+
   for pid,_ in pairs(set) do
-    out[#out+1] = pid
+    if not _DUNGEON_COMPLETION_PENDING[pid] then
+      out[#out + 1] = pid
+    end
   end
+
   return out
 end
 
@@ -228,6 +233,9 @@ Net:on("player_disconnect", function(event)
   local pid = event and event.player_id
   if not pid then return end
   _PENDING_KICK[pid] = nil
+  _DUNGEON_COMPLETION_PENDING[pid] = nil
+
+
   _set_player_dungeon_key(pid, nil)
   _clear_lives(pid)
 end)
@@ -845,8 +853,14 @@ local function _grant_money(pid, amount)
 end
 
 local function _chip_display_name(card_def, fallback_key)
-  if card_def and card_def.name then
-    return tostring(card_def.name)
+  if card_def then
+    if card_def.display_name then
+      return tostring(card_def.display_name)
+    end
+
+    if card_def.name then
+      return tostring(card_def.name)
+    end
   end
 
   local asset_path = tostring(card_def and card_def.asset_path or "")
@@ -881,7 +895,33 @@ local function _grant_chip(pid, card_key)
   local chip_name = _chip_display_name(card_def, card_key)
 
   if ok then
-    return ("Reward: BattleChip %s."):format(chip_name)
+    local resolved_key =
+      card_def and card_def.card_key
+      or card_key
+
+    return
+      ("Reward: BattleChip %s."):format(chip_name),
+      {
+        kind = "chip",
+
+        card_key = tostring(resolved_key),
+        display_name = chip_name,
+
+        code = tostring(
+          card_def and card_def.code
+          or "*"
+        ),
+
+        preview_key = tostring(
+          card_def and card_def.preview_key
+          or resolved_key
+        ),
+
+        folder_card = tostring(
+          card_def and card_def.folder_card
+          or "regular"
+        ),
+      }
   end
 
   if reason ~= "already_unlocked" then
@@ -935,39 +975,126 @@ local function _try_award_bugfrag(pid)
   return nil
 end
 
-local function _eject_player_after_message(pid, fallback_area_id, message, before_transfer)
+local function _eject_player_after_message(
+  pid,
+  fallback_area_id,
+  boss_message,
+  reward_message,
+  after_transfer
+)
   local area_id = Net.get_player_area(pid)
-  local exit = _resolve_exit_from_area(area_id) or (fallback_area_id and _resolve_exit_from_area(fallback_area_id))
-  if not exit then return end
 
-  -- Clear any death-kick state; we will manage transfer ourselves.
+  local exit =
+    _resolve_exit_from_area(area_id)
+    or (
+      fallback_area_id
+      and _resolve_exit_from_area(fallback_area_id)
+    )
+
+  if not exit then
+    _DUNGEON_COMPLETION_PENDING[pid] = nil
+    return
+  end
+
+  -- Clear any death-kick state; this flow owns the transfer.
   _PENDING_KICK[pid] = nil
 
-  message = tostring(message or "")
-  if message == "" then message = "The dungeon shifts..." end
+  boss_message = tostring(boss_message or "")
+  if boss_message == "" then
+    boss_message = "The dungeon shifts..."
+  end
+
+  reward_message = tostring(reward_message or "")
 
   if Async and Async.message_player and await then
     async(function()
-      pcall(Net.lock_player_input, pid)
-      await(Async.message_player(pid, message))
+      local ok, err = xpcall(function()
+        --------------------------------------------------------
+        -- 1. Show the final boss message while still inside.
+        --------------------------------------------------------
+        pcall(Net.lock_player_input, pid)
 
-      if type(before_transfer) == "function" then
-        local ok_cb, result = pcall(before_transfer, pid)
+        await(Async.message_player(
+          pid,
+          boss_message
+        ))
 
-        if ok_cb and result ~= nil then
-          await(result)
-        elseif not ok_cb then
-          print("[dungeon] before transfer callback error:", tostring(result))
+        --------------------------------------------------------
+        -- 2. Immediately remove the player from the dungeon.
+        --------------------------------------------------------
+        Net.transfer_player(
+          pid,
+          exit.area_id,
+          true,
+          exit.x,
+          exit.y,
+          exit.z,
+          exit.dir
+        )
+
+        -- Let the transfer settle before opening another UI.
+        if Async.sleep then
+          await(Async.sleep(0.25))
         end
-      end
 
+        -- Transfers may unlock input automatically.
+        pcall(Net.lock_player_input, pid)
+
+        --------------------------------------------------------
+        -- 3. Show the reward text outside the dungeon.
+        --------------------------------------------------------
+        if reward_message ~= "" then
+          await(Async.message_player(
+            pid,
+            reward_message
+          ))
+        end
+
+        --------------------------------------------------------
+        -- 4. Pet XP, chip preview, or other post-reward UI.
+        --------------------------------------------------------
+        if type(after_transfer) == "function" then
+          local ok_cb, result = pcall(
+            after_transfer,
+            pid
+          )
+
+          if ok_cb and result ~= nil then
+            await(result)
+          elseif not ok_cb then
+            print(
+              "[dungeon] after transfer callback error:",
+              tostring(result)
+            )
+          end
+        end
+      end, _safe_traceback)
+
+      _DUNGEON_COMPLETION_PENDING[pid] = nil
       pcall(Net.unlock_player_input, pid)
-      Net.transfer_player(pid, exit.area_id, true, exit.x, exit.y, exit.z, exit.dir)
+
+      if not ok then
+        print(
+          "[dungeon] player completion flow error:",
+          tostring(err)
+        )
+      end
     end)
   else
-    -- fallback: best effort (may warp after some other textbox)
-    _PENDING_KICK[pid] = { stage = "kick", from_area = area_id, exit = exit }
-    Net.message_player(pid, message)
+    -- Older fallback: combine the text and use the normal textbox kick.
+    local combined = boss_message
+
+    if reward_message ~= "" then
+      combined = combined .. "\n" .. reward_message
+    end
+
+    _PENDING_KICK[pid] = {
+      stage = "kick",
+      from_area = area_id,
+      exit = exit,
+    }
+
+    Net.message_player(pid, combined)
   end
 end
 
@@ -1030,13 +1157,82 @@ local function _mainboss_award_pet_xp_before_transfer(pid, amount)
     end
 
     if MenuAPI and type(MenuAPI.is_open) == "function" and Async and Async.sleep then
-      local guard = 0
-
-      while MenuAPI.is_open(pid) and guard < 400 do
+      while MenuAPI.is_open(pid) do
         await(Async.sleep(0.05))
-        guard = guard + 1
       end
     end
+  end
+end
+
+local function _mainboss_show_chip_before_transfer(pid, chip_data)
+  if type(chip_data) ~= "table" then
+    return
+  end
+
+  local MenuAPI = rawget(_G, "MenuAPI")
+
+  if not (
+    MenuAPI
+    and type(MenuAPI.show_chip_reward) == "function"
+  ) then
+    local ok_menu, mod =
+      pcall(require, "scripts/menuAPI/main")
+
+    if ok_menu then
+      MenuAPI = mod
+    end
+  end
+
+  if not (
+    MenuAPI
+    and type(MenuAPI.show_chip_reward) == "function"
+  ) then
+    print("[dungeon] chip reward popup is unavailable")
+    return
+  end
+
+  local ok_show, opened = pcall(
+    MenuAPI.show_chip_reward,
+    pid,
+    {
+      card_key = chip_data.card_key,
+      display_name = chip_data.display_name,
+      code = chip_data.code,
+      preview_key = chip_data.preview_key,
+      folder_card = chip_data.folder_card,
+    }
+  )
+
+  if not ok_show or not opened then
+    print(
+      "[dungeon] failed to show chip reward popup:",
+      tostring(opened)
+    )
+    return
+  end
+
+  if type(MenuAPI.is_open) == "function"
+    and Async
+    and Async.sleep
+  then
+    while MenuAPI.is_open(pid) do
+      await(Async.sleep(0.05))
+    end
+  end
+end
+
+local function _chain_before_transfer(first_callback, second_callback)
+  if type(first_callback) ~= "function" then
+    return second_callback
+  end
+
+  if type(second_callback) ~= "function" then
+    return first_callback
+  end
+
+  return function(pid)
+    first_callback(pid)
+    second_callback(pid)
   end
 end
 
@@ -1055,7 +1251,12 @@ local function _handle_mainboss_defeated(seed_area_id, mem_area, defeated_messag
     local pids = _list_live_dungeon_players(mem_area)
     if #pids == 0 and seed_area_id then
       local lp = Net.list_players(seed_area_id) or {}
-      for _,pid in ipairs(lp) do pids[#pids+1] = pid end
+
+      for _,pid in ipairs(lp) do
+        if not _DUNGEON_COMPLETION_PENDING[pid] then
+          pids[#pids + 1] = pid
+        end
+      end
     end
 
     -- Rewards are defined on the map custom properties of the dungeon area.
@@ -1070,29 +1271,107 @@ local function _handle_mainboss_defeated(seed_area_id, mem_area, defeated_messag
     -- For each player: award bugfrag (cap 10) + ONE rolled reward (weighted by Chance #),
     -- then kick them out after they close the message.
     for _,pid in ipairs(pids) do
-      pcall(function()
-        local lines = {}
+      if not _DUNGEON_COMPLETION_PENDING[pid] then
+        _DUNGEON_COMPLETION_PENDING[pid] = true
 
-        local bf = _try_award_bugfrag(pid)
-        if bf then lines[#lines+1] = bf end
+        local ok_player, player_err = pcall(function()
+          local lines = {}
 
-        local picked = _roll_reward_for_player(pid, rewards)
-        local rw = _grant_reward(pid, picked)
-        if rw then lines[#lines+1] = rw end
+          --------------------------------------------------------
+          -- Commit rewards now so a disconnect cannot lose them.
+          --------------------------------------------------------
+          local bf = _try_award_bugfrag(pid)
+          if bf then
+            lines[#lines + 1] = bf
+          end
 
-        local msg = tostring(defeated_message or "Boss defeated!")
-        if #lines > 0 then
-          msg = msg .. "\n" .. table.concat(lines, "\n")
+          local picked =
+            _roll_reward_for_player(pid, rewards)
+
+          local rw, reward_ui =
+            _grant_reward(pid, picked)
+
+          if rw then
+            lines[#lines + 1] = rw
+          end
+
+          --------------------------------------------------------
+          -- The boss and reward messages are now separate.
+          --------------------------------------------------------
+          local boss_message =
+            tostring(defeated_message or "Boss defeated!")
+
+          local reward_message =
+            table.concat(lines, "\n")
+
+          --------------------------------------------------------
+          -- Build the post-transfer UI chain.
+          --------------------------------------------------------
+          local after_transfer = nil
+
+          local final_pet_xp = math.max(
+            0,
+            math.floor(
+              tonumber(opts.final_pet_xp or 0) or 0
+            )
+          )
+
+          if final_pet_xp > 0 then
+            after_transfer = function(player_id)
+              _mainboss_award_pet_xp_before_transfer(
+                player_id,
+                final_pet_xp
+              )
+            end
+          end
+
+          -- Backwards compatibility for existing custom callbacks.
+          local callback_map =
+            opts.after_transfer_by_pid
+            or opts.before_transfer_by_pid
+
+          if callback_map
+            and type(callback_map[pid]) == "function"
+          then
+            after_transfer = _chain_before_transfer(
+              after_transfer,
+              callback_map[pid]
+            )
+          end
+
+          -- Chip preview always comes after pet XP.
+          if reward_ui and reward_ui.kind == "chip" then
+            local chip_popup_data = reward_ui
+
+            after_transfer = _chain_before_transfer(
+              after_transfer,
+              function(player_id)
+                _mainboss_show_chip_before_transfer(
+                  player_id,
+                  chip_popup_data
+                )
+              end
+            )
+          end
+
+          _eject_player_after_message(
+            pid,
+            seed_area_id,
+            boss_message,
+            reward_message,
+            after_transfer
+          )
+        end)
+
+        if not ok_player then
+          _DUNGEON_COMPLETION_PENDING[pid] = nil
+
+          print(
+            "[dungeon] failed to schedule player completion:",
+            tostring(player_err)
+          )
         end
-
-        local before_transfer = nil
-
-        if opts.before_transfer_by_pid and type(opts.before_transfer_by_pid[pid]) == "function" then
-          before_transfer = opts.before_transfer_by_pid[pid]
-        end
-
-        _eject_player_after_message(pid, seed_area_id, msg, before_transfer)
-      end)
+      end
     end
   end, _safe_traceback)
 
@@ -1677,9 +1956,43 @@ local DUNGEON_TEST_REWARDS_EVENT = {
       if not seed_area_id then return nil end
 
       local mem_area = props["Boss Memory Area"]
-      local msg = props["Boss Defeated Message"] or props["Test Message"] or "Boss defeated!"
 
-      _handle_mainboss_defeated(seed_area_id, mem_area, msg)
+      local msg =
+        props["Boss Defeated Message"]
+        or props["Test Message"]
+        or "Boss defeated!"
+
+      local test_pet_xp = math.max(
+        0,
+        math.floor(tonumber(
+          props["Pet XP"]
+          or props["Final Pet XP"]
+          or 0
+        ) or 0)
+      )
+
+      local before_transfer_by_pid = nil
+
+      if test_pet_xp > 0 then
+        before_transfer_by_pid = {
+          [player_id] = function(pid)
+            _mainboss_award_pet_xp_before_transfer(
+              pid,
+              test_pet_xp
+            )
+          end,
+        }
+      end
+
+      _handle_mainboss_defeated(
+        seed_area_id,
+        mem_area,
+        msg,
+        {
+          before_transfer_by_pid =
+            before_transfer_by_pid,
+        }
+      )
       return nil
     end)
   end

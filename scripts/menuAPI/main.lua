@@ -85,6 +85,28 @@ local cfg = {
   spbar_anim = "/server/assets/ui/menuAPI/SPBar.animation",
   spbar_state = "sp_01",
 
+  -- BattleChip reward popup
+  chip_reward_card_texture =
+    "/server/assets/chips/previews/folder_card.png",
+
+  chip_reward_card_mega_texture =
+    "/server/assets/chips/previews/folder_card_mega.png",
+
+  chip_reward_preview_dir =
+    "/server/assets/chips/previews/",
+
+  -- An 80x134 card centered on the 240x160 logical screen.
+  chip_reward_x = 100,
+  chip_reward_y = 13,
+  chip_reward_z = 230,
+  chip_reward_scale = 1.0,
+
+  -- 56x48 preview placement relative to the folder card.
+  chip_reward_preview_x = 6,
+  chip_reward_preview_y = 4,
+  chip_reward_preview_z_offset = 1,
+  chip_reward_preview_scale = 1.0,
+
   title_x = 17,
   title_y = 1,
   title_font = "THICK",
@@ -1075,6 +1097,74 @@ local function draw_sp_gauge_popup(pid, st)
   draw_sp_gauge(pid, st, px, py, pz)
 end
 
+local function draw_chip_reward_popup(pid, st)
+  local layout = st.layout or {}
+  local profile = st.profile or {}
+
+  local card_x = st.x or layout.x or cfg.chip_reward_x
+  local card_y = st.y or layout.y or cfg.chip_reward_y
+  local card_z = st.z or layout.z or cfg.chip_reward_z
+  local card_scale =
+    st.scale or layout.scale or cfg.chip_reward_scale
+
+  local card_texture =
+    profile.card_texture
+    or layout.card_texture
+    or cfg.chip_reward_card_texture
+
+  local preview_texture = profile.preview_texture
+
+  add_sprite(
+    pid,
+    st,
+    "chip_reward_card",
+    card_texture,
+    nil,
+    "",
+    card_x,
+    card_y,
+    card_z,
+    card_scale,
+    card_scale
+  )
+
+  if preview_texture and preview_texture ~= "" then
+    local preview_x =
+      profile.preview_x
+      or layout.preview_x
+      or cfg.chip_reward_preview_x
+
+    local preview_y =
+      profile.preview_y
+      or layout.preview_y
+      or cfg.chip_reward_preview_y
+
+    local preview_z_offset =
+      profile.preview_z_offset
+      or layout.preview_z_offset
+      or cfg.chip_reward_preview_z_offset
+
+    local preview_scale =
+      profile.preview_scale
+      or layout.preview_scale
+      or cfg.chip_reward_preview_scale
+
+    add_sprite(
+      pid,
+      st,
+      "chip_reward_preview",
+      preview_texture,
+      nil,
+      "",
+      card_x + preview_x,
+      card_y + preview_y,
+      card_z + preview_z_offset,
+      preview_scale,
+      preview_scale
+    )
+  end
+end
+
 function draw_profile_friends_menu(pid, st)
   local layout = st.layout or {}
 
@@ -1681,6 +1771,32 @@ local MENU_TYPES = {
       spbar_points_z_offset = 14,
     },
     draw = draw_sp_gauge_popup,
+  },
+
+  [8] = {
+    name = "chip_reward_popup",
+    kind = "popup",
+    vertical_input = false,
+    horizontal_input = false,
+    cursor_enabled = false,
+    scroll_enabled = false,
+    show_right = false,
+
+    layout = {
+      x = cfg.chip_reward_x,
+      y = cfg.chip_reward_y,
+      z = cfg.chip_reward_z,
+      scale = cfg.chip_reward_scale,
+
+      card_texture = cfg.chip_reward_card_texture,
+
+      preview_x = cfg.chip_reward_preview_x,
+      preview_y = cfg.chip_reward_preview_y,
+      preview_z_offset = cfg.chip_reward_preview_z_offset,
+      preview_scale = cfg.chip_reward_preview_scale,
+    },
+
+    draw = draw_chip_reward_popup,
   },
 }
 
@@ -2437,6 +2553,187 @@ function MenuAPI.show_message(pid, text, opts)
         MenuAPI.hide_message(pid, box_id)
       end
     end)
+  end
+
+  return true
+end
+
+local function provide_chip_reward_asset(pid, path)
+  path = tostring(path or "")
+  if path == "" then
+    return false
+  end
+
+  if Net and Net.has_asset then
+    local ok_has, exists = pcall(Net.has_asset, path)
+
+    if ok_has and exists ~= true then
+      log("Missing chip reward asset:", path)
+      return false
+    end
+  end
+
+  if Net and Net.provide_asset_for_player then
+    local ok = pcall(Net.provide_asset_for_player, pid, path)
+
+    if ok then
+      return true
+    end
+  end
+
+  if Net and Net.provide_asset and Net.get_player_area then
+    local ok_area, area_id = pcall(Net.get_player_area, pid)
+
+    if ok_area and area_id then
+      local ok = pcall(Net.provide_asset, area_id, path)
+
+      if ok then
+        return true
+      end
+    end
+  end
+
+  return false
+end
+
+function MenuAPI.show_chip_reward(pid, spec)
+  spec = spec or {}
+
+  local card_key = tostring(
+    spec.preview_key
+    or spec.card_key
+    or ""
+  ):lower()
+
+  card_key = card_key:gsub("[^%w_%-]", "")
+
+  local preview_texture = tostring(
+    spec.preview_texture
+    or (
+      card_key ~= ""
+      and (cfg.chip_reward_preview_dir .. card_key .. ".png")
+      or ""
+    )
+  )
+
+  local folder_card = tostring(
+    spec.folder_card
+    or spec.card_class
+    or "regular"
+  ):lower()
+
+  local is_mega =
+    spec.is_mega == true
+    or folder_card == "mega"
+
+  local card_texture = tostring(
+    spec.card_texture
+    or (
+      is_mega
+      and cfg.chip_reward_card_mega_texture
+      or cfg.chip_reward_card_texture
+    )
+  )
+
+  if preview_texture == "" then
+    log("Chip reward popup has no preview texture.")
+    return false
+  end
+
+  if not provide_chip_reward_asset(pid, card_texture) then
+    log("Couldn't provide chip reward card:", card_texture)
+    return false
+  end
+
+  if not provide_chip_reward_asset(pid, preview_texture) then
+    log("Couldn't provide chip preview:", preview_texture)
+    return false
+  end
+
+  local opened = MenuAPI.open(pid, {
+    type = 8,
+    title = "",
+    open_sfx = false,
+    cancel_sfx = false,
+    lock_input = true,
+
+    x = spec.x or cfg.chip_reward_x,
+    y = spec.y or cfg.chip_reward_y,
+    z = spec.z or cfg.chip_reward_z,
+    scale = spec.scale or cfg.chip_reward_scale,
+
+    profile = {
+      card_texture = card_texture,
+      preview_texture = preview_texture,
+
+      preview_x =
+        spec.preview_x or cfg.chip_reward_preview_x,
+
+      preview_y =
+        spec.preview_y or cfg.chip_reward_preview_y,
+
+      preview_z_offset =
+        spec.preview_z_offset
+        or cfg.chip_reward_preview_z_offset,
+
+      preview_scale =
+        spec.preview_scale
+        or cfg.chip_reward_preview_scale,
+    },
+  })
+
+  if not opened then
+    return false
+  end
+
+  local finished = false
+
+  local function finish_popup()
+    if finished then
+      return
+    end
+
+    finished = true
+
+    MenuAPI.close(pid, {
+      keep_frozen = false,
+      reason = "chip_reward_done",
+    })
+
+    if type(spec.on_close) == "function" then
+      pcall(spec.on_close, pid)
+    end
+  end
+
+  local chip_name = tostring(
+    spec.display_name
+    or spec.name
+    or spec.card_key
+    or "BattleChip"
+  )
+
+  local code = tostring(spec.code or "")
+  local chip_line = chip_name
+
+  if code ~= "" then
+    chip_line = chip_line .. " " .. code
+  end
+
+  local message = tostring(
+    spec.message
+    or ("BattleChip acquired!\n" .. chip_line)
+  )
+
+  local shown = MenuAPI.show_message(pid, message, {
+    box_id = spec.box_id or "menuapi_chip_reward",
+    speed = spec.speed or 80,
+    z = spec.message_z or 300,
+    on_close = finish_popup,
+  })
+
+  if not shown then
+    finish_popup()
+    return false
   end
 
   return true
