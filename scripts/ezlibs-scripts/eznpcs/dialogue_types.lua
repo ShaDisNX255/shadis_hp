@@ -4,6 +4,12 @@ local ezmemory = require('scripts/ezlibs-scripts/ezmemory')
 local ezquests = require('scripts/ezlibs-scripts/ezquests')
 local ezemail = require('scripts/ezlibs-scripts/ezemail')
 local whitelist = require('scripts/ezlibs-custom/whitelist')
+local MenuAPIOK, MenuAPI =
+    pcall(require, "scripts/menuAPI/main")
+
+if not MenuAPIOK then
+    MenuAPI = rawget(_G, "MenuAPI")
+end
 local NG_SHOP_ITEM_GET_SFX = "/server/assets/ezlibs-assets/sfx/item_get.ogg"
 local SUCCESS_SFX = "/server/assets/sfx/compile_complete.ogg"
 local FAIL_SFX = "/server/assets/sfx/card_error.ogg"
@@ -107,7 +113,80 @@ local function stop_chip_item_get_anim(player_id)
     end
 end
 
-local function notify_chip_get(player_id, chip_name, notify_player)
+local function show_chip_preview_timed(
+    player_id,
+    card_def,
+    chip_key,
+    duration
+)
+    local M = rawget(_G, "MenuAPI") or MenuAPI
+
+    if not (
+        M
+        and type(M.show_chip_reward_visual) == "function"
+    ) then
+        local ok_menu, mod =
+            pcall(require, "scripts/menuAPI/main")
+
+        if ok_menu then
+            M = mod
+            MenuAPI = mod
+        end
+    end
+
+    if not (
+        M
+        and type(M.show_chip_reward_visual) == "function"
+    ) then
+        return false
+    end
+
+    local resolved_key = tostring(
+        card_def and card_def.card_key
+        or chip_key
+        or ""
+    )
+
+    local preview_key = tostring(
+        card_def and card_def.preview_key
+        or resolved_key
+    )
+
+    local folder_card = tostring(
+        card_def and (
+            card_def.folder_card
+            or card_def.card_class
+        )
+        or "regular"
+    )
+
+    local ok, shown = pcall(
+        M.show_chip_reward_visual,
+        player_id,
+        {
+            card_key = resolved_key,
+            preview_key = preview_key,
+            folder_card = folder_card,
+
+            is_mega =
+                card_def
+                and card_def.is_mega == true,
+
+            duration = duration or 3,
+        }
+    )
+
+    return ok and shown == true
+end
+
+local function notify_chip_get(
+    player_id,
+    chip_name,
+    notify_player,
+    card_def,
+    chip_key,
+    preview_seconds
+)
     return async(function()
         if notify_player ~= true then
             return
@@ -125,7 +204,17 @@ local function notify_chip_get(player_id, chip_name, notify_player)
             started_anim = ok
         end
 
-        await(Async.message_player(player_id, "Got " .. tostring(chip_name) .. "!"))
+        show_chip_preview_timed(
+            player_id,
+            card_def,
+            chip_key,
+            preview_seconds
+        )
+
+        await(Async.message_player(
+            player_id,
+            "Got " .. tostring(chip_name) .. "!"
+        ))
 
         if started_anim then
             stop_chip_item_get_anim(player_id)
@@ -999,6 +1088,14 @@ local dialogue_types = {
                 -- 1 tick makes NPC chip gifts feel immediate instead of using the default post-battle delay.
                 local delay_ticks = tonumber(props["Delay Ticks"] or props["Reward Delay Ticks"] or "1") or 1
 
+                local preview_seconds = tonumber(
+                    props["Preview Seconds"]
+                    or props["Chip Preview Seconds"]
+                    or "3"
+                ) or 3
+
+                preview_seconds = math.max(0.05, preview_seconds)
+
                 for index, chip_key in ipairs(chip_keys) do
                     local code = props["Code " .. tostring(index)] or props["Code"]
 
@@ -1006,7 +1103,14 @@ local dialogue_types = {
 
                     if ok then
                         local chip_name = get_chip_display_name(card_def, chip_key)
-                        await(notify_chip_get(player_id, chip_name, notify_player))
+                        await(notify_chip_get(
+                            player_id,
+                            chip_name,
+                            notify_player,
+                            card_def,
+                            chip_key,
+                            preview_seconds
+                        ))
                     elseif reason ~= "already_unlocked" then
                         warn(
                             "[eznpcs] chip dialogue failed to unlock battle chip",

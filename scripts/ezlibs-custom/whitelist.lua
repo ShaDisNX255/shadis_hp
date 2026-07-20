@@ -176,6 +176,10 @@ whitelist.CARDS = {
     legacy_package_ids = { "com.OFC.card.EXE6-157-Recovery30" },
     asset_path = "/server/assets/chips/EXE6-Rec30.zip",
     code = "Q",
+
+    display_name = "Recovery 30",
+    preview_key = "rec30",
+    folder_card = "regular",
   },
   heatshot = {
     package_id = "com.wcity.OFC.card.EXEPoN-014-HeatShot",

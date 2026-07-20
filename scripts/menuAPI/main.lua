@@ -2596,8 +2596,189 @@ local function provide_chip_reward_asset(pid, path)
   return false
 end
 
+local timed_chip_visuals = {}
+local timed_chip_visual_seq = 0
+
+local function clear_timed_chip_visual(pid, expected_token)
+  local rec = timed_chip_visuals[pid]
+  if not rec then
+    return false
+  end
+
+  if expected_token ~= nil and rec.token ~= expected_token then
+    return false
+  end
+
+  timed_chip_visuals[pid] = nil
+  clear_registered_ui(pid, rec.state)
+
+  if type(rec.on_close) == "function" then
+    pcall(rec.on_close, pid)
+  end
+
+  return true
+end
+
+function MenuAPI.hide_chip_reward_visual(pid)
+  return clear_timed_chip_visual(pid)
+end
+
+function MenuAPI.show_chip_reward_visual(pid, spec)
+  spec = spec or {}
+
+  local card_key = tostring(
+    spec.preview_key
+    or spec.card_key
+    or ""
+  ):lower()
+
+  card_key = card_key:gsub("[^%w_%-]", "")
+
+  local preview_texture = tostring(
+    spec.preview_texture
+    or (
+      card_key ~= ""
+      and (cfg.chip_reward_preview_dir .. card_key .. ".png")
+      or ""
+    )
+  )
+
+  local folder_card = tostring(
+    spec.folder_card
+    or spec.card_class
+    or "regular"
+  ):lower()
+
+  local is_mega =
+    spec.is_mega == true
+    or folder_card == "mega"
+
+  local card_texture = tostring(
+    spec.card_texture
+    or (
+      is_mega
+      and cfg.chip_reward_card_mega_texture
+      or cfg.chip_reward_card_texture
+    )
+  )
+
+  if preview_texture == "" then
+    log("Timed chip visual has no preview texture.")
+    return false
+  end
+
+  if not provide_chip_reward_asset(pid, card_texture) then
+    log("Couldn't provide timed chip card:", card_texture)
+    return false
+  end
+
+  if not provide_chip_reward_asset(pid, preview_texture) then
+    log("Couldn't provide timed chip preview:", preview_texture)
+    return false
+  end
+
+  -- Replace an older timed visual instead of stacking cards.
+  MenuAPI.hide_chip_reward_visual(pid)
+
+  timed_chip_visual_seq = timed_chip_visual_seq + 1
+  local token = timed_chip_visual_seq
+
+  local card_x = spec.x or cfg.chip_reward_x
+  local card_y = spec.y or cfg.chip_reward_y
+  local card_z = spec.z or cfg.chip_reward_z
+  local card_scale = spec.scale or cfg.chip_reward_scale
+
+  local preview_x =
+    spec.preview_x
+    or cfg.chip_reward_preview_x
+
+  local preview_y =
+    spec.preview_y
+    or cfg.chip_reward_preview_y
+
+  local preview_z_offset =
+    spec.preview_z_offset
+    or cfg.chip_reward_preview_z_offset
+
+  local preview_scale =
+    spec.preview_scale
+    or cfg.chip_reward_preview_scale
+
+  -- This is deliberately not inserted into state_by_pid.
+  -- It draws using the same type-8 renderer but owns no input.
+  local st = {
+    type = 8,
+    type_name = "chip_reward_popup",
+    kind = "popup",
+
+    ui_prefix = next_ui_prefix(pid, 8),
+    ui_ids = {
+      sprites = {},
+      texts = {},
+    },
+
+    x = card_x,
+    y = card_y,
+    z = card_z,
+    scale = card_scale,
+
+    layout = {
+      x = card_x,
+      y = card_y,
+      z = card_z,
+      scale = card_scale,
+
+      card_texture = card_texture,
+
+      preview_x = preview_x,
+      preview_y = preview_y,
+      preview_z_offset = preview_z_offset,
+      preview_scale = preview_scale,
+    },
+
+    profile = {
+      card_texture = card_texture,
+      preview_texture = preview_texture,
+
+      preview_x = preview_x,
+      preview_y = preview_y,
+      preview_z_offset = preview_z_offset,
+      preview_scale = preview_scale,
+    },
+  }
+
+  timed_chip_visuals[pid] = {
+    token = token,
+    state = st,
+    on_close = spec.on_close,
+  }
+
+  draw_chip_reward_popup(pid, st)
+
+  local duration = tonumber(
+    spec.duration
+    or spec.auto_close_seconds
+    or 3
+  ) or 3
+
+  duration = math.max(0.05, duration)
+
+  if Async and Async.sleep then
+    Async.sleep(duration).and_then(function()
+      clear_timed_chip_visual(pid, token)
+    end)
+  else
+    clear_timed_chip_visual(pid, token)
+    return false
+  end
+
+  return true
+end
+
 function MenuAPI.show_chip_reward(pid, spec)
   spec = spec or {}
+
+  MenuAPI.hide_chip_reward_visual(pid)
 
   local card_key = tostring(
     spec.preview_key
@@ -2986,7 +3167,12 @@ if Net and Net.on then
 
   Net:on("player_disconnect", function(event)
     if event and event.player_id then
-      MenuAPI.close_all(event.player_id, { keep_frozen = true, reason = "disconnect" })
+      MenuAPI.hide_chip_reward_visual(event.player_id)
+
+      MenuAPI.close_all(event.player_id, {
+        keep_frozen = true,
+        reason = "disconnect"
+      })
     end
   end)
 end
