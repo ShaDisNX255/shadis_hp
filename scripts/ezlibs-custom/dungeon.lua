@@ -18,6 +18,7 @@ end
 local ezmemory = require("scripts/ezlibs-scripts/ezmemory")
 local eznpcs   = require("scripts/ezlibs-scripts/eznpcs/eznpcs")
 local helpers = require("scripts/ezlibs-scripts/helpers")
+local whitelist = require("scripts/ezlibs-custom/whitelist")
 local cosmetics_ok, cosmetics = pcall(require, "scripts/ezlibs-custom/cosmetics")
 
 
@@ -774,6 +775,36 @@ local function _roll_reward(entries)
   return entries[#entries]
 end
 
+local function _reward_available_for_player(pid, entry)
+  local typ = tostring(entry and entry.typ or ""):lower()
+
+  if typ ~= "chip" and typ ~= "card" and typ ~= "battlechip" then
+    return true
+  end
+
+  if not (whitelist and whitelist.player_has_card_unlocked) then
+    return false
+  end
+
+  local unlocked, card_def =
+    whitelist.player_has_card_unlocked(pid, entry.reward)
+
+  -- Invalid chip keys are also excluded from the roll.
+  return card_def ~= nil and not unlocked
+end
+
+local function _roll_reward_for_player(pid, entries)
+  local eligible = {}
+
+  for _, entry in ipairs(entries or {}) do
+    if _reward_available_for_player(pid, entry) then
+      eligible[#eligible + 1] = entry
+    end
+  end
+
+  return _roll_reward(eligible)
+end
+
 local DECOR_MEM_KEY = "oncehub_decor_inventory_v1"
 
 local function _grant_decor_owned(pid, id, qty)
@@ -813,6 +844,60 @@ local function _grant_money(pid, amount)
   return ("Reward: %d moneyz."):format(amount)
 end
 
+local function _chip_display_name(card_def, fallback_key)
+  if card_def and card_def.name then
+    return tostring(card_def.name)
+  end
+
+  local asset_path = tostring(card_def and card_def.asset_path or "")
+  local file = asset_path:match("([^/]+)%.zip$")
+
+  if file and file ~= "" then
+    file = file:gsub("^EXE%d+%-", "")
+    file = file:gsub("^EXEPoN%-", "")
+    file = file:gsub("^BN%d+%-", "")
+
+    if file ~= "" then
+      return file
+    end
+  end
+
+  return tostring(
+    card_def and card_def.card_key
+    or fallback_key
+    or "BattleChip"
+  )
+end
+
+local function _grant_chip(pid, card_key)
+  if not (whitelist and whitelist.unlock_card) then
+    print("[dungeon] whitelist.unlock_card is unavailable")
+    return nil
+  end
+
+  local ok, reason, card_def =
+    whitelist.unlock_card(pid, card_key)
+
+  local chip_name = _chip_display_name(card_def, card_key)
+
+  if ok then
+    return ("Reward: BattleChip %s."):format(chip_name)
+  end
+
+  if reason ~= "already_unlocked" then
+    print(
+      "[dungeon] failed to grant chip",
+      tostring(card_key),
+      "to",
+      pid,
+      "reason:",
+      tostring(reason)
+    )
+  end
+
+  return nil
+end
+
 local function _grant_reward(pid, entry)
   if not entry then return nil end
   local typ = tostring(entry.typ or ""):lower()
@@ -826,6 +911,8 @@ local function _grant_reward(pid, entry)
     if line then return line end
     print("[dungeon] failed to grant cosmetic", reward, "to", pid, "reason:", err)
     return nil
+  elseif typ == "chip" or typ == "card" or typ == "battlechip" then
+    return _grant_chip(pid, reward)
   elseif typ == "moneyz" or typ == "money" then
     return _grant_money(pid, amount)
   else
@@ -989,7 +1076,7 @@ local function _handle_mainboss_defeated(seed_area_id, mem_area, defeated_messag
         local bf = _try_award_bugfrag(pid)
         if bf then lines[#lines+1] = bf end
 
-        local picked = _roll_reward(rewards)
+        local picked = _roll_reward_for_player(pid, rewards)
         local rw = _grant_reward(pid, picked)
         if rw then lines[#lines+1] = rw end
 

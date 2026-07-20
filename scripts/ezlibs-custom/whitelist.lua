@@ -257,6 +257,41 @@ whitelist.CARDS = {
     asset_path = "/server/assets/chips/EXE6-Barrier.zip",
     code = "*",
   },
+  darkhole = {
+    package_id = "com.OFC.card.EXE4-132-DarkHole",
+    asset_path = "/server/assets/chips/EXE4-Darkhole.zip",
+    code = "*",
+  },
+  pulsebeam1 = {
+    package_id = "com.OFC.card.EXE5-012-PulseBeam1",
+    asset_path = "/server/assets/chips/EXE5-Pulsebeam1.zip",
+    code = "P",
+  },
+  shademan1 = {
+    package_id = "com.OFC.card.EXE5-262-ShadeMan",
+    asset_path = "/server/assets/chips/EXE5-Shademan.zip",
+    code = "S",
+  },
+  poltergeist = {
+    package_id = "com.darkware.card.EXE5-Poltergeist",
+    asset_path = "/server/assets/chips/EXE5-Poltergeist.zip",
+    code = "*",
+  },
+  meteorearth1 = {
+    package_id = "com.wcity.OFC.card.EXE5-093-MeteorEarth1",
+    asset_path = "/server/assets/chips/EXE5-MeteorEarth1.zip",
+    code = "A",
+  },
+  strawdoll = {
+    package_id = "com.wcity.OFC.card.EXE6-153-WaraNingyou",
+    asset_path = "/server/assets/chips/EXE6-StrawDoll.zip",
+    code = "*",
+  },
+  count1 = {
+    package_id = "com.wcity.k1rbyat1na.card.EXE6-276-Hakushaku",
+    asset_path = "/server/assets/chips/EXE6-Count.zip",
+    code = "H",
+  },
 }
 
 -- Current and legacy package-ID indexes.
