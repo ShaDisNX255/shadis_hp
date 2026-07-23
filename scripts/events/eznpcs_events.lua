@@ -873,6 +873,61 @@ local event8 = {
 }
 eznpcs.add_event(event8)
 
+local tech1_1 = {
+    name="tech1_1",
+    path="/server/assets/ezlibs-assets/ezencounters/optimized/events.zip",
+    pet_exp=0,
+    enemies={
+        {name="Mettaur",rank=1},
+        {name="Mettaur",rank=2},
+        {name="Mettaur",rank=3},
+    },
+    obstacles={
+    },
+    positions={
+        {0,0,0,1,0,0},
+        {0,0,0,0,2,0},
+        {0,0,0,0,0,3},
+    },
+    obstacle_positions={
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+    },
+    player_positions={
+        {0,0,0,0,0,0},
+        {0,1,0,0,0,0},
+        {0,0,0,0,0,0},
+    },
+    tiles={
+        {1,1,1,1,1,1},
+        {1,1,1,1,1,1},
+        {1,1,1,1,1,1},
+    },
+    teams={
+        {2,2,2,1,1,1},
+        {2,2,2,1,1,1},
+        {2,2,2,1,1,1},
+    },
+}
+
+local event_tech1_1 = {
+    name="Tech1_1 Battle",
+    action=function (npc,player_id,dialogue,relay_object)
+        return async(function()
+          local stats = await(ezencounters.begin_encounter(player_id, tech1_1))
+          local flags = _encounter_result_flags(stats)
+
+          if flags.ran or flags.lost then
+              return dialogue.custom_properties["Battle Lost"]
+          else
+              return dialogue.custom_properties["Battle Won"]
+          end
+        end)
+    end
+}
+eznpcs.add_event(event_tech1_1)
+
 -- Weighted pick helper (number weights)
 local function pick_weighted(entries)
     local total = 0

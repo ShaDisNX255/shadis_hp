@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="60" height="60" tilewidth="64" tileheight="32" infinite="0" nextlayerid="14" nextobjectid="38">
+<map version="1.10" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="60" height="60" tilewidth="64" tileheight="32" infinite="0" nextlayerid="14" nextobjectid="54">
  <properties>
   <property name="Background" value="custom"/>
   <property name="Background Animation" value="/server/assets/custom/backgrounds/techlab/07a-centralarea.animation"/>
@@ -129,6 +129,46 @@
     <property name="Skip Prompt" type="bool" value="true"/>
     <property name="Unlocked Message" value="You show the UnderGround Key..."/>
    </properties>
+  </object>
+  <object id="51" name="Merchant Nile" type="NPC" x="1040" y="1520">
+   <properties>
+    <property name="Asset Name" value="heel-navi-exe4_black"/>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Direction" value="Down Left"/>
+    <property name="Next 1" type="object" value="52"/>
+    <property name="Text 1" value="Hey there, I sell chips!"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="52" name="ChipShop" type="Dialogue" x="1040" y="1496">
+   <properties>
+    <property name="Currency" value="money"/>
+    <property name="Dialogue Type" value="chipshop"/>
+    <property name="Name 1" value="AquaBlde"/>
+    <property name="Name 2" value="BambBlde"/>
+    <property name="Name 3" value="ElecBlde"/>
+    <property name="Name 4" value="FlamBlde"/>
+    <property name="Preview Dir" value="chips/previews/"/>
+    <property name="Price 1" type="int" value="100000"/>
+    <property name="Price 2" type="int" value="100000"/>
+    <property name="Price 3" type="int" value="100000"/>
+    <property name="Price 4" type="int" value="100000"/>
+    <property name="Sell 1" value="aquablde"/>
+    <property name="Sell 2" value="bambblde"/>
+    <property name="Sell 3" value="elecblde"/>
+    <property name="Sell 4" value="flamblde"/>
+    <property name="Shop Title" value="SwordShop"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="53" name="PunkNavi" type="NPC" x="1392" y="1552">
+   <properties>
+    <property name="Asset Name" value="punk-navi-exe6_navy"/>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Direction" value="Up Left"/>
+    <property name="Text 1" value="I wonder what that guy is doing over there..."/>
+   </properties>
+   <point/>
   </object>
  </objectgroup>
  <layer id="3" name="Tile Layer 1" width="60" height="60" offsetx="0" offsety="-16">
@@ -590,6 +630,117 @@
     <property name="Next 1" type="object" value="9"/>
     <property name="Type" value="random"/>
    </properties>
+  </object>
+  <object id="38" type="Mystery Data" gid="283" x="624" y="1072" width="14" height="43">
+   <properties>
+    <property name="Name" value="HPMem"/>
+    <property name="Next 1" type="object" value="0"/>
+    <property name="Once" type="bool" value="true"/>
+    <property name="Type" value="item"/>
+   </properties>
+  </object>
+  <object id="39" name="NormalNavi" type="NPC" x="740.5" y="1231.5">
+   <properties>
+    <property name="Asset Name" value="normal-navi-bn4_green"/>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Direction" value="Up Left"/>
+    <property name="Next 1" type="object" value="41"/>
+    <property name="Text 1" value="Look at that guy over there. So smug. Wish I could reach over there to teach him a lesson or two"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="40" name="NormalNavi" type="NPC" x="698.5" y="1231.5">
+   <properties>
+    <property name="Asset Name" value="normal-navi-bn4_brown"/>
+    <property name="Dialogue Type" value="qcheck"/>
+    <property name="Direction" value="Down Right"/>
+    <property name="Next 1" type="object" value="43"/>
+    <property name="Next 2" type="object" value="44"/>
+    <property name="Quest ID" value="tech1_quest1"/>
+    <property name="State" value="complete"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="41" name="Mock" type="Dialogue" x="731" y="1209">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Mugshot" value="normal-navi-bn4_brown"/>
+    <property name="Next 1" type="object" value="42"/>
+    <property name="Text 1" value="Haha what's the matter? Still don't know how I got here? Haha!"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="42" name="Dialogue End" type="Dialogue" x="725.5" y="1186.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Text 1" value="Why I oughta..."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="43" name="Quest Complete" type="Dialogue" x="678.5" y="1229.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Text 1" value="I just like messing with that guy haha"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="44" name="Quest Start" type="Dialogue" x="677.5" y="1216.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="45"/>
+    <property name="Text 1" value="Ah!"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="45" name="Tech1_1 Battle" type="Dialogue" x="655.5" y="1198.5">
+   <properties>
+    <property name="Battle Lost" type="object" value="46"/>
+    <property name="Battle Won" type="object" value="47"/>
+    <property name="Dialogue Type" value="none"/>
+    <property name="Event Name" value="Tech1_1 Battle"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="46" name="Battle Lost" type="Dialogue" x="634" y="1192">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Text 1" value="Don't sneak up on a guy like that!"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="47" name="Battle Won" type="Dialogue" x="636.5" y="1181.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="49"/>
+    <property name="Text 1" value="Haha wow you're pretty good, you defeated all my Mettaurs! I think you should have this."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="48" name="PetXP" type="Dialogue" x="606" y="1152">
+   <properties>
+    <property name="Amount" type="int" value="40"/>
+    <property name="Dialogue Type" value="none"/>
+    <property name="Event Name" value="petxp"/>
+    <property name="Next 1" type="object" value="50"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="49" name="Chip Reward" type="Dialogue" x="616" y="1162">
+   <properties>
+    <property name="Chip" value="blind"/>
+    <property name="Code" value="*"/>
+    <property name="Dialogue Type" value="chip"/>
+    <property name="Next 1" type="object" value="48"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="50" name="SetComplete" type="Dialogue" x="592.5" y="1139.5">
+   <properties>
+    <property name="Dialogue Type" value="qset"/>
+    <property name="Quest ID" value="tech1_quest1"/>
+    <property name="State" value="complete"/>
+   </properties>
+   <point/>
   </object>
  </objectgroup>
 </map>

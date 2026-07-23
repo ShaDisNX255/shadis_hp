@@ -312,6 +312,35 @@ whitelist.CARDS = {
     preview_key = "count1",
     folder_card = "mega",
   },
+  blind = {
+    package_id = "com.wcity.OFC.card.EXE4-129-Blind",
+    asset_path = "/server/assets/chips/EXE4-Blind.zip",
+    code = "*",
+
+    display_name = "Blind",
+    preview_key = "blind",
+    folder_card = "regular",
+  },
+  aquablde = {
+    package_id = "com.wcity.OFC.card.EXEPoN-047-FlameBlade",
+    asset_path = "/server/assets/chips/EXEPoN-AquaBlde.zip",
+    code = "D",
+  },
+  bambblde = {
+    package_id = "com.wcity.OFC.card.EXEPoN-048-AquaBlade",
+    asset_path = "/server/assets/chips/EXEPoN-BambBlde.zip",
+    code = "D",
+  },
+  elecblde = {
+    package_id = "com.wcity.OFC.card.EXEPoN-049-ElecBlade",
+    asset_path = "/server/assets/chips/EXEPoN-ElecBlde.zip",
+    code = "D",
+  },
+  flamblde = {
+    package_id = "com.wcity.OFC.card.EXEPoN-050-BambooBlade",
+    asset_path = "/server/assets/chips/EXEPoN-FlamBlde.zip",
+    code = "D",
+  },
 }
 
 -- Current and legacy package-ID indexes.
