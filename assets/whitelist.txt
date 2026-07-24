@@ -57,6 +57,41 @@ fa456846580535d8b4016390a5f8528e com.wcity.louise.card.gutsmanv1
 0638acc618edadc03956feab3c6aee7f hoov.wcity.cards.wavearm1
 6ca443cc26315add3873429a714be8cd rune.wcity.legacy.bubbler
 
+5ecbb8b8cf8ebf0d6dc2755aed72289a Barr10.wcity.Library.92
+2f023319979cec2153ca090d01d59e2d com.OFC.card.EXE6-009-SpreadGun1
+80b15c32cd991ab6a66cc6e56804d51c com.OFC.card.EXE6-134-Toppuu
+8afac4c5e5feeb588e3d2c4718c972f1 com.OFC.card.EXE6-138-StoneCube
+4a39a4fd774bdd715606bc698bba7b37 com.OFC.card.EXEPoN-031-Ratton1
+83177b0083f487fafec68c4e9563f608 com.OFC.card.EXEPoN-040-LongSword
+f51f3c4ba868019b81de9786b2e7897a com.OFC.card.EXEPoN-051-ShockWave
+5cabb97f4c2c396b000838b74f3fac6f com.wcity.OFC.card.EXE6-010-SpreadGun2
+08fa9eb1e331f039ccbc61df59ea2475 com.wcity.OFC.card.EXE6-015-GunDelSol1
+136cd350be9b7493a835ee86853833c1 com.wcity.OFC.card.EXE6-018-YoYo
+bc2d28a6876b754c920f35ad2dfc96be com.wcity.OFC.card.EXE6-019-HellsBurner1
+770c4d946361532ac5d7ab41801632fb com.wcity.OFC.card.EXE6-029-ThunderBall
+dbbdf568a387d7e9a7827531da772e51 com.wcity.OFC.card.EXE6-055-MachineGun1
+0553208532b76ea781a8a20a39ead8d2 com.wcity.OFC.card.EXE6-056-MachineGun2
+c732fa035d804a84a4517e6f69be30ad com.wcity.OFC.card.EXE6-091-ReflecMet1
+a420327ff619c41117faa29b7a81e5a5 com.wcity.OFC.card.EXE6-116-KillerSensor1
+d8e45c0a5fdd4228caa821f3fe220b88 com.wcity.OFC.card.EXE6-117-KillerSensor2
+24b7dec4b757fe749abe3a511c8b3772 com.wcity.OFC.card.EXE6-157-Recovery30
+eb0ba448c3d116a56163d2b5983a0cec com.wcity.OFC.card.EXEPoN-002-HighCannon
+54e064ff3b86b5301689ca756aab6123 com.wcity.OFC.card.EXEPoN-014-HeatShot
+1c5f820fca4a2846b1c61d9521e921f1 com.wcity.OFC.card.EXEPoN-017-RabiRing1
+70a7b77778c6ff14578079e3a07efef3 com.wcity.OFC.card.EXEPoN-018-RabiRing2
+2a258ebbe85583a320e066dc0732cc7a com.wcity.OFC.card.EXEPoN-032-Ratton2
+cc2a2327082f80bcd5efc34ee40ce0db com.wcity.OFC.card.EXEPoN-052-SonicWave
+e38e14e99a55480c418ee1223c8a6b53 com.wcity.OFC.card.EXEPoN-066-Boomerang1
+dc9538cc5fd4246e894cef03df11c6cd com.wcity.OFC.card.EXEPoN-067-Boomerang2
+e9d53322d86fe3f522d96135c54d631b com.wcity.OFC.card.EXEPoN-121-Attack+20
+99f1ad8cdd04fcbf1106fa4f85c460d5 com.wcity.k1rbyat1na.card.EXE6-222-Roll
+edddf0fcd44f5c1b5857406723cd07c0 com.wcity.louise.card.dashattck
+fba316bdbd222bde78a193da8525e829 com.wcity.louise.card.gutsmanv1
+27158061d2398e4a3f777720aaa96933 com.wcity.rune.k1rbyat1na.card.EXE6-060-EnergyBomb
+07f220fefac0f15fc4db8ed16da8c9d5 com.wcity.rune.k1rbyat1na.card.EXE6-061-MegaEnergyBomb
+63f2f7e2ae21a78571a7a2ad7ba1fe41 hoov.wcity.cards.wavearm1
+6d54151caecff93a66ee5e1025d55c68 rune.wcity.legacy.bubbler
+
 48da282359df4cc3e6c1ece357bbdf8f com.OFC.card.EXE4-132-DarkHole
 1b26e647d692790aa6321b0bdc43353e com.OFC.card.EXE5-012-PulseBeam1
 b09483bac1d32aeefca347e40009889d com.OFC.card.EXE5-262-ShadeMan
@@ -77,6 +112,11 @@ ea4007ed21ee7f02a03e669aaa79e35e com.darkware.card.EXE5-Poltergeist
 6cc59676e5d8c2fd2a05fb8eb717d289 com.wcity.OFC.card.EXE5-093-MeteorEarth1
 b500a8ba814e9ed7b62b41b15df5b5ab com.wcity.OFC.card.EXE6-153-WaraNingyou
 2ea4f4f23ba3327468234a1398b136a3 com.wcity.k1rbyat1na.card.EXE6-276-Hakushaku
+83ed1f8e2061fbec6d94a26e85a2d8d1 com.wcity.OFC.card.EXE4-129-Blind
+ef8d43b5f176dd9d1b5f3e2c9c4e42bf com.wcity.OFC.card.EXEPoN-047-FlameBlade
+af66ec9fd3635b8d26d7a33fd627027a com.wcity.OFC.card.EXEPoN-048-AquaBlade
+61dd3335fc6634895411819407cc751f com.wcity.OFC.card.EXEPoN-049-ElecBlade
+aa5bca100f627e72f0865ea67e76d231 com.wcity.OFC.card.EXEPoN-050-BambooBlade
 
 ............................class BlockPackageManager............................
 2e6bd07f5f9614f8fce403bdea369392 com.OFC.block.EXE6-013-UnderShirt
@@ -121,4 +161,8 @@ c6b5dcb9f1c0be6a7178992ee4382597 com.drawcie.navi.darkmegaPVP
 e47d577ebb4efab216fad49a6351dd3f com.shadis.navi.adventure.Luigi.basic
 5d1a2f7e81a4be1146ad1784f793ca1b com.silva.navi.zarymura.adventure
 e3f43516c75e29fb501e244aaca907ce Crow_Basic
+ec34e6aacbf33126aed55218b2042b6b com.orphin.navi.wave
+15d737116e7261c8ede65e65b923267a com.orphin.navi.wave
+fa18fdf941e8f785faf457978492af28 com.orphin.navi.kit
+50c48f3d8f50d433daddd694fea41755 com.orphin.navi.kit
 
