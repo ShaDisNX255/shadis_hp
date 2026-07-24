@@ -3,6 +3,7 @@ local helpers = require('scripts/ezlibs-scripts/helpers')
 local ezmemory = require('scripts/ezlibs-scripts/ezmemory')
 local ezquests = require('scripts/ezlibs-scripts/ezquests')
 local ezemail = require('scripts/ezlibs-scripts/ezemail')
+local quest_progress = require('scripts/ezlibs-scripts/quest_progress')
 local whitelist = require('scripts/ezlibs-custom/whitelist')
 local MenuAPIOK, MenuAPI =
     pcall(require, "scripts/menuAPI/main")
@@ -655,7 +656,7 @@ local dialogue_types = {
                     return next_dialogues[2] or next_dialogues[1]
                 end
 
-                local current_state = qp_get_state(player_id, quest_id)
+                local current_state = quest_progress.get_state(player_id, quest_id)
                 local passed = tostring(current_state or "") == tostring(expected_state)
 
                 return next_dialogues[passed and 1 or 2]
@@ -680,7 +681,7 @@ local dialogue_types = {
                     return dialogue.custom_properties["Next 2"] or dialogue.custom_properties["Next 1"]
                 end
 
-                qp_set_state(player_id, quest_id, state)
+                quest_progress.set_state(player_id, quest_id, state)
 
                 return dialogue.custom_properties["Next 1"]
             end)

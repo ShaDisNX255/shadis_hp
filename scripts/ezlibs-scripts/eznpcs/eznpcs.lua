@@ -5,7 +5,7 @@ local ezcache = require('scripts/ezlibs-scripts/ezcache')
 local object_registry = require('scripts/ezlibs-scripts/object_registry')
 local math = require('math')
 local ezbus = require('scripts/ezlibs-scripts/ezbus')
-local ezquests = require('scripts/ezlibs-scripts/ezquests')   -- added for quest checks
+local quest_progress = require('scripts/ezlibs-scripts/quest_progress')
 
 local eznpcs = {}
 local placeholder_to_botid = {}          -- area_id -> placeholder_id -> global bot ID (for non-exclusive NPCs)
@@ -16,8 +16,9 @@ local exclusive_placeholders = {}        -- list of { area_id, object_id } for a
 -- Systems such as timed raids explicitly spawn/despawn them through the public API.
 local deferred_placeholders = {}         -- area_id -> placeholder_id -> true
 
--- NEW: Quest‑exclusive NPC data
+-- NEW: Quest-exclusive NPC data
 local quest_exclusive_placeholders = {}  -- list of { area_id, object_id, quest_name, required_state }
+local quest_exclusive_placeholder_keys = {}
 local quest_exclusive_npcs = {}           -- player_id -> { placeholder_id = bot_id }
 
 local npcs = {}                           -- global bot ID -> npc data (for all bots, including exclusive)
@@ -136,7 +137,7 @@ function do_dialogue(npc,player_id,dialogue,relay_object)
 end
 
 -- Creates a bot (global or per-player) and returns its npc_data
-function create_bot_from_object(area_id, object, player_id)
+function create_bot_from_object(area_id, object, player_id, exclusive_kind)
     if not object then return end
     local x = object.x
     local y = object.y
@@ -174,10 +175,22 @@ function create_bot_from_object(area_id, object, player_id)
 
     -- If this is an exclusive NPC for a specific player, hide it from everyone else
     if player_id then
-        if not exclusive_npcs[player_id] then exclusive_npcs[player_id] = {} end
-        exclusive_npcs[player_id][tostring(object.id)] = npc.bot_id
+        local target = exclusive_npcs
+        local label = "Exclusive"
+
+        if exclusive_kind == "quest" then
+            target = quest_exclusive_npcs
+            label = "Quest-exclusive"
+        end
+
+        if not target[player_id] then
+            target[player_id] = {}
+        end
+
+        target[player_id][tostring(object.id)] = npc.bot_id
+
         exclude_except_for(player_id, npc.bot_id)
-        printd("Exclusive bot", npc.bot_id, "created for player", player_id)
+        printd(label .. " bot", npc.bot_id, "created for player", player_id)
     else
         -- Global NPC: store in placeholder_to_botid and ensure visible to all
         if not placeholder_to_botid[area_id] then placeholder_to_botid[area_id] = {} end
@@ -548,30 +561,71 @@ function on_npc_reached_waypoint(npc,waypoint)
     end
 end
 
--- Helper to update quest‑exclusive NPCs for a given player
+local function register_quest_exclusive_placeholder(area_id, object, quest_name, required_state)
+    local key = tostring(area_id) .. ":" .. tostring(object.id)
+
+    if quest_exclusive_placeholder_keys[key] then
+        return
+    end
+
+    quest_exclusive_placeholder_keys[key] = true
+
+    table.insert(quest_exclusive_placeholders, {
+        area_id = area_id,
+        object_id = object.id,
+        quest_name = quest_name,
+        required_state = required_state or "active",
+    })
+
+    printd(
+        "Registered quest-exclusive placeholder id " .. tostring(object.id)
+        .. " in " .. tostring(area_id)
+        .. " for quest " .. tostring(quest_name)
+    )
+end
+
+-- Helper to update quest-exclusive NPCs for a given player
 local function update_quest_exclusive_for_player(player_id)
-    -- Remove any existing quest exclusive NPCs for this player
+    -- Remove any existing quest-exclusive NPCs for this player
     if quest_exclusive_npcs[player_id] then
         for placeholder_id, bot_id in pairs(quest_exclusive_npcs[player_id]) do
             Net.remove_bot(bot_id)
             npcs[bot_id] = nil
         end
+
         quest_exclusive_npcs[player_id] = nil
     end
 
-    -- For each quest exclusive placeholder, check if the player's quest state matches
+    -- Recreate only the NPCs whose required quest state matches
     for _, entry in ipairs(quest_exclusive_placeholders) do
-        local state = ezquests.get_player_quest_state(player_id, entry.quest_name)
+        local state = quest_progress.get_state(
+            player_id,
+            entry.quest_name
+        )
+
         if state and state == entry.required_state then
-            local object = ezcache.get_object_by_id_cached(entry.area_id, entry.object_id)
+            local object = ezcache.get_object_by_id_cached(
+                entry.area_id,
+                entry.object_id
+            )
+
             if object then
-                local npc = create_bot_from_object(entry.area_id, object, player_id)
+                local npc = create_bot_from_object(
+                    entry.area_id,
+                    object,
+                    player_id,
+                    "quest"
+                )
+
                 if npc then
-                    if not quest_exclusive_npcs[player_id] then
-                        quest_exclusive_npcs[player_id] = {}
-                    end
-                    quest_exclusive_npcs[player_id][tostring(entry.object_id)] = npc.bot_id
-                    printd("Quest‑exclusive bot", npc.bot_id, "created for player", player_id, "quest", entry.quest_name)
+                    printd(
+                        "Quest-exclusive bot",
+                        npc.bot_id,
+                        "created for player",
+                        player_id,
+                        "quest",
+                        entry.quest_name
+                    )
                 end
             end
         end
@@ -586,15 +640,15 @@ object_registry.register_handler("NPC", function(area_id, object)
     local quest_exclusive = props["Quest Exclusive"]   -- string (quest name) or nil
 
     if quest_exclusive then
-        -- This is a quest‑exclusive placeholder
-        local required_state = props["Quest State"] or "active"   -- default state
-        table.insert(quest_exclusive_placeholders, {
-            area_id = area_id,
-            object_id = object.id,
-            quest_name = quest_exclusive,
-            required_state = required_state
-        })
-        printd("Registered quest‑exclusive placeholder id "..object.id.." in "..area_id.." for quest "..quest_exclusive)
+        -- This is a quest-exclusive placeholder
+        local required_state = props["Quest State"] or "active"
+
+        register_quest_exclusive_placeholder(
+            area_id,
+            object,
+            quest_exclusive,
+            required_state
+        )
     elseif is_quest or is_exclusive then
         printd("Skipping quest/exclusive NPC placeholder id "..object.id.." in "..area_id)
         if is_exclusive then
@@ -638,15 +692,16 @@ function eznpcs.add_npcs_to_area(area_id)
             local is_exclusive = is_property_true(props["Player Exclusive"])
             local quest_exclusive = props["Quest Exclusive"]
             if quest_exclusive then
-                -- Already handled by registry, but ensure it's stored (registry runs first)
-                -- (duplicate entries won't hurt)
+                -- Already handled by the registry in most cases.
+                -- This helper safely ignores duplicate registration.
                 local required_state = props["Quest State"] or "active"
-                table.insert(quest_exclusive_placeholders, {
-                    area_id = area_id,
-                    object_id = object.id,
-                    quest_name = quest_exclusive,
-                    required_state = required_state
-                })
+
+                register_quest_exclusive_placeholder(
+                    area_id,
+                    object,
+                    quest_exclusive,
+                    required_state
+                )
             elseif not is_quest and not is_exclusive then
                 create_bot_from_object(area_id, object)
             elseif is_exclusive then
@@ -881,29 +936,63 @@ function eznpcs.handle_object_interaction(player_id, object_id)
             return
         end
 
-        -- Check if it's a quest‑exclusive placeholder
+        -- Check if it's a quest-exclusive placeholder
         local quest_exclusive = object.custom_properties["Quest Exclusive"]
+
         if quest_exclusive then
-            printd("Quest‑exclusive NPC interaction for player", player_id, "placeholder", object.id)
-            if not quest_exclusive_npcs[player_id] or not quest_exclusive_npcs[player_id][tostring(object.id)] then
-                local required_state = object.custom_properties["Quest State"] or "active"
-                local state = ezquests.get_player_quest_state(player_id, quest_exclusive)
+            printd(
+                "Quest-exclusive NPC interaction for player",
+                player_id,
+                "placeholder",
+                object.id
+            )
+
+            if not quest_exclusive_npcs[player_id]
+                or not quest_exclusive_npcs[player_id][tostring(object.id)]
+            then
+                local required_state =
+                    object.custom_properties["Quest State"]
+                    or "active"
+
+                local state = quest_progress.get_state(
+                    player_id,
+                    quest_exclusive
+                )
+
                 if state and state == required_state then
-                    local npc = create_bot_from_object(area_id, object, player_id)
+                    local npc = create_bot_from_object(
+                        area_id,
+                        object,
+                        player_id,
+                        "quest"
+                    )
+
                     if npc then
-                        if not quest_exclusive_npcs[player_id] then
-                            quest_exclusive_npcs[player_id] = {}
-                        end
-                        quest_exclusive_npcs[player_id][tostring(object.id)] = npc.bot_id
-                        do_actor_interaction(player_id, npc.bot_id, object)
+                        do_actor_interaction(
+                            player_id,
+                            npc.bot_id,
+                            object
+                        )
                     end
                 else
-                    printd("Player", player_id, "does not meet quest state for", quest_exclusive)
+                    printd(
+                        "Player",
+                        player_id,
+                        "does not meet quest state for",
+                        quest_exclusive
+                    )
                 end
             else
-                local bot_id = quest_exclusive_npcs[player_id][tostring(object.id)]
-                do_actor_interaction(player_id, bot_id, object)
+                local bot_id =
+                    quest_exclusive_npcs[player_id][tostring(object.id)]
+
+                do_actor_interaction(
+                    player_id,
+                    bot_id,
+                    object
+                )
             end
+
             return
         end
     end
@@ -952,12 +1041,11 @@ function eznpcs.get_bot_id_for_placeholder(area_id, placeholder_id)
     return nil
 end
 
--- Listen for quest events to refresh quest‑exclusive NPCs
-ezbus:on("quest_event", function(event)
-    local player_id = event.player_id
-    -- When a quest event occurs, update quest‑exclusive NPCs for that player
-    -- (This covers state changes that happen through dialogue)
-    update_quest_exclusive_for_player(player_id)
+-- Refresh quest-exclusive NPCs immediately after qset changes a state.
+ezbus:on("quest_progress_changed", function(event)
+    if event and event.player_id then
+        update_quest_exclusive_for_player(event.player_id)
+    end
 end)
 
 return eznpcs
