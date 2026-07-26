@@ -341,6 +341,15 @@ whitelist.CARDS = {
     asset_path = "/server/assets/chips/EXEPoN-FlamBlde.zip",
     code = "D",
   },
+  childrive = {
+    package_id = "com.darkware.card.PKMN026",
+    asset_path = "/server/assets/chips/Custom-ChilDrive.zip",
+    code = "C",
+
+    display_name = "ChilDrive",
+    preview_key = "childrive",
+    folder_card = "regular",
+  },
 }
 
 -- Current and legacy package-ID indexes.

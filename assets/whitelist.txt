@@ -104,6 +104,7 @@ b09483bac1d32aeefca347e40009889d com.OFC.card.EXE5-262-ShadeMan
 5c442c43f349765bb2b9b436a78ea571 com.wcity.OFC.card.EXEPoN-048-AquaBlade
 b6414a67a524f674886ceb9221c97e82 com.wcity.OFC.card.EXEPoN-049-ElecBlade
 23e60f591470dfb79dc43c54211074e1 com.wcity.OFC.card.EXEPoN-050-BambooBlade
+59e98a01839d50ca275fb6cbff52e932 com.darkware.card.PKMN026
 
 e50d912d5be732003327b83fe91f55e0 com.OFC.card.EXE4-132-DarkHole
 92128b1ab25dd932aa87da0edb9ae510 com.OFC.card.EXE5-012-PulseBeam1

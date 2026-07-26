@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="50" height="50" tilewidth="64" tileheight="32" infinite="0" nextlayerid="4" nextobjectid="164">
+<map version="1.10" tiledversion="1.12.2" orientation="isometric" renderorder="right-down" width="50" height="50" tilewidth="64" tileheight="32" infinite="0" nextlayerid="4" nextobjectid="191">
  <properties>
   <property name="Background" value="custom"/>
   <property name="Background Animation" value="/server/assets/custom/backgrounds/home/suidoukyokunodennou1.animation"/>
@@ -769,6 +769,94 @@
     <property name="Dialogue Type" value="quest_event"/>
     <property name="Event Value" value="zary_reveal_official"/>
     <property name="Quest Name" value="EchoProgram"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="181" name="NormalNavi" type="NPC" x="848" y="1358">
+   <properties>
+    <property name="Asset Name" value="male-navi-exe4_pink"/>
+    <property name="Dialogue Type" value="qcheck"/>
+    <property name="Direction" value="Up Right"/>
+    <property name="Next 1" type="object" value="182"/>
+    <property name="Next 2" type="object" value="183"/>
+    <property name="Quest Exclusive" value="fisherman_rumor_icerink_npc"/>
+    <property name="Quest ID" value="fisherman_rumor_icerink_npc"/>
+    <property name="Quest State" value="active"/>
+    <property name="State" value="active"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="182" name="First Check" type="Dialogue" x="836" y="1338">
+   <properties>
+    <property name="Dialogue Type" value="qcheck"/>
+    <property name="Next 1" type="object" value="184"/>
+    <property name="Next 2" type="object" value="190"/>
+    <property name="Quest ID" value="fisherman_rumor"/>
+    <property name="State" value="icerink"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="183" name="Found Me" type="Dialogue" x="851" y="1339">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Text 1" value="Oh you found me. Good job, now try actually starting this quest from the beginning."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="184" name="IceRink_Text_1" type="Dialogue" x="826.5" y="1323.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="185"/>
+    <property name="Text 1" value="Just saw a really skilled fisherman pass through here, he was amazing!"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="185" name="IceRink_Text_2" type="Dialogue" x="816" y="1310">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="186"/>
+    <property name="Text 1" value="I think he caught more than just fish, it was interesting to see."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="186" name="IceRink_Text_3" type="Dialogue" x="806.5" y="1297.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="187"/>
+    <property name="Text 1" value="He said he was going to go deeper into a hidden part of IceRink3 for the best fish, you might find him there."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="187" name="IceRink_Set_Fisherman" type="Dialogue" x="799" y="1285">
+   <properties>
+    <property name="Dialogue Type" value="qset"/>
+    <property name="Next 1" type="object" value="188"/>
+    <property name="Quest ID" value="fisherman_rumor"/>
+    <property name="State" value="fisherman"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="188" name="IceRink_Hide_FishArea" type="Dialogue" x="792.5" y="1273.5">
+   <properties>
+    <property name="Dialogue Type" value="qset"/>
+    <property name="Next 1" type="object" value="189"/>
+    <property name="Quest ID" value="fisherman_rumor_fisharea_npc"/>
+    <property name="State" value="complete"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="189" name="IceRink_Show_Fisherman" type="Dialogue" x="786.5" y="1261.5">
+   <properties>
+    <property name="Dialogue Type" value="qset"/>
+    <property name="Quest ID" value="fisherman_rumor_fisher_npc"/>
+    <property name="State" value="active"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="190" name="IceRink_Reminder" type="Dialogue" x="832" y="1318">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Text 1" value="He headed deeper into IceRink3, seems to have taken a hidden path."/>
    </properties>
    <point/>
   </object>
