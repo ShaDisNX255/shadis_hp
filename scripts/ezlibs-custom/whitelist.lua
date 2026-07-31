@@ -350,6 +350,42 @@ whitelist.CARDS = {
     preview_key = "childrive",
     folder_card = "regular",
   },
+  swapaqua = {
+    package_id = "com.wcity.Thor.card.SwapAqua",
+    asset_path = "/server/assets/chips/Custom-SwapAqua.zip",
+    code = "*",
+
+    display_name = "SwapAqua",
+    preview_key = "swapaqua",
+    folder_card = "regular",
+  },
+  swapelec = {
+    package_id = "com.wcity.Thor.card.SwapElec",
+    asset_path = "/server/assets/chips/Custom-SwapElec.zip",
+    code = "*",
+
+    display_name = "SwapElec",
+    preview_key = "swapelec",
+    folder_card = "regular",
+  },
+  swapfire = {
+    package_id = "com.wcity.Thor.card.SwapFire",
+    asset_path = "/server/assets/chips/Custom-SwapFire.zip",
+    code = "*",
+
+    display_name = "SwapFire",
+    preview_key = "swapfire",
+    folder_card = "regular",
+  },
+  swapwood = {
+    package_id = "com.wcity.Thor.card.SwapWood",
+    asset_path = "/server/assets/chips/Custom-SwapWood.zip",
+    code = "*",
+
+    display_name = "SwapWood",
+    preview_key = "swapwood",
+    folder_card = "regular",
+  },
 }
 
 -- Current and legacy package-ID indexes.

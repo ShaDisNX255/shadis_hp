@@ -28,7 +28,45 @@ end
 return {
   minimum_steps_before_encounter = 40,
   encounter_chance_per_step = 0.10,
-  encounters = {},
+  encounters = {
+    {
+      name="tech1_1",
+      path="/server/assets/ezlibs-assets/ezencounters/optimized/wcity1.zip",
+      pet_exp=0,
+      enemies={
+        {name="Mettaur",rank=1},
+        {name="Mettaur",rank=2},
+        {name="Mettaur",rank=3},
+      },
+      obstacles={
+      },
+      positions={
+        {0,0,0,1,0,0},
+        {0,0,0,0,2,0},
+        {0,0,0,0,0,3},
+      },
+      obstacle_positions={
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+        {0,0,0,0,0,0},
+      },
+      player_positions={
+        {0,0,0,0,0,0},
+        {0,1,0,0,0,0},
+        {0,0,0,0,0,0},
+      },
+      tiles={
+        {1,1,1,1,1,1},
+        {1,1,1,1,1,1},
+        {1,1,1,1,1,1},
+      },
+      teams={
+        {2,2,2,1,1,1},
+        {2,2,2,1,1,1},
+        {2,2,2,1,1,1},
+      },
+    },
+  },
 
   rewards = {
     enabled = true,

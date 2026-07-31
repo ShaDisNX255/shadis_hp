@@ -1042,9 +1042,14 @@ function Friends.open_friends_board(pid, opts)
         return true
       end
 
+      local open = OPEN_FRIEND_MENUS[player_id]
+      local previous_secret = open and open.selected and open.selected.secret
+      local same_friend_selected = previous_secret
+        and selected_friend.secret
+        and tostring(previous_secret) == tostring(selected_friend.secret)
+
       LAST_FRIEND_ROW_ID_BY_PID[player_id] = row.id
 
-      local open = OPEN_FRIEND_MENUS[player_id]
       if open then
         open.selected = selected_friend
       end
@@ -1064,7 +1069,12 @@ function Friends.open_friends_board(pid, opts)
         end
       end
 
-      Friends.open_friend_actions(player_id, selected_friend)
+      -- First confirm selects/views the friend.
+      -- Second confirm on the same friend opens the action menu.
+      if same_friend_selected then
+        Friends.open_friend_actions(player_id, selected_friend)
+      end
+
       return true
     end,
 

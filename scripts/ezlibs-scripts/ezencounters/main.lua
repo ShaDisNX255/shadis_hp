@@ -1203,6 +1203,36 @@ Net:on("battle_results", function(event)
             encounter_finished_callbacks[player_id] = nil
         end
 
+        local encounter_info = player_encounter.encounter_info
+        local final_encounter_info = player_encounter.final_encounter_info
+
+        local skip_post_battle_processing =
+            (encounter_info and encounter_info.no_results == true)
+            or (final_encounter_info and final_encounter_info.no_results == true)
+
+        if skip_post_battle_processing then
+            -- Preserve the player's actual remaining battle HP and emotion,
+            -- but do not calculate or grant any result rewards.
+            _persist_health_and_emotion(player_id, event)
+
+            players_in_encounters[player_id] = nil
+
+            ezbus:emit("encounter_finished", {
+                player_id = player_id,
+                stats = {
+                    health = event.health,
+                    time = event.time,
+                    ran = event.ran,
+                    emotion = event.emotion,
+                    turns = event.turns,
+                    enemies = event.enemies,
+                    score = event.score
+                }
+            })
+
+            return
+        end
+
         local flags = _result_flags(event)
 
         if Pets
@@ -1283,9 +1313,6 @@ Net:on("battle_results", function(event)
                 print("[PET FATIGUE] record failed: " .. tostring(recorded))
             end
         end
-
-        local encounter_info = player_encounter.encounter_info
-        local final_encounter_info = player_encounter.final_encounter_info
 
         local area_id =
             (encounter_info and encounter_info._area_id)

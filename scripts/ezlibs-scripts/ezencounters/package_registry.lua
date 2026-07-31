@@ -14,6 +14,7 @@ registry.EVENTS_PATH = registry.PACKAGE_PREFIX .. "events.zip"
 registry.FISHING_PATH = registry.PACKAGE_PREFIX .. "fishing.zip"
 registry.RAIDS_PATH = registry.PACKAGE_PREFIX .. "raids.zip"
 registry.TOURNAMENTS_PATH = registry.PACKAGE_PREFIX .. "tournaments.zip"
+registry.ELMQUEST_PATH = registry.PACKAGE_PREFIX .. "elmquest.zip"
 
 
 registry.packages = {
@@ -70,6 +71,13 @@ registry.packages = {
         name = "Tournaments" ,
         package_id = "com.shadishp.mob.ezencounters.tournaments" ,
         allow_battle_pets = false,
+        supports_obstacles = false,
+        supports_music = false,
+    },
+    [registry.ELMQUEST_PATH] = {
+        name = "Elmquest" ,
+        package_id = "com.shadishp.mob.ezencounters.elmquest" ,
+        allow_battle_pets = true,
         supports_obstacles = false,
         supports_music = false,
     },

@@ -104,7 +104,13 @@ b09483bac1d32aeefca347e40009889d com.OFC.card.EXE5-262-ShadeMan
 5c442c43f349765bb2b9b436a78ea571 com.wcity.OFC.card.EXEPoN-048-AquaBlade
 b6414a67a524f674886ceb9221c97e82 com.wcity.OFC.card.EXEPoN-049-ElecBlade
 23e60f591470dfb79dc43c54211074e1 com.wcity.OFC.card.EXEPoN-050-BambooBlade
-59e98a01839d50ca275fb6cbff52e932 com.darkware.card.PKMN026
+8ef570c64c2e7c29104616af02fa5411 com.darkware.card.PKMN024
+5d6487b89f486eaf3af9077175728c7d com.darkware.card.PKMN025
+f8e40a684e60f95f3b26558a033cc734 com.darkware.card.PKMN026
+00687fcef1254bee64235798a81ce60c com.wcity.Thor.card.SwapAqua
+7624c61cfe4437b3c1ed09ce6d6f9c4e com.wcity.Thor.card.SwapElec
+f7bd959c653b621b923a4c5991c35008 com.wcity.Thor.card.SwapFire
+faa0e66daa9f44db3fa8e9552f3e070e com.wcity.Thor.card.SwapWood
 
 e50d912d5be732003327b83fe91f55e0 com.OFC.card.EXE4-132-DarkHole
 92128b1ab25dd932aa87da0edb9ae510 com.OFC.card.EXE5-012-PulseBeam1
@@ -118,6 +124,13 @@ ef8d43b5f176dd9d1b5f3e2c9c4e42bf com.wcity.OFC.card.EXEPoN-047-FlameBlade
 af66ec9fd3635b8d26d7a33fd627027a com.wcity.OFC.card.EXEPoN-048-AquaBlade
 61dd3335fc6634895411819407cc751f com.wcity.OFC.card.EXEPoN-049-ElecBlade
 aa5bca100f627e72f0865ea67e76d231 com.wcity.OFC.card.EXEPoN-050-BambooBlade
+927b5c4c4e027bdbedd5a5f6e95fcc3c com.darkware.card.PKMN024
+95977887479e9992cdc629debac25953 com.darkware.card.PKMN025
+e65ed5040e602807ea2495a11f5adc89 com.darkware.card.PKMN026
+f7a0936aa9c20e853f2d3718d14f7d28 com.wcity.Thor.card.SwapAqua
+4948f6b1ebd921edaee01048c3def47b com.wcity.Thor.card.SwapElec
+8d3e6b1a08636e95d56b2f720adddd08 com.wcity.Thor.card.SwapFire
+297245e95a29d6150a33e3b155efd0b3 com.wcity.Thor.card.SwapWood
 
 ............................class BlockPackageManager............................
 2e6bd07f5f9614f8fce403bdea369392 com.OFC.block.EXE6-013-UnderShirt
@@ -166,4 +179,6 @@ ec34e6aacbf33126aed55218b2042b6b com.orphin.navi.wave
 15d737116e7261c8ede65e65b923267a com.orphin.navi.wave
 fa18fdf941e8f785faf457978492af28 com.orphin.navi.kit
 50c48f3d8f50d433daddd694fea41755 com.orphin.navi.kit
-
+efb70c5b5aa670d030f3ff26acca7128 com.discord.neohgo.player.HackerMan
+fcafb24114f3fecd9aa1d6d02b13b6c9 com.D3str0y3d.player.Quickman
+380e0d9efeec1213a1444a7786566730 com.d3str0y3d255.navi.burnermanpvp
