@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="60" height="60" tilewidth="64" tileheight="32" infinite="0" nextlayerid="14" nextobjectid="54">
+<map version="1.10" tiledversion="1.12.2" orientation="isometric" renderorder="right-down" width="60" height="60" tilewidth="64" tileheight="32" infinite="0" nextlayerid="14" nextobjectid="143">
  <properties>
   <property name="Background" value="custom"/>
   <property name="Background Animation" value="/server/assets/custom/backgrounds/techlab/07a-centralarea.animation"/>
@@ -23,6 +23,7 @@
  <tileset firstgid="275" source="../assets/ezlibs-assets/ezmystery/GreenMysteryData.tsx"/>
  <tileset firstgid="283" source="../assets/ezlibs-assets/ezmystery/BlueMysteryData.tsx"/>
  <tileset firstgid="291" source="../assets/ezlibs-assets/ezcheckpoints/bn5cubegreen_tile.tsx"/>
+ <tileset firstgid="295" source="../assets/tiles/BN2SquareColorful.tsx"/>
  <layer id="1" name="Tile Layer 0" width="60" height="60">
   <data encoding="csv">
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -49,15 +50,15 @@
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,14,16,15,0,0,0,16,15,14,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,13,0,14,0,15,14,13,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,13,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,149,151,151,151,151,151,151,151,151,152,174,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,297,0,0,149,151,151,151,151,151,151,151,151,152,174,0,0,299,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,297,295,297,297,197,159,159,159,159,159,159,159,159,159,183,299,299,295,299,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,297,0,0,197,159,159,159,159,159,159,159,159,159,183,0,0,299,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,197,159,159,159,159,159,159,159,159,159,183,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,197,159,159,159,159,159,159,159,159,159,183,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,197,159,159,159,159,159,159,159,159,159,183,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,197,159,159,159,159,159,159,159,159,159,183,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,197,159,159,159,159,159,159,159,159,159,183,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,197,159,159,159,159,159,159,159,159,159,183,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,197,159,159,159,159,159,159,159,159,159,183,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,197,159,159,159,159,159,159,159,159,159,183,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,296,0,0,197,159,159,159,159,159,159,159,159,159,183,0,0,298,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,296,295,296,296,197,159,159,159,159,159,159,159,159,159,183,298,298,295,298,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,296,0,0,197,159,159,159,159,159,159,159,159,159,183,0,0,298,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,205,191,191,191,191,191,191,191,191,191,182,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,14,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,13,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -167,6 +168,773 @@
     <property name="Dialogue Type" value="first"/>
     <property name="Direction" value="Up Left"/>
     <property name="Text 1" value="I wonder what that guy is doing over there..."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="54" name="Protoman Key" type="Checkpoint" gid="291" x="1248" y="1008" width="53.25" height="56">
+   <properties>
+    <property name="Description" value="This security cube seems to be sealed by an Official Navi. There are a few words written on the surface: &quot;Only those who have gained my trust will be allowed in&quot;"/>
+    <property name="Dialogue Type" value=""/>
+    <property name="Key Name" value="ProtoBadge"/>
+    <property name="Once" type="bool" value="true"/>
+    <property name="Required Keys" type="int" value="1"/>
+    <property name="Skip Prompt" type="bool" value="true"/>
+    <property name="Unlocked Message" value="You show the ProtoBadge..."/>
+   </properties>
+  </object>
+  <object id="55" name="Protoman Key" type="Checkpoint" gid="291" x="1248" y="816" width="53.25" height="56">
+   <properties>
+    <property name="Description" value="This security cube seems to be sealed by an Official Navi. There are a few words written on the surface: &quot;Only those who have gained my trust will be allowed in&quot;"/>
+    <property name="Dialogue Type" value=""/>
+    <property name="Key Name" value="ProtoBadge"/>
+    <property name="Once" type="bool" value="true"/>
+    <property name="Required Keys" type="int" value="1"/>
+    <property name="Skip Prompt" type="bool" value="true"/>
+    <property name="Unlocked Message" value="You show the ProtoBadge..."/>
+   </properties>
+  </object>
+  <object id="56" name="Protoman Key" type="Checkpoint" gid="291" x="1664" y="816" width="53.25" height="56">
+   <properties>
+    <property name="Description" value="This security cube seems to be sealed by an Official Navi. There are a few words written on the surface: &quot;Only those who have gained my trust will be allowed in&quot;"/>
+    <property name="Dialogue Type" value=""/>
+    <property name="Key Name" value="ProtoBadge"/>
+    <property name="Once" type="bool" value="true"/>
+    <property name="Required Keys" type="int" value="1"/>
+    <property name="Skip Prompt" type="bool" value="true"/>
+    <property name="Unlocked Message" value="You show the ProtoBadge..."/>
+   </properties>
+  </object>
+  <object id="57" name="Protoman Key" type="Checkpoint" gid="291" x="1664" y="1008" width="53.25" height="56">
+   <properties>
+    <property name="Description" value="This security cube seems to be sealed by an Official Navi. There are a few words written on the surface: &quot;Only those who have gained my trust will be allowed in&quot;"/>
+    <property name="Dialogue Type" value=""/>
+    <property name="Key Name" value="ProtoBadge"/>
+    <property name="Once" type="bool" value="true"/>
+    <property name="Required Keys" type="int" value="1"/>
+    <property name="Skip Prompt" type="bool" value="true"/>
+    <property name="Unlocked Message" value="You show the ProtoBadge..."/>
+   </properties>
+  </object>
+  <object id="58" name="Master of Wood" type="NPC" x="1200" y="1008">
+   <properties>
+    <property name="Asset Name" value="normal_green"/>
+    <property name="Dialogue Type" value="qcheck"/>
+    <property name="Direction" value="Down Right"/>
+    <property name="Next 1" type="object" value="59"/>
+    <property name="Next 2" type="object" value="60"/>
+    <property name="Quest ID" value="element_wood"/>
+    <property name="State" value="complete"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="59" name="Wood repeat dialogue" type="Dialogue" x="1181" y="1005">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Text 1" value="Stand firm-but never allow patience to become inaction."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="60" name="Wood Intro Check" type="Dialogue" x="1197.5" y="986.5">
+   <properties>
+    <property name="Dialogue Type" value="qcheck"/>
+    <property name="Next 1" type="object" value="61"/>
+    <property name="Next 2" type="object" value="90"/>
+    <property name="Quest ID" value="element_intro"/>
+    <property name="State" value="seen"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="61" name="Wood Opening" type="Dialogue" x="1186.5" y="975.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="62"/>
+    <property name="Text 1" value="Wood is an element of growth and endurance. It draws strength from the ground beneath it, recovering where others would weaken. Strong roots can survive even the harshest conditions. But roots planted too deeply can also become restraints."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="62" name="Wood Text 2" type="Dialogue" x="1175" y="963">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="63"/>
+    <property name="Text 1" value="Overcome my three trials and prove nature answers to you."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="63" name="Wood Battle 1" type="Dialogue" x="1162" y="950">
+   <properties>
+    <property name="Battle Lost" type="object" value="77"/>
+    <property name="Battle Won" type="object" value="64"/>
+    <property name="Dialogue Type" value="none"/>
+    <property name="Event Name" value="grass_1"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="64" name="Wood Battle 2" type="Dialogue" x="1151.5" y="938.5">
+   <properties>
+    <property name="Battle Lost" type="object" value="77"/>
+    <property name="Battle Won" type="object" value="65"/>
+    <property name="Dialogue Type" value="none"/>
+    <property name="Event Name" value="grass_2"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="65" name="Wood Battle 3" type="Dialogue" x="1141.5" y="928.5">
+   <properties>
+    <property name="Battle Lost" type="object" value="77"/>
+    <property name="Battle Won" type="object" value="66"/>
+    <property name="Dialogue Type" value="none"/>
+    <property name="Event Name" value="grass_3"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="66" name="Wood Flavor Text" type="Dialogue" x="1128.5" y="915.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="67"/>
+    <property name="Text 1" value="You've learned how wood endures and draws strength from the battlefield. Now you'll learn what happens when even the strongest roots are threatened."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="67" name="Wood Flavor Text 2" type="Dialogue" x="1117" y="903">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="68"/>
+    <property name="Text 1" value="For your final trial, you'll wield the Wood element yourself. Prove nature still answers to you when standing firm is no longer enough."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="68" name="Wood Battle 4" type="Dialogue" x="1105" y="891">
+   <properties>
+    <property name="Battle Lost" type="object" value="77"/>
+    <property name="Battle Won" type="object" value="74"/>
+    <property name="Dialogue Type" value="none"/>
+    <property name="Event Name" value="grass_4"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="69" name="Wood Complete" type="Dialogue" x="1080.5" y="865.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="70"/>
+    <property name="Text 1" value="You held your ground when it mattered and moved when it did not. You've proven yourself worthy of Wood."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="70" name="Wood Complete 2" type="Dialogue" x="1063.5" y="848.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="75"/>
+    <property name="Text 1" value="Take this chip. Let it serve as proof that nature answers to you."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="74" name="Provide Chip Assets" type="Dialogue" x="1089.5" y="874.5">
+   <properties>
+    <property name="Asset 1" value="assets/chips/previews/folder_card.png"/>
+    <property name="Asset 2" value="assets/chips/previews/swapwood.png"/>
+    <property name="Dialogue Type" value="none"/>
+    <property name="Event Name" value="provideassets"/>
+    <property name="Next 1" type="object" value="69"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="75" name="Chip Reward" type="Dialogue" x="1041.5" y="826.5">
+   <properties>
+    <property name="Chip" value="swapwood"/>
+    <property name="Code" value="*"/>
+    <property name="Dialogue Type" value="chip"/>
+    <property name="Next 1" type="object" value="76"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="76" name="Set Wood Complete" type="Dialogue" x="1018" y="804">
+   <properties>
+    <property name="Dialogue Type" value="qset"/>
+    <property name="Next 1" type="object" value="84"/>
+    <property name="Quest ID" value="element_wood"/>
+    <property name="State" value="complete"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="77" name="Generic Fail Message" type="Dialogue" x="1198" y="914">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Text 1" value="Not bad, but you haven't cleared the trial yet. Try again and show me what you've learned."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="78" name="Main Intro" type="Dialogue" x="1247.5" y="946.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="79"/>
+    <property name="Text 1" value="So, you opened the Security Cube. That means Protoman may make his move soon, and we'll need to be prepared when that time comes. I think it's time you mastered the elements. It's the most basic form of training."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="79" name="Main Intro 2" type="Dialogue" x="1240.5" y="937.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="83"/>
+    <property name="Text 1" value="Each of us specializes in one of the four elements. Pass our trials, and you'll be ready for what's ahead. Let us begin."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="80" name="Master of Aqua" type="NPC" x="1200" y="816">
+   <properties>
+    <property name="Asset Name" value="normal_blue"/>
+    <property name="Dialogue Type" value="qcheck"/>
+    <property name="Direction" value="Down Right"/>
+    <property name="Next 1" type="object" value="113"/>
+    <property name="Next 2" type="object" value="114"/>
+    <property name="Quest ID" value="element_aqua"/>
+    <property name="State" value="complete"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="81" name="Master of Fire" type="NPC" x="1712" y="1008">
+   <properties>
+    <property name="Asset Name" value="normal_red"/>
+    <property name="Dialogue Type" value="qcheck"/>
+    <property name="Direction" value="Up Left"/>
+    <property name="Next 1" type="object" value="98"/>
+    <property name="Next 2" type="object" value="99"/>
+    <property name="Quest ID" value="element_fire"/>
+    <property name="State" value="complete"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="82" name="Master of Elec" type="NPC" x="1712" y="816">
+   <properties>
+    <property name="Asset Name" value="normal_yellow"/>
+    <property name="Dialogue Type" value="qcheck"/>
+    <property name="Direction" value="Up Left"/>
+    <property name="Next 1" type="object" value="128"/>
+    <property name="Next 2" type="object" value="129"/>
+    <property name="Quest ID" value="element_elec"/>
+    <property name="State" value="complete"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="83" name="SetComplete" type="Dialogue" x="1232" y="928">
+   <properties>
+    <property name="Dialogue Type" value="qset"/>
+    <property name="Next 1" type="object" value="94"/>
+    <property name="Quest ID" value="element_intro"/>
+    <property name="State" value="seen"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="84" name="Check Fire Complete" type="Dialogue" x="999.5" y="784.5">
+   <properties>
+    <property name="Dialogue Type" value="qcheck"/>
+    <property name="Next 1" type="object" value="85"/>
+    <property name="Quest ID" value="element_fire"/>
+    <property name="State" value="complete"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="85" name="Check Aqua Complete" type="Dialogue" x="985" y="769">
+   <properties>
+    <property name="Dialogue Type" value="qcheck"/>
+    <property name="Next 1" type="object" value="86"/>
+    <property name="Quest ID" value="element_aqua"/>
+    <property name="State" value="complete"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="86" name="Check Elec Complete" type="Dialogue" x="968.5" y="751.5">
+   <properties>
+    <property name="Dialogue Type" value="qcheck"/>
+    <property name="Next 1" type="object" value="89"/>
+    <property name="Quest ID" value="element_elec"/>
+    <property name="State" value="complete"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="87" name="Final Quest Dialogue" type="Dialogue" x="939" y="721">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Text 1" value="So, you've passed every trial. You’ve now mastered all four elements. Our training is complete. When Protoman makes his move, put everything you've learned to use."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="88" name="Set Element Mastery" type="Dialogue" x="952.5" y="735.5">
+   <properties>
+    <property name="Dialogue Type" value="qset"/>
+    <property name="Next 1" type="object" value="87"/>
+    <property name="Quest ID" value="element_mastery"/>
+    <property name="State" value="complete"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="89" name="Check Wood Complete" type="Dialogue" x="960.5" y="743.5">
+   <properties>
+    <property name="Dialogue Type" value="qcheck"/>
+    <property name="Next 1" type="object" value="88"/>
+    <property name="Quest ID" value="element_wood"/>
+    <property name="State" value="complete"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="90" name="Set Current Wood Master" type="Dialogue" x="1216" y="975">
+   <properties>
+    <property name="Dialogue Type" value="qset"/>
+    <property name="Next 1" type="object" value="78"/>
+    <property name="Quest ID" value="element_intro_master"/>
+    <property name="State" value="wood"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="91" name="Set Current Aqua Master" type="Dialogue" x="1216" y="783">
+   <properties>
+    <property name="Dialogue Type" value="qset"/>
+    <property name="Next 1" type="object" value="78"/>
+    <property name="Quest ID" value="element_intro_master"/>
+    <property name="State" value="aqua"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="92" name="Set Current Fire Master" type="Dialogue" x="1696" y="975">
+   <properties>
+    <property name="Dialogue Type" value="qset"/>
+    <property name="Next 1" type="object" value="78"/>
+    <property name="Quest ID" value="element_intro_master"/>
+    <property name="State" value="fire"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="93" name="Set Current Elec Master" type="Dialogue" x="1696" y="783">
+   <properties>
+    <property name="Dialogue Type" value="qset"/>
+    <property name="Next 1" type="object" value="78"/>
+    <property name="Quest ID" value="element_intro_master"/>
+    <property name="State" value="elec"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="94" name="Route Intro Wood" type="Dialogue" x="1248" y="916">
+   <properties>
+    <property name="Dialogue Type" value="qcheck"/>
+    <property name="Next 1" type="object" value="61"/>
+    <property name="Next 2" type="object" value="95"/>
+    <property name="Quest ID" value="element_intro_master"/>
+    <property name="State" value="wood"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="95" name="Route Intro Fire" type="Dialogue" x="1264" y="904">
+   <properties>
+    <property name="Dialogue Type" value="qcheck"/>
+    <property name="Next 1" type="object" value="100"/>
+    <property name="Next 2" type="object" value="96"/>
+    <property name="Quest ID" value="element_intro_master"/>
+    <property name="State" value="fire"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="96" name="Route Intro Aqua" type="Dialogue" x="1280" y="892">
+   <properties>
+    <property name="Dialogue Type" value="qcheck"/>
+    <property name="Next 1" type="object" value="115"/>
+    <property name="Next 2" type="object" value="97"/>
+    <property name="Quest ID" value="element_intro_master"/>
+    <property name="State" value="aqua"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="97" name="Route Intro Elec" type="Dialogue" x="1296" y="880">
+   <properties>
+    <property name="Dialogue Type" value="qcheck"/>
+    <property name="Next 1" type="object" value="130"/>
+    <property name="Quest ID" value="element_intro_master"/>
+    <property name="State" value="elec"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="98" name="Fire repeat dialogue" type="Dialogue" x="1731" y="1005">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Text 1" value="Strike hard-but don't let your power make you careless."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="99" name="Fire Intro Check" type="Dialogue" x="1714.5" y="986.5">
+   <properties>
+    <property name="Dialogue Type" value="qcheck"/>
+    <property name="Next 1" type="object" value="100"/>
+    <property name="Next 2" type="object" value="92"/>
+    <property name="Quest ID" value="element_intro"/>
+    <property name="State" value="seen"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="100" name="Fire Opening" type="Dialogue" x="1725.5" y="975.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="101"/>
+    <property name="Text 1" value="Fire is an element of power and destruction. It consumes the battlefield, reducing anything in its path to ash. A true Fire Navi can stand where others would be burned. But no flame burns without limits."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="101" name="Fire Text 2" type="Dialogue" x="1737" y="963">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="102"/>
+    <property name="Text 1" value="Overcome my three trials and prove the flame answers to you."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="102" name="Fire Battle 1" type="Dialogue" x="1750" y="950">
+   <properties>
+    <property name="Battle Lost" type="object" value="77"/>
+    <property name="Battle Won" type="object" value="103"/>
+    <property name="Dialogue Type" value="none"/>
+    <property name="Event Name" value="fire_1"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="103" name="Fire Battle 2" type="Dialogue" x="1760.5" y="938.5">
+   <properties>
+    <property name="Battle Lost" type="object" value="77"/>
+    <property name="Battle Won" type="object" value="104"/>
+    <property name="Dialogue Type" value="none"/>
+    <property name="Event Name" value="fire_2"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="104" name="Fire Battle 3" type="Dialogue" x="1770.5" y="928.5">
+   <properties>
+    <property name="Battle Lost" type="object" value="77"/>
+    <property name="Battle Won" type="object" value="105"/>
+    <property name="Dialogue Type" value="none"/>
+    <property name="Event Name" value="fire_3"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="105" name="Fire Flavor Text" type="Dialogue" x="1783.5" y="915.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="106"/>
+    <property name="Text 1" value="You've learned how fire overwhelms its enemies. Now you'll learn what happens when the flame is pushed to its limit."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="106" name="Fire Flavor Text 2" type="Dialogue" x="1795" y="903">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="107"/>
+    <property name="Text 1" value="For your final trial, you'll wield the Fire element yourself. Prove the flame still answers to you when the tide turns."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="107" name="Fire Battle 4" type="Dialogue" x="1807" y="891">
+   <properties>
+    <property name="Battle Lost" type="object" value="77"/>
+    <property name="Battle Won" type="object" value="108"/>
+    <property name="Dialogue Type" value="none"/>
+    <property name="Event Name" value="fire_4"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="108" name="Provide Chip Assets" type="Dialogue" x="1822.5" y="874.5">
+   <properties>
+    <property name="Asset 1" value="assets/chips/previews/folder_card.png"/>
+    <property name="Asset 2" value="assets/chips/previews/swapfire.png"/>
+    <property name="Dialogue Type" value="none"/>
+    <property name="Event Name" value="provideassets"/>
+    <property name="Next 1" type="object" value="109"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="109" name="Fire Complete" type="Dialogue" x="1831.5" y="865.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="110"/>
+    <property name="Text 1" value="You faced the flame at its strongest and stood firm when its power was tested. You've proven yourself worthy of fire."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="110" name="Fire Complete 2" type="Dialogue" x="1848.5" y="848.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="111"/>
+    <property name="Text 1" value="Take this chip. Let it serve as proof that the flame answers to you."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="111" name="Chip Reward" type="Dialogue" x="1870.5" y="826.5">
+   <properties>
+    <property name="Chip" value="swapfire"/>
+    <property name="Code" value="*"/>
+    <property name="Dialogue Type" value="chip"/>
+    <property name="Next 1" type="object" value="112"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="112" name="Set Fire Complete" type="Dialogue" x="1894" y="804">
+   <properties>
+    <property name="Dialogue Type" value="qset"/>
+    <property name="Next 1" type="object" value="84"/>
+    <property name="Quest ID" value="element_fire"/>
+    <property name="State" value="complete"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="113" name="Aqua repeat dialogue" type="Dialogue" x="1181" y="813">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Text 1" value="Adapt to the battlefield-but never let it choose your course."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="114" name="Aqua Intro Check" type="Dialogue" x="1197.5" y="794.5">
+   <properties>
+    <property name="Dialogue Type" value="qcheck"/>
+    <property name="Next 1" type="object" value="115"/>
+    <property name="Next 2" type="object" value="91"/>
+    <property name="Quest ID" value="element_intro"/>
+    <property name="State" value="seen"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="115" name="Aqua Opening" type="Dialogue" x="1186.5" y="783.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="116"/>
+    <property name="Text 1" value="Aqua is an element of movement and adaptation. It flows through the field in multiple states and it has the power to stop you in your tracks or take control away from you. One must be able to change with the current to control it"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="116" name="Aqua Text 2" type="Dialogue" x="1175" y="771">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="117"/>
+    <property name="Text 1" value="Overcome my three trials and prove the tide answers to you."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="117" name="Aqua Battle 1" type="Dialogue" x="1162" y="758">
+   <properties>
+    <property name="Battle Lost" type="object" value="77"/>
+    <property name="Battle Won" type="object" value="118"/>
+    <property name="Dialogue Type" value="none"/>
+    <property name="Event Name" value="aqua_1"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="118" name="Aqua Battle 2" type="Dialogue" x="1151.5" y="746.5">
+   <properties>
+    <property name="Battle Lost" type="object" value="77"/>
+    <property name="Battle Won" type="object" value="119"/>
+    <property name="Dialogue Type" value="none"/>
+    <property name="Event Name" value="aqua_2"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="119" name="Aqua Battle 3" type="Dialogue" x="1141.5" y="736.5">
+   <properties>
+    <property name="Battle Lost" type="object" value="77"/>
+    <property name="Battle Won" type="object" value="120"/>
+    <property name="Dialogue Type" value="none"/>
+    <property name="Event Name" value="aqua_3"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="120" name="Aqua Flavor Text" type="Dialogue" x="1128.5" y="723.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="121"/>
+    <property name="Text 1" value="You've demonstrated that you're capable of changing with the current. Now it's time to prove that even when the current takes you to a path of danger, you can take it head on and overcome it"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="121" name="Aqua Flavor Text 2" type="Dialogue" x="1117" y="711">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="122"/>
+    <property name="Text 1" value="Get ready..."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="122" name="Aqua Battle 4" type="Dialogue" x="1105" y="699">
+   <properties>
+    <property name="Battle Lost" type="object" value="77"/>
+    <property name="Battle Won" type="object" value="123"/>
+    <property name="Dialogue Type" value="none"/>
+    <property name="Event Name" value="aqua_4"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="123" name="Provide Chip Assets" type="Dialogue" x="1089.5" y="682.5">
+   <properties>
+    <property name="Asset 1" value="assets/chips/previews/folder_card.png"/>
+    <property name="Asset 2" value="assets/chips/previews/swapaqua.png"/>
+    <property name="Dialogue Type" value="none"/>
+    <property name="Event Name" value="provideassets"/>
+    <property name="Next 1" type="object" value="124"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="124" name="Aqua Complete" type="Dialogue" x="1080.5" y="673.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="125"/>
+    <property name="Text 1" value="You moved with the current without allowing it to carry you away. You've proven yourself worthy of Aqua."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="125" name="Aqua Complete 2" type="Dialogue" x="1063.5" y="656.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="126"/>
+    <property name="Text 1" value="Take this chip. Let it serve as proof that the tide answers to you."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="126" name="Chip Reward" type="Dialogue" x="1041.5" y="634.5">
+   <properties>
+    <property name="Chip" value="swapaqua"/>
+    <property name="Code" value="*"/>
+    <property name="Dialogue Type" value="chip"/>
+    <property name="Next 1" type="object" value="127"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="127" name="Set Aqua Complete" type="Dialogue" x="1018" y="612">
+   <properties>
+    <property name="Dialogue Type" value="qset"/>
+    <property name="Next 1" type="object" value="84"/>
+    <property name="Quest ID" value="element_aqua"/>
+    <property name="State" value="complete"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="128" name="Elec repeat dialogue" type="Dialogue" x="1731" y="813">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Text 1" value="Move quickly-but never faster than your judgment."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="129" name="Elec Intro Check" type="Dialogue" x="1714.5" y="794.5">
+   <properties>
+    <property name="Dialogue Type" value="qcheck"/>
+    <property name="Next 1" type="object" value="130"/>
+    <property name="Next 2" type="object" value="93"/>
+    <property name="Quest ID" value="element_intro"/>
+    <property name="State" value="seen"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="130" name="Elec Opening" type="Dialogue" x="1725.5" y="783.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="131"/>
+    <property name="Text 1" value="Elec is an element of speed and precision. Its power races through water, and even the smallest opening can carry its force. A true Elec Navi can withstand the shock without losing momentum. But speed without control disappears in a flash."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="131" name="Elec Text 2" type="Dialogue" x="1737" y="771">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="132"/>
+    <property name="Text 1" value="Overcome my three trials and prove the lightning answers to you."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="132" name="Elec Battle 1" type="Dialogue" x="1750" y="758">
+   <properties>
+    <property name="Battle Lost" type="object" value="77"/>
+    <property name="Battle Won" type="object" value="133"/>
+    <property name="Dialogue Type" value="none"/>
+    <property name="Event Name" value="elec_1"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="133" name="Elec Battle 2" type="Dialogue" x="1760.5" y="746.5">
+   <properties>
+    <property name="Battle Lost" type="object" value="77"/>
+    <property name="Battle Won" type="object" value="134"/>
+    <property name="Dialogue Type" value="none"/>
+    <property name="Event Name" value="elec_2"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="134" name="Elec Battle 3" type="Dialogue" x="1770.5" y="736.5">
+   <properties>
+    <property name="Battle Lost" type="object" value="77"/>
+    <property name="Battle Won" type="object" value="135"/>
+    <property name="Dialogue Type" value="none"/>
+    <property name="Event Name" value="elec_3"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="135" name="Elec Flavor Text" type="Dialogue" x="1783.5" y="723.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="136"/>
+    <property name="Text 1" value="You've learned how lightning finds an opening and strikes before it closes. Now you'll learn what happens when the charge meets something that refuses to yield."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="136" name="Elec Flavor Text 2" type="Dialogue" x="1795" y="711">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="137"/>
+    <property name="Text 1" value="For your final trial, you'll wield the Elec element yourself. Prove the lightning still answers to you when speed alone is not enough."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="137" name="Elec Battle 4" type="Dialogue" x="1807" y="699">
+   <properties>
+    <property name="Battle Lost" type="object" value="77"/>
+    <property name="Battle Won" type="object" value="138"/>
+    <property name="Dialogue Type" value="none"/>
+    <property name="Event Name" value="elec_4"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="138" name="Provide Chip Assets" type="Dialogue" x="1822.5" y="682.5">
+   <properties>
+    <property name="Asset 1" value="assets/chips/previews/folder_card.png"/>
+    <property name="Asset 2" value="assets/chips/previews/swapelec.png"/>
+    <property name="Dialogue Type" value="none"/>
+    <property name="Event Name" value="provideassets"/>
+    <property name="Next 1" type="object" value="139"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="139" name="Elec Complete" type="Dialogue" x="1831.5" y="673.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="140"/>
+    <property name="Text 1" value="You carried the charge without allowing it to control your actions. You've proven yourself worthy of Elec."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="140" name="Elec Complete 2" type="Dialogue" x="1848.5" y="656.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="141"/>
+    <property name="Text 1" value="Take this chip. Let it serve as proof that the lightning answers to you."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="141" name="Chip Reward" type="Dialogue" x="1870.5" y="634.5">
+   <properties>
+    <property name="Chip" value="swapelec"/>
+    <property name="Code" value="*"/>
+    <property name="Dialogue Type" value="chip"/>
+    <property name="Next 1" type="object" value="142"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="142" name="Set Elec Complete" type="Dialogue" x="1894" y="612">
+   <properties>
+    <property name="Dialogue Type" value="qset"/>
+    <property name="Next 1" type="object" value="84"/>
+    <property name="Quest ID" value="element_elec"/>
+    <property name="State" value="complete"/>
    </properties>
    <point/>
   </object>
@@ -695,7 +1463,7 @@
   <object id="45" name="Tech1_1 Battle" type="Dialogue" x="655.5" y="1198.5">
    <properties>
     <property name="Battle Lost" type="object" value="46"/>
-    <property name="Battle Won" type="object" value="47"/>
+    <property name="Battle Won" type="object" value="73"/>
     <property name="Dialogue Type" value="none"/>
     <property name="Event Name" value="Tech1_1 Battle"/>
    </properties>
@@ -708,7 +1476,7 @@
    </properties>
    <point/>
   </object>
-  <object id="47" name="Battle Won" type="Dialogue" x="636.5" y="1181.5">
+  <object id="47" name="Battle Won" type="Dialogue" x="629.5" y="1174.5">
    <properties>
     <property name="Dialogue Type" value="first"/>
     <property name="Next 1" type="object" value="49"/>
@@ -739,6 +1507,16 @@
     <property name="Dialogue Type" value="qset"/>
     <property name="Quest ID" value="tech1_quest1"/>
     <property name="State" value="complete"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="73" name="Provide Chip Assets" type="Dialogue" x="640" y="1184">
+   <properties>
+    <property name="Asset 1" value="assets/chips/previews/folder_card.png"/>
+    <property name="Asset 2" value="assets/chips/previews/blind.png"/>
+    <property name="Dialogue Type" value="none"/>
+    <property name="Event Name" value="provideassets"/>
+    <property name="Next 1" type="object" value="47"/>
    </properties>
    <point/>
   </object>

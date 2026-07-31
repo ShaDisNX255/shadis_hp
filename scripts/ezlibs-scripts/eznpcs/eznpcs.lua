@@ -584,51 +584,120 @@ local function register_quest_exclusive_placeholder(area_id, object, quest_name,
     )
 end
 
--- Helper to update quest-exclusive NPCs for a given player
-local function update_quest_exclusive_for_player(player_id)
-    -- Remove any existing quest-exclusive NPCs for this player
-    if quest_exclusive_npcs[player_id] then
-        for placeholder_id, bot_id in pairs(quest_exclusive_npcs[player_id]) do
-            Net.remove_bot(bot_id)
-            npcs[bot_id] = nil
-        end
-
-        quest_exclusive_npcs[player_id] = nil
+local function remove_quest_exclusive_bot(bot_id, warp_out)
+    if not bot_id then
+        return
     end
 
-    -- Recreate only the NPCs whose required quest state matches
+    if warp_out then
+        -- Match the warp-out removal used by pets when starting expeditions.
+        local ok = pcall(Net.remove_bot, bot_id, true)
+
+        -- Fall back to ordinary removal on server builds that do not
+        -- support the optional warp-out argument.
+        if not ok then
+            pcall(Net.remove_bot, bot_id)
+        end
+    else
+        pcall(Net.remove_bot, bot_id)
+    end
+
+    npcs[bot_id] = nil
+end
+
+-- Helper to update quest-exclusive NPCs for a given player
+local function update_quest_exclusive_for_player(
+    player_id,
+    changed_quest_id,
+    warp_out
+)
+    local current = quest_exclusive_npcs[player_id]
+
+    if not current then
+        current = {}
+        quest_exclusive_npcs[player_id] = current
+    end
+
     for _, entry in ipairs(quest_exclusive_placeholders) do
-        local state = quest_progress.get_state(
-            player_id,
-            entry.quest_name
-        )
+        -- On login, changed_quest_id is nil and every placeholder is checked.
+        -- After qset, only NPCs controlled by that Quest ID are checked.
+        local relevant =
+            changed_quest_id == nil
+            or tostring(entry.quest_name) == tostring(changed_quest_id)
 
-        if state and state == entry.required_state then
-            local object = ezcache.get_object_by_id_cached(
-                entry.area_id,
-                entry.object_id
-            )
+        if relevant then
+            local placeholder_id = tostring(entry.object_id)
+            local bot_id = current[placeholder_id]
 
-            if object then
-                local npc = create_bot_from_object(
-                    entry.area_id,
-                    object,
-                    player_id,
-                    "quest"
-                )
+            -- Clear stale bookkeeping if the engine already removed this bot.
+            if bot_id and Net.is_bot then
+                local ok_exists, exists = pcall(Net.is_bot, bot_id)
 
-                if npc then
-                    printd(
-                        "Quest-exclusive bot",
-                        npc.bot_id,
-                        "created for player",
-                        player_id,
-                        "quest",
-                        entry.quest_name
-                    )
+                if ok_exists and not exists then
+                    current[placeholder_id] = nil
+                    npcs[bot_id] = nil
+                    bot_id = nil
                 end
             end
+
+            local state = quest_progress.get_state(
+                player_id,
+                entry.quest_name
+            )
+
+            local should_exist =
+                state ~= nil
+                and tostring(state) == tostring(entry.required_state)
+
+            if should_exist then
+                -- Already present and still eligible: leave it completely alone.
+                if not bot_id then
+                    local object = ezcache.get_object_by_id_cached(
+                        entry.area_id,
+                        entry.object_id
+                    )
+
+                    if object then
+                        local npc = create_bot_from_object(
+                            entry.area_id,
+                            object,
+                            player_id,
+                            "quest"
+                        )
+
+                        if npc then
+                            printd(
+                                "Quest-exclusive bot",
+                                npc.bot_id,
+                                "created for player",
+                                player_id,
+                                "quest",
+                                entry.quest_name
+                            )
+                        end
+                    end
+                end
+            elseif bot_id then
+                -- This NPC was present, but its required state no longer matches.
+                remove_quest_exclusive_bot(bot_id, warp_out == true)
+                current[placeholder_id] = nil
+
+                printd(
+                    "Quest-exclusive bot",
+                    bot_id,
+                    "removed for player",
+                    player_id,
+                    "quest",
+                    entry.quest_name,
+                    "state",
+                    tostring(state)
+                )
+            end
         end
+    end
+
+    if next(current) == nil then
+        quest_exclusive_npcs[player_id] = nil
     end
 end
 
@@ -1023,12 +1092,23 @@ end
 -- Helper to remove a quest‑exclusive NPC (can be called when quest state changes)
 function eznpcs.remove_quest_exclusive_npc(player_id, placeholder_id)
     if quest_exclusive_npcs[player_id] then
-        local bot_id = quest_exclusive_npcs[player_id][tostring(placeholder_id)]
+        local key = tostring(placeholder_id)
+        local bot_id = quest_exclusive_npcs[player_id][key]
+
         if bot_id then
-            Net.remove_bot(bot_id)
-            npcs[bot_id] = nil
-            quest_exclusive_npcs[player_id][tostring(placeholder_id)] = nil
-            printd("Removed quest‑exclusive NPC bot", bot_id, "for player", player_id)
+            remove_quest_exclusive_bot(bot_id, true)
+            quest_exclusive_npcs[player_id][key] = nil
+
+            if next(quest_exclusive_npcs[player_id]) == nil then
+                quest_exclusive_npcs[player_id] = nil
+            end
+
+            printd(
+                "Removed quest-exclusive NPC bot",
+                bot_id,
+                "for player",
+                player_id
+            )
         end
     end
 end
@@ -1041,10 +1121,14 @@ function eznpcs.get_bot_id_for_placeholder(area_id, placeholder_id)
     return nil
 end
 
--- Refresh quest-exclusive NPCs immediately after qset changes a state.
+-- Refresh only the quest-exclusive NPCs controlled by the changed Quest ID.
 ezbus:on("quest_progress_changed", function(event)
     if event and event.player_id then
-        update_quest_exclusive_for_player(event.player_id)
+        update_quest_exclusive_for_player(
+            event.player_id,
+            event.quest_id,
+            true
+        )
     end
 end)
 

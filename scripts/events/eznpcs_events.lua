@@ -873,49 +873,17 @@ local event8 = {
 }
 eznpcs.add_event(event8)
 
-local tech1_1 = {
-    name="tech1_1",
-    path="/server/assets/ezlibs-assets/ezencounters/optimized/events.zip",
-    pet_exp=0,
-    enemies={
-        {name="Mettaur",rank=1},
-        {name="Mettaur",rank=2},
-        {name="Mettaur",rank=3},
-    },
-    obstacles={
-    },
-    positions={
-        {0,0,0,1,0,0},
-        {0,0,0,0,2,0},
-        {0,0,0,0,0,3},
-    },
-    obstacle_positions={
-        {0,0,0,0,0,0},
-        {0,0,0,0,0,0},
-        {0,0,0,0,0,0},
-    },
-    player_positions={
-        {0,0,0,0,0,0},
-        {0,1,0,0,0,0},
-        {0,0,0,0,0,0},
-    },
-    tiles={
-        {1,1,1,1,1,1},
-        {1,1,1,1,1,1},
-        {1,1,1,1,1,1},
-    },
-    teams={
-        {2,2,2,1,1,1},
-        {2,2,2,1,1,1},
-        {2,2,2,1,1,1},
-    },
-}
-
 local event_tech1_1 = {
     name="Tech1_1 Battle",
     action=function (npc,player_id,dialogue,relay_object)
         return async(function()
-          local stats = await(ezencounters.begin_encounter(player_id, tech1_1))
+          local stats = await(
+              ezencounters.begin_encounter_by_name(
+                  player_id,
+                  "tech1_1",
+                  relay_object
+              )
+          )
           local flags = _encounter_result_flags(stats)
 
           if flags.ran or flags.lost then
@@ -4906,6 +4874,106 @@ eznpcs.add_event{
   end
 }
 
+----------------------------------------------------------------
+-- Dialogue Type: provideassets
+--
+-- Tiled properties:
+--   Dialogue Type = provideassets
+--   Asset = /server/assets/example.png
+--
+-- Or:
+--   Asset 1 = /server/assets/example.png
+--   Asset 2 = /server/assets/example.animation
+--   Asset 3 = /server/assets/example.ogg
+--
+--   Next 1 = <next dialogue object id>
+----------------------------------------------------------------
+
+eznpcs.add_event{
+  name = "provideassets",
+
+  action = function(npc, player_id, dialogue, relay_object)
+    return async(function()
+      local props = dialogue.custom_properties or {}
+      local asset_paths = {}
+      local seen = {}
+
+      local function add_asset_path(path)
+        path = tostring(path or "")
+        path = path:gsub("\\", "/")
+        path = path:gsub("^%s+", ""):gsub("%s+$", "")
+
+        if path == "" then
+          return
+        end
+
+        -- Convenience path normalization.
+        if path:sub(1, 7) == "server/" then
+          path = "/" .. path
+        elseif path:sub(1, 8) == "assets/" then
+          path = "/server/" .. path
+        elseif path:sub(1, 8) == "/assets/" then
+          path = "/server" .. path
+        end
+
+        if not seen[path] then
+          seen[path] = true
+          asset_paths[#asset_paths + 1] = path
+        end
+      end
+
+      -- Optional unnumbered property for a single asset.
+      add_asset_path(props["Asset"])
+
+      -- Asset 1, Asset 2, Asset 3, etc.
+      for _, path in ipairs(
+        helpers.extract_numbered_properties(dialogue, "Asset ")
+      ) do
+        add_asset_path(path)
+      end
+
+      for _, path in ipairs(asset_paths) do
+        local exists = true
+
+        if Net.has_asset then
+          local ok, result = pcall(Net.has_asset, path)
+          exists = ok and result == true
+        end
+
+        if exists then
+          local ok, err = pcall(
+            Net.provide_asset_for_player,
+            player_id,
+            path
+          )
+
+          if not ok then
+            print(
+              "[provideassets] Failed to provide "
+              .. tostring(path)
+              .. ": "
+              .. tostring(err)
+            )
+          end
+        else
+          print(
+            "[provideassets] Asset does not exist: "
+            .. tostring(path)
+          )
+        end
+      end
+
+      -- Give the transfers a small head start if the next dialogue
+      -- immediately tries to draw or play one of these assets.
+      if #asset_paths > 0 then
+        await(Async.sleep(0.05))
+      end
+
+      return props["Next 1"]
+    end)
+  end
+}
+
 -- Repaint any already-revealed paths when players appear in an area
 Net:on("player_join", function(ev)
     if not ev or not ev.player_id then return end
@@ -4922,3 +4990,5 @@ Net:on("player_area_transfer", function(ev)
         rehydrate_secret_paths_for_area(area_id)
     end
 end)
+
+helpers.safe_require("scripts/events/eznpcs_battle_events")

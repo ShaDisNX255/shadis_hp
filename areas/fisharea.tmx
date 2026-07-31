@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.11.2" orientation="isometric" renderorder="right-down" width="50" height="50" tilewidth="64" tileheight="32" infinite="0" nextlayerid="4" nextobjectid="92">
+<map version="1.10" tiledversion="1.12.2" orientation="isometric" renderorder="right-down" width="50" height="50" tilewidth="64" tileheight="32" infinite="0" nextlayerid="4" nextobjectid="100">
  <properties>
   <property name="Background" value="custom"/>
   <property name="Background Animation" value="/server/assets/custom/backgrounds/fisharea/aquarium.animation"/>
@@ -13,10 +13,10 @@
  <tileset firstgid="1" source="../assets/tiles/central_platform.tsx"/>
  <tileset firstgid="241" source="../assets/tiles/EXE6_Shortcuts.tsx"/>
  <tileset firstgid="289" source="../assets/tiles/Roadblock.tsx"/>
- <tileset firstgid="314" source="../assets/tiles/enclosed-water-tiles.tsx"/>
- <tileset firstgid="362" source="../assets/tiles/HoloPanelz.tsx"/>
- <tileset firstgid="372" source="../assets/tiles/BBSOldFixed.tsx"/>
- <tileset firstgid="415" source="../assets/fishing/ex.tsx"/>
+ <tileset firstgid="291" source="../assets/tiles/enclosed-water-tiles.tsx"/>
+ <tileset firstgid="339" source="../assets/tiles/HoloPanelz.tsx"/>
+ <tileset firstgid="349" source="../assets/tiles/BBSOldFixed.tsx"/>
+ <tileset firstgid="352" source="../assets/fishing/ex.tsx"/>
  <layer id="1" name="Tile Layer 0" width="50" height="50">
   <data encoding="csv">
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -39,13 +39,13 @@
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,324,328,328,326,63,73,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,323,315,315,329,72,83,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,323,315,315,329,72,83,0,0,0,62,63,73,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,323,315,315,329,72,83,93,109,91,61,72,83,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,323,315,315,329,72,83,0,0,0,71,81,82,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,323,315,315,329,72,83,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,322,327,327,325,81,82,0,0,0,0,0,0,363,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,301,305,305,303,63,73,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,300,292,292,306,72,83,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,300,292,292,306,72,83,0,0,0,62,63,73,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,300,292,292,306,72,83,93,109,91,61,72,83,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,300,292,292,306,72,83,0,0,0,71,81,82,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,300,292,292,306,72,83,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,299,304,304,302,81,82,0,0,0,0,0,0,340,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -79,7 +79,7 @@
     <property name="Target Object" value="307"/>
    </properties>
   </object>
-  <object id="36" name="FishBBS" type="FishBBS" gid="373" x="1136" y="832" width="48" height="69">
+  <object id="36" name="FishBBS" type="FishBBS" gid="350" x="1136" y="832" width="48" height="69">
    <properties>
     <property name="Color" type="color" value="#ffff0000"/>
     <property name="Name" value="FishBBS"/>
@@ -88,10 +88,13 @@
   <object id="43" name="Mr. Fisher Prog" type="NPC" x="1200" y="656">
    <properties>
     <property name="Asset Name" value="fisherprog"/>
-    <property name="Dialogue Type" value="first"/>
+    <property name="Dialogue Type" value="qcheck"/>
     <property name="Direction" value="Down Left"/>
-    <property name="Next 1" type="object" value="48"/>
-    <property name="Text 1" value="Hey there, welcome to the fishing mini-game"/>
+    <property name="Next 1" type="object" value="93"/>
+    <property name="Next 2" type="object" value="92"/>
+    <property name="Quest ID" value="fisherman_rumor_fisharea_npc"/>
+    <property name="State" value="active"/>
+    <property name="Text 1" value=""/>
    </properties>
    <point/>
   </object>
@@ -110,7 +113,7 @@
    </properties>
    <point/>
   </object>
-  <object id="48" name="Quiz" type="Dialogue" x="1175.5" y="614.5">
+  <object id="48" name="Quiz" type="Dialogue" x="1165" y="585">
    <properties>
     <property name="Dialogue Type" value="quiz"/>
     <property name="Next 1" type="object" value="45"/>
@@ -185,6 +188,73 @@
    <properties>
     <property name="Water" type="bool" value="true"/>
    </properties>
+  </object>
+  <object id="92" name="OG Dialogue" type="Dialogue" x="1197" y="615">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="48"/>
+    <property name="Text 1" value="Hey there, welcome to the fishing mini-game"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="93" name="Quest Check" type="Dialogue" x="1175" y="633">
+   <properties>
+    <property name="Dialogue Type" value="qcheck"/>
+    <property name="Next 1" type="object" value="94"/>
+    <property name="Next 2" type="object" value="99"/>
+    <property name="Quest ID" value="fisherman_rumor"/>
+    <property name="State" value="fisharea"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="94" name="FishArea_Text_1" type="Dialogue" x="1153.5" y="626.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="95"/>
+    <property name="Text 1" value="Oh yeah, there was a fisherman that bought a bunch of ordinary bait."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="95" name="FishArea_Text_2" type="Dialogue" x="1138.5" y="623.5">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Next 1" type="object" value="96"/>
+    <property name="Text 1" value="He wanted somewhere quiet, where the fish take their time. That sounded like IceRink, so I pointed him there."/>
+   </properties>
+   <point/>
+  </object>
+  <object id="96" name="FishArea_Set_IceRink" type="Dialogue" x="1126" y="620">
+   <properties>
+    <property name="Dialogue Type" value="qset"/>
+    <property name="Next 1" type="object" value="97"/>
+    <property name="Quest ID" value="fisherman_rumor"/>
+    <property name="State" value="icerink"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="97" name="FishArea_Hide_WCity" type="Dialogue" x="1113.5" y="614.5">
+   <properties>
+    <property name="Dialogue Type" value="qset"/>
+    <property name="Next 1" type="object" value="98"/>
+    <property name="Quest ID" value="fisherman_rumor_wcity_npc"/>
+    <property name="State" value="complete"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="98" name="FishArea_Show_IceRink_NPC" type="Dialogue" x="1101.5" y="608.5">
+   <properties>
+    <property name="Dialogue Type" value="qset"/>
+    <property name="Quest ID" value="fisherman_rumor_icerink_npc"/>
+    <property name="State" value="active"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="99" name="FishArea_Reminder" type="Dialogue" x="1167" y="621">
+   <properties>
+    <property name="Dialogue Type" value="first"/>
+    <property name="Text 1" value="The fisherman left for the colder waters of IceRink."/>
+   </properties>
+   <point/>
   </object>
  </objectgroup>
 </map>
