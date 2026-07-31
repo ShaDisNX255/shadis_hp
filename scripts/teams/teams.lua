@@ -38,6 +38,7 @@ local TEAM_NAMES_BY_MONTH = {
   ["2026-04"] = { [1] = "Team Mario",  [2] = "Team Luigi"    },
   ["2026-05"] = { [1] = "Team Shadow",  [2] = "Team Sonic"    },
   ["2026-06"] = { [1] = "Team Undernet",  [2] = "Team Secret"    },
+  ["2026-08"] = { [1] = "Team WoodShadow",  [2] = "Team ElecShield"    },
 }
 
 -- Object types for map objects (press A to open)
@@ -84,6 +85,10 @@ local TEAM_COLORS_BY_MONTH = {
    ["2026-06"] = {
      [1] = { r=159,  g=66, b=245 },
      [2] = { r=230, g=205,  b=247 },
+   },
+   ["2026-08"] = {
+     [1] = { r=0,  g=168, b=68 },
+     [2] = { r=248, g=216,  b=0 },
    },
 }
 

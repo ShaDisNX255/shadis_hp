@@ -3414,7 +3414,140 @@ eznpcs.add_event({
         or "You already bought that chip."
       )
 
+      local sold_out_msg = tostring(
+        get_ci(ci, "sold out msg")
+        or "That item is SOLD OUT."
+      )
+
+      -- Optional HPMem stock.
+      -- Each numbered HPMem is purchased once per player, per shop.
+      local hpmem_limit = math.max(0, math.floor(tonumber(
+        get_ci(ci, "hpmem limit")
+        or 0
+      ) or 0))
+
+      -- A stable Shop ID prevents stock from resetting if the Tiled
+      -- dialogue object's numeric ID changes later.
+      local hpmem_shop_key = tostring(
+        get_ci(ci, "hpmem shop id")
+        or get_ci(ci, "shop id")
+        or (
+          tostring(Net.get_player_area(player_id) or "unknown")
+          .. ":"
+          .. tostring(dialogue.id or dialogue.name or "chipshop")
+        )
+      )
+
+      local hpmem_slots = {}
+      local hpmem_player_secret = nil
+
+      if hpmem_limit > 0 then
+        hpmem_player_secret = helpers.get_safe_player_secret(player_id)
+
+        local pmem = ezmemory.get_player_memory(hpmem_player_secret) or {}
+
+        pmem.chipshop_hpmem_v1 =
+          pmem.chipshop_hpmem_v1 or {}
+
+        pmem.chipshop_hpmem_v1[hpmem_shop_key] =
+          pmem.chipshop_hpmem_v1[hpmem_shop_key] or {}
+
+        hpmem_slots =
+          pmem.chipshop_hpmem_v1[hpmem_shop_key]
+      end
+
+      local function hpmem_slot_is_sold(slot)
+        return hpmem_slots[tostring(slot)] == true
+      end
+
+      local function hpmem_price_for_slot(slot)
+        local raw_price =
+          get_ci(ci, "hpmem price " .. tostring(slot))
+          or get_ci(ci, "hpmem cost " .. tostring(slot))
+
+        if raw_price == nil or tostring(raw_price) == "" then
+          return nil
+        end
+
+        return math.max(
+          0,
+          math.floor(tonumber(raw_price) or 0)
+        )
+      end
+
+      local function find_next_hpmem_slot()
+        for slot = 1, hpmem_limit do
+          if not hpmem_slot_is_sold(slot) then
+            local price = hpmem_price_for_slot(slot)
+
+            if price == nil then
+              print(string.format(
+                "[chipshop] %s is missing HPMem Price %d.",
+                hpmem_shop_key,
+                slot
+              ))
+
+              return nil, nil
+            end
+
+            return slot, price
+          end
+        end
+
+        return nil, nil
+      end
+
+      local function mark_hpmem_slot_sold(slot)
+        if not slot then
+          return
+        end
+
+        hpmem_slots[tostring(slot)] = true
+
+        if hpmem_player_secret and ezmemory.save_player_memory then
+          ezmemory.save_player_memory(hpmem_player_secret)
+        end
+      end
+
+      local function refresh_hpmem_offer(offer)
+        local next_slot, next_price = find_next_hpmem_slot()
+
+        if next_slot and next_price ~= nil then
+          offer.slot = next_slot
+          offer.price = next_price
+          offer.sold_out = false
+        else
+          offer.slot = nil
+          offer.sold_out = true
+
+          -- Keep the final HPMem price visible beside SOLD OUT.
+          if hpmem_limit > 0 then
+            offer.price =
+              hpmem_price_for_slot(hpmem_limit)
+              or offer.price
+              or 0
+          end
+        end
+      end
+
       local offers = {}
+
+      -- HPMem is one evolving offer and always appears first.
+      if hpmem_limit > 0 then
+        local hpmem_offer = {
+          kind = "hpmem",
+          name = tostring(
+            get_ci(ci, "hpmem name")
+            or "HPMem"
+          ),
+          price = 0,
+          slot = nil,
+          sold_out = false,
+        }
+
+        refresh_hpmem_offer(hpmem_offer)
+        table.insert(offers, hpmem_offer)
+      end
       local i = 1
       while true do
         local sell = get_ci(ci, "sell " .. i)
@@ -3437,6 +3570,7 @@ eznpcs.add_event({
           )
 
           table.insert(offers, {
+            kind = "chip",
             lookup = tostring(sell),
             package_id = card_def.package_id,
             price = price,
@@ -3449,10 +3583,26 @@ eznpcs.add_event({
         i = i + 1
       end
 
+      local function offer_is_sold_out(pid, offer)
+        if not offer then
+          return true
+        end
+
+        if offer.kind == "hpmem" then
+          return offer.sold_out == true
+            or offer.slot == nil
+        end
+
+        return whitelist.player_has_card_unlocked(
+          pid,
+          offer.package_id
+        )
+      end
+
       if #offers == 0 then
         await(Async.message_player(
           player_id,
-          "Sorry, I'm not selling any chips right now.",
+          "Sorry, I'm not selling anything right now.",
           mug.texture_path, mug.animation_path
         ))
         return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
@@ -3521,39 +3671,69 @@ if ok_menu then
     local id = tostring(idx)
     by_choice_id[id] = offer
 
-    local owned = whitelist.player_has_card_unlocked(player_id, offer.package_id)
-    local display_name = owned and (offer.name .. " (Owned)") or offer.name
+    local sold_out = offer_is_sold_out(player_id, offer)
+    local display_name = sold_out and "SOLD OUT" or offer.name
 
     options[#options+1] = {
       id = id,
-      text = display_name,           -- fallback
-      shop_name = display_name,      -- column name (your prompt_vertical column UI)
-      shop_price = tonumber(offer.price) or 0, -- number -> will render as 2k/5m etc in the menu rows
+      text = display_name,
+      shop_name = display_name,
+
+      -- Keep the original price visible even after the item sells out.
+      shop_price = tonumber(offer.price) or 0,
     }
+
     opt_ref_by_id[id] = options[#options]
 
-    -- Resolve preview path:
-    local p = get_ci(ci, "preview " .. tostring(offer.prop_index or idx))
-          or get_ci(ci, "icon " .. tostring(offer.prop_index or idx))
+    local p = nil
 
-    if (not p or p == "") and preview_template ~= "" then
-      p = preview_template
-        :gsub("{id}",   tostring(offer.lookup))
-        :gsub("{sell}", tostring(offer.lookup))
-        :gsub("{code}", tostring(offer.code or "*"))
-    end
+    if offer.kind == "hpmem" then
+      -- HPMems use the generic shop icon unless one of these
+      -- optional properties is provided.
+      p = get_ci(
+            ci,
+            "hpmem preview " .. tostring(offer.slot)
+          )
+        or get_ci(
+            ci,
+            "hpmem icon " .. tostring(offer.slot)
+          )
+        or get_ci(ci, "hpmem preview")
+        or get_ci(ci, "hpmem icon")
+    else
+      p = get_ci(
+            ci,
+            "preview " .. tostring(offer.prop_index or idx)
+          )
+        or get_ci(
+            ci,
+            "icon " .. tostring(offer.prop_index or idx)
+          )
 
-    if (not p or p == "") and preview_dir ~= "" then
-      local dir = preview_dir
-      if dir:sub(-1) ~= "/" then dir = dir .. "/" end
-      p = dir .. tostring(offer.lookup) .. preview_ext
+      if (not p or p == "") and preview_template ~= "" then
+        p = preview_template
+          :gsub("{id}", tostring(offer.lookup))
+          :gsub("{sell}", tostring(offer.lookup))
+          :gsub("{code}", tostring(offer.code or "*"))
+      end
+
+      if (not p or p == "") and preview_dir ~= "" then
+        local dir = preview_dir
+
+        if dir:sub(-1) ~= "/" then
+          dir = dir .. "/"
+        end
+
+        p = dir .. tostring(offer.lookup) .. preview_ext
+      end
     end
 
     p = normalize_preview_path(p)
 
-    -- Avoid engine panic: if asset doesn’t exist, fall back safely.
+    -- Do not attempt to send a nonexistent preview asset.
     if p and Net and Net.has_asset then
       local ok, exists = pcall(Net.has_asset, p)
+
       if ok and exists == false then
         p = nil
       end
@@ -3638,7 +3818,14 @@ if ok_menu then
         skip_ids = { exit = true },
         text_fn = function(pid, choice_id)
           local offer = by_choice_id[tostring(choice_id)]
-          if not offer then return "Buy this?" end
+
+          if not offer then
+            return "Buy this?"
+          end
+
+          if offer_is_sold_out(pid, offer) then
+            return sold_out_msg
+          end
 
           local have = get_balance(pid)
           local unit = (currency == "bugfrags") and " BF" or "$"
@@ -3658,18 +3845,29 @@ if ok_menu then
 
     on_confirm_yes = function(pid, choice_id, _choice_text, menu)
       local offer = by_choice_id[tostring(choice_id)]
+
       if not offer then
-        return "Huh? That chip is gone.", "Anything else?"
+        return "Huh? That item is gone.", "Anything else?"
       end
 
-      if whitelist.player_has_card_unlocked(pid, offer.package_id) then
-        return owned_msg, "Anything else?"
+      if offer_is_sold_out(pid, offer) then
+        local message = sold_out_msg
+
+        if offer.kind == "chip" then
+          message = owned_msg
+        end
+
+        return message, "Anything else?"
       end
 
       local cost = tonumber(offer.price) or 0
-      if cost < 0 then cost = 0 end
+
+      if cost < 0 then
+        cost = 0
+      end
 
       local paid = true
+
       if cost > 0 then
         if currency == "bugfrags" then
           paid = ezmemory.spend_player_fragments(pid, cost)
@@ -3682,41 +3880,101 @@ if ok_menu then
         return not_enough_msg, "Anything else?"
       end
 
-      local ok, reason = whitelist.unlock_card(pid, offer.lookup, offer.code)
+      if offer.kind == "hpmem" then
+        local old_total = tonumber(
+          ezmemory.count_player_item(pid, "HPMem") or 0
+        ) or 0
 
-      if not ok then
-        -- refund if unlock failed
-        if cost > 0 then
-          if currency == "bugfrags" then
-            ezmemory.spend_player_fragments(pid, -cost)
-          else
-            ezmemory.spend_player_money(pid, -cost)
+        local ok_give, new_total = pcall(
+          ezmemory.give_player_item,
+          pid,
+          "HPMem",
+          1
+        )
+
+        new_total = tonumber(new_total or 0) or 0
+
+        if not ok_give or new_total <= old_total then
+          -- Refund the purchase if the HPMem could not be given.
+          if cost > 0 then
+            if currency == "bugfrags" then
+              ezmemory.spend_player_fragments(pid, -cost)
+            else
+              ezmemory.spend_player_money(pid, -cost)
+            end
           end
+
+          return "Couldn't give you the HPMem.", "Anything else?"
         end
 
-        local msg = (reason == "already_unlocked")
-          and owned_msg
-          or ("Couldn't unlock that chip (" .. tostring(reason or "error") .. ").")
+        mark_hpmem_slot_sold(offer.slot)
+        refresh_hpmem_offer(offer)
+      else
+        local ok, reason = whitelist.unlock_card(
+          pid,
+          offer.lookup,
+          offer.code
+        )
 
-        return msg, "Anything else?"
+        if not ok then
+          -- Refund the purchase if the chip could not be unlocked.
+          if cost > 0 then
+            if currency == "bugfrags" then
+              ezmemory.spend_player_fragments(pid, -cost)
+            else
+              ezmemory.spend_player_money(pid, -cost)
+            end
+          end
+
+          local message
+
+          if reason == "already_unlocked" then
+            message = owned_msg
+          else
+            message =
+              "Couldn't unlock that chip ("
+              .. tostring(reason or "error")
+              .. ")."
+          end
+
+          return message, "Anything else?"
+        end
       end
 
-      -- Mark as owned in the menu row immediately
+      -- Update the selected row immediately.
       local opt = opt_ref_by_id[tostring(choice_id)]
+
       if opt then
-        opt.shop_name = tostring(offer.name) .. " (Owned)"
-        opt.text = opt.shop_name
+        if offer.kind == "hpmem"
+          and not offer_is_sold_out(pid, offer)
+        then
+          -- Another HPMem remains. Keep the same row and advance
+          -- it to the next configured price.
+          opt.shop_name = tostring(offer.name)
+          opt.text = tostring(offer.name)
+          opt.shop_price = tonumber(offer.price) or 0
+        else
+          -- Chips sell out immediately. HPMem only reaches this
+          -- after the final configured HPMem is purchased.
+          opt.shop_name = "SOLD OUT"
+          opt.text = "SOLD OUT"
+          opt.shop_price = tonumber(offer.price) or 0
+        end
       end
 
--- Do NOT force a menu redraw here.
--- This runs right before TalkVertMenu resets the textbox to the purchase message,
--- and it can corrupt/overlap the post-purchase text draw.
-
+      -- Do not force a redraw here. TalkVertMenu will redraw after
+      -- displaying the purchase result.
       if sfx and sfx.item_get then
         Net.play_sound_for_player(pid, sfx.item_get)
       end
 
-      return "You bought " .. tostring(offer.name) .. "!", "Anything else?"
+      if offer.kind == "hpmem" then
+        return "You bought an HPMem!\nMax HP increased by 20!",
+          "Anything else?"
+      end
+
+      return "You bought " .. tostring(offer.name) .. "!",
+        "Anything else?"
     end,
   })
 
@@ -3736,14 +3994,18 @@ end
         local items = {}
 
         for idx, offer in ipairs(offers) do
-          local owned = whitelist.player_has_card_unlocked(player_id, offer.package_id)
+          local sold_out = offer_is_sold_out(
+            player_id,
+            offer
+          )
+
           local price_label = (currency == "bugfrags")
             and (tostring(offer.price) .. " BF")
             or short_money(offer.price)
 
-          local label = owned
-            and string.format("%s (%s, Owned)", offer.name, price_label)
-            or  string.format("%s (%s)", offer.name, price_label)
+          local label = sold_out
+            and string.format("SOLD OUT (%s)", price_label)
+            or string.format("%s (%s)", offer.name, price_label)
 
           local post = helpers.create_bbs_option(label)
           post.id = "__chipshop:" .. tostring(idx)
@@ -3776,12 +4038,20 @@ end
 
         if sel ~= "__chipshop_balance__" then
           local chosen = items[tostring(sel)]
+
           if chosen then
-            if whitelist.player_has_card_unlocked(player_id, chosen.package_id) then
+            if offer_is_sold_out(player_id, chosen) then
+              local message = sold_out_msg
+
+              if chosen.kind == "chip" then
+                message = owned_msg
+              end
+
               await(Async.message_player(
                 player_id,
-                owned_msg,
-                mug.texture_path, mug.animation_path
+                message,
+                mug.texture_path,
+                mug.animation_path
               ))
             else
               local price_label = (currency == "bugfrags")
@@ -3790,8 +4060,13 @@ end
 
               local confirm = await(Async.question_player(
                 player_id,
-                string.format("Buy %s for %s?", chosen.name, price_label),
-                mug.texture_path, mug.animation_path
+                string.format(
+                  "Buy %s for %s?",
+                  chosen.name,
+                  price_label
+                ),
+                mug.texture_path,
+                mug.animation_path
               ))
 
               if confirm == 1 then
@@ -3799,9 +4074,15 @@ end
 
                 if chosen.price > 0 then
                   if currency == "bugfrags" then
-                    paid = ezmemory.spend_player_fragments(player_id, chosen.price)
+                    paid = ezmemory.spend_player_fragments(
+                      player_id,
+                      chosen.price
+                    )
                   else
-                    paid = ezmemory.spend_player_money(player_id, chosen.price)
+                    paid = ezmemory.spend_player_money(
+                      player_id,
+                      chosen.price
+                    )
                   end
                 end
 
@@ -3809,34 +4090,103 @@ end
                   await(Async.message_player(
                     player_id,
                     not_enough_msg,
-                    mug.texture_path, mug.animation_path
+                    mug.texture_path,
+                    mug.animation_path
                   ))
                 else
-                  local ok, reason, card_def = whitelist.unlock_card(
-                    player_id,
-                    chosen.lookup,
-                    chosen.code
-                  )
+                  local granted = false
+                  local fail_msg = nil
 
-                  if ok then
+                  if chosen.kind == "hpmem" then
+                    local old_total = tonumber(
+                      ezmemory.count_player_item(
+                        player_id,
+                        "HPMem"
+                      ) or 0
+                    ) or 0
+
+                    local ok_give, new_total = pcall(
+                      ezmemory.give_player_item,
+                      player_id,
+                      "HPMem",
+                      1
+                    )
+
+                    new_total = tonumber(new_total or 0) or 0
+                    granted = ok_give and new_total > old_total
+
+                    if granted then
+                      mark_hpmem_slot_sold(chosen.slot)
+                      refresh_hpmem_offer(chosen)
+                    else
+                      fail_msg = "Couldn't give you the HPMem."
+                    end
+                  else
+                    local ok, reason = whitelist.unlock_card(
+                      player_id,
+                      chosen.lookup,
+                      chosen.code
+                    )
+
+                    granted = ok == true
+
+                    if not granted then
+                      if reason == "already_unlocked" then
+                        fail_msg = owned_msg
+                      else
+                        fail_msg =
+                          "Couldn't unlock that chip ("
+                          .. tostring(reason or "error")
+                          .. ")."
+                      end
+                    end
+                  end
+
+                  if granted then
                     if sfx and sfx.item_get then
-                      Net.play_sound_for_player(player_id, sfx.item_get)
+                      Net.play_sound_for_player(
+                        player_id,
+                        sfx.item_get
+                      )
+                    end
+
+                    local success_msg
+
+                    if chosen.kind == "hpmem" then
+                      success_msg =
+                        "You bought an HPMem! Max HP increased by 20!"
+                    else
+                      success_msg =
+                        "You bought " .. chosen.name .. "!"
                     end
 
                     await(Async.message_player(
                       player_id,
-                      "You bought " .. chosen.name .. "!",
-                      mug.texture_path, mug.animation_path
+                      success_msg,
+                      mug.texture_path,
+                      mug.animation_path
                     ))
                   else
-                    local msg = (reason == "already_unlocked")
-                      and owned_msg
-                      or ("Couldn't unlock that chip (" .. tostring(reason or "error") .. ").")
+                    -- Refund a failed purchase.
+                    if chosen.price > 0 then
+                      if currency == "bugfrags" then
+                        ezmemory.spend_player_fragments(
+                          player_id,
+                          -chosen.price
+                        )
+                      else
+                        ezmemory.spend_player_money(
+                          player_id,
+                          -chosen.price
+                        )
+                      end
+                    end
 
                     await(Async.message_player(
                       player_id,
-                      msg,
-                      mug.texture_path, mug.animation_path
+                      fail_msg or "Couldn't complete that purchase.",
+                      mug.texture_path,
+                      mug.animation_path
                     ))
                   end
                 end

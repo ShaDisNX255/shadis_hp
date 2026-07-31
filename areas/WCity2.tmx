@@ -1961,6 +1961,9 @@
    <properties>
     <property name="Currency" value="money"/>
     <property name="Dialogue Type" value="chipshop"/>
+    <property name="HPMem Limit" type="int" value="2"/>
+    <property name="HPMem Price 1" type="int" value="15000"/>
+    <property name="HPMem Price 2" type="int" value="25000"/>
     <property name="Name 1" value="Spreader 1"/>
     <property name="Name 2" value="EnergyBomb"/>
     <property name="Name 3" value="HighCannon"/>
@@ -1974,6 +1977,7 @@
     <property name="Sell 2" value="energybomb"/>
     <property name="Sell 3" value="highcannon"/>
     <property name="Sell 4" value="gundelsol1"/>
+    <property name="Shop ID" value="wcity2_chipshop"/>
     <property name="Shop Title" value="WCity2 Shop"/>
    </properties>
    <point/>
