@@ -1322,6 +1322,15 @@ local function _petshop_show_preview(pid, ci, kind)
   return true
 end
 
+-- Public bridge so other mixed-type shops can reuse the petshop preview.
+function pets.show_shop_preview(pid, ci, kind)
+  return _petshop_show_preview(pid, ci or {}, kind)
+end
+
+function pets.clear_shop_preview(pid)
+  _petshop_clear_preview(pid)
+end
+
 -- Price resolution: first NPC property "Price <id>" (case-insensitive), else entry.price, else default
 local DECOR_DEFAULT_PRICE = 1000
 local function price_for(dialogue, id)

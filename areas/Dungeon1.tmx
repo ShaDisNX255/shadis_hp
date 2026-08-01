@@ -1,61 +1,51 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <map version="1.10" tiledversion="1.12.2" orientation="isometric" renderorder="right-down" width="57" height="57" tilewidth="64" tileheight="32" infinite="0" nextlayerid="7" nextobjectid="196">
-<properties>
-  <property name="Type 1" value="decor"/>
-  <property name="Reward 1" value="pet_meddy"/>
+ <properties>
   <property name="Amount 1" type="int" value="1"/>
-  <property name="Chance 1" type="int" value="5"/>
-
-  <property name="Type 2" value="cosmetic"/>
-  <property name="Reward 2" value="ShadowAura"/>
   <property name="Amount 2" type="int" value="1"/>
-  <property name="Chance 2" type="int" value="10"/>
-
-  <property name="Type 3" value="moneyz"/>
-  <property name="Reward 3" value="moneyz"/>
   <property name="Amount 3" type="int" value="15000"/>
-  <property name="Chance 3" type="int" value="25"/>
-
-  <property name="Type 4" value="moneyz"/>
-  <property name="Reward 4" value="moneyz"/>
   <property name="Amount 4" type="int" value="10000"/>
-  <property name="Chance 4" type="int" value="38"/>
-
-  <property name="Type 5" value="chip"/>
-  <property name="Reward 5" value="pulsebeam1"/>
   <property name="Amount 5" type="int" value="1"/>
-  <property name="Chance 5" type="int" value="7"/>
-
-  <property name="Type 6" value="chip"/>
-  <property name="Reward 6" value="meteorearth1"/>
   <property name="Amount 6" type="int" value="1"/>
-  <property name="Chance 6" type="int" value="7"/>
-
-  <property name="Type 7" value="chip"/>
-  <property name="Reward 7" value="strawdoll"/>
   <property name="Amount 7" type="int" value="1"/>
-  <property name="Chance 7" type="int" value="7"/>
-
-  <property name="Type 8" value="chip"/>
-  <property name="Reward 8" value="count1"/>
   <property name="Amount 8" type="int" value="1"/>
-  <property name="Chance 8" type="int" value="1"/>
-
-  <property name="Dungeon" type="bool" value="true"/>
-  <property name="Name" value="Lost Lab"/>
-  <property name="Forced Base HP" type="int" value="500"/>
-  <property name="PunishHP" type="int" value="150"/>
-  <property name="DungeonKickArea" value="WCity2"/>
-  <property name="DungeonKickObject" value="202"/>
-
-  <property name="Song" value="/server/assets/dungeon1.ogg"/>
-
   <property name="Background" value="custom"/>
-  <property name="Background Texture" value="/server/assets/custom/backgrounds/dungeon1/09-graveyard.png"/>
   <property name="Background Animation" value="/server/assets/custom/backgrounds/dungeon1/09-graveyard.animation"/>
+  <property name="Background Texture" value="/server/assets/custom/backgrounds/dungeon1/09-graveyard.png"/>
   <property name="Background Vel X" type="float" value="-0.0295"/>
   <property name="Background Vel Y" type="float" value="0"/>
-</properties>
+  <property name="Chance 1" type="int" value="10"/>
+  <property name="Chance 2" type="int" value="10"/>
+  <property name="Chance 3" type="int" value="20"/>
+  <property name="Chance 4" type="int" value="25"/>
+  <property name="Chance 5" type="int" value="10"/>
+  <property name="Chance 6" type="int" value="10"/>
+  <property name="Chance 7" type="int" value="10"/>
+  <property name="Chance 8" type="int" value="5"/>
+  <property name="Dungeon" type="bool" value="true"/>
+  <property name="DungeonKickArea" value="WCity2"/>
+  <property name="DungeonKickObject" value="202"/>
+  <property name="Forced Base HP" type="int" value="500"/>
+  <property name="Name" value="Lost Lab"/>
+  <property name="PunishHP" type="int" value="150"/>
+  <property name="Reward 1" value="pet_meddy"/>
+  <property name="Reward 2" value="ShadowAura"/>
+  <property name="Reward 3" value="moneyz"/>
+  <property name="Reward 4" value="moneyz"/>
+  <property name="Reward 5" value="pulsebeam1"/>
+  <property name="Reward 6" value="meteorearth1"/>
+  <property name="Reward 7" value="strawdoll"/>
+  <property name="Reward 8" value="count1"/>
+  <property name="Song" value="/server/assets/dungeon1.ogg"/>
+  <property name="Type 1" value="decor"/>
+  <property name="Type 2" value="cosmetic"/>
+  <property name="Type 3" value="moneyz"/>
+  <property name="Type 4" value="moneyz"/>
+  <property name="Type 5" value="chip"/>
+  <property name="Type 6" value="chip"/>
+  <property name="Type 7" value="chip"/>
+  <property name="Type 8" value="chip"/>
+ </properties>
  <tileset firstgid="1" source="../assets/objects/NoiseWaveEntrance.tsx"/>
  <tileset firstgid="5" source="../assets/tiles/bn3_undernet_tiles.tsx"/>
  <tileset firstgid="239" source="../assets/tiles/bn3_arrows_undernet.tsx"/>
@@ -520,16 +510,28 @@
   <object id="164" name="Bug Frag Shop" type="Dialogue" x="1394" y="730">
    <properties>
     <property name="Already Owned Msg" value="Kid you already have this one, but I can take your bugfrags if you want ~"/>
-    <property name="Amount 1" type="int" value="1"/>
-    <property name="Amount 2" type="int" value="1"/>
     <property name="Dialogue Type" value="fragshop"/>
-    <property name="Not Enough Msg" value="Sorry kid looks like you a lil short on bugfrags"/>
-    <property name="Price 1" type="int" value="8"/>
+    <property name="Not Enough Msg" value="Sorry kid, looks like you're a lil' short on BugFrags."/>
+    <property name="Preview Dir" value="chips/previews/"/>
+    <property name="Price 1" type="int" value="10"/>
     <property name="Price 2" type="int" value="10"/>
+    <property name="Price 3" type="int" value="10"/>
+    <property name="Price 4" type="int" value="10"/>
+    <property name="Price 5" type="int" value="10"/>
+    <property name="Price 6" type="int" value="20"/>
     <property name="Sell 1" value="ShadowAura"/>
     <property name="Sell 2" value="pet_meddy"/>
+    <property name="Sell 3" value="pulsebeam1"/>
+    <property name="Sell 4" value="meteorearth1"/>
+    <property name="Sell 5" value="strawdoll"/>
+    <property name="Sell 6" value="count1"/>
+    <property name="Shop Title" value="Lost Lab Rewards"/>
     <property name="Type 1" value="cosmetic"/>
-    <property name="Type 2" value="decor"/>
+    <property name="Type 2" value="pet"/>
+    <property name="Type 3" value="chip"/>
+    <property name="Type 4" value="chip"/>
+    <property name="Type 5" value="chip"/>
+    <property name="Type 6" value="chip"/>
    </properties>
    <point/>
   </object>

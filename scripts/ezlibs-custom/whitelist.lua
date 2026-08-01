@@ -53,13 +53,13 @@ whitelist.CARDS = {
   },
 
   shockwave = {
-    package_id = "com.OFC.card.EXEPoN-051-ShockWave",
+    package_id = "com.wcity.OFC.card.EXEPoN-051-ShockWave",
     asset_path = "/server/assets/chips/EXEPoN-Shockwave.zip",
     code = "*",
   },
 
   longsword = {
-    package_id = "com.OFC.card.EXEPoN-040-LongSword",
+    package_id = "com.wcity.OFC.card.EXEPoN-040-LongSword",
     asset_path = "/server/assets/chips/EXEPoN-LongSword.zip",
     code = "*",
   },
@@ -71,7 +71,7 @@ whitelist.CARDS = {
   },
 
   ratton1 = {
-    package_id = "com.OFC.card.EXEPoN-031-Ratton1",
+    package_id = "com.wcity.OFC.card.EXEPoN-031-Ratton1",
     asset_path = "/server/assets/chips/EXEPoN-Ratton.zip",
     code = "*",
   },

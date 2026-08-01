@@ -2060,126 +2060,415 @@ eznpcs.add_event{
 }
 
 ----------------------------------------------------------------
--- BugFrag Dealer Shop (sells cosmetics + decors/pets for BugFrags)
+-- Multi-type BugFrag Shop
 -- Dialogue Type: "fragshop"
 --
--- Configure per-NPC via custom properties (case-insensitive):
---   Sell 1   = ShadowAura
---   Type 1   = cosmetic        (or decor / pet)
---   Amount 1 = 1               (ignored for cosmetics; defaults to 1)
---   Price 1  = 5               (BugFrag cost; defaults to 0)
---   Sell 2 / Type 2 / Amount 2 / Price 2 ... etc
+-- Supported Type N values:
+--   chip       = whitelist BattleChip, unique, becomes SOLD OUT
+--   cosmetic   = cosmetic unlock, unique, becomes SOLD OUT
+--   pet        = modern owned pet, repeatable
 --
--- Optional:
---   Shop Title = BugFrag Dealer
---   Not Enough Msg = You don't have enough BugFrags.
---   Already Owned Msg = You already own that cosmetic.
+-- Required per listing:
+--   Sell N, Type N, Price N
+--
+-- Optional per listing:
+--   Amount N, Name N, Code N, Preview N, Icon N
+--
+-- Optional shared:
+--   Shop Title, Not Enough Msg, Already Owned Msg, Sold Out Msg
+--   Preview Dir, Preview Ext
+--   Pet Preview X/Y/Z/Scale/State
 ----------------------------------------------------------------
 
-local BUGFRAG_SHOP_COLOR = { r = 245, g = 210, b = 70 } -- match decor/cosmetic shop yellow
-local DECOR_MEM_KEY__ONCEHUB = "oncehub_decor_inventory_v1"
+local FRAGSHOP_DEFAULT_ICON = "/server/assets/net-games/ui/card_shop_item.png"
 
-local function short_frags(n)
-  n = math.floor(tonumber(n) or 0)
-  return string.format("%d BF", n)
+local function fragshop_type(raw_type, item_id)
+  local typ = tostring(raw_type or "chip"):lower()
+
+  if typ == "card" or typ == "battlechip" or typ == "battle chip" then
+    typ = "chip"
+  elseif typ == "cosmetics" then
+    typ = "cosmetic"
+  elseif typ == "pets" then
+    typ = "pet"
+  elseif typ == "decor" and tostring(item_id or ""):sub(1, 4) == "pet_" then
+    -- Backwards compatibility for the old Dungeon1 setup.
+    typ = "pet"
+  end
+
+  return typ
 end
 
-local function oncehub_catalog_name_for(id)
-  id = tostring(id or "")
-  local cat = rawget(_G, "ONCEHUB_CATALOG") or ONCEHUB_CATALOG
-  if type(cat) == "table" then
-    for _, e in ipairs(cat) do
-      if tostring(e.id) == id then
-        return e.name or e.label or e.title or id
-      end
+local function fragshop_pet_kind(item_id)
+  return tostring(item_id or ""):gsub("^pet_", ""):lower()
+end
+
+local function fragshop_pet_name(item_id)
+  local name = fragshop_pet_kind(item_id):gsub("_", " ")
+
+  name = name:gsub("(%a)([%w']*)", function(first, rest)
+    return first:upper() .. rest:lower()
+  end)
+
+  return name ~= "" and name or "Pet"
+end
+
+local function fragshop_chip_name(card_def, fallback)
+  if card_def then
+    if card_def.display_name then
+      return tostring(card_def.display_name)
+    end
+
+    if card_def.name then
+      return tostring(card_def.name)
     end
   end
-  return id
+
+  return tostring(fallback or "BattleChip")
 end
 
-local function oncehub_add_owned(pid, id, qty)
-  qty = math.floor(tonumber(qty) or 0)
-  if qty == 0 then return end
-  id = tostring(id or "")
-  if id == "" then return end
-
-  local secret = (helpers and helpers.get_safe_player_secret) and helpers.get_safe_player_secret(pid) or pid
-  local pmem = ezmemory.get_player_memory(secret) or {}
-  if type(pmem[DECOR_MEM_KEY__ONCEHUB]) ~= "table" then
-    pmem[DECOR_MEM_KEY__ONCEHUB] = {}
+local function fragshop_is_sold_out(pid, offer)
+  if not offer then
+    return true
   end
-  local inv = pmem[DECOR_MEM_KEY__ONCEHUB]
-  inv[id] = (tonumber(inv[id]) or 0) + qty
 
-  if ezmemory.save_player_memory then
-    ezmemory.save_player_memory(secret)
-  elseif ezmemory.set_player_memory then
-    ezmemory.set_player_memory(secret, pmem)
+  if offer.type == "chip" then
+    return whitelist.player_has_card_unlocked(
+      pid,
+      offer.item_id
+    ) == true
+  end
+
+  if offer.type == "cosmetic" then
+    return cosmetics
+      and cosmetics.has_cosmetic
+      and cosmetics.has_cosmetic(pid, offer.item_id)
+      or false
+  end
+
+  -- Pets remain repeatable. Each purchase creates a new pet UID.
+  return false
+end
+
+local function fragshop_clear_previews(pid)
+  if cosmetics and cosmetics.clear_shop_previews then
+    pcall(cosmetics.clear_shop_previews, pid)
+  end
+
+  if Pets and Pets.clear_shop_preview then
+    pcall(Pets.clear_shop_preview, pid)
   end
 end
 
-local function oncehub_count_owned(pid, id)
-  id = tostring(id or "")
-  if id == "" then return 0 end
-  local secret = (helpers and helpers.get_safe_player_secret) and helpers.get_safe_player_secret(pid) or pid
-  local pmem = ezmemory.get_player_memory(secret) or {}
-  local inv = pmem[DECOR_MEM_KEY__ONCEHUB]
-  if type(inv) ~= "table" then return 0 end
-  return tonumber(inv[id] or 0) or 0
+local function fragshop_refund(pid, amount)
+  amount = math.max(
+    0,
+    math.floor(tonumber(amount) or 0)
+  )
+
+  if amount > 0 then
+    pcall(
+      ezmemory.spend_player_fragments,
+      pid,
+      -amount
+    )
+  end
+end
+
+local function fragshop_update_row(
+  menu,
+  choice_id,
+  offer,
+  sold_out
+)
+  if not (menu and menu.options) then
+    return
+  end
+
+  for _, opt in ipairs(menu.options) do
+    if tostring(opt.id) == tostring(choice_id) then
+      local label = sold_out
+        and "SOLD OUT"
+        or tostring(offer.name)
+
+      opt.text = label
+      opt.shop_name = label
+      opt.shop_price = tonumber(offer.price) or 0
+      break
+    end
+  end
+
+  -- TalkVertMenu redraws after the result text closes.
 end
 
 eznpcs.add_event{
   name = "fragshop",
-  action = function(npc, player_id, dialogue, relay_object)
+
+  action = function(
+    npc,
+    player_id,
+    dialogue,
+    relay_object
+  )
     return async(function()
-      local mug = eznpcs.get_dialogue_mugshot(npc, player_id, dialogue)
+      local mug = eznpcs.get_dialogue_mugshot(
+        npc,
+        player_id,
+        dialogue
+      )
+
       local ci = build_ci_props(dialogue)
 
-      -- Ensure fragments support exists
-      if not ezmemory or not ezmemory.get_player_fragments or not ezmemory.spend_player_fragments then
+      if not (
+        ezmemory
+        and ezmemory.get_player_fragments
+        and ezmemory.spend_player_fragments
+      ) then
         await(Async.message_player(
           player_id,
           "BugFrag shop isn't available on this server build.",
-          mug.texture_path, mug.animation_path
+          mug.texture_path,
+          mug.animation_path
         ))
-        return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+
+        return dialogue.custom_properties
+          and dialogue.custom_properties["Next 1"]
       end
 
-      local title = tostring(get_ci(ci, "shop title") or "BugFrag Dealer")
-      local not_enough_msg = tostring(get_ci(ci, "not enough msg") or "You don't have enough BugFrags.")
-      local owned_msg = tostring(get_ci(ci, "already owned msg") or "You already own that cosmetic.")
+      local ok_menu, TalkVertMenu = pcall(
+        require,
+        "scripts/net-games/npcs/talk_vert_menu"
+      )
 
-      -- Build offers from Sell N / Type N / Amount N / Price N
+      local ok_presets, TalkPresets = pcall(
+        require,
+        "scripts/net-games/npcs/talk_presets"
+      )
+
+      if not ok_menu
+        or not TalkVertMenu
+        or not ok_presets
+        or not TalkPresets
+      then
+        await(Async.message_player(
+          player_id,
+          "The new BugFrag shop UI isn't available right now.",
+          mug.texture_path,
+          mug.animation_path
+        ))
+
+        return dialogue.custom_properties
+          and dialogue.custom_properties["Next 1"]
+      end
+
+      local title = tostring(
+        get_ci(ci, "shop title")
+        or "BugFrag Dealer"
+      )
+
+      local not_enough_msg = tostring(
+        get_ci(ci, "not enough msg")
+        or "You don't have enough BugFrags."
+      )
+
+      local owned_msg = tostring(
+        get_ci(ci, "already owned msg")
+        or "You already own that item."
+      )
+
+      local sold_out_msg = tostring(
+        get_ci(ci, "sold out msg")
+        or "That item is SOLD OUT."
+      )
+
+      local preview_dir = tostring(
+        get_ci(ci, "preview dir")
+        or "chips/previews/"
+      )
+
+      local preview_ext = tostring(
+        get_ci(ci, "preview ext")
+        or ".png"
+      )
+
       local offers = {}
       local i = 1
+
       while true do
-        local sell = get_ci(ci, "sell " .. i)
-        if not sell then break end
+        local raw_sell = get_ci(ci, "sell " .. i)
 
-        local typ = tostring(get_ci(ci, "type " .. i) or "decor")
-        typ = string.lower(typ)
-        if typ == "pet" then typ = "decor" end
-        if typ == "cosmetics" then typ = "cosmetic" end
+        if raw_sell == nil then
+          break
+        end
 
-        local amount = math.floor(tonumber(get_ci(ci, "amount " .. i) or 1) or 1)
-        if amount < 1 then amount = 1 end
+        local item_id = tostring(raw_sell)
 
-        local price = math.floor(tonumber(get_ci(ci, "price " .. i) or get_ci(ci, "cost " .. i) or 0) or 0)
-        if price < 0 then price = 0 end
+        local typ = fragshop_type(
+          get_ci(ci, "type " .. i),
+          item_id
+        )
 
-        local id = tostring(sell)
-        local pretty =
-          (typ == "cosmetic" and cosmetics and cosmetics.get_name_for_id and cosmetics.get_name_for_id(id))
-          or (typ == "decor" and oncehub_catalog_name_for(id))
-          or id
+        local amount = math.max(
+          1,
+          math.floor(tonumber(
+            get_ci(ci, "amount " .. i)
+            or 1
+          ) or 1)
+        )
 
-        table.insert(offers, {
-          id = id,
+        local price = math.max(
+          0,
+          math.floor(tonumber(
+            get_ci(ci, "price " .. i)
+            or get_ci(ci, "cost " .. i)
+            or 0
+          ) or 0)
+        )
+
+        local custom_name = get_ci(
+          ci,
+          "name " .. i
+        )
+
+        local offer = {
+          choice_id = tostring(i),
+          item_id = item_id,
           type = typ,
           amount = amount,
           price = price,
-          name = pretty,
-        })
+        }
+
+        local valid = false
+
+        if typ == "chip" then
+          local card_def = whitelist
+            and whitelist.get_card_def
+            and whitelist.get_card_def(item_id)
+            or nil
+
+          if card_def and card_def.package_id then
+            offer.name = tostring(
+              custom_name
+              or fragshop_chip_name(
+                card_def,
+                item_id
+              )
+            )
+
+            offer.code = tostring(
+              get_ci(ci, "code " .. i)
+              or card_def.code
+              or "*"
+            )
+
+            local preview =
+              get_ci(ci, "preview " .. i)
+              or get_ci(ci, "icon " .. i)
+
+            if preview == nil
+              or tostring(preview) == ""
+            then
+              local dir = preview_dir
+
+              if dir ~= ""
+                and dir:sub(-1) ~= "/"
+              then
+                dir = dir .. "/"
+              end
+
+              preview = dir
+                .. tostring(
+                  card_def.preview_key
+                  or card_def.card_key
+                  or item_id
+                )
+                .. preview_ext
+            end
+
+            offer.preview_path =
+              normalize_shop_preview_path(preview)
+
+            if offer.preview_path
+              and Net
+              and Net.has_asset
+            then
+              local ok_exists, exists = pcall(
+                Net.has_asset,
+                offer.preview_path
+              )
+
+              if ok_exists and exists == false then
+                offer.preview_path =
+                  FRAGSHOP_DEFAULT_ICON
+              end
+            end
+
+            valid = true
+          else
+            print(
+              "[fragshop] invalid chip:",
+              item_id
+            )
+          end
+
+        elseif typ == "cosmetic" then
+          local cosmetic_opt = cosmetics
+            and cosmetics.get_shop_option
+            and cosmetics.get_shop_option(item_id)
+            or nil
+
+          if cosmetic_opt then
+            offer.name = tostring(
+              custom_name
+              or (
+                cosmetics.get_name_for_id
+                and cosmetics.get_name_for_id(item_id)
+              )
+              or cosmetic_opt.name
+              or item_id
+            )
+
+            offer.amount = 1
+            valid = true
+          else
+            print(
+              "[fragshop] invalid cosmetic:",
+              item_id
+            )
+          end
+
+        elseif typ == "pet" then
+          if Pets
+            and Pets.grant_owned_pet
+            and item_id:sub(1, 4) == "pet_"
+          then
+            offer.pet_kind =
+              fragshop_pet_kind(item_id)
+
+            offer.name = tostring(
+              custom_name
+              or fragshop_pet_name(item_id)
+            )
+
+            valid = true
+          else
+            print(
+              "[fragshop] invalid pet:",
+              item_id
+            )
+          end
+
+        else
+          print(
+            "[fragshop] unsupported item type:",
+            typ,
+            item_id
+          )
+        end
+
+        if valid then
+          offers[#offers + 1] = offer
+        end
 
         i = i + 1
       end
@@ -2188,133 +2477,477 @@ eznpcs.add_event{
         await(Async.message_player(
           player_id,
           "Sorry, I'm not selling anything right now.",
-          mug.texture_path, mug.animation_path
+          mug.texture_path,
+          mug.animation_path
         ))
-        return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+
+        return dialogue.custom_properties
+          and dialogue.custom_properties["Next 1"]
       end
 
-      while true do
-        local cur_frags = tonumber(ezmemory.get_player_fragments(player_id) or 0) or 0
+      local prog_mug = helpers.deep_copy(
+        TalkPresets.mugs.prog
+        or { enabled = true }
+      )
 
-        local posts, items = {}, {}
-        for _, offer in ipairs(offers) do
-          local label
-          if offer.type == "cosmetic" then
-            local owned = cosmetics and cosmetics.has_cosmetic and cosmetics.has_cosmetic(player_id, offer.id)
-            label = owned
-              and string.format("%s (%s, Owned)", offer.name, short_frags(offer.price))
-              or  string.format("%s (%s)",        offer.name, short_frags(offer.price))
-          else
-            local owned = oncehub_count_owned(player_id, offer.id)
-            if offer.amount ~= 1 then
-              label = string.format("%s x%d (%s) [Owned:%d]", offer.name, offer.amount, short_frags(offer.price), owned)
-            else
-              label = string.format("%s (%s) [Owned:%d]", offer.name, short_frags(offer.price), owned)
-            end
-          end
+      prog_mug.texture_path = mug.texture_path
+      prog_mug.anim_path = mug.animation_path
+      prog_mug.sprite_id = nil
 
-          local post = helpers.create_bbs_option(label)
-          table.insert(posts, post)
-          items[#posts] = offer
+      local talk_cfg = {
+        preset = "prog_prompt",
+        area_id = Net.get_player_area(player_id),
+
+        object = "fragshop_"
+          .. tostring(dialogue.id or "shop"),
+
+        ui = {
+          mugshot = prog_mug,
+          typing_speed = 9999,
+        }
+      }
+
+      local layout =
+        TalkPresets.get_vert_menu_layout(
+          "prog_prompt_shop"
+        ) or {}
+
+      layout.monies_label_text = "FRAGS"
+
+      local assets = {
+        menu_bg =
+          "/server/assets/net-games/ui/prompt_vert_menu_shop_an.png",
+
+        menu_bg_anim =
+          "/server/assets/net-games/ui/prompt_vert_menu_an.animation",
+
+        menu_bg_frame =
+          "/server/assets/net-games/ui/prompt_vert_menu_shop_an_frame.png",
+
+        highlight =
+          "/server/assets/net-games/ui/highlight_shop.png",
+      }
+
+      local options = {}
+      local by_choice_id = {}
+
+      for _, offer in ipairs(offers) do
+        local label =
+          fragshop_is_sold_out(
+            player_id,
+            offer
+          )
+          and "SOLD OUT"
+          or offer.name
+
+        options[#options + 1] = {
+          id = offer.choice_id,
+          text = label,
+          shop_name = label,
+          shop_price = offer.price,
+        }
+
+        by_choice_id[offer.choice_id] =
+          offer
+      end
+
+      options[#options + 1] = {
+        id = "exit",
+        text = "Exit"
+      }
+
+      local exit_index = #options
+      local last_preview_id = "__none__"
+
+      local function update_preview(choice)
+        local choice_id =
+          choice
+          and choice.id
+          and tostring(choice.id)
+          or nil
+
+        if choice_id == "exit" then
+          choice_id = nil
         end
 
-        -- Add a "balance" footer option (non-purchasable)
-        local bal_post = helpers.create_bbs_option(string.format("Your BugFrags: %d", cur_frags))
-        bal_post.id = "__bf_balance__"
-        table.insert(posts, bal_post)
+        if choice_id == last_preview_id then
+          local current = choice_id
+            and by_choice_id[choice_id]
+            or nil
 
-        local board = ezmenus.open_menu(
-          player_id,
-          title,
-          BUGFRAG_SHOP_COLOR,
-          posts
+          if current
+            and current.type == "chip"
+          then
+            return current.preview_path
+              or FRAGSHOP_DEFAULT_ICON
+          end
+
+          -- Pet and cosmetic previews draw their own sprites.
+          return nil
+        end
+
+        last_preview_id = choice_id
+
+        fragshop_clear_previews(
+          player_id
         )
 
-        local sel = await(board.selection_once())
-        Net.close_bbs(player_id)
+        local offer = choice_id
+          and by_choice_id[choice_id]
+          or nil
 
-        if not sel then break end -- cancel
+        if not offer then
+          return FRAGSHOP_DEFAULT_ICON
+        end
 
-        if sel == "__bf_balance__" then
-          -- just reopen (acts like a footer)
-        else
-          -- Resolve choice
-          local chosen
-          for idx, post in ipairs(posts) do
-            local pid = post.id or post.title or ""
-            if sel == pid then
-              chosen = items[idx]
-              break
-            end
+        if offer.type == "chip" then
+          return offer.preview_path
+            or FRAGSHOP_DEFAULT_ICON
+        end
+
+        if offer.type == "cosmetic" then
+          if cosmetics
+            and cosmetics.show_shop_preview
+          then
+            pcall(
+              cosmetics.show_shop_preview,
+              player_id,
+              offer.item_id
+            )
           end
-          if not chosen then
-            -- if they selected balance or something unknown, just loop
-          else
-            -- Cosmetic owned check
-            if chosen.type == "cosmetic" and cosmetics and cosmetics.has_cosmetic and cosmetics.has_cosmetic(player_id, chosen.id) then
-              await(Async.message_player(player_id, owned_msg, mug.texture_path, mug.animation_path))
-            else
-              -- Preview for cosmetics (optional)
-              if chosen.type == "cosmetic" and cosmetics and cosmetics.preview_for_shop then
-                cosmetics.preview_for_shop(player_id, chosen.id)
-              end
 
-              local question
-              if chosen.type == "decor" and chosen.amount ~= 1 then
-                question = string.format("Buy %s x%d for %s?", chosen.name, chosen.amount, short_frags(chosen.price))
-              else
-                question = string.format("Buy %s for %s?", chosen.name, short_frags(chosen.price))
-              end
+          -- Cosmetic preview supplies its own sprites.
+          return nil
+        end
 
-              local res = await(Async.question_player(player_id, question, mug.texture_path, mug.animation_path))
-              local do_buy = (res == 1)
+        if offer.type == "pet" then
+          if Pets
+            and Pets.show_shop_preview
+          then
+            pcall(
+              Pets.show_shop_preview,
+              player_id,
+              ci,
+              offer.pet_kind
+            )
+          end
 
-              if cosmetics and cosmetics.clear_shop_previews then
-                cosmetics.clear_shop_previews(player_id)
-              end
+          -- Pet preview supplies its own sprites.
+          return nil
+        end
 
-              if do_buy then
-                if chosen.price > 0 and not ezmemory.spend_player_fragments(player_id, chosen.price) then
-                  await(Async.message_player(player_id, not_enough_msg, mug.texture_path, mug.animation_path))
-                else
-                  local reward_msg = nil
+        return FRAGSHOP_DEFAULT_ICON
+      end
 
-                  if chosen.type == "cosmetic" then
-                    local ok, reason = cosmetics.unlock_for_player(player_id, chosen.id)
-                    if ok then
-                      reward_msg = "You got the " .. chosen.name .. " cosmetic!"
-                    else
-                      reward_msg = "Couldn't unlock that cosmetic (" .. tostring(reason or "error") .. ")."
-                    end
-                  else
-                    oncehub_add_owned(player_id, chosen.id, chosen.amount)
-                    if chosen.amount ~= 1 then
-                      reward_msg = string.format("You got %dx %s!", chosen.amount, chosen.name)
-                    else
-                      reward_msg = "You got " .. chosen.name .. "!"
-                    end
-                  end
+      if Net
+        and Net.provide_asset_for_player
+      then
+        pcall(
+          Net.provide_asset_for_player,
+          player_id,
+          FRAGSHOP_DEFAULT_ICON
+        )
 
-                  if sfx and sfx.item_get then
-                    pcall(Net.play_sound_for_player, player_id, sfx.item_get)
-                  end
-
-                  local new_frags = tonumber(ezmemory.get_player_fragments(player_id) or 0) or 0
-                  reward_msg = (reward_msg or "Purchase complete.") .. ("\nBugFrags: %d"):format(new_frags)
-                  await(Async.message_player(player_id, reward_msg, mug.texture_path, mug.animation_path))
-                end
-              end
-            end
+        for _, offer in ipairs(offers) do
+          if offer.type == "chip"
+            and offer.preview_path
+          then
+            pcall(
+              Net.provide_asset_for_player,
+              player_id,
+              offer.preview_path
+            )
           end
         end
       end
 
-      return dialogue.custom_properties and dialogue.custom_properties["Next 1"]
+      await(Async.sleep(0.05))
+
+      if Net.lock_player_input then
+        pcall(
+          Net.lock_player_input,
+          player_id
+        )
+      end
+
+      TalkVertMenu.open(
+        player_id,
+        title,
+        talk_cfg,
+        {
+          intro_text = "What would you like?",
+          options = options,
+          exit_index = exit_index,
+          layout = layout,
+          assets = assets,
+
+          monies_amount_fn = function(pid)
+            return tostring(
+              tonumber(
+                ezmemory.get_player_fragments(pid)
+                or 0
+              ) or 0
+            )
+          end,
+
+          shop_item_texture_fn =
+            update_preview,
+
+          flow = {
+            keep_menu_open = true,
+            after_text = "Anything else?",
+            exit_goodbye_text = "Come again!",
+
+            confirm = {
+              enabled = true,
+              skip_ids = {
+                exit = true
+              },
+
+              text_fn = function(
+                pid,
+                choice_id
+              )
+                local offer =
+                  by_choice_id[
+                    tostring(choice_id)
+                  ]
+
+                if not offer then
+                  return "Buy this?"
+                end
+
+                if fragshop_is_sold_out(
+                  pid,
+                  offer
+                ) then
+                  return sold_out_msg
+                end
+
+                local have = tonumber(
+                  ezmemory.get_player_fragments(
+                    pid
+                  ) or 0
+                ) or 0
+
+                local amount_text =
+                  (
+                    offer.type == "pet"
+                    and offer.amount > 1
+                  )
+                  and (
+                    " x"
+                    .. offer.amount
+                  )
+                  or ""
+
+                return string.format(
+                  "Buy %s%s for %d BF?\nYou have %d BF",
+                  offer.name,
+                  amount_text,
+                  offer.price,
+                  have
+                )
+              end,
+            },
+
+            post_select = {
+              enabled = true,
+              skip_ids = {
+                exit = true
+              }
+            },
+          },
+
+          on_confirm_yes = function(
+            pid,
+            choice_id,
+            _choice_text,
+            menu
+          )
+            local offer =
+              by_choice_id[
+                tostring(choice_id)
+              ]
+
+            if not offer then
+              return
+                "Huh? That item is gone.",
+                "Anything else?"
+            end
+
+            if fragshop_is_sold_out(
+              pid,
+              offer
+            ) then
+              return
+                owned_msg,
+                "Anything else?"
+            end
+
+            local cost = math.max(
+              0,
+              math.floor(
+                tonumber(offer.price)
+                or 0
+              )
+            )
+
+            if cost > 0
+              and not ezmemory.spend_player_fragments(
+                pid,
+                cost
+              )
+            then
+              local have = tonumber(
+                ezmemory.get_player_fragments(
+                  pid
+                ) or 0
+              ) or 0
+
+              return string.format(
+                "%s\nCost: %d BF  You have: %d BF",
+                not_enough_msg,
+                cost,
+                have
+              ), "Anything else?"
+            end
+
+            local granted = false
+            local reason = nil
+            local created = nil
+
+            if offer.type == "chip" then
+              granted, reason =
+                whitelist.unlock_card(
+                  pid,
+                  offer.item_id,
+                  offer.code
+                )
+
+            elseif offer.type == "cosmetic" then
+              granted, reason =
+                cosmetics.unlock_for_player(
+                  pid,
+                  offer.item_id
+                )
+
+            elseif offer.type == "pet" then
+              local ok_grant, result = pcall(
+                Pets.grant_owned_pet,
+                pid,
+                offer.item_id,
+                offer.amount
+              )
+
+              created =
+                ok_grant and result or nil
+
+              granted =
+                type(created) == "table"
+                and #created == offer.amount
+
+              reason =
+                granted and nil or result
+            end
+
+            if not granted then
+              fragshop_refund(
+                pid,
+                cost
+              )
+
+              if reason == "already_unlocked"
+                or reason == "already_owned"
+              then
+                return
+                  owned_msg,
+                  "Anything else?"
+              end
+
+              return
+                "Couldn't complete that purchase ("
+                .. tostring(reason or "error")
+                .. ").",
+                "Anything else?"
+            end
+
+            fragshop_update_row(
+              menu,
+              choice_id,
+              offer,
+              fragshop_is_sold_out(
+                pid,
+                offer
+              )
+            )
+
+            if sfx
+              and sfx.item_get
+            then
+              pcall(
+                Net.play_sound_for_player,
+                pid,
+                sfx.item_get
+              )
+            end
+
+            if offer.type == "chip" then
+              return string.format(
+                "You bought %s!\n(-%d BF)",
+                offer.name,
+                cost
+              ), "Anything else?"
+            end
+
+            if offer.type == "cosmetic" then
+              return string.format(
+                "You got the %s cosmetic!\n(-%d BF)",
+                offer.name,
+                cost
+              ), "Anything else?"
+            end
+
+            local first_pet =
+              created and created[1]
+
+            if offer.amount == 1
+              and first_pet
+              and first_pet.uid
+            then
+              return string.format(
+                "You bought %s!\nPet ID: %s\n(-%d BF)",
+                offer.name,
+                tostring(first_pet.uid),
+                cost
+              ), "Anything else?"
+            end
+
+            return string.format(
+              "You bought %dx %s!\n(-%d BF)",
+              offer.amount,
+              offer.name,
+              cost
+            ), "Anything else?"
+          end,
+        }
+      )
+
+      while TalkVertMenu.is_busy
+        and TalkVertMenu.is_busy(player_id)
+      do
+        await(Async.sleep(0.05))
+      end
+
+      fragshop_clear_previews(
+        player_id
+      )
+
+      return dialogue.custom_properties
+        and dialogue.custom_properties["Next 1"]
     end)
   end
 }
-
-
 
 
 ----------------------------------------------------------------

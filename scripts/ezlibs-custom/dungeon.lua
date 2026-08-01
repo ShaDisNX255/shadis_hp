@@ -20,6 +20,7 @@ local eznpcs   = require("scripts/ezlibs-scripts/eznpcs/eznpcs")
 local helpers = require("scripts/ezlibs-scripts/helpers")
 local whitelist = require("scripts/ezlibs-custom/whitelist")
 local cosmetics_ok, cosmetics = pcall(require, "scripts/ezlibs-custom/cosmetics")
+local pets_ok, pets = pcall(require, "scripts/ezlibs-custom/pets")
 
 
 ----------------------------------------------------------------
@@ -784,21 +785,68 @@ local function _roll_reward(entries)
 end
 
 local function _reward_available_for_player(pid, entry)
-  local typ = tostring(entry and entry.typ or ""):lower()
+  local typ = tostring(
+    entry and entry.typ or ""
+  ):lower()
 
-  if typ ~= "chip" and typ ~= "card" and typ ~= "battlechip" then
-    return true
+  if typ == "chip"
+    or typ == "card"
+    or typ == "battlechip"
+  then
+    if not (
+      whitelist
+      and whitelist.player_has_card_unlocked
+    ) then
+      return false
+    end
+
+    local unlocked, card_def =
+      whitelist.player_has_card_unlocked(
+        pid,
+        entry.reward
+      )
+
+    -- Invalid and already-unlocked chips are excluded.
+    return card_def ~= nil and not unlocked
   end
 
-  if not (whitelist and whitelist.player_has_card_unlocked) then
-    return false
+  if typ == "cosmetic"
+    or typ == "cosmetics"
+  then
+    if not (
+      cosmetics_ok
+      and cosmetics
+      and cosmetics.has_cosmetic
+      and cosmetics.get_shop_option
+    ) then
+      return false
+    end
+
+    -- Invalid and already-owned cosmetics are excluded.
+    return cosmetics.get_shop_option(
+      entry.reward
+    ) ~= nil
+      and not cosmetics.has_cosmetic(
+        pid,
+        entry.reward
+      )
   end
 
-  local unlocked, card_def =
-    whitelist.player_has_card_unlocked(pid, entry.reward)
+  if typ == "pet"
+    or typ == "pets"
+  then
+    -- Pets can be received more than once.
+    return pets_ok
+      and pets
+      and type(
+        pets.grant_owned_pet
+      ) == "function"
+      and tostring(
+        entry.reward or ""
+      ):sub(1, 4) == "pet_"
+  end
 
-  -- Invalid chip keys are also excluded from the roll.
-  return card_def ~= nil and not unlocked
+  return true
 end
 
 local function _roll_reward_for_player(pid, entries)
@@ -842,6 +890,75 @@ local function _grant_cosmetic(pid, id, qty)
     return ("Reward: cosmetic %s."):format(tostring(id))
   end
   return nil, tostring(reason or "unlock failed")
+end
+
+local function _grant_pet(pid, id, qty)
+  qty = math.max(
+    1,
+    math.floor(tonumber(qty) or 1)
+  )
+
+  id = tostring(id or "")
+
+  if not (
+    pets_ok
+    and pets
+    and type(
+      pets.grant_owned_pet
+    ) == "function"
+  ) then
+    return nil, "pets module not available"
+  end
+
+  local ok_grant, created = pcall(
+    pets.grant_owned_pet,
+    pid,
+    id,
+    qty
+  )
+
+  if not ok_grant
+    or type(created) ~= "table"
+    or #created ~= qty
+  then
+    return nil,
+      ok_grant
+      and "pet creation failed"
+      or tostring(created)
+  end
+
+  local kind = id
+    :gsub("^pet_", "")
+    :gsub("_", " ")
+
+  kind = kind:gsub(
+    "(%a)([%w']*)",
+    function(first, rest)
+      return first:upper()
+        .. rest:lower()
+    end
+  )
+
+  local display_name =
+    kind ~= "" and kind or "Pet"
+
+  if qty == 1 then
+    local pet = created[1]
+
+    return string.format(
+      "Reward: Pet %s.\nPet ID: %s",
+      display_name,
+      tostring(
+        pet and pet.uid or "?"
+      )
+    )
+  end
+
+  return string.format(
+    "Reward: Pet %s x%d.",
+    display_name,
+    qty
+  )
 end
 
 local function _grant_money(pid, amount)
@@ -939,24 +1056,99 @@ local function _grant_chip(pid, card_key)
 end
 
 local function _grant_reward(pid, entry)
-  if not entry then return nil end
-  local typ = tostring(entry.typ or ""):lower()
-  local reward = tostring(entry.reward or "")
-  local amount = tonumber(entry.amount or 1) or 1
-
-  if typ == "decor" then
-    return _grant_decor_owned(pid, reward, amount)
-  elseif typ == "cosmetic" or typ == "cosmetics" then
-    local line, err = _grant_cosmetic(pid, reward, amount)
-    if line then return line end
-    print("[dungeon] failed to grant cosmetic", reward, "to", pid, "reason:", err)
+  if not entry then
     return nil
-  elseif typ == "chip" or typ == "card" or typ == "battlechip" then
-    return _grant_chip(pid, reward)
-  elseif typ == "moneyz" or typ == "money" then
-    return _grant_money(pid, amount)
+  end
+
+  local typ = tostring(
+    entry.typ or ""
+  ):lower()
+
+  local reward = tostring(
+    entry.reward or ""
+  )
+
+  local amount =
+    tonumber(entry.amount or 1) or 1
+
+  if typ == "pet"
+    or typ == "pets"
+  then
+    local line, err = _grant_pet(
+      pid,
+      reward,
+      amount
+    )
+
+    if line then
+      return line
+    end
+
+    print(
+      "[dungeon] failed to grant pet",
+      reward,
+      "to",
+      pid,
+      "reason:",
+      err
+    )
+
+    return nil
+
+  elseif typ == "decor" then
+    return _grant_decor_owned(
+      pid,
+      reward,
+      amount
+    )
+
+  elseif typ == "cosmetic"
+    or typ == "cosmetics"
+  then
+    local line, err = _grant_cosmetic(
+      pid,
+      reward,
+      amount
+    )
+
+    if line then
+      return line
+    end
+
+    print(
+      "[dungeon] failed to grant cosmetic",
+      reward,
+      "to",
+      pid,
+      "reason:",
+      err
+    )
+
+    return nil
+
+  elseif typ == "chip"
+    or typ == "card"
+    or typ == "battlechip"
+  then
+    return _grant_chip(
+      pid,
+      reward
+    )
+
+  elseif typ == "moneyz"
+    or typ == "money"
+  then
+    return _grant_money(
+      pid,
+      amount
+    )
+
   else
-    print("[dungeon] unknown reward type:", tostring(entry.typ))
+    print(
+      "[dungeon] unknown reward type:",
+      tostring(entry.typ)
+    )
+
     return nil
   end
 end
