@@ -116,6 +116,7 @@
     <property name="Price 3" type="int" value="5000"/>
     <property name="Price 30" type="int" value="50000"/>
     <property name="Price 31" type="int" value="100000"/>
+    <property name="Price 32" type="int" value="100000"/>
     <property name="Price 4" type="int" value="5000"/>
     <property name="Price 5" type="int" value="6000"/>
     <property name="Price 6" type="int" value="5000"/>
@@ -147,6 +148,7 @@
     <property name="Sell 3" value="green_tree"/>
     <property name="Sell 30" value="casino_shortcut"/>
     <property name="Sell 31" value="jukebox"/>
+    <property name="Sell 32" value="jukebox"/>
     <property name="Sell 4" value="blue_tree"/>
     <property name="Sell 5" value="stuffed_bear"/>
     <property name="Sell 6" value="lan_tile"/>
