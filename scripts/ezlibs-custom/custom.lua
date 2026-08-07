@@ -10,6 +10,7 @@ local slots  = require('scripts/ezlibs-custom/slots')
 local blackjack = require('scripts/ezlibs-custom/blackjack')
 local duels  = require('scripts/ezlibs-custom/duels')
 local lobby  = require('scripts/ezlibs-custom/lobby')
+local uno_pvp = require('scripts/ezlibs-custom/uno_pvp')
 local octopvp  = require('scripts/octo-ranking/octopvp')
 local tournaments  = require('scripts/ezlibs-custom/tournaments')
 -- Optional L-Menu (net-games) support

@@ -129,6 +129,15 @@ local cfg = {
   hint_y     = 149,  -- tweak to move up/down
 }
 
+local function provide_lobby_assets(pid)
+  if not (Net and Net.provide_asset_for_player) then
+    return
+  end
+
+  pcall(Net.provide_asset_for_player, pid, cfg.texture)
+  pcall(Net.provide_asset_for_player, pid, cfg.anim)
+end
+
 -- ---------------------------------------------------------------------------
 -- Host / Join (lobby-main) layout
 -- ---------------------------------------------------------------------------
@@ -818,6 +827,7 @@ end
 
 function Lobby.open_activity(pid, activity_id)
   if not pid then return false end
+  provide_lobby_assets(pid)
   activity_id = tostring(activity_id or "debug")
   local cfgA = ensure_activity(activity_id)
 
@@ -1520,6 +1530,17 @@ Net:on("virtual_input", function(event)
 
     ::continue::
   end
+end)
+
+-- ---------------------------------------------------------------------------
+-- Preload shared lobby UI assets
+-- ---------------------------------------------------------------------------
+Net:on("player_join", function(event)
+  if not event or not event.player_id then
+    return
+  end
+
+  provide_lobby_assets(event.player_id)
 end)
 
 -- ---------------------------------------------------------------------------

@@ -668,6 +668,29 @@ local function is_tour_active(pid)
   return type(s) == "table" and s.active == true
 end
 
+local function is_actor_interaction_blocked(pid)
+  local LMenu = rawget(_G, "LMenu")
+
+  if type(LMenu) == "table" then
+    if type(LMenu.is_open_for) == "function" then
+      local ok, open = pcall(LMenu.is_open_for, pid)
+      if ok and open then
+        return true
+      end
+    end
+
+    if type(LMenu.is_modal_open_for) == "function" then
+      local ok, blocked = pcall(LMenu.is_modal_open_for, pid)
+      if ok and blocked then
+        return true
+      end
+    end
+  end
+
+  -- Safety fallback in case LMenu somehow isn't loaded yet.
+  return is_tour_active(pid)
+end
+
 local function close_menuapi(pid, reason)
   local MenuAPI = get_menuapi()
   if MenuAPI and type(MenuAPI.close) == "function" then
@@ -1168,22 +1191,22 @@ open_actor_interaction_menuapi = function(player_id, actor_id, opts)
   local player_area = Net.get_player_area(player_id)
   local mode = get_area_mode(player_area)
 
-  if is_tour_active(player_id) then
+  -- Don't allow actor actions while either player is occupied by
+  -- LMenu or any game/modal UI guarded by LMenu.
+  if is_actor_interaction_blocked(player_id) then
     return false
   end
 
-  if is_tour_active(actor_id) then
+  if is_actor_interaction_blocked(actor_id) then
     local MenuAPI = get_menuapi()
 
     if MenuAPI and type(MenuAPI.show_message) == "function" then
-      MenuAPI.show_message(player_id, "They're taking a tour right now.", {
-        box_id = "tour_busy",
+      MenuAPI.show_message(player_id, "They're busy right now.", {
+        box_id = "player_busy",
         modal = false,
         duration = 1.2,
         speed = 1000,
       })
-    else
-      Net.message_player(player_id, "They're taking a tour right now.")
     end
 
     return false
@@ -1203,6 +1226,15 @@ open_actor_interaction_menuapi = function(player_id, actor_id, opts)
 
     on_confirm = function(pid, row)
       local id = tostring(row and row.id or "")
+
+      -- Re-check at selection time in case either player's state
+      -- changed after this actor menu was originally opened.
+      if is_actor_interaction_blocked(pid)
+        or is_actor_interaction_blocked(actor_id)
+      then
+        close_menuapi(pid, "player_busy")
+        return true
+      end
 
       if not is_real_player(actor_id) then
         close_menuapi(pid, "target_left")

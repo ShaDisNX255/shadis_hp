@@ -1,0 +1,347 @@
+animation state="CARD_BACK"
+frame duration="1" x="0" y="0" w="22" h="34" originx="0" originy="0"
+
+animation state="WILD_DRAW_4"
+frame duration="1" x="22" y="0" w="22" h="34" originx="0" originy="0"
+
+animation state="WILD"
+frame duration="1" x="44" y="0" w="22" h="34" originx="0" originy="0"
+
+animation state="BLANK_WILD"
+frame duration="1" x="66" y="0" w="22" h="34" originx="0" originy="0"
+
+animation state="BLANK_RED_FILLED"
+frame duration="1" x="88" y="0" w="22" h="34" originx="0" originy="0"
+
+animation state="BLANK_BLUE_FILLED"
+frame duration="1" x="110" y="0" w="22" h="34" originx="0" originy="0"
+
+animation state="BLANK_GREEN_FILLED"
+frame duration="1" x="132" y="0" w="22" h="34" originx="0" originy="0"
+
+animation state="BLANK_YELLOW_FILLED"
+frame duration="1" x="154" y="0" w="22" h="34" originx="0" originy="0"
+
+animation state="BLANK_RED_OUTLINE"
+frame duration="1" x="176" y="0" w="22" h="34" originx="0" originy="0"
+
+animation state="BLANK_BLUE_OUTLINE"
+frame duration="1" x="198" y="0" w="22" h="34" originx="0" originy="0"
+
+animation state="BLANK_GREEN_OUTLINE"
+frame duration="1" x="220" y="0" w="22" h="34" originx="0" originy="0"
+
+animation state="BLANK_YELLOW_OUTLINE"
+frame duration="1" x="242" y="0" w="22" h="34" originx="0" originy="0"
+
+animation state="RED_1_FILLED"
+frame duration="1" x="264" y="0" w="22" h="34" originx="0" originy="0"
+
+animation state="BLUE_1_FILLED"
+frame duration="1" x="286" y="0" w="22" h="34" originx="0" originy="0"
+
+animation state="GREEN_1_FILLED"
+frame duration="1" x="308" y="0" w="22" h="34" originx="0" originy="0"
+
+animation state="YELLOW_1_FILLED"
+frame duration="1" x="330" y="0" w="22" h="34" originx="0" originy="0"
+
+animation state="RED_1_OUTLINE"
+frame duration="1" x="352" y="0" w="22" h="34" originx="0" originy="0"
+
+animation state="BLUE_1_OUTLINE"
+frame duration="1" x="374" y="0" w="22" h="34" originx="0" originy="0"
+
+animation state="GREEN_1_OUTLINE"
+frame duration="1" x="396" y="0" w="22" h="34" originx="0" originy="0"
+
+animation state="YELLOW_1_OUTLINE"
+frame duration="1" x="418" y="0" w="22" h="34" originx="0" originy="0"
+
+animation state="RED_2_FILLED"
+frame duration="1" x="440" y="0" w="22" h="34" originx="0" originy="0"
+
+animation state="BLUE_2_FILLED"
+frame duration="1" x="462" y="0" w="22" h="34" originx="0" originy="0"
+
+animation state="GREEN_2_FILLED"
+frame duration="1" x="484" y="0" w="22" h="34" originx="0" originy="0"
+
+animation state="YELLOW_2_FILLED"
+frame duration="1" x="506" y="0" w="22" h="34" originx="0" originy="0"
+
+animation state="RED_2_OUTLINE"
+frame duration="1" x="528" y="0" w="22" h="34" originx="0" originy="0"
+
+animation state="BLUE_2_OUTLINE"
+frame duration="1" x="550" y="0" w="22" h="34" originx="0" originy="0"
+
+animation state="GREEN_2_OUTLINE"
+frame duration="1" x="572" y="0" w="22" h="34" originx="0" originy="0"
+
+animation state="YELLOW_2_OUTLINE"
+frame duration="1" x="594" y="0" w="22" h="34" originx="0" originy="0"
+
+animation state="RED_3_FILLED"
+frame duration="1" x="616" y="0" w="22" h="34" originx="0" originy="0"
+
+animation state="BLUE_3_FILLED"
+frame duration="1" x="638" y="0" w="22" h="34" originx="0" originy="0"
+
+animation state="GREEN_3_FILLED"
+frame duration="1" x="0" y="34" w="22" h="34" originx="0" originy="0"
+
+animation state="YELLOW_3_FILLED"
+frame duration="1" x="22" y="34" w="22" h="34" originx="0" originy="0"
+
+animation state="RED_3_OUTLINE"
+frame duration="1" x="44" y="34" w="22" h="34" originx="0" originy="0"
+
+animation state="BLUE_3_OUTLINE"
+frame duration="1" x="66" y="34" w="22" h="34" originx="0" originy="0"
+
+animation state="GREEN_3_OUTLINE"
+frame duration="1" x="88" y="34" w="22" h="34" originx="0" originy="0"
+
+animation state="YELLOW_3_OUTLINE"
+frame duration="1" x="110" y="34" w="22" h="34" originx="0" originy="0"
+
+animation state="RED_4_FILLED"
+frame duration="1" x="132" y="34" w="22" h="34" originx="0" originy="0"
+
+animation state="BLUE_4_FILLED"
+frame duration="1" x="154" y="34" w="22" h="34" originx="0" originy="0"
+
+animation state="GREEN_4_FILLED"
+frame duration="1" x="176" y="34" w="22" h="34" originx="0" originy="0"
+
+animation state="YELLOW_4_FILLED"
+frame duration="1" x="198" y="34" w="22" h="34" originx="0" originy="0"
+
+animation state="RED_4_OUTLINE"
+frame duration="1" x="220" y="34" w="22" h="34" originx="0" originy="0"
+
+animation state="BLUE_4_OUTLINE"
+frame duration="1" x="242" y="34" w="22" h="34" originx="0" originy="0"
+
+animation state="GREEN_4_OUTLINE"
+frame duration="1" x="264" y="34" w="22" h="34" originx="0" originy="0"
+
+animation state="YELLOW_4_OUTLINE"
+frame duration="1" x="286" y="34" w="22" h="34" originx="0" originy="0"
+
+animation state="RED_5_FILLED"
+frame duration="1" x="308" y="34" w="22" h="34" originx="0" originy="0"
+
+animation state="BLUE_5_FILLED"
+frame duration="1" x="330" y="34" w="22" h="34" originx="0" originy="0"
+
+animation state="GREEN_5_FILLED"
+frame duration="1" x="352" y="34" w="22" h="34" originx="0" originy="0"
+
+animation state="YELLOW_5_FILLED"
+frame duration="1" x="374" y="34" w="22" h="34" originx="0" originy="0"
+
+animation state="RED_5_OUTLINE"
+frame duration="1" x="396" y="34" w="22" h="34" originx="0" originy="0"
+
+animation state="BLUE_5_OUTLINE"
+frame duration="1" x="418" y="34" w="22" h="34" originx="0" originy="0"
+
+animation state="GREEN_5_OUTLINE"
+frame duration="1" x="440" y="34" w="22" h="34" originx="0" originy="0"
+
+animation state="YELLOW_5_OUTLINE"
+frame duration="1" x="462" y="34" w="22" h="34" originx="0" originy="0"
+
+animation state="RED_6_FILLED"
+frame duration="1" x="484" y="34" w="22" h="34" originx="0" originy="0"
+
+animation state="BLUE_6_FILLED"
+frame duration="1" x="506" y="34" w="22" h="34" originx="0" originy="0"
+
+animation state="GREEN_6_FILLED"
+frame duration="1" x="528" y="34" w="22" h="34" originx="0" originy="0"
+
+animation state="YELLOW_6_FILLED"
+frame duration="1" x="550" y="34" w="22" h="34" originx="0" originy="0"
+
+animation state="RED_6_OUTLINE"
+frame duration="1" x="572" y="34" w="22" h="34" originx="0" originy="0"
+
+animation state="BLUE_6_OUTLINE"
+frame duration="1" x="594" y="34" w="22" h="34" originx="0" originy="0"
+
+animation state="GREEN_6_OUTLINE"
+frame duration="1" x="616" y="34" w="22" h="34" originx="0" originy="0"
+
+animation state="YELLOW_6_OUTLINE"
+frame duration="1" x="638" y="34" w="22" h="34" originx="0" originy="0"
+
+animation state="RED_7_FILLED"
+frame duration="1" x="0" y="68" w="22" h="34" originx="0" originy="0"
+
+animation state="BLUE_7_FILLED"
+frame duration="1" x="22" y="68" w="22" h="34" originx="0" originy="0"
+
+animation state="GREEN_7_FILLED"
+frame duration="1" x="44" y="68" w="22" h="34" originx="0" originy="0"
+
+animation state="YELLOW_7_FILLED"
+frame duration="1" x="66" y="68" w="22" h="34" originx="0" originy="0"
+
+animation state="RED_7_OUTLINE"
+frame duration="1" x="88" y="68" w="22" h="34" originx="0" originy="0"
+
+animation state="BLUE_7_OUTLINE"
+frame duration="1" x="110" y="68" w="22" h="34" originx="0" originy="0"
+
+animation state="GREEN_7_OUTLINE"
+frame duration="1" x="132" y="68" w="22" h="34" originx="0" originy="0"
+
+animation state="YELLOW_7_OUTLINE"
+frame duration="1" x="154" y="68" w="22" h="34" originx="0" originy="0"
+
+animation state="RED_8_FILLED"
+frame duration="1" x="176" y="68" w="22" h="34" originx="0" originy="0"
+
+animation state="BLUE_8_FILLED"
+frame duration="1" x="198" y="68" w="22" h="34" originx="0" originy="0"
+
+animation state="GREEN_8_FILLED"
+frame duration="1" x="220" y="68" w="22" h="34" originx="0" originy="0"
+
+animation state="YELLOW_8_FILLED"
+frame duration="1" x="242" y="68" w="22" h="34" originx="0" originy="0"
+
+animation state="RED_8_OUTLINE"
+frame duration="1" x="264" y="68" w="22" h="34" originx="0" originy="0"
+
+animation state="BLUE_8_OUTLINE"
+frame duration="1" x="286" y="68" w="22" h="34" originx="0" originy="0"
+
+animation state="GREEN_8_OUTLINE"
+frame duration="1" x="308" y="68" w="22" h="34" originx="0" originy="0"
+
+animation state="YELLOW_8_OUTLINE"
+frame duration="1" x="330" y="68" w="22" h="34" originx="0" originy="0"
+
+animation state="RED_9_FILLED"
+frame duration="1" x="352" y="68" w="22" h="34" originx="0" originy="0"
+
+animation state="BLUE_9_FILLED"
+frame duration="1" x="374" y="68" w="22" h="34" originx="0" originy="0"
+
+animation state="GREEN_9_FILLED"
+frame duration="1" x="396" y="68" w="22" h="34" originx="0" originy="0"
+
+animation state="YELLOW_9_FILLED"
+frame duration="1" x="418" y="68" w="22" h="34" originx="0" originy="0"
+
+animation state="RED_9_OUTLINE"
+frame duration="1" x="440" y="68" w="22" h="34" originx="0" originy="0"
+
+animation state="BLUE_9_OUTLINE"
+frame duration="1" x="462" y="68" w="22" h="34" originx="0" originy="0"
+
+animation state="GREEN_9_OUTLINE"
+frame duration="1" x="484" y="68" w="22" h="34" originx="0" originy="0"
+
+animation state="YELLOW_9_OUTLINE"
+frame duration="1" x="506" y="68" w="22" h="34" originx="0" originy="0"
+
+animation state="RED_0_FILLED"
+frame duration="1" x="528" y="68" w="22" h="34" originx="0" originy="0"
+
+animation state="BLUE_0_FILLED"
+frame duration="1" x="550" y="68" w="22" h="34" originx="0" originy="0"
+
+animation state="GREEN_0_FILLED"
+frame duration="1" x="572" y="68" w="22" h="34" originx="0" originy="0"
+
+animation state="YELLOW_0_FILLED"
+frame duration="1" x="594" y="68" w="22" h="34" originx="0" originy="0"
+
+animation state="RED_0_OUTLINE"
+frame duration="1" x="616" y="68" w="22" h="34" originx="0" originy="0"
+
+animation state="BLUE_0_OUTLINE"
+frame duration="1" x="638" y="68" w="22" h="34" originx="0" originy="0"
+
+animation state="GREEN_0_OUTLINE"
+frame duration="1" x="0" y="102" w="22" h="34" originx="0" originy="0"
+
+animation state="YELLOW_0_OUTLINE"
+frame duration="1" x="22" y="102" w="22" h="34" originx="0" originy="0"
+
+animation state="RED_SKIP_FILLED"
+frame duration="1" x="44" y="102" w="22" h="34" originx="0" originy="0"
+
+animation state="BLUE_SKIP_FILLED"
+frame duration="1" x="66" y="102" w="22" h="34" originx="0" originy="0"
+
+animation state="GREEN_SKIP_FILLED"
+frame duration="1" x="88" y="102" w="22" h="34" originx="0" originy="0"
+
+animation state="YELLOW_SKIP_FILLED"
+frame duration="1" x="110" y="102" w="22" h="34" originx="0" originy="0"
+
+animation state="RED_SKIP_OUTLINE"
+frame duration="1" x="132" y="102" w="22" h="34" originx="0" originy="0"
+
+animation state="BLUE_SKIP_OUTLINE"
+frame duration="1" x="154" y="102" w="22" h="34" originx="0" originy="0"
+
+animation state="GREEN_SKIP_OUTLINE"
+frame duration="1" x="176" y="102" w="22" h="34" originx="0" originy="0"
+
+animation state="YELLOW_SKIP_OUTLINE"
+frame duration="1" x="198" y="102" w="22" h="34" originx="0" originy="0"
+
+animation state="RED_REVERSE_FILLED"
+frame duration="1" x="220" y="102" w="22" h="34" originx="0" originy="0"
+
+animation state="BLUE_REVERSE_FILLED"
+frame duration="1" x="242" y="102" w="22" h="34" originx="0" originy="0"
+
+animation state="GREEN_REVERSE_FILLED"
+frame duration="1" x="264" y="102" w="22" h="34" originx="0" originy="0"
+
+animation state="YELLOW_REVERSE_FILLED"
+frame duration="1" x="286" y="102" w="22" h="34" originx="0" originy="0"
+
+animation state="RED_REVERSE_OUTLINE"
+frame duration="1" x="308" y="102" w="22" h="34" originx="0" originy="0"
+
+animation state="BLUE_REVERSE_OUTLINE"
+frame duration="1" x="330" y="102" w="22" h="34" originx="0" originy="0"
+
+animation state="GREEN_REVERSE_OUTLINE"
+frame duration="1" x="352" y="102" w="22" h="34" originx="0" originy="0"
+
+animation state="YELLOW_REVERSE_OUTLINE"
+frame duration="1" x="374" y="102" w="22" h="34" originx="0" originy="0"
+
+animation state="RED_DRAW_2_FILLED"
+frame duration="1" x="396" y="102" w="22" h="34" originx="0" originy="0"
+
+animation state="BLUE_DRAW_2_FILLED"
+frame duration="1" x="418" y="102" w="22" h="34" originx="0" originy="0"
+
+animation state="GREEN_DRAW_2_FILLED"
+frame duration="1" x="440" y="102" w="22" h="34" originx="0" originy="0"
+
+animation state="YELLOW_DRAW_2_FILLED"
+frame duration="1" x="462" y="102" w="22" h="34" originx="0" originy="0"
+
+animation state="RED_DRAW_2_OUTLINE"
+frame duration="1" x="484" y="102" w="22" h="34" originx="0" originy="0"
+
+animation state="BLUE_DRAW_2_OUTLINE"
+frame duration="1" x="506" y="102" w="22" h="34" originx="0" originy="0"
+
+animation state="GREEN_DRAW_2_OUTLINE"
+frame duration="1" x="528" y="102" w="22" h="34" originx="0" originy="0"
+
+animation state="YELLOW_DRAW_2_OUTLINE"
+frame duration="1" x="550" y="102" w="22" h="34" originx="0" originy="0"

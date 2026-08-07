@@ -65,6 +65,22 @@ local function is_blackjack_open(pid)
   return false
 end
 
+local function is_uno_open(pid)
+  local Uno = rawget(_G, "UNO")
+  if type(Uno) == "table" and type(Uno.is_open_for) == "function" then
+    local ok, open = pcall(Uno.is_open_for, pid)
+    if ok and open then return true end
+  end
+
+  local f = rawget(_G, "uno_ui_is_open")
+  if type(f) == "function" then
+    local ok, open = pcall(f, pid)
+    if ok and open then return true end
+  end
+
+  return false
+end
+
 local function is_lobby_open(pid)
   local Lobby = rawget(_G, "Lobby")
   if type(Lobby) == "table" and type(Lobby.is_open_for) == "function" then
@@ -122,11 +138,15 @@ local function is_modal_open(pid)
       or is_slots_open(pid)
       or is_blackjack_open(pid)
       or is_duel_open(pid)
+      or is_uno_open(pid)
       or is_lobby_open(pid)
       or is_prompt_vertical_open(pid)
       or is_menuapi_open(pid)
 end
 
+function LMenu.is_modal_open_for(pid)
+  return is_modal_open(pid)
+end
 
 
 -- ---------------------------------------------------------------------------
