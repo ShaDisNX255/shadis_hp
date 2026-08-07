@@ -285,11 +285,7 @@
    </properties>
    <point/>
   </object>
-  <object id="111" name="UNO" type="UNO Table" gid="2147484012" x="441" y="484" width="68" height="58">
-   <properties>
-    <property name="Blackjack" type="bool" value="true"/>
-   </properties>
-  </object>
+  <object id="111" name="UNO" type="UNO Table" gid="2147484012" x="441" y="484" width="68" height="58"/>
   <object id="112" name="Dealer Prog" type="NPC" x="400" y="464">
    <properties>
     <property name="Asset Name" value="ProgDealer"/>
