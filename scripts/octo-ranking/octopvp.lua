@@ -668,7 +668,7 @@ local function is_tour_active(pid)
   return type(s) == "table" and s.active == true
 end
 
-local function is_actor_interaction_blocked(pid)
+local function is_actor_interaction_blocked(pid, opts)
   local LMenu = rawget(_G, "LMenu")
 
   if type(LMenu) == "table" then
@@ -680,7 +680,12 @@ local function is_actor_interaction_blocked(pid)
     end
 
     if type(LMenu.is_modal_open_for) == "function" then
-      local ok, blocked = pcall(LMenu.is_modal_open_for, pid)
+      local ok, blocked = pcall(
+        LMenu.is_modal_open_for,
+        pid,
+        opts
+      )
+
       if ok and blocked then
         return true
       end
@@ -1229,7 +1234,11 @@ open_actor_interaction_menuapi = function(player_id, actor_id, opts)
 
       -- Re-check at selection time in case either player's state
       -- changed after this actor menu was originally opened.
-      if is_actor_interaction_blocked(pid)
+      if is_actor_interaction_blocked(pid, {
+          -- The sender's currently open actor menu is itself MenuAPI,
+          -- so don't treat that specific fact as a reason to block them.
+          ignore_menuapi = true,
+        })
         or is_actor_interaction_blocked(actor_id)
       then
         close_menuapi(pid, "player_busy")

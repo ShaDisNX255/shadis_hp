@@ -133,7 +133,9 @@ local function is_tour_active(pid)
   return type(s) == "table" and s.active == true
 end
 
-local function is_modal_open(pid)
+local function is_modal_open(pid, opts)
+  opts = opts or {}
+
   return is_tour_active(pid)
       or is_slots_open(pid)
       or is_blackjack_open(pid)
@@ -141,11 +143,14 @@ local function is_modal_open(pid)
       or is_uno_open(pid)
       or is_lobby_open(pid)
       or is_prompt_vertical_open(pid)
-      or is_menuapi_open(pid)
+      or (
+        not opts.ignore_menuapi
+        and is_menuapi_open(pid)
+      )
 end
 
-function LMenu.is_modal_open_for(pid)
-  return is_modal_open(pid)
+function LMenu.is_modal_open_for(pid, opts)
+  return is_modal_open(pid, opts)
 end
 
 
