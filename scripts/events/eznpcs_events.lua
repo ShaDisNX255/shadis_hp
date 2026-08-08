@@ -5784,11 +5784,9 @@ eznpcs.add_event{
           { "TourGuide4", "TourPlayer4", 1.8 },
         })
 
-        await(guide_says("This is the General BBS and tournament board area."))
+        await(guide_says("This is the General BBS and the UNO table."))
         await(guide_says("The General BBS is where players can leave messages and chat freely."))
-        await(guide_says("Tournament boards host hourly tournaments that anyone can join."))
-        await(guide_says("Any empty tournament slots are filled by NetNavis, so you can still play even if there are not enough players."))
-        await(guide_says("Winning tournament matches can earn you money and RP."))
+        await(guide_says("The UNO table is here in case you just want to relax and play a few friendly games of UNO "))
       end)
 
       add_block(function()

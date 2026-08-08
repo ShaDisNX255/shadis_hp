@@ -37,6 +37,7 @@
  <tileset firstgid="398" source="../assets/objects/pokemon_mid_72x96_72x96.tsx"/>
  <tileset firstgid="422" source="../assets/objects/pokemon_pairs_128x96_128x96.tsx"/>
  <tileset firstgid="428" source="../assets/objects/midrug_72x96_72x96.tsx"/>
+ <tileset firstgid="429" source="../assets/uno/uno_table_new.tsx"/>
  <layer id="1" name="Tile Layer 1" width="30" height="30">
   <data encoding="csv">
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -285,8 +286,8 @@
    </properties>
    <point/>
   </object>
-  <object id="111" name="UNO" type="UNO Table" gid="2147484012" x="441" y="484" width="68" height="58"/>
-  <object id="112" name="Dealer Prog" type="NPC" x="400" y="464">
+  <object id="111" name="UNO" type="UNO Table" gid="2147484077" x="411" y="481" width="66" height="58"/>
+  <object id="112" name="Dealer Prog" type="NPC" x="399.5" y="464.5">
    <properties>
     <property name="Asset Name" value="ProgDealer"/>
     <property name="Dialogue Type" value="first"/>
