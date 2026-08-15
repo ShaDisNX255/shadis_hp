@@ -1,0 +1,209 @@
+animation state="ICON_1"
+frame duration="0.1" x="0" y="0" w="14" h="14" originx="0" originy="0"
+
+animation state="ICON_2"
+frame duration="0.1" x="14" y="0" w="14" h="14" originx="0" originy="0"
+
+animation state="ICON_3"
+frame duration="0.1" x="28" y="0" w="14" h="14" originx="0" originy="0"
+
+animation state="ICON_4"
+frame duration="0.1" x="42" y="0" w="14" h="14" originx="0" originy="0"
+
+animation state="ICON_5"
+frame duration="0.1" x="56" y="0" w="14" h="14" originx="0" originy="0"
+
+animation state="ICON_6"
+frame duration="0.1" x="0" y="14" w="14" h="14" originx="0" originy="0"
+
+animation state="ICON_7"
+frame duration="0.1" x="14" y="14" w="14" h="14" originx="0" originy="0"
+
+animation state="ICON_8"
+frame duration="0.1" x="28" y="14" w="14" h="14" originx="0" originy="0"
+
+animation state="ICON_9"
+frame duration="0.1" x="42" y="14" w="14" h="14" originx="0" originy="0"
+
+animation state="ICON_10"
+frame duration="0.1" x="56" y="14" w="14" h="14" originx="0" originy="0"
+
+animation state="ICON_11"
+frame duration="0.1" x="0" y="28" w="14" h="14" originx="0" originy="0"
+
+animation state="ICON_12"
+frame duration="0.1" x="14" y="28" w="14" h="14" originx="0" originy="0"
+
+animation state="ICON_13"
+frame duration="0.1" x="28" y="28" w="14" h="14" originx="0" originy="0"
+
+animation state="ICON_14"
+frame duration="0.1" x="42" y="28" w="14" h="14" originx="0" originy="0"
+
+animation state="ICON_15"
+frame duration="0.1" x="56" y="28" w="14" h="14" originx="0" originy="0"
+
+animation state="ICON_16"
+frame duration="0.1" x="0" y="42" w="14" h="14" originx="0" originy="0"
+
+animation state="ICON_17"
+frame duration="0.1" x="14" y="42" w="14" h="14" originx="0" originy="0"
+
+animation state="ICON_18"
+frame duration="0.1" x="28" y="42" w="14" h="14" originx="0" originy="0"
+
+animation state="ICON_19"
+frame duration="0.1" x="42" y="42" w="14" h="14" originx="0" originy="0"
+
+animation state="ICON_20"
+frame duration="0.1" x="56" y="42" w="14" h="14" originx="0" originy="0"
+
+animation state="ICON_21"
+frame duration="0.1" x="0" y="56" w="14" h="14" originx="0" originy="0"
+
+animation state="ICON_22"
+frame duration="0.1" x="14" y="56" w="14" h="14" originx="0" originy="0"
+
+animation state="ICON_23"
+frame duration="0.1" x="28" y="56" w="14" h="14" originx="0" originy="0"
+
+animation state="ICON_24"
+frame duration="0.1" x="42" y="56" w="14" h="14" originx="0" originy="0"
+
+animation state="ICON_25"
+frame duration="0.1" x="56" y="56" w="14" h="14" originx="0" originy="0"
+
+animation state="ICON_26"
+frame duration="0.1" x="0" y="70" w="14" h="14" originx="0" originy="0"
+
+animation state="ICON_27"
+frame duration="0.1" x="14" y="70" w="14" h="14" originx="0" originy="0"
+
+animation state="ICON_28"
+frame duration="0.1" x="28" y="70" w="14" h="14" originx="0" originy="0"
+
+animation state="ICON_29"
+frame duration="0.1" x="42" y="70" w="14" h="14" originx="0" originy="0"
+
+animation state="ICON_30"
+frame duration="0.1" x="56" y="70" w="14" h="14" originx="0" originy="0"
+
+animation state="PREVIEW_ICON_1"
+frame duration="0.4" x="0" y="0" w="14" h="14" originx="0" originy="0"
+frame duration="0.25" x="0" y="84" w="14" h="14" originx="0" originy="0"
+
+animation state="PREVIEW_ICON_2"
+frame duration="0.4" x="14" y="0" w="14" h="14" originx="0" originy="0"
+frame duration="0.25" x="0" y="84" w="14" h="14" originx="0" originy="0"
+
+animation state="PREVIEW_ICON_3"
+frame duration="0.4" x="28" y="0" w="14" h="14" originx="0" originy="0"
+frame duration="0.25" x="0" y="84" w="14" h="14" originx="0" originy="0"
+
+animation state="PREVIEW_ICON_4"
+frame duration="0.4" x="42" y="0" w="14" h="14" originx="0" originy="0"
+frame duration="0.25" x="0" y="84" w="14" h="14" originx="0" originy="0"
+
+animation state="PREVIEW_ICON_5"
+frame duration="0.4" x="56" y="0" w="14" h="14" originx="0" originy="0"
+frame duration="0.25" x="0" y="84" w="14" h="14" originx="0" originy="0"
+
+animation state="PREVIEW_ICON_6"
+frame duration="0.4" x="0" y="14" w="14" h="14" originx="0" originy="0"
+frame duration="0.25" x="0" y="84" w="14" h="14" originx="0" originy="0"
+
+animation state="PREVIEW_ICON_7"
+frame duration="0.4" x="14" y="14" w="14" h="14" originx="0" originy="0"
+frame duration="0.25" x="0" y="84" w="14" h="14" originx="0" originy="0"
+
+animation state="PREVIEW_ICON_8"
+frame duration="0.4" x="28" y="14" w="14" h="14" originx="0" originy="0"
+frame duration="0.25" x="0" y="84" w="14" h="14" originx="0" originy="0"
+
+animation state="PREVIEW_ICON_9"
+frame duration="0.4" x="42" y="14" w="14" h="14" originx="0" originy="0"
+frame duration="0.25" x="0" y="84" w="14" h="14" originx="0" originy="0"
+
+animation state="PREVIEW_ICON_10"
+frame duration="0.4" x="56" y="14" w="14" h="14" originx="0" originy="0"
+frame duration="0.25" x="0" y="84" w="14" h="14" originx="0" originy="0"
+
+animation state="PREVIEW_ICON_11"
+frame duration="0.4" x="0" y="28" w="14" h="14" originx="0" originy="0"
+frame duration="0.25" x="0" y="84" w="14" h="14" originx="0" originy="0"
+
+animation state="PREVIEW_ICON_12"
+frame duration="0.4" x="14" y="28" w="14" h="14" originx="0" originy="0"
+frame duration="0.25" x="0" y="84" w="14" h="14" originx="0" originy="0"
+
+animation state="PREVIEW_ICON_13"
+frame duration="0.4" x="28" y="28" w="14" h="14" originx="0" originy="0"
+frame duration="0.25" x="0" y="84" w="14" h="14" originx="0" originy="0"
+
+animation state="PREVIEW_ICON_14"
+frame duration="0.4" x="42" y="28" w="14" h="14" originx="0" originy="0"
+frame duration="0.25" x="0" y="84" w="14" h="14" originx="0" originy="0"
+
+animation state="PREVIEW_ICON_15"
+frame duration="0.4" x="56" y="28" w="14" h="14" originx="0" originy="0"
+frame duration="0.25" x="0" y="84" w="14" h="14" originx="0" originy="0"
+
+animation state="PREVIEW_ICON_16"
+frame duration="0.4" x="0" y="42" w="14" h="14" originx="0" originy="0"
+frame duration="0.25" x="0" y="84" w="14" h="14" originx="0" originy="0"
+
+animation state="PREVIEW_ICON_17"
+frame duration="0.4" x="14" y="42" w="14" h="14" originx="0" originy="0"
+frame duration="0.25" x="0" y="84" w="14" h="14" originx="0" originy="0"
+
+animation state="PREVIEW_ICON_18"
+frame duration="0.4" x="28" y="42" w="14" h="14" originx="0" originy="0"
+frame duration="0.25" x="0" y="84" w="14" h="14" originx="0" originy="0"
+
+animation state="PREVIEW_ICON_19"
+frame duration="0.4" x="42" y="42" w="14" h="14" originx="0" originy="0"
+frame duration="0.25" x="0" y="84" w="14" h="14" originx="0" originy="0"
+
+animation state="PREVIEW_ICON_20"
+frame duration="0.4" x="56" y="42" w="14" h="14" originx="0" originy="0"
+frame duration="0.25" x="0" y="84" w="14" h="14" originx="0" originy="0"
+
+animation state="PREVIEW_ICON_21"
+frame duration="0.4" x="0" y="56" w="14" h="14" originx="0" originy="0"
+frame duration="0.25" x="0" y="84" w="14" h="14" originx="0" originy="0"
+
+animation state="PREVIEW_ICON_22"
+frame duration="0.4" x="14" y="56" w="14" h="14" originx="0" originy="0"
+frame duration="0.25" x="0" y="84" w="14" h="14" originx="0" originy="0"
+
+animation state="PREVIEW_ICON_23"
+frame duration="0.4" x="28" y="56" w="14" h="14" originx="0" originy="0"
+frame duration="0.25" x="0" y="84" w="14" h="14" originx="0" originy="0"
+
+animation state="PREVIEW_ICON_24"
+frame duration="0.4" x="42" y="56" w="14" h="14" originx="0" originy="0"
+frame duration="0.25" x="0" y="84" w="14" h="14" originx="0" originy="0"
+
+animation state="PREVIEW_ICON_25"
+frame duration="0.4" x="56" y="56" w="14" h="14" originx="0" originy="0"
+frame duration="0.25" x="0" y="84" w="14" h="14" originx="0" originy="0"
+
+animation state="PREVIEW_ICON_26"
+frame duration="0.4" x="0" y="70" w="14" h="14" originx="0" originy="0"
+frame duration="0.25" x="0" y="84" w="14" h="14" originx="0" originy="0"
+
+animation state="PREVIEW_ICON_27"
+frame duration="0.4" x="14" y="70" w="14" h="14" originx="0" originy="0"
+frame duration="0.25" x="0" y="84" w="14" h="14" originx="0" originy="0"
+
+animation state="PREVIEW_ICON_28"
+frame duration="0.4" x="28" y="70" w="14" h="14" originx="0" originy="0"
+frame duration="0.25" x="0" y="84" w="14" h="14" originx="0" originy="0"
+
+animation state="PREVIEW_ICON_29"
+frame duration="0.4" x="42" y="70" w="14" h="14" originx="0" originy="0"
+frame duration="0.25" x="0" y="84" w="14" h="14" originx="0" originy="0"
+
+animation state="PREVIEW_ICON_30"
+frame duration="0.4" x="56" y="70" w="14" h="14" originx="0" originy="0"
+frame duration="0.25" x="0" y="84" w="14" h="14" originx="0" originy="0"

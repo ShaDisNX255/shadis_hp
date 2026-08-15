@@ -81,6 +81,13 @@ local cfg = {
   menu4_anim = nil,
   menu4_state = "",
 
+  menu5_texture = "/server/assets/ui/menuAPI/menu5.png",
+  menu5_anim = nil,
+  menu5_state = "",
+
+  petcust_icons_texture = "/server/assets/ui/menuAPI/petcust_icons.png",
+  petcust_icons_anim = "/server/assets/ui/menuAPI/petcust_icons.animation",
+
   spbar_texture = "/server/assets/ui/menuAPI/SPBar.png",
   spbar_anim = "/server/assets/ui/menuAPI/SPBar.animation",
   spbar_state = "sp_01",
@@ -694,8 +701,61 @@ local function draw_vertical_rows(pid, st, skip_title)
     local y_rel = row_y + ((i - 1) * row_advance)
 
     if row then
-      local text_x, text_y = rel(st, row_x, y_rel)
-      local display = truncate(row_text(row), st.row_max_ch or layout.row_max_ch or 20)
+      local effective_row_x = row.text_x or row_x
+
+      if row.icon_texture and row.icon_texture ~= "" then
+        local icon_x =
+          row.icon_x
+          or layout.row_icon_x
+          or row_x
+
+        local icon_y_offset =
+          row.icon_y_offset
+          or layout.row_icon_y_offset
+          or 0
+
+        local icon_scale =
+          row.icon_scale
+          or layout.row_icon_scale
+          or 1.0
+
+        local ix, iy = rel(
+          st,
+          icon_x,
+          y_rel + icon_y_offset
+        )
+
+        add_sprite(
+          pid,
+          st,
+          "row_icon_" .. tostring(i),
+          row.icon_texture,
+          row.icon_anim,
+          row.icon_state or "",
+          ix,
+          iy,
+          row.icon_z or ((st.z or layout.z or 0) + 7),
+          icon_scale,
+          icon_scale,
+          row.icon_tint
+        )
+
+        effective_row_x =
+          row.text_x
+          or layout.row_icon_text_x
+          or row_x
+      end
+
+      local text_x, text_y = rel(
+        st,
+        effective_row_x,
+        y_rel
+      )
+
+      local display = truncate(
+        row_text(row),
+        st.row_max_ch or layout.row_max_ch or 20
+      )
 
       if row_selectable(row) == false and row.disabled_prefix ~= false then
         display = truncate("- " .. str_trim(display), st.row_max_ch or layout.row_max_ch or 20)
@@ -899,6 +959,11 @@ local function draw_profile_card(pid, st)
   local pz = st.profile_z or layout.profile_z or (st.z or layout.z or 220)
   local scale = st.profile_scale or layout.profile_scale or 2.0
 
+  local profile_bg_tint = st.profile_bg_tint
+  if profile_bg_tint == nil then
+    profile_bg_tint = st.bg_tint
+  end
+
   add_sprite(
     pid,
     st,
@@ -911,7 +976,7 @@ local function draw_profile_card(pid, st)
     pz,
     scale,
     scale,
-    st.bg_tint
+    profile_bg_tint
   )
 
   local mug_texture = profile.mug_texture
@@ -1083,6 +1148,160 @@ local function draw_profile_friends_sp_menu(pid, st)
   local pz = st.profile_z or layout.profile_z or (st.z or layout.z or 220)
 
   draw_sp_gauge(pid, st, px, py, pz)
+end
+
+local PET_CUSTOMIZER_SLOT_X = {
+  15,
+  35,
+  55,
+}
+
+local PET_CUSTOMIZER_SLOT_Y = {
+  13,
+  33,
+  54,
+}
+
+local function pet_customizer_slot_position(index)
+  index = math.max(
+    1,
+    math.floor(tonumber(index) or 1)
+  )
+
+  local col = ((index - 1) % 3) + 1
+  local row = math.floor((index - 1) / 3) + 1
+
+  local x = PET_CUSTOMIZER_SLOT_X[col]
+  local y
+
+  if row <= #PET_CUSTOMIZER_SLOT_Y then
+    y = PET_CUSTOMIZER_SLOT_Y[row]
+  else
+    -- Continue below the actual 3x3 Customizer.
+    -- A full board + a 9-space preview can reach row 6.
+    y =
+      PET_CUSTOMIZER_SLOT_Y[#PET_CUSTOMIZER_SLOT_Y]
+      + ((row - #PET_CUSTOMIZER_SLOT_Y) * 20)
+  end
+
+  return x, y
+end
+
+local function draw_pet_customizer_menu(pid, st)
+  local layout = st.layout or {}
+
+  draw_profile_friends_menu(pid, st)
+
+  local customizer = st.customizer or {}
+  local slots = customizer.slots or {}
+  local preview_slots = customizer.preview_slots or {}
+
+  local panel_x =
+    st.profile_x or layout.profile_x or 144
+
+  local panel_y =
+    st.profile_y or layout.profile_y or 20
+
+  local panel_z =
+    st.profile_z
+    or layout.profile_z
+    or (st.z or layout.z or 220)
+
+  local panel_scale =
+    st.profile_scale
+    or layout.profile_scale
+    or 2.0
+
+  local icon_texture =
+    customizer.icon_texture
+    or layout.customizer_icon_texture
+    or cfg.petcust_icons_texture
+
+  local icon_anim =
+    customizer.icon_anim
+    or layout.customizer_icon_anim
+    or cfg.petcust_icons_anim
+
+  local icon_scale =
+    tonumber(customizer.icon_scale)
+    or panel_scale
+
+  local icon_z_offset =
+    tonumber(customizer.icon_z_offset)
+    or layout.customizer_icon_z_offset
+    or 8
+
+  -- Installed programs.
+  for i = 1, math.min(#slots, 9) do
+    local slot = slots[i]
+    local icon = 0
+    local tint = nil
+
+    if type(slot) == "table" then
+      icon = math.floor(tonumber(slot.icon) or 0)
+      tint = slot.tint
+    else
+      icon = math.floor(tonumber(slot) or 0)
+    end
+
+    if icon > 0 then
+      local x, y =
+        pet_customizer_slot_position(i)
+
+      add_sprite(
+        pid,
+        st,
+        "petcust_slot_" .. tostring(i),
+        icon_texture,
+        icon_anim,
+        "ICON_" .. tostring(icon),
+        panel_x + x,
+        panel_y + y,
+        panel_z + icon_z_offset,
+        icon_scale,
+        icon_scale,
+        tint
+      )
+    end
+  end
+
+  -- Highlight preview.
+  --
+  -- Slots 1-9 stay over the real Customizer.
+  -- Slots 10-18 continue into temporary overflow rows below it.
+  for i, slot in ipairs(preview_slots) do
+    if type(slot) == "table" then
+      local slot_index =
+        math.floor(tonumber(slot.slot_index) or 0)
+
+      local icon =
+        math.floor(tonumber(slot.icon) or 0)
+
+      if
+        slot_index >= 1
+        and slot_index <= 18
+        and icon > 0
+      then
+        local x, y =
+          pet_customizer_slot_position(slot_index)
+
+        add_sprite(
+          pid,
+          st,
+          "petcust_preview_" .. tostring(i),
+          icon_texture,
+          icon_anim,
+          "PREVIEW_ICON_" .. tostring(icon),
+          panel_x + x,
+          panel_y + y,
+          panel_z + icon_z_offset + 1,
+          icon_scale,
+          icon_scale,
+          slot.tint
+        )
+      end
+    end
+  end
 end
 
 local function draw_sp_gauge_popup(pid, st)
@@ -1315,6 +1534,11 @@ local function clear_visible_row_text(pid, st)
   for i = 1, visible do
     erase_text(pid, text_id_for_key(st, "row_" .. tostring(i)))
     erase_text(pid, text_id_for_key(st, "right_" .. tostring(i)))
+
+    safe_remove(
+      sprite_id_for_key(st, "row_icon_" .. tostring(i)),
+      pid
+    )
   end
 end
 
@@ -1323,7 +1547,7 @@ local function with_vertical_list_origin(st, fn)
 
   -- Type 5 draws its selectable list inside the list panel, not at the
   -- profile card origin. Match draw_profile_friends_menu's temporary origin.
-  if st.type ~= 5 and st.type ~= 6 then
+  if st.type ~= 5 and st.type ~= 6 and st.type ~= 9 then
     fn()
     return
   end
@@ -1798,6 +2022,83 @@ local MENU_TYPES = {
 
     draw = draw_chip_reward_popup,
   },
+  [9] = {
+    name = "pet_customizer",
+    kind = "vertical",
+    vertical_input = true,
+    cursor_enabled = true,
+    scroll_enabled = true,
+    show_right = true,
+
+    layout = {
+      profile_texture = cfg.menu5_texture,
+      profile_anim = cfg.menu5_anim,
+      profile_state = cfg.menu5_state,
+      profile_x = 150,
+      profile_y = 40,
+      profile_z = 220,
+      profile_scale = 2.0,
+
+      customizer_icon_texture = cfg.petcust_icons_texture,
+      customizer_icon_anim = cfg.petcust_icons_anim,
+      customizer_icon_z_offset = 8,
+
+      list_texture = "/server/assets/ui/menuAPI/menu1.png",
+      list_anim = nil,
+      list_state = "",
+      list_x = 2,
+      list_y = 20,
+      list_z = 10,
+      list_scale = 2.0,
+
+      title_x = 17,
+      title_y = 1,
+      title_font = "THICK",
+      title_scale = 1.5,
+      title_max_ch = 18,
+
+      row_x = 13,
+      row_y = 16,
+      row_font = "THICK",
+      row_scale = 1.5,
+      row_advance = 13,
+      visible_rows = 8,
+      row_max_ch = 14,
+
+
+      -- PetCustomizer list preview icons.
+      -- Field icons use 2.0 scale, so 1.5 is 75% of that size.
+      row_icon_x = 11,
+      row_icon_y_offset = -1,
+      row_icon_scale = 1.5,
+
+      -- Program text begins after the preview icon.
+      row_icon_text_x = 25,
+
+      right_x = 96,
+      right_font = "THICK",
+      right_scale = 1.5,
+      right_max_ch = 6,
+
+      cursor_texture = "/server/assets/ui/menuAPI/cursor.png",
+      cursor_anim = nil,
+      cursor_state = "",
+      cursor_x = 1,
+      cursor_y_offset = -2,
+      cursor_scale = 2.0,
+
+      scroll_texture = "/server/assets/ui/menuAPI/scroll.png",
+      scroll_anim = nil,
+      scroll_state = "",
+      scroll_x = 131,
+      scroll_top_y = 11,
+      scroll_bottom_y = 106,
+      scroll_h = 13,
+      scroll_scale = 2.0,
+    },
+
+    draw = draw_pet_customizer_menu,
+  },
 }
 
 MenuAPI.menu_types = MENU_TYPES
@@ -1922,6 +2223,7 @@ local function build_state(pid, spec, menu_type, def)
 
     title = spec.title or "Menu",
     profile = spec.profile or {},
+    customizer = spec.customizer or {},
     rows = rows,
     cursor = cursor,
     top_index = tonumber(spec.top_index) or 1,
@@ -1936,6 +2238,9 @@ local function build_state(pid, spec, menu_type, def)
     on_confirm = spec.on_confirm,
     on_cancel = spec.on_cancel,
     on_close = spec.on_close,
+
+    on_left = spec.on_left,
+    on_right = spec.on_right,
 
     -- Optional callback when the highlighted row changes.
     -- Signature: on_cursor_change(pid, row, st, old_row)
@@ -1956,6 +2261,7 @@ local function build_state(pid, spec, menu_type, def)
     row_tint = spec.row_tint or palette.row_tint,
     right_tint = spec.right_tint or palette.right_tint,
     bg_tint = spec.bg_tint or palette.bg_tint,
+    profile_bg_tint = spec.profile_bg_tint,
 
     lines = spec.lines or spec.type4_lines,
     choice = tostring(spec.default_choice or spec.choice or "no"):lower() == "yes" and "yes" or "no",
@@ -3075,6 +3381,41 @@ local function handle_button(pid, btn, kind)
       return move_horizontal_choice(pid, btn == "L" and "yes" or "no")
     end
     return true
+  end
+
+  if
+    st.kind == "vertical"
+    and kind == "press"
+    and (btn == "L" or btn == "R")
+  then
+    local callback =
+      (btn == "L")
+      and st.on_left
+      or st.on_right
+
+    if type(callback) == "function" then
+      local row =
+        st.rows
+        and st.rows[st.cursor]
+        or nil
+
+      local ok, handled =
+        pcall(
+          callback,
+          pid,
+          row,
+          st
+        )
+
+      if not ok then
+        log(
+          "horizontal callback failed:",
+          tostring(handled)
+        )
+      end
+
+      return true
+    end
   end
 
   if st.kind == "vertical" and (btn == "U" or btn == "D") then

@@ -14,6 +14,12 @@ if not FriendsOK then
   Friends = nil
 end
 
+local PetDuelsOK, PetDuels = pcall(require, "scripts/ezlibs-custom/petduels")
+if not PetDuelsOK then
+  print("[octo] PetDuels load failed:", tostring(PetDuels))
+  PetDuels = nil
+end
+
 --defaults
 local ranks_open  = {}
 local ranks_wcity = {}
@@ -25,6 +31,8 @@ local area_is_wcity = {["default"] = false}
 local player_challenges = {}
 local battle_requests = {}
 local battle_request_cooldowns = {}
+local pet_duel_requests = {}
+local pet_duel_request_cooldowns = {}
 local friend_requests = {}
 local friend_request_cooldowns = {}
 local actor_menu_target_by_pid = {}
@@ -445,6 +453,29 @@ local function get_menuapi()
   return MenuAPI
 end
 
+local function show_octopvp_message(pid, text, box_id)
+  local MenuAPI = get_menuapi()
+
+  if MenuAPI and type(MenuAPI.show_message) == "function" then
+    local ok, shown = pcall(
+      MenuAPI.show_message,
+      pid,
+      tostring(text or ""),
+      {
+        box_id = box_id or "octopvp_message",
+        speed = 80,
+        z = 300,
+      }
+    )
+
+    if ok and shown then
+      return true
+    end
+  end
+
+  return false
+end
+
 local function unlock_player_after_lmenu(pid)
   if Net and Net.unlock_player_input then
     pcall(Net.unlock_player_input, pid)
@@ -768,6 +799,8 @@ end
 local function cleanup_requests_for_player(player_id)
   battle_requests[player_id] = nil
   battle_request_cooldowns[player_id] = nil
+  pet_duel_requests[player_id] = nil
+  pet_duel_request_cooldowns[player_id] = nil
   friend_requests[player_id] = nil
   friend_request_cooldowns[player_id] = nil
   actor_menu_target_by_pid[player_id] = nil
@@ -775,6 +808,12 @@ local function cleanup_requests_for_player(player_id)
   for sender, target in pairs(battle_requests) do
     if target == player_id then
       battle_requests[sender] = nil
+    end
+  end
+
+  for sender, target in pairs(pet_duel_requests) do
+    if target == player_id then
+      pet_duel_requests[sender] = nil
     end
   end
 
@@ -797,6 +836,12 @@ local function cleanup_requests_for_player(player_id)
   for key in pairs(battle_request_cooldowns) do
     if request_key_involves_player(key, player_id) then
       battle_request_cooldowns[key] = nil
+    end
+  end
+
+  for key in pairs(pet_duel_request_cooldowns) do
+    if request_key_involves_player(key, player_id) then
+      pet_duel_request_cooldowns[key] = nil
     end
   end
 
@@ -917,6 +962,188 @@ local function send_battle_request(sender, target, mode)
 
     on_cancel = function(target_pid)
       reject_battle_request(sender, target_pid, "battle_request_cancel")
+      return true
+    end,
+  })
+
+  return true
+end
+
+local function cooldown_pet_duel_request(sender, target)
+  local key = request_key(sender, target)
+  pet_duel_request_cooldowns[key] = true
+
+  if Async and Async.sleep then
+    Async.sleep(5).and_then(function()
+      pet_duel_request_cooldowns[key] = nil
+      refresh_actor_menu_if_open(sender, target)
+    end)
+  else
+    pet_duel_request_cooldowns[key] = nil
+  end
+end
+
+local function reject_pet_duel_request(sender, target, reason)
+  if pet_duel_requests[sender] == target then
+    pet_duel_requests[sender] = nil
+  end
+
+  close_menuapi(target, reason or "pet_duel_request_rejected")
+  cooldown_pet_duel_request(sender, target)
+
+  refresh_actor_menu_if_open(sender, target)
+  refresh_actor_menu_if_open(target, sender)
+end
+
+local function accept_pet_duel_request(sender, target)
+  if pet_duel_requests[sender] ~= target then
+    close_menuapi(target, "pet_duel_request_missing")
+    return true
+  end
+
+  if not PetDuels or type(PetDuels.start) ~= "function" then
+    pet_duel_requests[sender] = nil
+    close_menuapi(target, "pet_duel_unavailable")
+    Net.message_player(target, "Pet Duel system is not available.")
+    return true
+  end
+
+  if type(PetDuels.can_request) == "function" then
+    local can_start, reason = PetDuels.can_request(target, sender)
+
+    if not can_start then
+      pet_duel_requests[sender] = nil
+      close_menuapi(target, "pet_duel_not_available")
+      close_menuapi(sender, "pet_duel_not_available")
+
+      Net.message_player(
+        target,
+        reason or "Pet Duel is no longer available."
+      )
+
+      if is_real_player(sender) then
+        Net.message_player(sender, "Pet Duel is no longer available.")
+      end
+
+      refresh_actor_menu_if_open(sender, target)
+      refresh_actor_menu_if_open(target, sender)
+      return true
+    end
+  end
+
+  pet_duel_requests[sender] = nil
+  pet_duel_request_cooldowns[request_key(sender, target)] = nil
+
+  close_menuapi(target, "pet_duel_request_accept")
+  close_menuapi(sender, "pet_duel_request_accept")
+
+  actor_menu_target_by_pid[sender] = nil
+  actor_menu_target_by_pid[target] = nil
+
+  clear_player_matchmaking(sender)
+  clear_player_matchmaking(target)
+
+  PetDuels.start(target, sender)
+  return true
+end
+
+local function send_pet_duel_request(sender, target)
+  if not (is_real_player(sender) and is_real_player(target)) then
+    return true
+  end
+
+  if not PetDuels
+    or type(PetDuels.can_request) ~= "function"
+    or type(PetDuels.start) ~= "function"
+  then
+    Net.message_player(sender, "Pet Duel system is not available.")
+    return true
+  end
+
+  local key = request_key(sender, target)
+
+  if pet_duel_requests[sender] == target
+    or pet_duel_request_cooldowns[key]
+  then
+    return true
+  end
+
+  local can_request, reason = PetDuels.can_request(sender, target)
+
+  if not can_request then
+    show_octopvp_message(
+      sender,
+      reason or "Pet Duel is not available right now.",
+      "pet_duel_unavailable"
+    )
+
+    return true
+  end
+
+  pet_duel_requests[sender] = target
+  clear_player_matchmaking(sender)
+
+  local sender_name = short_name(Net.get_player_name(sender), 16)
+
+  if Net.exclusive_player_emote then
+    pcall(Net.exclusive_player_emote, target, sender, 7)
+    pcall(Net.exclusive_player_emote, sender, sender, 7)
+  end
+
+  refresh_actor_menu_if_open(sender, target)
+
+  local MenuAPI = get_menuapi()
+
+  if not (MenuAPI and type(MenuAPI.open) == "function") then
+    Net.message_player(
+      target,
+      sender_name .. " sent you a pet duel request."
+    )
+    return true
+  end
+
+  close_lmenu_before_request_popup(target)
+
+  MenuAPI.open(target, {
+    type = 4,
+    title = "Pet Duel Request",
+    color = "purple",
+    open_sfx = "screen_open",
+    lock_input = true,
+
+    lines = {
+      sender_name .. " sent you",
+      "a pet duel request.",
+      "Accept?",
+    },
+
+    default_choice = "no",
+    yes_text = "Yes",
+    no_text = "No",
+
+    on_confirm = function(target_pid, row)
+      local choice = tostring(row and row.id or "no")
+
+      if choice == "yes" then
+        return accept_pet_duel_request(sender, target_pid)
+      end
+
+      reject_pet_duel_request(
+        sender,
+        target_pid,
+        "pet_duel_request_no"
+      )
+
+      return true
+    end,
+
+    on_cancel = function(target_pid)
+      reject_pet_duel_request(
+        sender,
+        target_pid,
+        "pet_duel_request_cancel"
+      )
+
       return true
     end,
   })
@@ -1160,6 +1387,18 @@ local function build_actor_rows(player_id, actor_id)
     friend_selectable = true
   end
 
+  local pet_duel_text = "Request Pet Duel"
+  local pet_duel_selectable = true
+
+  if pet_duel_requests[actor_id] == player_id then
+    pet_duel_text = "Accept Pet Duel"
+  elseif pet_duel_requests[player_id] == actor_id
+    or pet_duel_request_cooldowns[request_key(player_id, actor_id)]
+  then
+    pet_duel_text = "Pet Duel Sent"
+    pet_duel_selectable = false
+  end
+
   return {
     {
       id = "battle",
@@ -1176,7 +1415,14 @@ local function build_actor_rows(player_id, actor_id)
       disabled_prefix = false,
     },
     { id = "pat", text = "Pat", show_right = false },
-    { id = "duel", text = "Request Duel", show_right = false },
+    {
+      id = "duel",
+      text = pet_duel_text,
+      selectable = pet_duel_selectable,
+      enabled = pet_duel_selectable,
+      disabled_prefix = false,
+      show_right = false,
+    },
   }
 end
 
@@ -1267,16 +1513,11 @@ open_actor_interaction_menuapi = function(player_id, actor_id, opts)
       end
 
       if id == "duel" then
-        local MenuAPI2 = get_menuapi()
-        if MenuAPI2 and type(MenuAPI2.show_message) == "function" then
-          MenuAPI2.show_message(pid, "Duel requests are WIP.", {
-            box_id = "duel_wip",
-            speed = 80,
-          })
-        else
-          Net.message_player(pid, "Duel requests are WIP.")
+        if pet_duel_requests[actor_id] == pid then
+          return accept_pet_duel_request(actor_id, pid)
         end
-        return true
+
+        return send_pet_duel_request(pid, actor_id)
       end
 
       return true

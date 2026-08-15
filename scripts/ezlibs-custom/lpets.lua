@@ -20,6 +20,16 @@ if not PetsOK then
   Pets = nil
 end
 
+local EZMemoryOK, ezmemory =
+  pcall(
+    require,
+    "scripts/ezlibs-scripts/ezmemory"
+  )
+
+if not EZMemoryOK then
+  ezmemory = nil
+end
+
 -- ---------------------------------------------------------------------------
 -- Logging
 -- ---------------------------------------------------------------------------
@@ -57,6 +67,7 @@ local LAST_MAIN_ROW_ID_BY_PID = {}
 local LAST_PICKER_ROW_ID_BY_PID = {}
 local LAST_CHIP_ROW_ID_BY_PID = {}
 local LAST_XP_ROW_ID_BY_PID = {}
+local LAST_CUSTOMIZER_ROW_ID_BY_PID = {}
 
 local function get_menuapi()
   local M = rawget(_G, "MenuAPI") or MenuAPI
@@ -166,6 +177,15 @@ local function row(id, text, right, opts)
     enabled = opts.enabled ~= false,
     disabled_prefix = opts.disabled_prefix,
     data = opts.data,
+
+    icon_texture = opts.icon_texture,
+    icon_anim = opts.icon_anim,
+    icon_state = opts.icon_state,
+    icon_tint = opts.icon_tint,
+    icon_scale = opts.icon_scale,
+    icon_x = opts.icon_x,
+    icon_y_offset = opts.icon_y_offset,
+    text_x = opts.text_x,
   }
 end
 
@@ -293,6 +313,1012 @@ local function provide_pet_visual(pid, texture, anim)
 
   if texture and texture ~= "" then pcall(Net.provide_asset, area_id, texture) end
   if anim and anim ~= "" then pcall(Net.provide_asset, area_id, anim) end
+end
+
+local PET_CUSTOMIZER_MENU_TEXTURE =
+  "/server/assets/ui/menuAPI/menu5.png"
+
+local PET_CUSTOMIZER_ICON_TEXTURE =
+  "/server/assets/ui/menuAPI/petcust_icons.png"
+
+local PET_CUSTOMIZER_ICON_ANIM =
+  "/server/assets/ui/menuAPI/petcust_icons.animation"
+
+local PET_CUSTOMIZER_MAX_SPACES = 9
+
+local PET_CUSTOMIZER_ELEMENT_TINTS = {
+  wood = {
+    r = 70,
+    g = 200,
+    b = 80,
+    color_mode = 2,
+  },
+
+  fire = {
+    r = 220,
+    g = 70,
+    b = 55,
+    color_mode = 2,
+  },
+
+  elec = {
+    r = 235,
+    g = 205,
+    b = 55,
+    color_mode = 2,
+  },
+
+  aqua = {
+    r = 70,
+    g = 185,
+    b = 225,
+    color_mode = 2,
+  },
+}
+
+local PET_CUSTOMIZER_HP_TIERS = {
+  {
+    hp = 50,
+    icon = 24,
+    spaces = 1,
+  },
+
+  {
+    hp = 100,
+    icon = 25,
+    spaces = 2,
+  },
+
+  {
+    hp = 200,
+    icon = 26,
+    spaces = 4,
+  },
+
+  {
+    hp = 300,
+    icon = 27,
+    spaces = 6,
+  },
+
+  {
+    hp = 400,
+    icon = 28,
+    spaces = 8,
+  },
+
+  {
+    hp = 500,
+    icon = 29,
+    spaces = 9,
+  },
+}
+
+local PET_CUSTOMIZER_ELEMENT_ORDER = {
+  "wood",
+  "fire",
+  "elec",
+  "aqua",
+}
+
+local PET_CUSTOMIZER_PARTS = {}
+
+for _, tier in ipairs(PET_CUSTOMIZER_HP_TIERS) do
+  for _, element in ipairs(PET_CUSTOMIZER_ELEMENT_ORDER) do
+    PET_CUSTOMIZER_PARTS[#PET_CUSTOMIZER_PARTS + 1] = {
+      id =
+        "hp"
+        .. tostring(tier.hp)
+        .. "_"
+        .. tostring(element),
+
+      name = "HP+" .. tostring(tier.hp),
+
+      hp_bonus = tier.hp,
+      element = element,
+      icon = tier.icon,
+      spaces = tier.spaces,
+
+      tint = PET_CUSTOMIZER_ELEMENT_TINTS[element],
+    }
+  end
+end
+
+local PET_CUSTOMIZER_FIELD_PROGRAMS = {
+  {
+    id = "lavafield",
+    name = "LavaField",
+    field_effect = "lava",
+    icon = 11,
+    spaces = 3,
+  },
+
+  {
+    id = "grassfield",
+    name = "GrassField",
+    field_effect = "grass",
+    icon = 11,
+    spaces = 3,
+  },
+
+  {
+    id = "icefield",
+    name = "IceField",
+    field_effect = "ice",
+    icon = 11,
+    spaces = 3,
+  },
+
+  {
+    id = "seafield",
+    name = "SeaField",
+    field_effect = "sea",
+    icon = 11,
+    spaces = 3,
+  },
+}
+
+for _, field_def in ipairs(
+  PET_CUSTOMIZER_FIELD_PROGRAMS
+) do
+  for _, element in ipairs(
+    PET_CUSTOMIZER_ELEMENT_ORDER
+  ) do
+    PET_CUSTOMIZER_PARTS[
+      #PET_CUSTOMIZER_PARTS + 1
+    ] = {
+      id =
+        tostring(field_def.id)
+        .. "_"
+        .. tostring(element),
+
+      name = field_def.name,
+
+      program_class = "field",
+      field_effect = field_def.field_effect,
+
+      element = element,
+      icon = field_def.icon,
+      spaces = field_def.spaces,
+
+      tint =
+        PET_CUSTOMIZER_ELEMENT_TINTS[element],
+    }
+  end
+end
+
+for _, element in ipairs(
+  PET_CUSTOMIZER_ELEMENT_ORDER
+) do
+  PET_CUSTOMIZER_PARTS[
+    #PET_CUSTOMIZER_PARTS + 1
+  ] = {
+    id =
+      "undershirt_"
+      .. tostring(element),
+
+    name = "UnderShirt",
+
+    program_class = "passive",
+    passive_effect = "under_shirt",
+
+    element = element,
+
+    icon = 9,
+    spaces = 4,
+
+    tint =
+      PET_CUSTOMIZER_ELEMENT_TINTS[element],
+  }
+end
+
+-- PetCustomizer loadouts are persisted per player
+-- and keyed by individual PET UID.
+local PET_CUSTOMIZER_MEMORY_KEY =
+  "pet_customizers_v1"
+
+-- Runtime cache.
+--
+-- The outer key is the player's safe memory secret.
+-- The inner key is the individual PET UID.
+local PET_CUSTOMIZER_INSTALLED_BY_OWNER = {}
+local PET_CUSTOMIZER_LOADED_BY_OWNER = {}
+
+local function provide_pet_customizer_assets(pid)
+  provide_pet_visual(pid, PET_CUSTOMIZER_MENU_TEXTURE, nil)
+
+  provide_pet_visual(
+    pid,
+    PET_CUSTOMIZER_ICON_TEXTURE,
+    PET_CUSTOMIZER_ICON_ANIM
+  )
+end
+
+local function find_pet_customizer_part(part_id)
+  part_id = tostring(part_id or "")
+
+  for _, part in ipairs(PET_CUSTOMIZER_PARTS) do
+    if tostring(part.id) == part_id then
+      return part
+    end
+  end
+
+  return nil
+end
+
+local function get_pet_customizer_owned_quantity(
+  pid,
+  part_id
+)
+  local part =
+    find_pet_customizer_part(part_id)
+
+  if not part then
+    return 0
+  end
+
+  -- First-release inventory rule:
+  --
+  -- Every player may use up to 4 copies of every
+  -- PetCustomizer program on EACH individual pet.
+  --
+  -- Installing copies on Pet A does NOT consume
+  -- copies available to Pet B.
+  --
+  -- Later this function can read the player's
+  -- actual persistent PetCustomizer inventory.
+  return 4
+end
+
+local function pet_customizer_player_secret(pid)
+  if pid == nil then
+    return nil
+  end
+
+  if
+    helpers_ok
+    and helpers
+    and type(
+      helpers.get_safe_player_secret
+    ) == "function"
+  then
+    local ok, secret =
+      pcall(
+        helpers.get_safe_player_secret,
+        pid
+      )
+
+    if
+      ok
+      and secret ~= nil
+      and tostring(secret) ~= ""
+    then
+      return secret
+    end
+  end
+
+  return pid
+end
+
+local function pet_customizer_owner_cache(pid)
+  local secret =
+    pet_customizer_player_secret(pid)
+
+  if secret == nil then
+    return nil, nil, nil
+  end
+
+  local owner_key =
+    tostring(secret)
+
+  if
+    type(
+      PET_CUSTOMIZER_INSTALLED_BY_OWNER[
+        owner_key
+      ]
+    ) ~= "table"
+  then
+    PET_CUSTOMIZER_INSTALLED_BY_OWNER[
+      owner_key
+    ] = {}
+  end
+
+  if
+    type(
+      PET_CUSTOMIZER_LOADED_BY_OWNER[
+        owner_key
+      ]
+    ) ~= "table"
+  then
+    PET_CUSTOMIZER_LOADED_BY_OWNER[
+      owner_key
+    ] = {}
+  end
+
+  return
+    PET_CUSTOMIZER_INSTALLED_BY_OWNER[
+      owner_key
+    ],
+    PET_CUSTOMIZER_LOADED_BY_OWNER[
+      owner_key
+    ],
+    secret
+end
+
+local function pet_customizer_player_memory(pid)
+  if
+    not ezmemory
+    or type(
+      ezmemory.get_player_memory
+    ) ~= "function"
+  then
+    return nil, nil
+  end
+
+  local secret =
+    pet_customizer_player_secret(pid)
+
+  if secret == nil then
+    return nil, nil
+  end
+
+  local ok, memory =
+    pcall(
+      ezmemory.get_player_memory,
+      secret
+    )
+
+  if not ok then
+    warn(
+      "PetCustomizer memory read failed:",
+      tostring(memory)
+    )
+
+    return nil, secret
+  end
+
+  if type(memory) ~= "table" then
+    return nil, secret
+  end
+
+  return memory, secret
+end
+
+local function get_pet_customizer_installed(
+  pid,
+  uid
+)
+  uid = tostring(uid or "")
+
+  if uid == "" then
+    return {}
+  end
+
+  local cache,
+        loaded,
+        secret =
+    pet_customizer_owner_cache(pid)
+
+  if
+    not cache
+    or not loaded
+    or secret == nil
+  then
+    return {}
+  end
+
+  -- Already loaded during this server session.
+  if loaded[uid] == true then
+    local installed =
+      cache[uid]
+
+    if type(installed) ~= "table" then
+      installed = {}
+      cache[uid] = installed
+    end
+
+    return installed
+  end
+
+  local memory =
+    pet_customizer_player_memory(pid)
+
+  -- If memory temporarily cannot be read, don't mark
+  -- this UID as loaded. A later call may succeed.
+  if type(memory) ~= "table" then
+    cache[uid] =
+      cache[uid] or {}
+
+    return cache[uid]
+  end
+
+  local installed = {}
+
+  local bucket =
+    memory[
+      PET_CUSTOMIZER_MEMORY_KEY
+    ]
+
+  local stored =
+    type(bucket) == "table"
+    and bucket[uid]
+    or nil
+
+  if type(stored) == "table" then
+    for _, part_id in ipairs(stored) do
+      part_id =
+        tostring(part_id or "")
+
+      -- Ignore obsolete program IDs safely.
+      if
+        part_id ~= ""
+        and find_pet_customizer_part(
+          part_id
+        )
+      then
+        installed[
+          #installed + 1
+        ] = part_id
+      end
+    end
+  end
+
+  cache[uid] = installed
+  loaded[uid] = true
+
+  return installed
+end
+
+local function save_pet_customizer_installed(
+  pid,
+  uid,
+  installed
+)
+  uid = tostring(uid or "")
+
+  if uid == "" then
+    return false
+  end
+
+  installed =
+    type(installed) == "table"
+    and installed
+    or {}
+
+  local cache,
+        loaded,
+        secret =
+    pet_customizer_owner_cache(pid)
+
+  if
+    not cache
+    or not loaded
+    or secret == nil
+  then
+    return false
+  end
+
+  local memory =
+    pet_customizer_player_memory(pid)
+
+  if type(memory) ~= "table" then
+    warn(
+      "PetCustomizer memory unavailable:",
+      uid
+    )
+
+    return false
+  end
+
+  if
+    type(
+      memory[
+        PET_CUSTOMIZER_MEMORY_KEY
+      ]
+    ) ~= "table"
+  then
+    memory[
+      PET_CUSTOMIZER_MEMORY_KEY
+    ] = {}
+  end
+
+  local bucket =
+    memory[
+      PET_CUSTOMIZER_MEMORY_KEY
+    ]
+
+  local saved = {}
+
+  for _, part_id in ipairs(installed) do
+    part_id =
+      tostring(part_id or "")
+
+    if
+      part_id ~= ""
+      and find_pet_customizer_part(
+        part_id
+      )
+    then
+      saved[
+        #saved + 1
+      ] = part_id
+    end
+  end
+
+  if #saved > 0 then
+    bucket[uid] = saved
+  else
+    -- Don't leave empty pet records behind.
+    bucket[uid] = nil
+  end
+
+  cache[uid] = installed
+  loaded[uid] = true
+
+  if
+    type(
+      ezmemory.save_player_memory
+    ) == "function"
+  then
+    local ok, err =
+      pcall(
+        ezmemory.save_player_memory,
+        secret
+      )
+
+    if not ok then
+      warn(
+        "PetCustomizer save failed:",
+        tostring(err)
+      )
+
+      return false
+    end
+
+    return true
+  end
+
+  if
+    type(
+      ezmemory.set_player_memory
+    ) == "function"
+  then
+    local ok, err =
+      pcall(
+        ezmemory.set_player_memory,
+        secret,
+        memory
+      )
+
+    if not ok then
+      warn(
+        "PetCustomizer save failed:",
+        tostring(err)
+      )
+
+      return false
+    end
+
+    return true
+  end
+
+  warn(
+    "PetCustomizer save function unavailable"
+  )
+
+  return false
+end
+
+local function get_pet_customizer_active_installed(
+  pid,
+  installed
+)
+  local active = {}
+  local counts = {}
+
+  for _, part_id in ipairs(
+    installed or {}
+  ) do
+    part_id =
+      tostring(part_id or "")
+
+    local part =
+      find_pet_customizer_part(
+        part_id
+      )
+
+    if part then
+      local owned =
+        math.max(
+          0,
+          math.floor(
+            tonumber(
+              get_pet_customizer_owned_quantity(
+                pid,
+                part_id
+              )
+            ) or 0
+          )
+        )
+
+      local already_active =
+        counts[part_id] or 0
+
+      if already_active < owned then
+        active[
+          #active + 1
+        ] = part_id
+
+        counts[part_id] =
+          already_active + 1
+      end
+    end
+  end
+
+  return active
+end
+
+local function pet_customizer_used_spaces(installed)
+  local total = 0
+
+  for _, part_id in ipairs(installed or {}) do
+    local part = find_pet_customizer_part(part_id)
+
+    if part then
+      total = total + math.max(
+        0,
+        math.floor(tonumber(part.spaces) or 0)
+      )
+    end
+  end
+
+  return total
+end
+
+local function pet_customizer_installed_count(
+  installed,
+  part_id
+)
+  part_id = tostring(part_id or "")
+
+  local count = 0
+
+  for _, installed_id in ipairs(installed or {}) do
+    if tostring(installed_id) == part_id then
+      count = count + 1
+    end
+  end
+
+  return count
+end
+
+local function pet_customizer_remove_program_class(
+  installed,
+  class_name
+)
+  class_name =
+    tostring(class_name or "")
+
+  for i = #installed, 1, -1 do
+    local part =
+      find_pet_customizer_part(
+        installed[i]
+      )
+
+    if
+      part
+      and tostring(
+        part.program_class or ""
+      ) == class_name
+    then
+      table.remove(installed, i)
+    end
+  end
+end
+
+local function build_pet_customizer_slots(installed)
+  local slots = {}
+
+  for _, part_id in ipairs(installed or {}) do
+    local part = find_pet_customizer_part(part_id)
+
+    if part then
+      local icon = math.floor(tonumber(part.icon) or 0)
+      local spaces = math.max(
+        0,
+        math.floor(tonumber(part.spaces) or 0)
+      )
+
+      if icon > 0 then
+        for _ = 1, spaces do
+          if #slots >= PET_CUSTOMIZER_MAX_SPACES then
+            break
+          end
+
+          slots[#slots + 1] = {
+            icon = icon,
+            tint = part.tint,
+            element = part.element,
+            part_id = part.id,
+          }
+        end
+      end
+    end
+
+    if #slots >= PET_CUSTOMIZER_MAX_SPACES then
+      break
+    end
+  end
+
+  return slots
+end
+
+local PET_CUSTOMIZER_PREVIEW_OPACITY = 120
+
+local PET_CUSTOMIZER_OVERFLOW_TINT = {
+  r = 145,
+  g = 145,
+  b = 145,
+  opacity = 170,
+  color_mode = 2,
+}
+
+local function pet_customizer_preview_tint(tint)
+  tint = tint or {}
+
+  return {
+    r = tonumber(tint.r) or 255,
+    g = tonumber(tint.g) or 255,
+    b = tonumber(tint.b) or 255,
+
+    opacity = PET_CUSTOMIZER_PREVIEW_OPACITY,
+
+    color_mode =
+      tonumber(tint.color_mode)
+      or 2,
+  }
+end
+
+local function pet_customizer_preview_used_spaces(
+  installed,
+  part
+)
+  if
+    not part
+    or tostring(
+      part.program_class or ""
+    ) ~= "field"
+  then
+    return pet_customizer_used_spaces(
+      installed
+    )
+  end
+
+  local total = 0
+
+  -- Previewing a Field program means the currently
+  -- installed Field program will be replaced.
+  for _, part_id in ipairs(installed or {}) do
+    local installed_part =
+      find_pet_customizer_part(part_id)
+
+    if
+      installed_part
+      and tostring(
+        installed_part.program_class or ""
+      ) ~= "field"
+    then
+      total =
+        total
+        + math.max(
+          0,
+          math.floor(
+            tonumber(
+              installed_part.spaces
+            ) or 0
+          )
+        )
+    end
+  end
+
+  return total
+end
+
+local function build_pet_customizer_preview(
+  installed,
+  part
+)
+  local preview = {}
+
+  if type(part) ~= "table" then
+    return preview
+  end
+
+  local used =
+    pet_customizer_preview_used_spaces(
+      installed,
+      part
+    )
+
+  local spaces =
+    math.max(
+      0,
+      math.floor(tonumber(part.spaces) or 0)
+    )
+
+  local icon =
+    math.floor(tonumber(part.icon) or 0)
+
+  if icon <= 0 or spaces <= 0 then
+    return preview
+  end
+
+  -- A program is either completely valid or completely invalid.
+  -- If even one of its spaces would exceed the 3x3 board,
+  -- gray out the entire preview.
+  local fits =
+    used + spaces <= PET_CUSTOMIZER_MAX_SPACES
+
+  local preview_tint
+
+  if fits then
+    preview_tint =
+      pet_customizer_preview_tint(part.tint)
+  else
+    preview_tint =
+      PET_CUSTOMIZER_OVERFLOW_TINT
+  end
+
+  for i = 1, spaces do
+    preview[#preview + 1] = {
+      slot_index = used + i,
+      icon = icon,
+      tint = preview_tint,
+    }
+  end
+
+  return preview
+end
+
+local function pet_customizer_dominant_element(installed)
+  local counts = {}
+
+  for _, part_id in ipairs(installed or {}) do
+    local part = find_pet_customizer_part(part_id)
+
+    if part and part.element then
+      local element = tostring(part.element)
+
+      counts[element] =
+        (counts[element] or 0)
+        + math.max(
+          0,
+          math.floor(tonumber(part.spaces) or 0)
+        )
+    end
+  end
+
+  local dominant = nil
+  local dominant_spaces = 0
+  local tied = false
+
+  for element, spaces in pairs(counts) do
+    if spaces > dominant_spaces then
+      dominant = element
+      dominant_spaces = spaces
+      tied = false
+    elseif spaces == dominant_spaces and spaces > 0 then
+      tied = true
+    end
+  end
+
+  -- No installed parts, or no clear dominant element:
+  -- leave menu5.png at its original neutral blue.
+  if not dominant or tied then
+    return nil
+  end
+
+  return dominant
+end
+
+local function pet_customizer_panel_tint(installed)
+  local element = pet_customizer_dominant_element(installed)
+
+  if not element then
+    return false
+  end
+
+  return PET_CUSTOMIZER_ELEMENT_TINTS[element] or false
+end
+
+function LPets.get_pet_customizer_battle_state(
+  uid,
+  pid
+)
+  uid = tostring(uid or "")
+
+  local result = {
+    uid = uid,
+    installed = {},
+    programs = {},
+    hp_bonus = 0,
+    dominant_element = nil,
+  }
+
+  if uid == "" then
+    return result
+  end
+
+  local saved_installed =
+    get_pet_customizer_installed(
+      pid,
+      uid
+    )
+
+  local installed =
+    get_pet_customizer_active_installed(
+      pid,
+      saved_installed
+    )
+
+  for _, part_id in ipairs(installed or {}) do
+    result.installed[#result.installed + 1] =
+      tostring(part_id)
+
+    local part =
+      find_pet_customizer_part(part_id)
+
+    if part then
+      local hp_bonus =
+        math.max(
+          0,
+          math.floor(
+            tonumber(part.hp_bonus) or 0
+          )
+        )
+
+      result.hp_bonus =
+        result.hp_bonus + hp_bonus
+
+      result.programs[#result.programs + 1] = {
+        id = tostring(part.id),
+        name = tostring(part.name or part.id),
+
+        hp_bonus = hp_bonus,
+
+        element =
+          part.element
+          and tostring(part.element)
+          or nil,
+
+        field_effect =
+          part.field_effect
+          and tostring(part.field_effect)
+          or nil,
+
+        passive_effect =
+          part.passive_effect
+          and tostring(part.passive_effect)
+          or nil,
+
+        spaces =
+          math.max(
+            0,
+            math.floor(
+              tonumber(part.spaces) or 0
+            )
+          ),
+      }
+    end
+  end
+
+  -- We are exposing this now because the battle resolver
+  -- will eventually use it, but Pet Duels do NOT apply
+  -- the element yet.
+  result.dominant_element =
+    pet_customizer_dominant_element(installed)
+
+  return result
 end
 
 -- ---------------------------------------------------------------------------
@@ -606,6 +1632,7 @@ local function build_main_rows(pid, info)
   else
     local chip = info.pet_chip_id and chip_name(info.pet_chip_id) or "None"
     rows[#rows + 1] = row("__lpets:chip", "Pet Chip", short(chip, 6))
+    rows[#rows + 1] = row("__lpets:customizer", "PetCustomizer")
   end
 
   if tostring(info.mood or ""):lower() ~= "happy" then
@@ -632,6 +1659,7 @@ end
 -- Forward declarations for menu functions.
 local open_companion_picker
 local open_pet_chip_picker
+local open_pet_customizer
 local open_pet_xp_board
 local open_confirm
 
@@ -761,6 +1789,10 @@ function LPets.open_pets_board(pid, opts)
 
       if id == "__lpets:chip" then
         return open_pet_chip_picker(player_id, fresh, opts)
+      end
+
+      if id == "__lpets:customizer" then
+        return open_pet_customizer(player_id, fresh, opts)
       end
 
       if id == "__lpets:feed" then
@@ -1157,6 +2189,468 @@ open_pet_chip_picker = function(pid, info, opts)
 
     on_close = function(player_id, st)
       remember_row(player_id, st, LAST_CHIP_ROW_ID_BY_PID)
+    end,
+  })
+end
+
+-- ---------------------------------------------------------------------------
+-- Pet Customizer
+-- ---------------------------------------------------------------------------
+
+local function build_pet_customizer_rows(
+  pid,
+  installed
+)
+  local rows = {}
+
+  installed = installed or {}
+
+  rows[#rows + 1] = row(
+    "__lpets:customizer_remove_all",
+    "Remove All"
+  )
+
+  for _, part in ipairs(PET_CUSTOMIZER_PARTS) do
+    local owned =
+      math.max(
+        0,
+        math.floor(
+          tonumber(
+            get_pet_customizer_owned_quantity(
+              pid,
+              part.id
+            )
+          ) or 0
+        )
+      )
+
+    local installed_count =
+      pet_customizer_installed_count(
+        installed,
+        part.id
+      )
+
+    local available =
+      math.max(
+        0,
+        owned - installed_count
+      )
+
+    rows[#rows + 1] = row(
+      "__lpets:customizer:" .. tostring(part.id),
+      short(part.name, 16),
+      "x" .. tostring(available),
+      {
+        data = part,
+
+        icon_texture = PET_CUSTOMIZER_ICON_TEXTURE,
+        icon_anim = PET_CUSTOMIZER_ICON_ANIM,
+        icon_state =
+          "ICON_" .. tostring(part.icon),
+
+        icon_tint = part.tint,
+
+        icon_scale = 1.5,
+      }
+    )
+  end
+
+  rows[#rows + 1] =
+    row("__lpets:back", "Back")
+
+  return rows
+end
+
+local function refresh_pet_customizer_state(
+  pid,
+  st,
+  installed
+)
+  if not st then return end
+
+  installed = installed or {}
+
+  st.rows =
+    build_pet_customizer_rows(
+      pid,
+      installed
+    )
+
+  st.customizer =
+    st.customizer or {}
+
+  st.customizer.slots =
+    build_pet_customizer_slots(installed)
+
+  st.profile_bg_tint =
+    pet_customizer_panel_tint(installed)
+
+  local selected =
+    st.rows
+    and st.rows[st.cursor]
+    or nil
+
+  st.customizer.preview_slots =
+    build_pet_customizer_preview(
+      installed,
+      selected and selected.data or nil
+    )
+
+end
+
+open_pet_customizer = function(pid, info, opts)
+  opts = menu_opts(opts)
+
+  if not info or tostring(info.uid or "") == "" then
+    message(pid, "No companion pet selected.")
+    return LPets.open_pets_board(pid, opts)
+  end
+
+  local M = get_menuapi()
+  if not (M and type(M.open) == "function") then
+    message(pid, "Pet menu isn't available.")
+    return false
+  end
+
+  provide_pet_customizer_assets(pid)
+
+  local pet_uid = tostring(info.uid)
+  local installed =
+    get_pet_customizer_installed(
+      pid,
+      pet_uid
+    )
+
+  local rows =
+    build_pet_customizer_rows(
+      pid,
+      installed
+    )
+
+  local cursor =
+    row_index_for_id(
+      rows,
+      LAST_CUSTOMIZER_ROW_ID_BY_PID[pid]
+    )
+    or row_index_for_id(
+      rows,
+      first_selectable_row_id(rows)
+    )
+
+  return M.open(pid, {
+    type = 9,
+    z = 220,
+    title = "PetCustomizer",
+    color = "green",
+    open_sfx = false,
+    cancel_sfx = opts.cancel_sfx,
+    parent = main_parent(opts),
+    lock_input = opts.lock_input,
+
+    rows = rows,
+    cursor = cursor,
+
+    customizer = {
+      slots =
+        build_pet_customizer_slots(installed),
+
+      preview_slots =
+        build_pet_customizer_preview(
+          installed,
+          rows[cursor]
+          and rows[cursor].data
+          or nil
+        ),
+
+      icon_texture =
+        PET_CUSTOMIZER_ICON_TEXTURE,
+
+      icon_anim =
+        PET_CUSTOMIZER_ICON_ANIM,
+    },
+
+    bg_tint = {
+      r = 135,
+      g = 205,
+      b = 150,
+      color_mode = 2,
+    },
+
+    -- menu5.png reflects the dominant installed element.
+    -- No dominant element leaves its original neutral blue untouched.
+    profile_bg_tint = pet_customizer_panel_tint(installed),
+
+    title_tint = {
+      r = 25,
+      g = 95,
+      b = 55,
+      color_mode = 2,
+    },
+
+    row_tint = {
+      r = 50,
+      g = 100,
+      b = 65,
+      color_mode = 2,
+    },
+
+    right_tint = {
+      r = 35,
+      g = 135,
+      b = 80,
+      color_mode = 2,
+    },
+
+    on_cursor_change = function(
+      player_id,
+      selected_row,
+      st
+    )
+      if selected_row and selected_row.id then
+        LAST_CUSTOMIZER_ROW_ID_BY_PID[player_id] =
+          selected_row.id
+      end
+
+      local current_installed =
+        get_pet_customizer_installed(
+          player_id,
+          pet_uid
+        )
+
+      st.customizer.preview_slots =
+        build_pet_customizer_preview(
+          current_installed,
+          selected_row
+          and selected_row.data
+          or nil
+        )
+
+      if M and type(M.refresh) == "function" then
+        M.refresh(player_id)
+      end
+
+      return true
+    end,
+
+    on_left = function(
+      player_id,
+      selected_row,
+      st
+    )
+      local current_installed =
+        get_pet_customizer_installed(
+          player_id,
+          pet_uid
+        )
+
+      if #current_installed <= 0 then
+        play_error(player_id)
+        return true
+      end
+
+      -- Installation order is stored sequentially,
+      -- so removing the final entry is undo-last.
+      table.remove(
+        current_installed,
+        #current_installed
+      )
+
+      save_pet_customizer_installed(
+        player_id,
+        pet_uid,
+        current_installed
+      )
+
+      refresh_pet_customizer_state(
+        player_id,
+        st,
+        current_installed
+      )
+
+      if M and type(M.refresh) == "function" then
+        M.refresh(player_id)
+      end
+
+      return true
+    end,
+
+    on_confirm = function(player_id, selected_row, st)
+      if not selected_row or not selected_row.id then
+        return true
+      end
+
+      LAST_CUSTOMIZER_ROW_ID_BY_PID[player_id] =
+        selected_row.id
+
+      if selected_row.id == "__lpets:back" then
+        return LPets.open_pets_board(player_id, opts)
+      end
+
+      local current_installed =
+        get_pet_customizer_installed(
+          player_id,
+          pet_uid
+        )
+
+      if
+        selected_row.id
+        == "__lpets:customizer_remove_all"
+      then
+        for i = #current_installed, 1, -1 do
+          current_installed[i] = nil
+        end
+
+        save_pet_customizer_installed(
+          player_id,
+          pet_uid,
+          current_installed
+        )
+
+        refresh_pet_customizer_state(
+          player_id,
+          st,
+          current_installed
+        )
+
+        if M and type(M.refresh) == "function" then
+          M.refresh(player_id)
+        end
+
+        return true
+      end
+
+      local part_id =
+        tostring(selected_row.id):match(
+          "^__lpets:customizer:(.+)$"
+        )
+
+      if not part_id then
+        return true
+      end
+
+      local part =
+        find_pet_customizer_part(part_id)
+
+      if not part then
+        play_error(player_id)
+        return true
+      end
+
+      local candidate_installed = {}
+
+      for _, installed_id in ipairs(
+        current_installed
+      ) do
+        candidate_installed[
+          #candidate_installed + 1
+        ] = installed_id
+      end
+
+      if
+        tostring(part.program_class or "")
+        == "field"
+      then
+        pet_customizer_remove_program_class(
+          candidate_installed,
+          "field"
+        )
+      end
+
+      local owned =
+        math.max(
+          0,
+          math.floor(
+            tonumber(
+              get_pet_customizer_owned_quantity(
+                player_id,
+                part.id
+              )
+            ) or 0
+          )
+        )
+
+        local installed_count =
+          pet_customizer_installed_count(
+            candidate_installed,
+            part.id
+          )
+
+      if installed_count >= owned then
+        play_error(player_id)
+
+        message(
+          player_id,
+          "No copies of this program are available."
+        )
+
+        return true
+      end
+
+      local used =
+        pet_customizer_used_spaces(
+          candidate_installed
+        )
+
+      local needed =
+        math.max(
+          0,
+          math.floor(tonumber(part.spaces) or 0)
+        )
+
+      if
+        used + needed
+        > PET_CUSTOMIZER_MAX_SPACES
+      then
+        play_error(player_id)
+
+        message(
+          player_id,
+          "Not enough PetCustomizer space."
+        )
+
+        return true
+      end
+
+      if
+        tostring(part.program_class or "")
+        == "field"
+      then
+        pet_customizer_remove_program_class(
+          current_installed,
+          "field"
+        )
+      end
+
+      -- Duplicate copies are allowed.
+      current_installed[
+        #current_installed + 1
+      ] = part.id
+
+      save_pet_customizer_installed(
+        player_id,
+        pet_uid,
+        current_installed
+      )
+
+      refresh_pet_customizer_state(
+        player_id,
+        st,
+        current_installed
+      )
+
+      if M and type(M.refresh) == "function" then
+        M.refresh(player_id)
+      end
+
+      return true
+    end,
+
+    on_close = function(player_id, st)
+      remember_row(
+        player_id,
+        st,
+        LAST_CUSTOMIZER_ROW_ID_BY_PID
+      )
     end,
   })
 end
