@@ -324,6 +324,15 @@ local NPC_POOLS = {
       mug_texture = "/server/assets/tourney/npc-navis-testing/starman/mug.png",
     }),
 
+    encounter_npc({
+      id = "shockdos1",
+      display_name = "ShockDOS",
+      alias = "ShockDOS",
+      rank = "1",
+      weight = 80,
+      mug_texture = "/server/assets/tourney/npc-navis-testing/shockdos/mug.png",
+    }),
+
   },
 
   open_strong = {
