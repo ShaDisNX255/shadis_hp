@@ -9,7 +9,7 @@ local NEW_MAIL_MESSAGE_DELAY = CONFIG.NEW_MAIL_MESSAGE_DELAY or 1.5        -- se
 local ENABLE_TEST_EMAIL_ON_JOIN = false    -- set false after you finish tuning
 local TEST_EMAIL_DELAY = 2.0              -- seconds (start same as NEW_MAIL_MESSAGE_DELAY)
 local EZEMAIL_DEBUG = true -- set false after verified
-local ANNOUNCEMENTS_FEED_MODULE = 'scripts/ezlibs-scripts/announcements_feed'
+local ANNOUNCEMENTS_FEED_MODULE = 'scripts/ezlibs-scripts/ezannounce/announcements_feed'
 
 
 local function _preload_email_assets(player_id, mail)
