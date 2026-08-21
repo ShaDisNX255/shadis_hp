@@ -4,7 +4,7 @@ frame duration="0.0833333" x="22" y="0" w="22" h="26" originx="0" originy="0"
 animation state="INACTIVE"
 frame duration="0.0833333" x="0" y="0" w="22" h="26" originx="0" originy="0"  
 
-animation state="BATTLING"
+animation state="battling"
 frame duration="0.0833333" x="66" y="0" w="22" h="26" originx="0" originy="0"  
 frame duration="0.0833333" x="88" y="0" w="22" h="26" originx="0" originy="0"  
 frame duration="0.0833333" x="110" y="0" w="22" h="26" originx="0" originy="0"  

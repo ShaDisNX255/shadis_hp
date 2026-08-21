@@ -1,6 +1,6 @@
 imagePath=""
 
-animation state="IDLE_UI"
+animation state="idle_ui"
 frame duration="0" x="0" y="0" w="240" h="160" originx="0" originy="0" flipx="0" flipy="0"
 frame duration="0.017" x="0" y="160" w="240" h="160" originx="0" originy="0" flipx="0" flipy="0"
 frame duration="0.017" x="0" y="320" w="240" h="160" originx="0" originy="0" flipx="0" flipy="0"

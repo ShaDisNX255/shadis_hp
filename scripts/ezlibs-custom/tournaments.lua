@@ -405,7 +405,7 @@ local NPC_POOLS = {
       alias = "ElementMan",
       rank = "5",
       weight = 50,
-      mug_texture = "/server/assets/tourney/npc-navis-testing/cutman/mug.png",
+      mug_texture = "/server/assets/tourney/npc-navis-testing/elementman/mug.png",
     }),
 
     encounter_npc({
@@ -580,16 +580,21 @@ end
 
 local VISUALS = {
   enabled = true,
-  show_seconds = 4.0,
-  fade_seconds = 0.25,
+  show_seconds = 2.0,
+  fade_seconds = 0.3,
   background_key = "red_orange_bn4",
   music = "/server/assets/tourney/music/bbn4_tournament_announcement.ogg",
   mug_scale = 1.0,
 
-  -- Winner reveal transition.
-  transition_before_seconds = 1.25,
-  transition_step_seconds = 0.6,
-  transition_after_seconds = 1.5,
+  -- Rewrite-style result reveal timing.
+  transition_before_seconds = 2.0,
+  path_reveal_seconds = 0.6,
+  loser_reveal_seconds = 0.0,
+  squash_step_seconds = 0.05,
+  after_squash_seconds = 0.3,
+  after_unsquash_seconds = 0.3,
+  between_matches_seconds = 0.5,
+  transition_after_seconds = 2.0,
 }
 
 local TOURNEY_TEXT = {
@@ -770,13 +775,29 @@ local function tournament_collect_visual_assets()
 
     add(constants.crown_texture_path)
     add(constants.crown_anim_path)
+
+    add(constants.title_banner_anim_path)
+
+    for _, texture_path in pairs(constants.title_banner_paths or {}) do
+      add(texture_path)
+    end
+
+    for _, path_def in pairs(constants.progress_bar_path or {}) do
+      add(path_def.texture)
+      add(path_def.anim)
+    end
+
+    for _, overlay_theme in pairs(constants.progress_bar_overlay or {}) do
+      for _, path_def in pairs(overlay_theme or {}) do
+        add(path_def.texture)
+        add(path_def.anim)
+      end
+    end
   end
 
   -- Hardcoded board assets used by draw_tournament_board_for_player().
   add("/server/assets/tourney/tourney-board-elements/mini-mug-frame.png")
   add("/server/assets/tourney/tourney-board-elements/mini-mug-frame.anim")
-  add("/server/assets/tourney/title-banner.png")
-  add("/server/assets/tourney/title-banner.anim")
   -- Fallback participant mug if a player mug asset disappears after disconnect.
   add(FALLBACK_MUG_TEXTURE)
   add(LAST_RESORT_MUG_TEXTURE)
@@ -840,7 +861,7 @@ local function tournament_prewarm_visual_assets(player_id)
     if constants and constants.bracket_background_path then
       for key, bg in pairs(constants.bracket_background_path) do
         prewarm("__tourney_pre_bg_" .. tostring(key), bg.gradient_texture, constants.default_background_anim_path_bn4, "BG")
-        prewarm("__tourney_pre_grid_" .. tostring(key), bg.grid_texture, constants.default_grid_anim_path_bn4, "IDLE_UI")
+        prewarm("__tourney_pre_grid_" .. tostring(key), bg.grid_texture, constants.default_grid_anim_path_bn4, "idle_ui")
       end
     end
 
@@ -852,6 +873,19 @@ local function tournament_prewarm_visual_assets(player_id)
       prewarm("__tourney_pre_topper_bn45", constants.champion_topper_bn45, constants.champion_topper_bn45_anim, "UI")
 
       prewarm("__tourney_pre_crown", constants.crown_texture_path, constants.crown_anim_path, "INACTIVE")
+
+      if constants.progress_bar_path then
+        prewarm("__tourney_pre_path_bottom", constants.progress_bar_path.bottom_tier.texture, constants.progress_bar_path.bottom_tier.anim, "l1_move")
+        prewarm("__tourney_pre_path_middle", constants.progress_bar_path.middle_tier.texture, constants.progress_bar_path.middle_tier.anim, "l2_move")
+        prewarm("__tourney_pre_path_top", constants.progress_bar_path.top_tier.texture, constants.progress_bar_path.top_tier.anim, "l3_move")
+      end
+
+      local blue = constants.progress_bar_overlay and constants.progress_bar_overlay.blue_moon
+      if blue then
+        prewarm("__tourney_pre_overlay_bottom", blue.bottom_tier.texture, blue.bottom_tier.anim, "L1_MOVE")
+        prewarm("__tourney_pre_overlay_middle", blue.middle_tier.texture, blue.middle_tier.anim, "L2_MOVE")
+        prewarm("__tourney_pre_overlay_top", blue.top_tier.texture, blue.top_tier.anim, "L3_MOVE")
+      end
     end
 
     prewarm(
@@ -861,12 +895,18 @@ local function tournament_prewarm_visual_assets(player_id)
       "ACTIVE"
     )
 
-    prewarm(
-      "__tourney_pre_title_banner",
-      "/server/assets/tourney/title-banner.png",
-      "/server/assets/tourney/title-banner.anim",
-      "RED"
-    )
+    local default_title_texture = constants
+      and constants.title_banner_paths
+      and constants.title_banner_paths[constants.title_banner_default or "free-tourney"]
+
+    if default_title_texture then
+      prewarm(
+        "__tourney_pre_title_banner",
+        default_title_texture,
+        constants.title_banner_anim_path,
+        constants.title_banner_state or "TITLE"
+      )
+    end
 
     prewarm(
       "__tourney_pre_textbox",
@@ -1515,6 +1555,36 @@ local function get_board_background(queue_or_tournament)
   return nil
 end
 
+local function normalize_tournament_title_banner(value)
+  local key = tostring(value or ""):lower()
+
+  key = key:gsub("^%s+", "")
+  key = key:gsub("%s+$", "")
+  key = key:gsub("[_%s]+", "-")
+
+  local paths = constants and constants.title_banner_paths or nil
+
+  if paths and paths[key] then
+    return key
+  end
+
+  return (constants and constants.title_banner_default) or "free-tourney"
+end
+
+local function get_tournament_title_banner_texture(tournament)
+  local paths = constants and constants.title_banner_paths or nil
+  if not paths then
+    return nil
+  end
+
+  local key = normalize_tournament_title_banner(
+    tournament and tournament.title_banner_key
+  )
+
+  return paths[key]
+    or paths[(constants and constants.title_banner_default) or "free-tourney"]
+end
+
 function remember_board_visual_props(queue, object)
   if not queue or not object then return end
 
@@ -1523,6 +1593,13 @@ function remember_board_visual_props(queue, object)
     props["Board Background"]
     or props["Tournament Background"]
     or VISUALS.background_key
+
+  queue.title_banner_key = normalize_tournament_title_banner(
+    props["Tournament Title"]
+    or props["Tournament Title Banner"]
+    or props["Title Banner"]
+    or queue.title_banner_key
+  )
 end
 
 function tournament_visual_id(tournament, base_id)
@@ -1583,11 +1660,15 @@ local function acquire_tournament_music(area_id)
   if not state then
     state = {
       original_song = safe_get_area_song(area_id),
+      original_name = Net.get_area_name and Net.get_area_name(area_id) or nil,
       users = 0,
     }
 
     tournament_area_music[area_id] = state
     pcall(Net.set_song, area_id, VISUALS.music)
+    if Net.set_area_name then
+      pcall(Net.set_area_name, area_id, "Tournament")
+    end
   end
 
   state.users = state.users + 1
@@ -1614,6 +1695,10 @@ local function release_tournament_music(area_id)
 
   if state.original_song then
     pcall(Net.set_song, area_id, state.original_song)
+  end
+
+  if state.original_name and Net.set_area_name then
+    pcall(Net.set_area_name, area_id, state.original_name)
   end
 end
 
@@ -1656,16 +1741,15 @@ local function draw_ui(player_id, id, texture, anim, state, pos, sx, sy)
     return true
   end
 
-vdebug(
-  "[tournaments][visual] draw failed id=" .. tostring(id)
-  .. " texture=" .. tostring(texture)
-  .. " anim=" .. tostring(anim)
-  .. " state=" .. tostring(state)
-  .. " err=" .. tostring(err)
-)
+  vdebug(
+    "[tournaments][visual] draw failed id=" .. tostring(id)
+    .. " texture=" .. tostring(texture)
+    .. " anim=" .. tostring(anim)
+    .. " state=" .. tostring(state)
+    .. " err=" .. tostring(err)
+  )
 
   -- Fallback: try drawing the PNG as a static sprite.
-  -- This lets the board show even if the .anim file/state is the problem.
   if anim ~= "" then
     local ok_static, err_static = pcall(
       games.add_ui_element,
@@ -1712,8 +1796,8 @@ local function add_participant_mugshot(player_id, tournament, index, participant
   draw_ui(
     player_id,
     tournament_visual_id(tournament, "MUG_FRAME_" .. index),
-    "/server/assets/tourney/tourney-board-elements/mini-mug-frame.png",
-    "/server/assets/tourney/tourney-board-elements/mini-mug-frame.anim",
+    constants.mug_frame_texture_path or "/server/assets/tourney/tourney-board-elements/mini-mug-frame.png",
+    constants.mug_frame_anim_path or "/server/assets/tourney/tourney-board-elements/mini-mug-frame.anim",
     "ACTIVE",
     frame_pos,
     2.0,
@@ -1869,6 +1953,8 @@ local function collect_winner_movements(tournament, current_positions, new_posit
         moves[#moves + 1] = {
           index = participant_index,
           participant = result.winner,
+          result = result,
+          match_index = tonumber(result.match) or match_index,
           from_pos = from_pos,
           to_pos = to_pos,
         }
@@ -1879,8 +1965,224 @@ local function collect_winner_movements(tournament, current_positions, new_posit
   return moves
 end
 
+local function progress_tier_info(round_number)
+  if round_number == 1 then
+    return "bottom_tier", "l1_move", "r1_move", "ROUND1_PATH_"
+  elseif round_number == 2 then
+    return "middle_tier", "l2_move", "r2_move", "ROUND2_PATH_"
+  elseif round_number == 3 then
+    return "top_tier", "l3_move", "r3_move", "ROUND3_PATH_"
+  end
+
+  return nil
+end
+
+local function progress_bar_index(round_number, match_index, result)
+  if not result or not result.winner then return nil end
+
+  local winner_is_player1 = result.player1
+    and result.winner.id == result.player1.id
+
+  if round_number == 1 or round_number == 2 then
+    local base = (match_index - 1) * 2
+    return winner_is_player1 and (base + 1) or (base + 2), winner_is_player1
+  elseif round_number == 3 then
+    return winner_is_player1 and 1 or 2, winner_is_player1
+  end
+
+  return nil
+end
+
+local function draw_result_path(player_id, tournament, round_number, match_index, result, with_overlay)
+  if not constants or not ui_data or not result or not result.winner then
+    return nil
+  end
+
+  local tier, left_state, right_state, id_prefix = progress_tier_info(round_number)
+  if not tier then return nil end
+
+  local index, winner_is_player1 = progress_bar_index(round_number, match_index, result)
+  if not index then return nil end
+
+  local base_def = constants.progress_bar_path and constants.progress_bar_path[tier]
+  local overlay_def = constants.progress_bar_overlay
+    and constants.progress_bar_overlay.blue_moon
+    and constants.progress_bar_overlay.blue_moon[tier]
+
+  local base_pos = ui_data.progress_bars
+    and ui_data.progress_bars[tier]
+    and ui_data.progress_bars[tier][index]
+
+  local overlay_pos = ui_data.progress_bar_overlays
+    and ui_data.progress_bar_overlays[tier]
+    and ui_data.progress_bar_overlays[tier][index]
+
+  if not base_def or not base_pos then
+    return nil
+  end
+
+  local anim_state = winner_is_player1 and left_state or right_state
+  local base_id = tournament_visual_id(tournament, id_prefix .. tostring(index))
+
+  draw_ui(
+    player_id,
+    base_id,
+    base_def.texture,
+    base_def.anim,
+    anim_state,
+    base_pos,
+    2.0,
+    2.0
+  )
+
+  if with_overlay and overlay_def and overlay_pos then
+    local overlay_id = base_id .. "_OVERLAY"
+    local overlay_anim_state = string.upper(anim_state)
+
+    draw_ui(
+      player_id,
+      overlay_id,
+      overlay_def.texture,
+      overlay_def.anim,
+      overlay_anim_state,
+      overlay_pos,
+      2.0,
+      2.0
+    )
+    return overlay_id
+  end
+
+  return nil
+end
+
+local function draw_completed_paths(player_id, tournament, max_round)
+  max_round = math.max(0, math.min(3, tonumber(max_round or 0) or 0))
+
+  for round_number = 1, max_round do
+    local results = tournament.round_results[round_number] or {}
+    for match_index = 1, #results do
+      local result = results[match_index]
+      if result and result.winner then
+        draw_result_path(
+          player_id,
+          tournament,
+          round_number,
+          tonumber(result.match) or match_index,
+          result,
+          false
+        )
+      end
+    end
+  end
+end
+
+local function tint_participant_eliminated(player_id, tournament, participant)
+  if not participant or not constants or not constants.sepia_properties then return end
+
+  local index = participant_original_index(tournament, participant)
+  if not index then return end
+
+  local mug_id = tournament_visual_id(tournament, "MUG_" .. index)
+  if games and games.update_ui_element then
+    pcall(games.update_ui_element, mug_id, player_id, constants.sepia_properties)
+  end
+end
+
+local function apply_existing_eliminations(player_id, tournament, mode)
+  local current_round = tournament.current_round or 0
+  local reveal_current_round = mode ~= "after_round_animated"
+
+  for _, participant in ipairs(tournament.all_participants or {}) do
+    if participant.eliminated then
+      local eliminated_round = tonumber(participant.eliminated_round or 0) or 0
+
+      -- During the animated result reveal, the current round's losers start in full
+      -- color and fade only when their individual matchup is processed.
+      if reveal_current_round or eliminated_round < current_round then
+        tint_participant_eliminated(player_id, tournament, participant)
+      end
+    end
+  end
+end
+
+local function set_participant_vertical_scale(player_id, tournament, index, mug_sy, frame_sy)
+  if not games or not games.update_ui_element then return end
+
+  local mug_id = tournament_visual_id(tournament, "MUG_" .. index)
+  local frame_id = tournament_visual_id(tournament, "MUG_FRAME_" .. index)
+
+  pcall(games.update_ui_element, mug_id, player_id, { sy = mug_sy })
+  pcall(games.update_ui_element, frame_id, player_id, { sy = frame_sy })
+end
+
+local function squash_participant(player_id, tournament, index)
+  return async(function()
+    local mug_steps = { 0.8, 0.6, 0.4, 0.2, 0.0 }
+    local frame_steps = { 1.7, 1.3, 0.9, 0.5, 0.0 }
+
+    for i = 1, #mug_steps do
+      set_participant_vertical_scale(
+        player_id,
+        tournament,
+        index,
+        mug_steps[i],
+        frame_steps[i]
+      )
+      await(Async.sleep(VISUALS.squash_step_seconds or 0.05))
+    end
+  end)
+end
+
+local function unsquash_participant(player_id, tournament, index)
+  return async(function()
+    local mug_steps = { 0.2, 0.4, 0.6, 0.8, 1.0 }
+    local frame_steps = { 0.5, 0.9, 1.3, 1.7, 2.0 }
+
+    for i = 1, #mug_steps do
+      set_participant_vertical_scale(
+        player_id,
+        tournament,
+        index,
+        mug_steps[i],
+        frame_steps[i]
+      )
+      await(Async.sleep(VISUALS.squash_step_seconds or 0.05))
+    end
+  end)
+end
+
+local function move_participant_ui(player_id, tournament, index, to_pos)
+  if not games or not games.update_ui_element or not to_pos then return end
+
+  local mug_id = tournament_visual_id(tournament, "MUG_" .. index)
+  local frame_id = tournament_visual_id(tournament, "MUG_FRAME_" .. index)
+
+  pcall(games.update_ui_element, mug_id, player_id, {
+    x = to_pos.x,
+    y = to_pos.y,
+    z = to_pos.z or 0,
+  })
+
+  pcall(games.update_ui_element, frame_id, player_id, {
+    x = to_pos.x,
+    y = to_pos.y,
+    z = (to_pos.z or 0) + 1,
+  })
+end
+
+local function remove_visual_element(player_id, id)
+  if not id or not games or not games.remove_ui_element then return end
+  pcall(games.remove_ui_element, id, player_id)
+  if player_visual_ids[player_id] then
+    player_visual_ids[player_id][id] = nil
+  end
+end
+
 local function animated_board_hold_seconds(tournament, mode)
   if mode ~= "after_round_animated" then
+    if mode == "champion" then
+      return 3.0
+    end
     return VISUALS.show_seconds
   end
 
@@ -1892,8 +2194,17 @@ local function animated_board_hold_seconds(tournament, mode)
     return VISUALS.show_seconds
   end
 
-  return (VISUALS.transition_before_seconds or 1.25)
-    + (#moves * (VISUALS.transition_step_seconds or 0.6))
+  local squash_time = (VISUALS.squash_step_seconds or 0.05) * 5
+  local per_match = (VISUALS.path_reveal_seconds or 0.6)
+    + (VISUALS.loser_reveal_seconds or 0.15)
+    + squash_time
+    + (VISUALS.after_squash_seconds or 0.3)
+    + squash_time
+    + (VISUALS.after_unsquash_seconds or 0.3)
+    + (VISUALS.between_matches_seconds or 0.5)
+
+  return (VISUALS.transition_before_seconds or 1.0)
+    + (#moves * per_match)
     + (VISUALS.transition_after_seconds or 1.5)
 end
 
@@ -1904,20 +2215,47 @@ local function animate_winner_movements(player_id, tournament, moves)
       return
     end
 
-    await(Async.sleep(VISUALS.transition_before_seconds or 1.25))
+    await(Async.sleep(VISUALS.transition_before_seconds or 1.0))
 
-    for _, move in ipairs(moves) do
-      remove_participant_mugshot(player_id, tournament, move.index)
+    local round_number = tournament.current_round or 0
 
-      add_participant_mugshot(
+    for move_index, move in ipairs(moves) do
+      local result = move.result
+      local overlay_id = draw_result_path(
         player_id,
         tournament,
-        move.index,
-        move.participant,
-        move.to_pos
+        round_number,
+        move.match_index or move_index,
+        result,
+        true
       )
 
-      await(Async.sleep(VISUALS.transition_step_seconds or 0.6))
+      -- Let the path/highlight travel first, exactly like the rewrite presentation.
+      await(Async.sleep(VISUALS.path_reveal_seconds or 0.6))
+
+      if result and result.loser then
+        tint_participant_eliminated(player_id, tournament, result.loser)
+      end
+
+      await(Async.sleep(VISUALS.loser_reveal_seconds or 0.15))
+
+      await(squash_participant(player_id, tournament, move.index))
+      await(Async.sleep(VISUALS.after_squash_seconds or 0.3))
+
+      -- The rewrite removes/re-adds the mug at its destination. Updating x/y here
+      -- produces the same visual beat without reallocating the sprite.
+      move_participant_ui(player_id, tournament, move.index, move.to_pos)
+
+      -- Once the winner arrives, the temporary Blue Moon glow disappears while the
+      -- permanent base path remains visible as tournament history.
+      remove_visual_element(player_id, overlay_id)
+
+      await(unsquash_participant(player_id, tournament, move.index))
+      await(Async.sleep(VISUALS.after_unsquash_seconds or 0.3))
+
+      if move_index < #moves then
+        await(Async.sleep(VISUALS.between_matches_seconds or 0.5))
+      end
     end
 
     await(Async.sleep(VISUALS.transition_after_seconds or 1.5))
@@ -1931,7 +2269,6 @@ local function draw_tournament_board_for_player(player_id, tournament, mode)
 
   return async(function()
     local area_id = Net.get_player_area(player_id)
-    local original_name = Net.get_area_name(area_id)
     local music_area = acquire_tournament_music(area_id)
 
     local bg_info = get_board_background(tournament)
@@ -1955,27 +2292,33 @@ local function draw_tournament_board_for_player(player_id, tournament, mode)
 
     if bg_info then
       draw_ui(player_id, tournament_visual_id(tournament, "BOARD_BG"), bg_info.gradient_texture, constants.default_background_anim_path_bn4, "BG", pos.bg)
-      draw_ui(player_id, tournament_visual_id(tournament, "BOARD_GRID"), bg_info.grid_texture, constants.default_grid_anim_path_bn4, "UI", pos.grid)
+      draw_ui(player_id, tournament_visual_id(tournament, "BOARD_GRID"), bg_info.grid_texture, constants.default_grid_anim_path_bn4, "idle_ui", pos.grid)
     end
 
     draw_ui(player_id, tournament_visual_id(tournament, "BRACKET"), constants.bracket_bm_bn4, constants.default_bracket_anim_path_bn4, "UI", pos.bracket)
     draw_ui(player_id, tournament_visual_id(tournament, "CHAMPION_TOPPER"), constants.champion_topper_bn4, constants.champion_topper_bn4_anim, "UI", pos.champion_topper_bn4)
 
-    draw_ui(
-      player_id,
-      tournament_visual_id(tournament, "TITLE_BANNER"),
-      "/server/assets/tourney/title-banner.png",
-      "/server/assets/tourney/title-banner.anim",
-      "RED",
-      pos.title_banner
-    )
+    local title_banner_texture = get_tournament_title_banner_texture(tournament)
 
+    if title_banner_texture then
+      draw_ui(
+        player_id,
+        tournament_visual_id(tournament, "TITLE_BANNER"),
+        title_banner_texture,
+        constants.title_banner_anim_path,
+        constants.title_banner_state or "TITLE",
+        pos.title_banner
+      )
+    end
+
+    -- Keep the two side crowns in their normal inactive state. The rewrite uses a
+    -- dedicated center crown once the champion is known.
     draw_ui(
       player_id,
       tournament_visual_id(tournament, "CROWN_1"),
       constants.crown_texture_path,
       constants.crown_anim_path,
-      tournament.champion and "ACTIVE" or "INACTIVE",
+      "INACTIVE",
       pos.crown1
     )
 
@@ -1984,32 +2327,59 @@ local function draw_tournament_board_for_player(player_id, tournament, mode)
       tournament_visual_id(tournament, "CROWN_2"),
       constants.crown_texture_path,
       constants.crown_anim_path,
-      tournament.champion and "ACTIVE" or "INACTIVE",
+      "INACTIVE",
       pos.crown2
     )
 
     local animate_after_round = mode == "after_round_animated"
     local positions = nil
     local moves = nil
+    local completed_path_round = 0
 
     if animate_after_round then
       local current_positions = get_visual_positions(tournament, "before_round")
       local new_positions = get_visual_positions(tournament, "after_round")
       moves = collect_winner_movements(tournament, current_positions, new_positions)
 
-      -- If we have moves, draw the old/current board first.
-      -- If something weird happens and there are no moves, fall back to the final board.
       if #moves > 0 then
         positions = current_positions
       else
         positions = new_positions
       end
+
+      completed_path_round = math.max(0, (tournament.current_round or 1) - 1)
     else
       positions = get_visual_positions(tournament, mode)
+
+      if mode == "initial" then
+        completed_path_round = 0
+      elseif mode == "before_round" then
+        completed_path_round = math.max(0, (tournament.current_round or 1) - 1)
+      elseif mode == "champion" then
+        completed_path_round = 3
+      else
+        completed_path_round = tournament.current_round or 0
+      end
     end
+
+    -- Draw permanent history paths behind the mugs before any current-round reveal.
+    draw_completed_paths(player_id, tournament, completed_path_round)
 
     for i, participant in ipairs(tournament.all_participants or {}) do
       add_participant_mugshot(player_id, tournament, i, participant, positions[i])
+    end
+
+    apply_existing_eliminations(player_id, tournament, mode)
+
+    if tournament.champion then
+      draw_ui(
+        player_id,
+        tournament_visual_id(tournament, "CHAMPION_INDICATOR"),
+        constants.crown_texture_path,
+        constants.crown_anim_path,
+        "active",
+        pos.champion_crown or { x = 120, y = 36, z = 4 }
+      )
     end
 
     pcall(Net.fade_player_camera, player_id, { r = 0, g = 0, b = 0, a = 0 }, VISUALS.fade_seconds)
@@ -2018,7 +2388,7 @@ local function draw_tournament_board_for_player(player_id, tournament, mode)
     if animate_after_round and moves and #moves > 0 then
       await(animate_winner_movements(player_id, tournament, moves))
     else
-      await(Async.sleep(VISUALS.show_seconds))
+      await(Async.sleep(mode == "champion" and 3.0 or VISUALS.show_seconds))
     end
 
     pcall(Net.fade_player_camera, player_id, { r = 0, g = 0, b = 0, a = 255 }, VISUALS.fade_seconds)
@@ -2028,10 +2398,6 @@ local function draw_tournament_board_for_player(player_id, tournament, mode)
 
     if Net.toggle_player_hud then
       pcall(Net.toggle_player_hud, player_id)
-    end
-
-    if original_name then
-      pcall(Net.set_area_name, area_id, original_name)
     end
 
     release_tournament_music(music_area)
@@ -2051,15 +2417,15 @@ local function show_tournament_board_to_players(tournament, mode)
       return false
     end
 
-  for_each_tournament_viewer(tournament, function(participant)
-    draw_tournament_board_for_player(participant.player_id, tournament, mode)
-  end)
+    for_each_tournament_viewer(tournament, function(participant)
+      draw_tournament_board_for_player(participant.player_id, tournament, mode)
+    end)
 
-  await(Async.sleep(
-    VISUALS.fade_seconds * 2
-    + animated_board_hold_seconds(tournament, mode)
-    + 0.25
-  ))
+    await(Async.sleep(
+      VISUALS.fade_seconds * 2
+      + animated_board_hold_seconds(tournament, mode)
+      + 0.35
+    ))
     return true
   end)
 end
@@ -2818,6 +3184,9 @@ local function create_tournament_from_queue(queue)
     round_results = {},
     champion = nil,
     board_background = queue.board_background or VISUALS.background_key,
+    title_banner_key = queue.title_banner_key
+      or (constants and constants.title_banner_default)
+      or "free-tourney",
     visual_positions = {},
     spectators = {},
     pvp_mode = queue.pvp_mode or "auto",
@@ -4062,9 +4431,6 @@ Net:on("player_disconnect", function(event)
   local player_id = event.player_id
   disconnected_players[player_id] = true
   spectator_prompt_open[player_id] = nil
-  if tournament and tournament.spectators then
-      tournament.spectators[player_id] = nil
-    end
 
   if player_to_queue[player_id] then
     remove_from_queue(player_id, true)
@@ -4072,6 +4438,11 @@ Net:on("player_disconnect", function(event)
 
   local tournament_id = player_to_tournament[player_id]
   local tournament = tournament_id and active_tournaments[tournament_id] or nil
+
+  if tournament and tournament.spectators then
+    tournament.spectators[player_id] = nil
+  end
+
   if tournament then
     for _, participant in ipairs(tournament.all_participants or {}) do
       if participant.kind == "player" and participant.player_id == player_id then
