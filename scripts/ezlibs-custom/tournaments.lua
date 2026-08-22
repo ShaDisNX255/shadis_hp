@@ -57,6 +57,17 @@ if not package_registry_ok then
   print("[tournaments] WARNING: encounter package registry unavailable; tournament fallback validation disabled")
 end
 
+local MenuAPI
+do
+  local ok, mod = pcall(require, "scripts/menuAPI/main")
+  if ok and type(mod) == "table" then
+    MenuAPI = mod
+  else
+    MenuAPI = nil
+    print("[tournaments] WARNING: MenuAPI could not be loaded; tournament lobby/confirm UI disabled")
+  end
+end
+
 local function require_visual_module(label, path)
   local ok, mod = pcall(require, path)
   if not ok then
@@ -512,7 +523,14 @@ local SETTINGS = {
   },
 
   spectator_cancel_enabled = true,
-  spectator_battle_message = "Battle in progress...{end_line}Press B to stop watching.",
+
+  -- If a scheduled tournament reaches start time with nobody registered,
+  -- fill the entire bracket from the board's normal NPC pool and run it as
+  -- an exhibition tournament. NPC-only matches are deliberately slowed down
+  -- so spectators can actually watch the live bracket progress.
+  npc_only_tournaments_enabled = true,
+  npc_only_match_min_seconds = 8,
+  npc_only_match_max_seconds = 12,
 
   -- Wall-clock schedule.
   -- Boards can override these with Tiled properties.
@@ -995,8 +1013,46 @@ local disconnected_players = {}
 local next_tournament_id = 1
 local spectator_prompt_open = {}
 local player_visual_ids = {}
+
+-- Each async tournament-board presentation captures the player's current visual
+-- epoch. Disconnecting (or explicitly invalidating that player's board) bumps the
+-- epoch so any coroutine that wakes up later knows it must stop before touching
+-- native player sprite APIs. This matters because a Rust-side panic cannot be
+-- contained by Lua pcall().
+local player_visual_epoch = {}
+
+local function current_player_visual_epoch(player_id)
+  return tonumber(player_visual_epoch[player_id] or 0) or 0
+end
+
+local function invalidate_player_visual_jobs(player_id)
+  player_visual_epoch[player_id] = current_player_visual_epoch(player_id) + 1
+end
+
+local function tournament_visual_job_is_valid(player_id, expected_epoch)
+  if not player_id or not Net.is_player(player_id) then
+    return false
+  end
+
+  if expected_epoch ~= nil
+    and current_player_visual_epoch(player_id) ~= expected_epoch
+  then
+    return false
+  end
+
+  return true
+end
+
 local scheduler_clock = 0
 local next_scheduled_start_at = nil
+
+-- Live MenuAPI lobby/list state and persistent bracket viewers.
+local TourneyUX = {
+  menu_views = {},
+  menu_last_refresh_second = nil,
+  live_board_viewers = {},
+  spectator_cancel_guard_until = {},
+}
 
 -- -----------------------------------------------------------------------------
 -- Small table helpers
@@ -1042,6 +1098,37 @@ local function format_duration(seconds)
   end
 
   return tostring(secs) .. "s"
+end
+
+local function format_minutes_only(seconds)
+  seconds = math.max(0, tonumber(seconds or 0) or 0)
+  return tostring(math.ceil(seconds / 60)) .. "m"
+end
+
+-- Lobby countdowns stay minute-only until the final minute. During the
+-- last minute, expose only 5-second buckets so MenuAPI does not redraw
+-- every second (important while the current client shows a loading spinner
+-- for sprite/UI updates).
+local function format_lobby_countdown(seconds)
+  seconds = math.max(0, tonumber(seconds or 0) or 0)
+
+  if seconds >= 60 then
+    return tostring(math.ceil(seconds / 60)) .. "m"
+  end
+
+  if seconds <= 0 then
+    return "0s"
+  end
+
+  -- Keep displaying 1m until the first true 5-second boundary.
+  -- Then: 55..51 => 55s, 50..46 => 50s, ... 5..1 => 5s.
+  if seconds > 55 then
+    return "1m"
+  end
+
+  local bucket = math.ceil(seconds / 5) * 5
+  bucket = math.max(5, bucket)
+  return tostring(bucket) .. "s"
 end
 
 local function clamp_int(value, fallback, min_value, max_value)
@@ -1204,7 +1291,6 @@ local function to_bool_or(value, fallback)
 
   return fallback
 end
-
 local function remember_board_tournament_props(queue, object)
   if not queue or not object then return end
 
@@ -1601,14 +1687,23 @@ function remember_board_visual_props(queue, object)
     or queue.title_banner_key
   )
 end
-
 function tournament_visual_id(tournament, base_id)
   local tid = tournament and tournament.id or "no_tournament"
   return "TOURNEY_" .. tostring(tid) .. "_" .. tostring(base_id)
 end
 
 local function erase_tournament_board(player_id)
-  if not games or not games.remove_ui_element then return end
+  -- Never call native sprite APIs after the player is gone. Just forget our Lua
+  -- bookkeeping; the client is already disconnected and needs no visual cleanup.
+  if not player_id or not Net.is_player(player_id) then
+    player_visual_ids[player_id] = {}
+    return
+  end
+
+  if not games or not games.remove_ui_element then
+    player_visual_ids[player_id] = {}
+    return
+  end
 
   local ids = {}
 
@@ -1703,6 +1798,10 @@ local function release_tournament_music(area_id)
 end
 
 local function draw_ui(player_id, id, texture, anim, state, pos, sx, sy)
+  if not player_id or not Net.is_player(player_id) then
+    return false
+  end
+
   if not texture or not pos then
     vdebug("[tournaments][visual] skipped draw: missing texture/pos for " .. tostring(id))
     return false
@@ -1838,6 +1937,7 @@ local function add_participant_mugshot(player_id, tournament, index, participant
 end
 
 local function remove_participant_mugshot(player_id, tournament, index)
+  if not player_id or not Net.is_player(player_id) then return end
   if not games or not games.remove_ui_element then return end
 
   local frame_id = tournament_visual_id(tournament, "MUG_FRAME_" .. index)
@@ -1997,7 +2097,6 @@ local function draw_result_path(player_id, tournament, round_number, match_index
   if not constants or not ui_data or not result or not result.winner then
     return nil
   end
-
   local tier, left_state, right_state, id_prefix = progress_tier_info(round_number)
   if not tier then return nil end
 
@@ -2056,6 +2155,7 @@ local function draw_result_path(player_id, tournament, round_number, match_index
 end
 
 local function draw_completed_paths(player_id, tournament, max_round)
+  if not player_id or not Net.is_player(player_id) then return end
   max_round = math.max(0, math.min(3, tonumber(max_round or 0) or 0))
 
   for round_number = 1, max_round do
@@ -2077,6 +2177,7 @@ local function draw_completed_paths(player_id, tournament, max_round)
 end
 
 local function tint_participant_eliminated(player_id, tournament, participant)
+  if not player_id or not Net.is_player(player_id) then return end
   if not participant or not constants or not constants.sepia_properties then return end
 
   local index = participant_original_index(tournament, participant)
@@ -2106,6 +2207,7 @@ local function apply_existing_eliminations(player_id, tournament, mode)
 end
 
 local function set_participant_vertical_scale(player_id, tournament, index, mug_sy, frame_sy)
+  if not player_id or not Net.is_player(player_id) then return end
   if not games or not games.update_ui_element then return end
 
   local mug_id = tournament_visual_id(tournament, "MUG_" .. index)
@@ -2115,12 +2217,16 @@ local function set_participant_vertical_scale(player_id, tournament, index, mug_
   pcall(games.update_ui_element, frame_id, player_id, { sy = frame_sy })
 end
 
-local function squash_participant(player_id, tournament, index)
+local function squash_participant(player_id, tournament, index, visual_epoch)
   return async(function()
     local mug_steps = { 0.8, 0.6, 0.4, 0.2, 0.0 }
     local frame_steps = { 1.7, 1.3, 0.9, 0.5, 0.0 }
 
     for i = 1, #mug_steps do
+      if not tournament_visual_job_is_valid(player_id, visual_epoch) then
+        return false
+      end
+
       set_participant_vertical_scale(
         player_id,
         tournament,
@@ -2128,17 +2234,24 @@ local function squash_participant(player_id, tournament, index)
         mug_steps[i],
         frame_steps[i]
       )
+
       await(Async.sleep(VISUALS.squash_step_seconds or 0.05))
     end
+
+    return tournament_visual_job_is_valid(player_id, visual_epoch)
   end)
 end
 
-local function unsquash_participant(player_id, tournament, index)
+local function unsquash_participant(player_id, tournament, index, visual_epoch)
   return async(function()
     local mug_steps = { 0.2, 0.4, 0.6, 0.8, 1.0 }
     local frame_steps = { 0.5, 0.9, 1.3, 1.7, 2.0 }
 
     for i = 1, #mug_steps do
+      if not tournament_visual_job_is_valid(player_id, visual_epoch) then
+        return false
+      end
+
       set_participant_vertical_scale(
         player_id,
         tournament,
@@ -2146,12 +2259,16 @@ local function unsquash_participant(player_id, tournament, index)
         mug_steps[i],
         frame_steps[i]
       )
+
       await(Async.sleep(VISUALS.squash_step_seconds or 0.05))
     end
+
+    return tournament_visual_job_is_valid(player_id, visual_epoch)
   end)
 end
 
 local function move_participant_ui(player_id, tournament, index, to_pos)
+  if not player_id or not Net.is_player(player_id) then return end
   if not games or not games.update_ui_element or not to_pos then return end
 
   local mug_id = tournament_visual_id(tournament, "MUG_" .. index)
@@ -2171,6 +2288,7 @@ local function move_participant_ui(player_id, tournament, index, to_pos)
 end
 
 local function remove_visual_element(player_id, id)
+  if not player_id or not Net.is_player(player_id) then return end
   if not id or not games or not games.remove_ui_element then return end
   pcall(games.remove_ui_element, id, player_id)
   if player_visual_ids[player_id] then
@@ -2208,18 +2326,29 @@ local function animated_board_hold_seconds(tournament, mode)
     + (VISUALS.transition_after_seconds or 1.5)
 end
 
-local function animate_winner_movements(player_id, tournament, moves)
+local function animate_winner_movements(player_id, tournament, moves, visual_epoch)
   return async(function()
+    if not tournament_visual_job_is_valid(player_id, visual_epoch) then
+      return false
+    end
+
     if not moves or #moves == 0 then
       await(Async.sleep(VISUALS.show_seconds))
-      return
+      return tournament_visual_job_is_valid(player_id, visual_epoch)
     end
 
     await(Async.sleep(VISUALS.transition_before_seconds or 1.0))
+    if not tournament_visual_job_is_valid(player_id, visual_epoch) then
+      return false
+    end
 
     local round_number = tournament.current_round or 0
 
     for move_index, move in ipairs(moves) do
+      if not tournament_visual_job_is_valid(player_id, visual_epoch) then
+        return false
+      end
+
       local result = move.result
       local overlay_id = draw_result_path(
         player_id,
@@ -2230,35 +2359,53 @@ local function animate_winner_movements(player_id, tournament, moves)
         true
       )
 
-      -- Let the path/highlight travel first, exactly like the rewrite presentation.
       await(Async.sleep(VISUALS.path_reveal_seconds or 0.6))
+      if not tournament_visual_job_is_valid(player_id, visual_epoch) then
+        return false
+      end
 
       if result and result.loser then
         tint_participant_eliminated(player_id, tournament, result.loser)
       end
 
       await(Async.sleep(VISUALS.loser_reveal_seconds or 0.15))
+      if not tournament_visual_job_is_valid(player_id, visual_epoch) then
+        return false
+      end
 
-      await(squash_participant(player_id, tournament, move.index))
+      await(squash_participant(player_id, tournament, move.index, visual_epoch))
+      if not tournament_visual_job_is_valid(player_id, visual_epoch) then
+        return false
+      end
+
       await(Async.sleep(VISUALS.after_squash_seconds or 0.3))
+      if not tournament_visual_job_is_valid(player_id, visual_epoch) then
+        return false
+      end
 
-      -- The rewrite removes/re-adds the mug at its destination. Updating x/y here
-      -- produces the same visual beat without reallocating the sprite.
       move_participant_ui(player_id, tournament, move.index, move.to_pos)
-
-      -- Once the winner arrives, the temporary Blue Moon glow disappears while the
-      -- permanent base path remains visible as tournament history.
       remove_visual_element(player_id, overlay_id)
 
-      await(unsquash_participant(player_id, tournament, move.index))
+      await(unsquash_participant(player_id, tournament, move.index, visual_epoch))
+      if not tournament_visual_job_is_valid(player_id, visual_epoch) then
+        return false
+      end
+
       await(Async.sleep(VISUALS.after_unsquash_seconds or 0.3))
+      if not tournament_visual_job_is_valid(player_id, visual_epoch) then
+        return false
+      end
 
       if move_index < #moves then
         await(Async.sleep(VISUALS.between_matches_seconds or 0.5))
+        if not tournament_visual_job_is_valid(player_id, visual_epoch) then
+          return false
+        end
       end
     end
 
     await(Async.sleep(VISUALS.transition_after_seconds or 1.5))
+    return tournament_visual_job_is_valid(player_id, visual_epoch)
   end)
 end
 
@@ -2267,9 +2414,27 @@ local function draw_tournament_board_for_player(player_id, tournament, mode)
     return async(function() return false end)
   end
 
+  local visual_epoch = current_player_visual_epoch(player_id)
+
   return async(function()
+    if not tournament_visual_job_is_valid(player_id, visual_epoch) then
+      return false
+    end
+
     local area_id = Net.get_player_area(player_id)
     local music_area = acquire_tournament_music(area_id)
+
+    local function abort_if_player_gone()
+      if tournament_visual_job_is_valid(player_id, visual_epoch) then
+        return false
+      end
+
+      -- Do not attempt sprite/HUD/camera cleanup for a disconnected player.
+      -- Forget local bookkeeping and release only area-level music state.
+      player_visual_ids[player_id] = {}
+      release_tournament_music(music_area)
+      return true
+    end
 
     local bg_info = get_board_background(tournament)
     local pos = ui_data.unmoving_ui_pos or {}
@@ -2286,6 +2451,7 @@ local function draw_tournament_board_for_player(player_id, tournament, mode)
 
     pcall(Net.fade_player_camera, player_id, { r = 0, g = 0, b = 0, a = 255 }, VISUALS.fade_seconds)
     await(Async.sleep(VISUALS.fade_seconds))
+    if abort_if_player_gone() then return false end
 
     hide_tournament_text(player_id)
     erase_tournament_board(player_id)
@@ -2384,15 +2550,19 @@ local function draw_tournament_board_for_player(player_id, tournament, mode)
 
     pcall(Net.fade_player_camera, player_id, { r = 0, g = 0, b = 0, a = 0 }, VISUALS.fade_seconds)
     await(Async.sleep(VISUALS.fade_seconds))
+    if abort_if_player_gone() then return false end
 
     if animate_after_round and moves and #moves > 0 then
-      await(animate_winner_movements(player_id, tournament, moves))
+      await(animate_winner_movements(player_id, tournament, moves, visual_epoch))
     else
       await(Async.sleep(mode == "champion" and 3.0 or VISUALS.show_seconds))
     end
 
+    if abort_if_player_gone() then return false end
+
     pcall(Net.fade_player_camera, player_id, { r = 0, g = 0, b = 0, a = 255 }, VISUALS.fade_seconds)
     await(Async.sleep(VISUALS.fade_seconds))
+    if abort_if_player_gone() then return false end
 
     erase_tournament_board(player_id)
 
@@ -2401,6 +2571,11 @@ local function draw_tournament_board_for_player(player_id, tournament, mode)
     end
 
     release_tournament_music(music_area)
+
+    if not tournament_visual_job_is_valid(player_id, visual_epoch) then
+      player_visual_ids[player_id] = {}
+      return false
+    end
 
     pcall(Net.fade_player_camera, player_id, { r = 0, g = 0, b = 0, a = 0 }, VISUALS.fade_seconds)
     if not tournament_input_locked[player_id] then
@@ -2417,8 +2592,19 @@ local function show_tournament_board_to_players(tournament, mode)
       return false
     end
 
+    local preserve_existing_live_board = mode == "initial" or mode == "before_round"
+
     for_each_tournament_viewer(tournament, function(participant)
-      draw_tournament_board_for_player(participant.player_id, tournament, mode)
+      local player_id = participant.player_id
+
+      -- A spectator can join while the opening ceremony is still running. Their
+      -- persistent board must not be replaced by the transient initial/before-round
+      -- presentation, because that presentation intentionally erases itself.
+      if not (preserve_existing_live_board
+        and TourneyUX.live_board_viewers[player_id] == tournament.id)
+      then
+        draw_tournament_board_for_player(player_id, tournament, mode)
+      end
     end)
 
     await(Async.sleep(
@@ -2439,6 +2625,7 @@ local function tournament_text_available()
 end
 
 function hide_tournament_text(player_id)
+  if not player_id or not Net.is_player(player_id) then return end
   if not tournament_text_available() then return end
   pcall(Displayer.Text.removeTextBox, player_id, TOURNEY_TEXT.box_id)
 end
@@ -2599,56 +2786,330 @@ local function announce_join_to_other_registered_players(queue, joiner_id, joine
   end
 end
 
-local function show_persistent_tournament_text_for_player(player_id, message)
-  if not Net.is_player(player_id) then
+-- -----------------------------------------------------------------------------
+-- Persistent live tournament board / spectator UX
+-- -----------------------------------------------------------------------------
+
+function TourneyUX.participant_is_currently_battling(tournament, participant)
+  if not tournament or not participant then
     return false
   end
 
-  if not tournament_text_available() then
-    return false
+  for _, match in pairs(tournament.active_spectator_matches or {}) do
+    if match and participant_is_in_match(participant, match) then
+      return true
+    end
   end
 
-  local opts = {
-    -- This stays up until we explicitly remove/replace it.
-    page_advance = "wait_for_confirm",
-    confirm_during_typing = false,
-    open_seconds = TOURNEY_TEXT.backdrop.open_seconds,
+  return false
+end
 
-    wrap_opts = {
-      max_chars_for_line = function(line_idx_in_page, default_limit)
-        return math.max(default_limit, TOURNEY_TEXT.max_chars_per_line or default_limit)
+function TourneyUX.apply_live_board_eliminations(player_id, tournament)
+  if not tournament then return end
+
+  local current_round = tonumber(tournament.current_round or 0) or 0
+
+  for _, participant in ipairs(tournament.all_participants or {}) do
+    if participant.eliminated then
+      local eliminated_round = tonumber(participant.eliminated_round or 0) or 0
+
+      -- Never reveal the current round's result early. Only losers whose result
+      -- was officially presented in a previous round are tinted on the live view.
+      if eliminated_round > 0 and eliminated_round < current_round then
+        tint_participant_eliminated(player_id, tournament, participant)
       end
-    }
-  }
+    end
+  end
+end
 
-  local ok, err = pcall(
-    Displayer.Text.resetTextBox,
-    player_id,
-    TOURNEY_TEXT.box_id,
-    message,
-    TOURNEY_TEXT.x,
-    TOURNEY_TEXT.y,
-    TOURNEY_TEXT.width,
-    TOURNEY_TEXT.height,
-    TOURNEY_TEXT.font,
-    TOURNEY_TEXT.scale,
-    TOURNEY_TEXT.z,
-    TOURNEY_TEXT.backdrop,
-    TOURNEY_TEXT.speed,
-    opts
-  )
-
-  if not ok then
-    print("[tournaments][textbox] persistent text failed: " .. tostring(err))
+function TourneyUX.update_live_board_frame_states_for_player(player_id, tournament)
+  if not tournament
+    or not Net.is_player(player_id)
+    or TourneyUX.live_board_viewers[player_id] ~= tournament.id
+    or not games
+    or not games.update_ui_element
+  then
     return false
+  end
+
+  local battling = {}
+
+  for _, match in pairs(tournament.active_spectator_matches or {}) do
+    if match then
+      if match.player1 then battling[match.player1.id] = true end
+      if match.player2 then battling[match.player2.id] = true end
+    end
+  end
+
+  for index, participant in ipairs(tournament.all_participants or {}) do
+    local frame_id = tournament_visual_id(tournament, "MUG_FRAME_" .. tostring(index))
+    local state = battling[participant.id] and "battling" or "ACTIVE"
+
+    pcall(games.update_ui_element, frame_id, player_id, {
+      animation_state = state,
+    })
   end
 
   return true
 end
 
-local function stop_watching_tournament(tournament, participant)
-  if not tournament or not participant or participant.kind ~= "player" then
+function TourneyUX.draw_live_tournament_board_for_player(player_id, tournament)
+  if not visuals_available() or not tournament or not Net.is_player(player_id) then
+    return false
+  end
+
+  local first_open = TourneyUX.live_board_viewers[player_id] ~= tournament.id
+  local bg_info = get_board_background(tournament)
+  local pos = ui_data.unmoving_ui_pos or {}
+  local positions = get_visual_positions(tournament, "before_round")
+  local completed_path_round = math.max(
+    0,
+    (tonumber(tournament.current_round or 1) or 1) - 1
+  )
+
+  if MenuAPI and MenuAPI.is_open and MenuAPI.is_open(player_id) then
+    -- A lobby/list should never remain layered over the persistent bracket.
+    pcall(MenuAPI.close_all, player_id, {
+      keep_frozen = true,
+      reason = "tournament_live_board",
+    })
+    TourneyUX.menu_views[player_id] = nil
+  end
+
+  if not Net.is_player(player_id) then
+    return false
+  end
+
+  hide_tournament_text(player_id)
+  erase_tournament_board(player_id)
+  set_player_tournament_input_locked(player_id, true)
+
+  if first_open and Net.toggle_player_hud then
+    pcall(Net.toggle_player_hud, player_id)
+  end
+
+  TourneyUX.live_board_viewers[player_id] = tournament.id
+
+  if bg_info then
+    draw_ui(
+      player_id,
+      tournament_visual_id(tournament, "BOARD_BG"),
+      bg_info.gradient_texture,
+      constants.default_background_anim_path_bn4,
+      "BG",
+      pos.bg
+    )
+    draw_ui(
+      player_id,
+      tournament_visual_id(tournament, "BOARD_GRID"),
+      bg_info.grid_texture,
+      constants.default_grid_anim_path_bn4,
+      "idle_ui",
+      pos.grid
+    )
+  end
+
+  draw_ui(
+    player_id,
+    tournament_visual_id(tournament, "BRACKET"),
+    constants.bracket_bm_bn4,
+    constants.default_bracket_anim_path_bn4,
+    "UI",
+    pos.bracket
+  )
+
+  draw_ui(
+    player_id,
+    tournament_visual_id(tournament, "CHAMPION_TOPPER"),
+    constants.champion_topper_bn4,
+    constants.champion_topper_bn4_anim,
+    "UI",
+    pos.champion_topper_bn4
+  )
+
+  local title_banner_texture = get_tournament_title_banner_texture(tournament)
+  if title_banner_texture then
+    draw_ui(
+      player_id,
+      tournament_visual_id(tournament, "TITLE_BANNER"),
+      title_banner_texture,
+      constants.title_banner_anim_path,
+      constants.title_banner_state or "TITLE",
+      pos.title_banner
+    )
+  end
+
+  draw_ui(
+    player_id,
+    tournament_visual_id(tournament, "CROWN_1"),
+    constants.crown_texture_path,
+    constants.crown_anim_path,
+    "INACTIVE",
+    pos.crown1
+  )
+
+  draw_ui(
+    player_id,
+    tournament_visual_id(tournament, "CROWN_2"),
+    constants.crown_texture_path,
+    constants.crown_anim_path,
+    "INACTIVE",
+    pos.crown2
+  )
+
+  -- The live board only shows paths already officially revealed in prior rounds.
+  draw_completed_paths(player_id, tournament, completed_path_round)
+
+  for i, participant in ipairs(tournament.all_participants or {}) do
+    add_participant_mugshot(player_id, tournament, i, participant, positions[i])
+  end
+
+  TourneyUX.apply_live_board_eliminations(player_id, tournament)
+  TourneyUX.update_live_board_frame_states_for_player(player_id, tournament)
+  return true
+end
+
+function TourneyUX.close_live_board_for_player(player_id, tournament, keep_tournament_lock)
+  local tid = tournament and tournament.id or TourneyUX.live_board_viewers[player_id]
+
+  if not tid or TourneyUX.live_board_viewers[player_id] ~= tid then
+    return false
+  end
+
+  -- Cancel any old async presentation for this player before changing ownership of
+  -- the board sprites. A new presentation captures the new epoch afterward.
+  invalidate_player_visual_jobs(player_id)
+
+  TourneyUX.live_board_viewers[player_id] = nil
+
+  if not Net.is_player(player_id) then
+    player_visual_ids[player_id] = {}
+    tournament_input_locked[player_id] = nil
+    return true
+  end
+
+  hide_tournament_text(player_id)
+  erase_tournament_board(player_id)
+
+  if Net.toggle_player_hud then
+    pcall(Net.toggle_player_hud, player_id)
+  end
+
+  if keep_tournament_lock then
+    set_player_tournament_input_locked(player_id, true)
+  else
+    set_player_tournament_input_locked(player_id, false)
+  end
+
+  return true
+end
+
+function TourneyUX.cancel_spectator_prompt(player_id)
+  if not spectator_prompt_open[player_id] then
     return
+  end
+
+  spectator_prompt_open[player_id] = nil
+
+  if MenuAPI and MenuAPI.is_open and MenuAPI.is_open(player_id) then
+    pcall(MenuAPI.close_all, player_id, {
+      keep_frozen = true,
+      reason = "tournament_presentation",
+    })
+  end
+end
+
+function TourneyUX.close_live_boards_for_tournament(tournament, keep_tournament_lock)
+  if not tournament then return end
+
+  local viewers = {}
+  for player_id, tournament_id in pairs(TourneyUX.live_board_viewers) do
+    if tournament_id == tournament.id then
+      viewers[#viewers + 1] = player_id
+    end
+  end
+
+  for _, player_id in ipairs(viewers) do
+    TourneyUX.cancel_spectator_prompt(player_id)
+    TourneyUX.close_live_board_for_player(
+      player_id,
+      tournament,
+      keep_tournament_lock
+    )
+  end
+end
+
+function TourneyUX.refresh_live_board_viewers(tournament)
+  if not tournament then return end
+
+  for player_id, tournament_id in pairs(TourneyUX.live_board_viewers) do
+    if tournament_id == tournament.id and Net.is_player(player_id) then
+      TourneyUX.update_live_board_frame_states_for_player(player_id, tournament)
+    end
+  end
+end
+
+function TourneyUX.open_live_boards_for_waiting_viewers(tournament)
+  if not tournament then return end
+
+  for_each_tournament_viewer(tournament, function(participant)
+    local player_id = participant.player_id
+    local in_active_match = participant_is_in_any_active_match(tournament, participant)
+    local engine_battling = false
+
+    if Net.is_player_battling then
+      local ok, value = pcall(Net.is_player_battling, player_id)
+      engine_battling = ok and value == true
+    end
+
+    if in_active_match or engine_battling then
+      if TourneyUX.live_board_viewers[player_id] == tournament.id then
+        TourneyUX.close_live_board_for_player(player_id, tournament, true)
+      end
+    else
+      if TourneyUX.live_board_viewers[player_id] ~= tournament.id then
+        TourneyUX.draw_live_tournament_board_for_player(player_id, tournament)
+      else
+        TourneyUX.update_live_board_frame_states_for_player(player_id, tournament)
+      end
+    end
+  end)
+end
+
+function TourneyUX.show_spectator_notice(player_id)
+  -- Keep the short spectator instruction visually tied to the tournament board.
+  show_tournament_text_for_player(
+    player_id,
+    "Spectating tournament.{end_line}Press B to stop spectating.",
+    2.0
+  )
+end
+
+function TourneyUX.enter_spectator_mode(tournament, participant, show_notice)
+  if not tournament or not participant or participant.kind ~= "player" then
+    return false
+  end
+
+  local player_id = participant.player_id
+  if not Net.is_player(player_id) then
+    return false
+  end
+
+  participant.wants_updates = true
+  participant.spectating = true
+  set_player_tournament_input_locked(player_id, true)
+  TourneyUX.draw_live_tournament_board_for_player(player_id, tournament)
+
+  if show_notice ~= false then
+    TourneyUX.show_spectator_notice(player_id)
+  end
+
+  return true
+end
+
+function TourneyUX.stop_watching_tournament(tournament, participant)
+  if not tournament or not participant or participant.kind ~= "player" then
+    return false
   end
 
   local player_id = participant.player_id
@@ -2656,205 +3117,146 @@ local function stop_watching_tournament(tournament, participant)
   participant.wants_updates = false
   participant.spectating = false
 
+  TourneyUX.cancel_spectator_prompt(player_id)
+  TourneyUX.close_live_board_for_player(player_id, tournament, false)
   hide_tournament_text(player_id)
-  erase_tournament_board(player_id)
   set_player_tournament_input_locked(player_id, false)
 
-  message_player_safe(player_id, "You stopped watching the tournament.")
+  if participant.is_spectator_only then
+    if tournament.spectators then
+      tournament.spectators[player_id] = nil
+    end
+
+    if player_to_tournament[player_id] == tournament.id then
+      player_to_tournament[player_id] = nil
+    end
+  end
+
+  message_player_safe(player_id, "You stopped spectating the tournament.")
+  return true
 end
 
-local function match_should_show_battle_progress(match)
-  return match and (is_human(match.player1) or is_human(match.player2))
-end
-
-local function restore_battle_progress_if_needed(tournament, participant)
-  if not tournament or not participant or participant.kind ~= "player" then
-    return
+function TourneyUX.ask_player_stop_spectating(tournament, player_id)
+  if not tournament or not Net.is_player(player_id) then
+    return false
   end
 
-  local match = nil
-
-  for _, active_match in pairs(tournament.active_spectator_matches or {}) do
-    if match_should_show_battle_progress(active_match)
-      and not participant_is_in_match(participant, active_match)
-    then
-      match = active_match
-      break
-    end
+  local participant = get_player_participant(tournament, player_id)
+  if not participant
+    or participant.kind ~= "player"
+    or not participant.eliminated
+    or participant.spectating ~= true
+    or participant.wants_updates == false
+  then
+    return false
   end
 
-  if not match then
-    match = tournament.active_spectator_match
+  if spectator_prompt_open[player_id] then
+    return false
   end
 
-  if not match_should_show_battle_progress(match) then
-    return
-  end
-
-  if participant_is_in_match(participant, match) then
-    return
-  end
-
-  if participant_wants_tournament_updates(participant) then
-    show_persistent_tournament_text_for_player(
-      participant.player_id,
-      SETTINGS.spectator_battle_message
-    )
-  end
-end
-
-local function ask_player_keep_watching_tournament(tournament, player_id, prompt)
-  return async(function()
-    if not tournament or not Net.is_player(player_id) then
-      return false
-    end
-
-    local participant = get_player_participant(tournament, player_id)
-    if not participant or participant.kind ~= "player" then
-      return false
-    end
-
-    if spectator_prompt_open[player_id] then
-      return false
-    end
-
-    spectator_prompt_open[player_id] = true
-
-    -- IMPORTANT:
-    -- Temporarily opt them OUT while the question is open.
-    -- This prevents tournament text/board broadcasts from drawing over Async.question_player().
-    participant.wants_updates = false
-    participant.spectating = false
-
-    hide_tournament_text(player_id)
-    erase_tournament_board(player_id)
-
-    -- Let the question UI receive input cleanly.
-    set_player_tournament_input_locked(player_id, false)
-
-    if Input and Input.swallow then
-      Input.swallow(player_id, 0.15)
-    end
-
-    local result = await(Async.question_player(
+  if not MenuAPI or not MenuAPI.open then
+    message_player_safe(
       player_id,
-      prompt or "Keep watching the tournament?"
-    ))
+      "MenuAPI is unavailable; spectator mode was left unchanged."
+    )
+    return false
+  end
 
-    -- Assumption: 1 = Yes, 0 = No.
-    -- If your server shows this reversed, flip this one line.
-    local keep_watching = (result == 1 or result == true or tostring(result):lower() == "yes")
+  spectator_prompt_open[player_id] = true
 
-    if keep_watching and active_tournaments[tournament.id] == tournament then
-      participant.wants_updates = true
+  local function resume_spectating()
+    spectator_prompt_open[player_id] = nil
+    TourneyUX.spectator_cancel_guard_until[player_id] = os.clock() + 0.12
+
+    if active_tournaments[tournament.id] == tournament
+      and Net.is_player(player_id)
+      and participant.wants_updates ~= false
+    then
       participant.spectating = true
       set_player_tournament_input_locked(player_id, true)
 
-      restore_battle_progress_if_needed(tournament, participant)
-
-    elseif keep_watching then
-      -- Tournament ended while the question was open.
-      participant.wants_updates = false
-      participant.spectating = false
-      hide_tournament_text(player_id)
-      erase_tournament_board(player_id)
-      set_player_tournament_input_locked(player_id, false)
-
-      if Input and Input.swallow then
-        Input.swallow(player_id, 0.25)
+      if TourneyUX.live_board_viewers[player_id] ~= tournament.id then
+        TourneyUX.draw_live_tournament_board_for_player(player_id, tournament)
+      else
+        TourneyUX.update_live_board_frame_states_for_player(player_id, tournament)
       end
-    else
-      -- Already opted out above. Just keep them out.
-      participant.wants_updates = false
-      participant.spectating = false
-
-      hide_tournament_text(player_id)
-      erase_tournament_board(player_id)
-      set_player_tournament_input_locked(player_id, false)
     end
+  end
 
+  local ok, err = pcall(MenuAPI.open, player_id, {
+    type = 4,
+    title = "Tournament",
+    lines = { "Stop spectating?" },
+    yes_text = "Yes",
+    no_text = "No",
+    default_choice = "no",
+    lock_input = true,
+
+    on_confirm = function(pid, row)
+      local choice = tostring(row and (row.id or row.choice) or "no"):lower()
+
+      if choice == "yes" then
+        spectator_prompt_open[pid] = nil
+        pcall(MenuAPI.close, pid, {
+          keep_frozen = true,
+          reason = "stop_spectating_yes",
+        })
+        TourneyUX.stop_watching_tournament(tournament, participant)
+      else
+        spectator_prompt_open[pid] = nil
+        pcall(MenuAPI.close, pid, {
+          keep_frozen = true,
+          reason = "stop_spectating_no",
+        })
+        resume_spectating()
+      end
+    end,
+
+    on_cancel = function(pid)
+      -- B means No: close the confirmation and return to the live board.
+      spectator_prompt_open[pid] = nil
+      pcall(MenuAPI.close, pid, {
+        keep_frozen = true,
+        reason = "stop_spectating_cancel",
+      })
+      resume_spectating()
+      return true
+    end,
+
+    on_close = function(pid)
+      -- If another tournament presentation force-closes this prompt, keep the
+      -- participant enrolled as a spectator; the presentation will take over.
+      if spectator_prompt_open[pid] then
+        resume_spectating()
+      end
+    end,
+  })
+
+  if not ok then
     spectator_prompt_open[player_id] = nil
-    return keep_watching
-  end)
-end
-
-local function start_eliminated_player_spectator_prompt(tournament, loser)
-  if not tournament or not loser or loser.kind ~= "player" then
+    print("[tournaments][spectator] stop confirmation failed: " .. tostring(err))
+    set_player_tournament_input_locked(player_id, true)
     return false
   end
-
-  if tournament.status == "completed" then
-    return false
-  end
-
-  -- Don't bother asking after the final match.
-  if (tournament.current_round or 0) >= 3 then
-    return false
-  end
-
-  if loser.wants_updates == false then
-    return false
-  end
-
-  local player_id = loser.player_id
-  if not Net.is_player(player_id) then
-    return false
-  end
-
-  -- Opt out immediately, before the async question starts.
-  -- This prevents later tournament text/board updates from drawing over the question.
-  loser.wants_updates = false
-  loser.spectating = false
-
-  hide_tournament_text(player_id)
-  erase_tournament_board(player_id)
-  set_player_tournament_input_locked(player_id, false)
-
-  ask_player_keep_watching_tournament(
-    tournament,
-    player_id,
-    "You've been eliminated. Keep watching?"
-  )
 
   return true
 end
 
-local function show_battle_in_progress_to_spectators(tournament, match)
-  local shown_to = {}
-
-  if not tournament or not match then
-    return shown_to
+function TourneyUX.start_eliminated_player_spectating(tournament, loser)
+  if not tournament or not loser or loser.kind ~= "player" then
+    return false
   end
 
-  -- Only show this for matches that can actually take a while.
-  -- NPC vs NPC is simulated almost instantly, so no need.
-  if not (is_human(match.player1) or is_human(match.player2)) then
-    return shown_to
+  if tournament.status == "completed" or (tournament.current_round or 0) >= 3 then
+    return false
   end
 
-  for _, participant in ipairs(tournament.all_participants or {}) do
-    if participant_wants_tournament_updates(participant)
-      and not participant_is_in_match(participant, match)
-      and not participant_is_in_any_active_match(tournament, participant)
-    then
-      if show_persistent_tournament_text_for_player(
-        participant.player_id,
-        SETTINGS.spectator_battle_message
-      ) then
-        shown_to[#shown_to + 1] = participant.player_id
-      end
-    end
+  if not Net.is_player(loser.player_id) then
+    return false
   end
 
-  return shown_to
-end
-
-local function hide_tournament_text_for_players(player_ids)
-  for _, player_id in ipairs(player_ids or {}) do
-    if Net.is_player(player_id) then
-      hide_tournament_text(player_id)
-    end
-  end
+  return TourneyUX.enter_spectator_mode(tournament, loser, true)
 end
 
 local function show_tournament_text_to_players(tournament, message, hold_seconds)
@@ -2883,10 +3285,101 @@ end
 -- Announcements / board messages
 -- -----------------------------------------------------------------------------
 
-function message_player_safe(player_id, message)
-  if player_id and Net.is_player(player_id) then
-    pcall(Net.message_player, player_id, message)
+local TOURNAMENT_NOTICE_BOX_ID = "menuapi_tournament_notice"
+local standalone_tournament_notices = {}
+
+local function clear_tournament_notice(player_id)
+  standalone_tournament_notices[player_id] = nil
+
+  if MenuAPI and MenuAPI.hide_message then
+    pcall(MenuAPI.hide_message, player_id, TOURNAMENT_NOTICE_BOX_ID)
   end
+
+  if Displayer and Displayer.Text and Displayer.Text.removeTextBox then
+    pcall(Displayer.Text.removeTextBox, player_id, TOURNAMENT_NOTICE_BOX_ID)
+  end
+end
+
+local function show_standalone_tournament_notice(player_id, message)
+  if not (Displayer and Displayer.Text and Displayer.Text.resetTextBox) then
+    return false
+  end
+
+  clear_tournament_notice(player_id)
+
+  local text = tostring(message or ""):gsub("{end_line}", "\n")
+  local opts = {
+    page_advance = "wait_for_confirm",
+    confirm_during_typing = true,
+    open_seconds = TOURNEY_TEXT.backdrop.open_seconds,
+    wrap_opts = {
+      max_chars_for_line = function(line_idx_in_page, default_limit)
+        return math.max(default_limit, TOURNEY_TEXT.max_chars_per_line or default_limit)
+      end
+    }
+  }
+
+  local ok, err = pcall(
+    Displayer.Text.resetTextBox,
+    player_id,
+    TOURNAMENT_NOTICE_BOX_ID,
+    text,
+    TOURNEY_TEXT.x,
+    TOURNEY_TEXT.y,
+    TOURNEY_TEXT.width,
+    TOURNEY_TEXT.height,
+    TOURNEY_TEXT.font,
+    TOURNEY_TEXT.scale,
+    TOURNEY_TEXT.z,
+    TOURNEY_TEXT.backdrop,
+    TOURNEY_TEXT.speed,
+    opts
+  )
+
+  if not ok then
+    print("[tournaments][notice] standalone message failed: " .. tostring(err))
+    return false
+  end
+
+  standalone_tournament_notices[player_id] = true
+  return true
+end
+
+function message_player_safe(player_id, message)
+  if not player_id or not Net.is_player(player_id) then
+    return false
+  end
+
+  -- If a MenuAPI window is open, use its modal message handling so Confirm
+  -- advances/finishes the textbox instead of selecting the row underneath it.
+  if MenuAPI
+    and MenuAPI.show_message
+    and MenuAPI.is_open
+    and MenuAPI.is_open(player_id)
+  then
+    clear_tournament_notice(player_id)
+
+    local ok, shown = pcall(MenuAPI.show_message, player_id, tostring(message or ""), {
+      box_id = TOURNAMENT_NOTICE_BOX_ID,
+      modal = true,
+      page_advance = "wait_for_confirm",
+      confirm_during_typing = true,
+      speed = 80,
+    })
+
+    if ok and shown ~= false then
+      return true
+    end
+  end
+
+  -- Outside MenuAPI, draw the same style box directly. A fresh Confirm press
+  -- advances it; reaching the final page removes it from the player's screen.
+  if show_standalone_tournament_notice(player_id, message) then
+    return true
+  end
+
+  print("[tournaments][notice] tournament message unavailable for " .. tostring(player_id) .. ": " .. tostring(message))
+  return false
 end
 
 local function announce_to_tournament(tournament, message)
@@ -2914,7 +3407,7 @@ local function build_queue_summary(queue)
   lines[#lines + 1] = queue.name .. " Queue"
 
   if SETTINGS.scheduled_enabled == true then
-    lines[#lines + 1] = "Starts in: " .. format_duration(seconds_until_next_scheduled_tournament(queue))
+    lines[#lines + 1] = "Starts in " .. format_lobby_countdown(seconds_until_next_scheduled_tournament(queue))
   end
 
   if #queue.participants == 0 then
@@ -3004,6 +3497,10 @@ local function remove_from_queue(player_id, quiet)
     )
   end
 
+  if TourneyUX.refresh_queue_menu_viewers then
+    TourneyUX.refresh_queue_menu_viewers(queue, true)
+  end
+
   return true
 end
 
@@ -3023,6 +3520,8 @@ end
 local function prune_busy_queue_participants(queue)
   if not queue then return end
 
+  local changed = false
+
   for i = #queue.participants, 1, -1 do
     local participant = queue.participants[i]
 
@@ -3041,6 +3540,7 @@ local function prune_busy_queue_participants(queue)
       if should_remove then
         player_to_queue[player_id] = nil
         table.remove(queue.participants, i)
+        changed = true
 
         if reason then
           message_player_safe(player_id, reason)
@@ -3051,6 +3551,11 @@ local function prune_busy_queue_participants(queue)
 
   if queue.host_player_id and not find_participant_index(queue.participants, queue.host_player_id) then
     queue.host_player_id = queue.participants[1] and queue.participants[1].player_id or nil
+    changed = true
+  end
+
+  if changed and TourneyUX.refresh_queue_menu_viewers then
+    TourneyUX.refresh_queue_menu_viewers(queue, true)
   end
 end
 
@@ -3061,7 +3566,7 @@ local function add_player_to_queue(queue, player_id)
 
   if not tournament_registration_is_open(queue) then
     return false, "Registration is closed. Next tournament starts in " ..
-      format_duration(seconds_until_next_scheduled_tournament(queue)) .. "."
+      format_minutes_only(seconds_until_next_scheduled_tournament(queue)) .. "."
   end
 
   if Net.is_player_battling and Net.is_player_battling(player_id) then
@@ -3094,12 +3599,17 @@ local function add_player_to_queue(queue, player_id)
     participant_name(participant)
   )
 
+  if TourneyUX.refresh_queue_menu_viewers then
+    TourneyUX.refresh_queue_menu_viewers(queue, true)
+  end
+
   message_player_safe(
     player_id,
     "You're registered! Tournament starts in " ..
-    format_duration(seconds_until_next_scheduled_tournament(queue)) ..
+    format_minutes_only(seconds_until_next_scheduled_tournament(queue)) ..
     ". Please avoid random encounters and PVP until it starts."
   )
+
   return true
 end
 
@@ -3157,6 +3667,7 @@ local function fill_with_npcs(participants, queue)
 end
 
 local function create_tournament_from_queue(queue)
+  local npc_only = #(queue.participants or {}) == 0
   local participants, err = fill_with_npcs(queue.participants, queue)
   if err then
     return nil, err
@@ -3195,6 +3706,7 @@ local function create_tournament_from_queue(queue)
     winner_gp_reward = queue.winner_gp_reward or 0,
     winner_money_reward = queue.winner_money_reward or 0,
     deduct_opposing_team_gp = queue.deduct_opposing_team_gp == true,
+    npc_only = npc_only,
   }
 
   active_tournaments[tournament_id] = tournament
@@ -3214,25 +3726,31 @@ end
 
 local function cleanup_tournament(tournament)
   if not tournament then return end
+
+  TourneyUX.close_live_boards_for_tournament(tournament, false)
   set_tournament_input_locked(tournament, false)
 
   for _, participant in ipairs(tournament.all_participants or {}) do
     if participant.kind == "player" then
       local player_id = participant.player_id
 
+      TourneyUX.cancel_spectator_prompt(player_id)
       hide_tournament_text(player_id)
       erase_tournament_board(player_id)
 
       spectator_prompt_open[player_id] = nil
+      TourneyUX.live_board_viewers[player_id] = nil
       player_to_tournament[player_id] = nil
     end
   end
 
   for player_id, spectator in pairs(tournament.spectators or {}) do
+    TourneyUX.cancel_spectator_prompt(player_id)
     hide_tournament_text(player_id)
     erase_tournament_board(player_id)
 
     spectator_prompt_open[player_id] = nil
+    TourneyUX.live_board_viewers[player_id] = nil
     player_to_tournament[player_id] = nil
     set_player_tournament_input_locked(player_id, false)
   end
@@ -3245,6 +3763,10 @@ local function cleanup_tournament(tournament)
     queue.host_player_id = nil
     queue.active_tournament_id = nil
     queue.participants = {}
+
+    if TourneyUX.refresh_queue_menu_viewers then
+      TourneyUX.refresh_queue_menu_viewers(queue, true)
+    end
   end
 end
 
@@ -3438,6 +3960,8 @@ local function run_player_vs_player(match, tournament)
       end
     end
 
+    clear_tournament_notice(p1)
+    clear_tournament_notice(p2)
     local battle_promise = Async.initiate_pvp(p1, p2)
 
     -- If the battle eventually finishes after a timeout, still clean up HP/input.
@@ -3587,6 +4111,7 @@ local function run_player_vs_npc(player_participant, npc_participant, tournament
       end
     end
 
+    clear_tournament_notice(player_id)
     local battle_promise = Async.initiate_encounter(player_id, data.path or npc_participant.path, data)
 
     -- If the encounter eventually finishes after a timeout, still unlock input.
@@ -3630,7 +4155,7 @@ local function run_player_vs_npc(player_participant, npc_participant, tournament
   end)
 end
 
-local function run_npc_vs_npc(match)
+local function run_npc_vs_npc(match, tournament)
   return async(function()
     local p1 = match.player1
     local p2 = match.player2
@@ -3638,7 +4163,23 @@ local function run_npc_vs_npc(match)
     local w2 = math.max(1, tonumber(p2.weight or 50) or 50)
     local roll = math.random(1, w1 + w2)
 
-    await(Async.sleep(0.25))
+    local wait_seconds = 0.25
+
+    -- NPC-vs-NPC matches inside a normal human tournament remain nearly
+    -- instant. Only a fully synthetic exhibition tournament gets a visible
+    -- "battle" duration so spectators have time to watch the active frames.
+    if tournament and tournament.npc_only then
+      local min_wait = math.max(0, tonumber(SETTINGS.npc_only_match_min_seconds or 8) or 8)
+      local max_wait = math.max(min_wait, tonumber(SETTINGS.npc_only_match_max_seconds or 12) or 12)
+
+      -- Keep fractional configuration useful while still choosing a varied
+      -- duration. Randomize in tenths of a second.
+      local min_tenths = math.floor(min_wait * 10 + 0.5)
+      local max_tenths = math.floor(max_wait * 10 + 0.5)
+      wait_seconds = math.random(min_tenths, max_tenths) / 10
+    end
+
+    await(Async.sleep(wait_seconds))
 
     if roll <= w1 then
       return p1, p2
@@ -3646,6 +4187,16 @@ local function run_npc_vs_npc(match)
 
     return p2, p1
   end)
+end
+
+local function match_should_show_battle_progress(match, tournament)
+  if not match then return false end
+
+  if tournament and tournament.npc_only then
+    return true
+  end
+
+  return is_human(match.player1) or is_human(match.player2)
 end
 
 local function run_match(tournament, match, match_index, opts)
@@ -3667,14 +4218,10 @@ local function run_match(tournament, match, match_index, opts)
 
     local winner, loser
 
+    -- run_round_matches_parallel pre-populates all human-involved matches before
+    -- any battle coroutine starts, so every waiting viewer sees the correct set
+    -- of green "battling" frames immediately.
     tournament.active_spectator_matches = tournament.active_spectator_matches or {}
-
-    if match_should_show_battle_progress(match) then
-      tournament.active_spectator_matches[match_index] = match
-      tournament.active_spectator_match = match -- compatibility for older helper logic
-    end
-
-    local passive_watchers = show_battle_in_progress_to_spectators(tournament, match)
 
     if is_human(p1) and is_human(p2) then
       winner, loser = await(run_player_vs_player(match, tournament))
@@ -3683,27 +4230,20 @@ local function run_match(tournament, match, match_index, opts)
     elseif not is_human(p1) and is_human(p2) then
       winner, loser = await(run_player_vs_npc(p2, p1, tournament))
     else
-      winner, loser = await(run_npc_vs_npc(match))
+      winner, loser = await(run_npc_vs_npc(match, tournament))
     end
 
     if tournament.active_spectator_matches then
       tournament.active_spectator_matches[match_index] = nil
     end
 
-    local any_active_match = false
+    tournament.active_spectator_match = nil
     for _, active_match in pairs(tournament.active_spectator_matches or {}) do
       if active_match then
-        any_active_match = true
         tournament.active_spectator_match = active_match
         break
       end
     end
-
-    if not any_active_match then
-      tournament.active_spectator_match = nil
-    end
-
-    hide_tournament_text_for_players(passive_watchers)
 
     match.completed = true
     match.winner = winner
@@ -3716,9 +4256,7 @@ local function run_match(tournament, match, match_index, opts)
 
     tournament.round_results[tournament.current_round] = tournament.round_results[tournament.current_round] or {}
 
-    -- IMPORTANT:
-    -- Parallel matches finish in random order, so do NOT table.insert here.
-    -- Store by match_index to preserve bracket order.
+    -- Parallel matches finish in random order, so preserve bracket order by index.
     tournament.round_results[tournament.current_round][match_index] = {
       match = match_index,
       winner = winner,
@@ -3735,7 +4273,13 @@ local function run_match(tournament, match, match_index, opts)
       ), 2.5))
     end
 
-    start_eliminated_player_spectator_prompt(tournament, loser)
+    -- Losing humans automatically become spectators (except after the final).
+    TourneyUX.start_eliminated_player_spectating(tournament, loser)
+
+    -- The finished player can now return to the live bracket while other matches
+    -- continue. Current-round results remain unrevealed until the announcer phase.
+    TourneyUX.open_live_boards_for_waiting_viewers(tournament)
+    TourneyUX.refresh_live_board_viewers(tournament)
 
     await(Async.sleep(0.25))
     return winner, loser
@@ -3747,6 +4291,19 @@ local function run_round_matches_parallel(tournament)
     local jobs = {}
 
     tournament.active_spectator_matches = {}
+    tournament.active_spectator_match = nil
+
+    -- Mark every human-involved match active BEFORE starting any battle. This
+    -- avoids a race where one player's live board could briefly open before their
+    -- own match coroutine has registered itself.
+    for match_index, match in ipairs(tournament.matches or {}) do
+      if match_should_show_battle_progress(match, tournament) then
+        tournament.active_spectator_matches[match_index] = match
+        tournament.active_spectator_match = tournament.active_spectator_match or match
+      end
+    end
+
+    TourneyUX.open_live_boards_for_waiting_viewers(tournament)
 
     for match_index, match in ipairs(tournament.matches or {}) do
       jobs[#jobs + 1] = {
@@ -3767,6 +4324,10 @@ local function run_round_matches_parallel(tournament)
 
     tournament.active_spectator_matches = {}
     tournament.active_spectator_match = nil
+
+    -- The live waiting board ends before the official results. From here onward
+    -- the existing announcer -> advancing text -> animated result reveal is kept.
+    TourneyUX.close_live_boards_for_tournament(tournament, true)
 
     local winners = {}
     for i = 1, #(tournament.matches or {}) do
@@ -3888,10 +4449,10 @@ end
 local function run_tournament(tournament)
   return async(function()
     if not tournament then return end
-set_tournament_input_locked(tournament, true)
+    set_tournament_input_locked(tournament, true)
 
-await(show_tournament_text_to_players(tournament, tournament.name .. " is starting!", 2.5))
-await(show_tournament_board_to_players(tournament, "initial"))
+    await(show_tournament_text_to_players(tournament, tournament.name .. " is starting!", 2.5))
+    await(show_tournament_board_to_players(tournament, "initial"))
 
     local remaining = tournament.participants
     local round_number = 1
@@ -3901,12 +4462,12 @@ await(show_tournament_board_to_players(tournament, "initial"))
       tournament.matches = generate_matches(remaining)
       tournament.status = "round_" .. tostring(round_number)
 
-await(show_tournament_text_to_players(
-  tournament,
-  build_round_bracket_text(tournament),
-  3.0
-))
-await(show_tournament_board_to_players(tournament, "before_round"))
+      await(show_tournament_text_to_players(
+        tournament,
+        build_round_bracket_text(tournament),
+        3.0
+      ))
+      await(show_tournament_board_to_players(tournament, "before_round"))
       await(Async.sleep(0.75))
 
       local winners = await(run_round_matches_parallel(tournament))
@@ -3919,13 +4480,13 @@ await(show_tournament_board_to_players(tournament, "before_round"))
         names[#names + 1] = participant_name(participant)
       end
 
-await(show_tournament_text_to_players(tournament, string.format(
-  "Round %d complete!{end_line}Advancing: %s",
-  round_number,
-  table.concat(names, ", ")
-), 3.0))
+      await(show_tournament_text_to_players(tournament, string.format(
+        "Round %d complete!{end_line}Advancing: %s",
+        round_number,
+        table.concat(names, ", ")
+      ), 3.0))
 
-await(show_tournament_board_to_players(tournament, "after_round_animated"))
+      await(show_tournament_board_to_players(tournament, "after_round_animated"))
 
       await(Async.sleep(1.0))
       round_number = round_number + 1
@@ -3934,6 +4495,7 @@ await(show_tournament_board_to_players(tournament, "after_round_animated"))
     tournament.champion = remaining[1]
     tournament.status = "completed"
 
+    TourneyUX.close_live_boards_for_tournament(tournament, true)
     await(show_tournament_board_to_players(tournament, "champion"))
 
     await(show_tournament_text_to_players(tournament, string.format(
@@ -3948,6 +4510,12 @@ await(show_tournament_board_to_players(tournament, "after_round_animated"))
       tournament_announce(
         "Tournament " .. tostring(tournament.name or "Tournament") ..
         " has finished. Congratulations to " .. participant_name(tournament.champion),
+        { loops = 2 }
+      )
+    elseif tournament.npc_only and tournament.champion then
+      tournament_announce(
+        "Tournament " .. tostring(tournament.name or "Tournament") ..
+        " has finished. " .. participant_name(tournament.champion) .. " is the champion!",
         { loops = 2 }
       )
     else
@@ -3972,7 +4540,12 @@ start_queue_tournament = function(queue, starter_id, automatic)
 
   prune_busy_queue_participants(queue)
 
-  if #queue.participants == 0 then
+  local npc_only_start =
+    #queue.participants == 0
+    and automatic == true
+    and SETTINGS.npc_only_tournaments_enabled == true
+
+  if #queue.participants == 0 and not npc_only_start then
     if starter_id then
       message_player_safe(starter_id, "Nobody is registered for this tournament yet.")
     end
@@ -3982,7 +4555,7 @@ start_queue_tournament = function(queue, starter_id, automatic)
   if not automatic and SETTINGS.manual_start_enabled ~= true then
     if starter_id then
       message_player_safe(starter_id, "Tournament starts automatically. Next start in " ..
-        format_duration(seconds_until_next_scheduled_tournament(queue)) .. ".")
+        format_minutes_only(seconds_until_next_scheduled_tournament(queue)) .. ".")
     end
     return false
   end
@@ -3998,6 +4571,14 @@ start_queue_tournament = function(queue, starter_id, automatic)
       message_player_safe(starter_id, err or "Could not start tournament.")
     end
     return false
+  end
+
+  if TourneyUX.refresh_queue_menu_viewers then
+    TourneyUX.refresh_queue_menu_viewers(queue, true)
+  end
+
+  if TourneyUX.close_queue_menu_viewers then
+    TourneyUX.close_queue_menu_viewers(queue, tournament)
   end
 
   tournament_announce(
@@ -4024,20 +4605,7 @@ local function rewatch_eliminated_participant(tournament, player_id)
     return false, "You're already in this tournament."
   end
 
-  participant.wants_updates = true
-  participant.spectating = true
-
-  set_player_tournament_input_locked(player_id, true)
-
-  message_player_safe(player_id, "Now watching the tournament again. Press B during updates to stop watching.")
-
-  if tournament.active_spectator_match then
-    restore_battle_progress_if_needed(tournament, participant)
-  else
-    draw_tournament_board_for_player(player_id, tournament, "before_round")
-  end
-
-  return true
+  return TourneyUX.enter_spectator_mode(tournament, participant, true), nil
 end
 
 local function add_player_as_spectator(tournament, player_id)
@@ -4076,117 +4644,486 @@ local function add_player_as_spectator(tournament, player_id)
   tournament.spectators[player_id] = spectator
   player_to_tournament[player_id] = tournament.id
 
-  set_player_tournament_input_locked(player_id, true)
-
-  message_player_safe(player_id, "Now spectating the tournament. Press B during updates to stop watching.")
-
-  if tournament.active_spectator_match then
-    restore_battle_progress_if_needed(tournament, spectator)
-  else
-    draw_tournament_board_for_player(player_id, tournament, "before_round")
+  if not TourneyUX.enter_spectator_mode(tournament, spectator, true) then
+    tournament.spectators[player_id] = nil
+    player_to_tournament[player_id] = nil
+    return false, "Could not open tournament spectator mode."
   end
 
   return true
 end
 
 -- -----------------------------------------------------------------------------
--- Board UI
+-- MenuAPI tournament lobby
 -- -----------------------------------------------------------------------------
 
-local function open_tournament_menu(player_id, queue)
-  local posts = {}
-
-  if queue.status == "running" then
-    posts[#posts + 1] = { id = "spectate", read = true, title = "Spectate Current Tournament", author = "" }
-    posts[#posts + 1] = { id = "exit", read = true, title = "Exit", author = "" }
-  elseif player_to_queue[player_id] == queue.key then
-    posts[#posts + 1] = { id = "view", read = true, title = "View Queue", author = "" }
-
-    if SETTINGS.manual_start_enabled == true and queue.host_player_id == player_id then
-      posts[#posts + 1] = { id = "start", read = true, title = "Start Now (Backfill NPCs)", author = "" }
-    end
-
-    posts[#posts + 1] = { id = "leave", read = true, title = "Leave Queue", author = "" }
-    posts[#posts + 1] = { id = "exit", read = true, title = "Exit", author = "" }
-
-  elseif player_to_queue[player_id] and player_to_queue[player_id] ~= queue.key then
-    posts[#posts + 1] = {
-      id = "already_queued",
-      read = true,
-      title = "Already Registered",
-      author = ""
-    }
-    posts[#posts + 1] = { id = "exit", read = true, title = "Exit", author = "" }
-
-  else
-    if tournament_registration_is_open(queue) then
-      posts[#posts + 1] = { id = "join", read = true, title = "Register for Tournament", author = "" }
-    else
-      posts[#posts + 1] = {
-        id = "closed",
-        read = true,
-        title = "Registration opens soon",
-        author = ""
-      }
-    end
-
-    posts[#posts + 1] = { id = "view", read = true, title = "View Queue", author = "" }
-    posts[#posts + 1] = { id = "exit", read = true, title = "Exit", author = "" }
+function TourneyUX.seconds_until_registration_open(queue)
+  if SETTINGS.scheduled_enabled ~= true then
+    return 0
   end
 
-  local emitter = Net.open_board(player_id, queue.name, { r = 127, g = 127, b = 127 }, posts)
+  local lead = tonumber(
+    queue and queue.registration_lead_seconds
+      or SETTINGS.registration_lead_seconds
+      or 600
+  ) or 600
 
-  emitter:on("post_selection", function(event)
-    if event.post_id == "spectate" then
-      local tournament = queue.active_tournament_id and active_tournaments[queue.active_tournament_id] or nil
-      local ok, err = add_player_as_spectator(tournament, player_id)
-      if not ok then
-        message_player_safe(player_id, err or "Could not spectate tournament.")
-      end
-      return
+  return math.max(0, seconds_until_next_scheduled_tournament(queue) - lead)
+end
+
+function TourneyUX.active_match_count(tournament)
+  local count = 0
+  for _, match in pairs(tournament and tournament.active_spectator_matches or {}) do
+    if match then count = count + 1 end
+  end
+  return count
+end
+
+function TourneyUX.info_row(id, text, right)
+  return {
+    id = id,
+    text = text,
+    right = right,
+    selectable = false,
+  }
+end
+
+function TourneyUX.action_row(id, text)
+  return {
+    id = id,
+    text = text,
+    selectable = true,
+  }
+end
+
+function TourneyUX.separator_row()
+  return TourneyUX.info_row("separator", "----------------")
+end
+
+function TourneyUX.lobby_rows_for_player(player_id, queue)
+  local rows = {}
+  local active_tournament = queue.active_tournament_id
+    and active_tournaments[queue.active_tournament_id]
+    or nil
+
+  if queue.status == "running" and active_tournament then
+    rows[#rows + 1] = TourneyUX.info_row("status", "Tournament Running")
+    rows[#rows + 1] = TourneyUX.info_row(
+      "round",
+      "Round: " .. tostring(active_tournament.current_round or 0)
+    )
+    rows[#rows + 1] = TourneyUX.info_row(
+      "battles",
+      "Battles",
+      tostring(TourneyUX.active_match_count(active_tournament))
+    )
+    rows[#rows + 1] = TourneyUX.separator_row()
+
+    local participant = get_player_participant(active_tournament, player_id)
+    local can_spectate = not player_to_tournament[player_id]
+      or (participant and participant.eliminated and participant.wants_updates == false)
+
+    if can_spectate then
+      rows[#rows + 1] = TourneyUX.action_row("spectate", "Spectate")
+    elseif participant and participant.eliminated and participant.spectating == true then
+      rows[#rows + 1] = TourneyUX.info_row("spectating", "Already Spectating")
     end
-    if event.post_id == "already_queued" then
-      message_player_safe(
-        player_id,
-        "You're already registered for another tournament."
-      )
-      return
+
+    rows[#rows + 1] = TourneyUX.action_row("exit", "Exit")
+    return rows
+  end
+
+  local registered_here = player_to_queue[player_id] == queue.key
+  local registered_elsewhere = player_to_queue[player_id]
+    and player_to_queue[player_id] ~= queue.key
+  local registration_open = tournament_registration_is_open(queue)
+  local queue_full = #(queue.participants or {}) >= BRACKET_SIZE
+
+  if registered_here then
+    rows[#rows + 1] = TourneyUX.info_row("status", "Registered")
+  elseif registered_elsewhere then
+    rows[#rows + 1] = TourneyUX.info_row("status", "Registered Elsewhere")
+  elseif registration_open and queue_full then
+    rows[#rows + 1] = TourneyUX.info_row("status", "Signups: FULL")
+  elseif registration_open then
+    rows[#rows + 1] = TourneyUX.info_row("status", "Signups: OPEN")
+  else
+    rows[#rows + 1] = TourneyUX.info_row("status", "Signups: CLOSED")
+    rows[#rows + 1] = TourneyUX.info_row(
+      "opens",
+      "Opens in " .. format_lobby_countdown(TourneyUX.seconds_until_registration_open(queue))
+    )
+  end
+
+  if SETTINGS.scheduled_enabled == true then
+    rows[#rows + 1] = TourneyUX.info_row(
+      "starts",
+      "Starts in " .. format_lobby_countdown(seconds_until_next_scheduled_tournament(queue))
+    )
+  else
+    rows[#rows + 1] = TourneyUX.info_row("starts", "Starts manually")
+  end
+
+  rows[#rows + 1] = TourneyUX.info_row(
+    "players",
+    "Players",
+    tostring(#(queue.participants or {})) .. "/" .. tostring(BRACKET_SIZE)
+  )
+  rows[#rows + 1] = TourneyUX.separator_row()
+
+  if not registered_here
+    and not registered_elsewhere
+    and registration_open
+    and not queue_full
+  then
+    rows[#rows + 1] = TourneyUX.action_row("register", "Register")
+  end
+
+  rows[#rows + 1] = TourneyUX.action_row("view_players", "View Players")
+
+  if registered_here then
+    if SETTINGS.manual_start_enabled == true and queue.host_player_id == player_id then
+      rows[#rows + 1] = TourneyUX.action_row("start", "Start Now")
     end
-    if event.post_id == "join" then
-      local ok, err = add_player_to_queue(queue, player_id)
-      if not ok then
-        message_player_safe(player_id, err or "Could not join tournament.")
-        return
-      end
+    rows[#rows + 1] = TourneyUX.action_row("withdraw", "Withdraw")
+  end
 
-      if SETTINGS.auto_start_when_full and #queue.participants >= BRACKET_SIZE and queue.host_player_id then
-        start_queue_tournament(queue, queue.host_player_id)
-      end
+  rows[#rows + 1] = TourneyUX.action_row("exit", "Exit")
+  return rows
+end
 
-    elseif event.post_id == "view" then
-      message_player_safe(player_id, build_queue_summary(queue))
+function TourneyUX.registered_player_rows(queue)
+  local rows = {}
 
-    elseif event.post_id == "start" then
-      start_queue_tournament(queue, player_id)
+  for i, participant in ipairs(queue and queue.participants or {}) do
+    -- Keep entrant rows selectable so Type 1 can scroll naturally when the
+    -- list grows. Confirming a player row intentionally does nothing.
+    rows[#rows + 1] = TourneyUX.action_row(
+      "player_" .. tostring(i),
+      tostring(i) .. ". " .. participant_name(participant)
+    )
+  end
 
-    elseif event.post_id == "closed" then
-      message_player_safe(
-        player_id,
-        "Registration is closed. Next tournament starts in " ..
-        format_duration(seconds_until_next_scheduled_tournament(queue)) .. "."
-      )
+  if #rows == 0 then
+    rows[#rows + 1] = TourneyUX.info_row("empty", "No players yet")
+  end
 
-    elseif event.post_id == "leave" then
-      remove_from_queue(player_id)
-      message_player_safe(player_id, "You left the tournament queue.")
+  rows[#rows + 1] = TourneyUX.action_row("back", "Back")
+  return rows
+end
+
+function TourneyUX.menu_rows_signature(rows)
+  local parts = {}
+  for _, row in ipairs(rows or {}) do
+    parts[#parts + 1] = table.concat({
+      tostring(row.id or ""),
+      tostring(row.text or ""),
+      tostring(row.right or ""),
+      tostring(row.selectable ~= false),
+    }, "|")
+  end
+  return table.concat(parts, "\n")
+end
+
+function TourneyUX.refresh_tournament_menu_view(player_id, force)
+  local view = TourneyUX.menu_views[player_id]
+  if not view or not MenuAPI or not MenuAPI.set_rows then
+    return false
+  end
+
+  if not Net.is_player(player_id) then
+    TourneyUX.menu_views[player_id] = nil
+    return false
+  end
+
+  local queue = board_queues[view.queue_key]
+  if not queue then
+    TourneyUX.menu_views[player_id] = nil
+    return false
+  end
+
+  local rows
+  if view.view == "players" then
+    rows = TourneyUX.registered_player_rows(queue)
+  else
+    rows = TourneyUX.lobby_rows_for_player(player_id, queue)
+  end
+
+  local signature = TourneyUX.menu_rows_signature(rows)
+  if not force and signature == view.last_signature then
+    return true
+  end
+
+  local ok, result = pcall(MenuAPI.set_rows, player_id, rows, {
+    keep_cursor = true,
+  })
+
+  if ok and result ~= false then
+    view.last_signature = signature
+    return true
+  end
+
+  return false
+end
+
+TourneyUX.refresh_queue_menu_viewers = function(queue, force)
+  if not queue then return end
+
+  for player_id, view in pairs(TourneyUX.menu_views) do
+    if view.queue_key == queue.key then
+      TourneyUX.refresh_tournament_menu_view(player_id, force)
     end
-  end)
+  end
+end
+
+function TourneyUX.close_queue_menu_viewers(queue, tournament)
+  if not queue then return end
+
+  local viewers = {}
+  for player_id, view in pairs(TourneyUX.menu_views) do
+    if view.queue_key == queue.key then
+      viewers[#viewers + 1] = player_id
+    end
+  end
+
+  for _, player_id in ipairs(viewers) do
+    TourneyUX.menu_views[player_id] = nil
+
+    if MenuAPI and MenuAPI.is_open and MenuAPI.is_open(player_id) then
+      local is_participant = tournament
+        and player_to_tournament[player_id] == tournament.id
+
+      pcall(MenuAPI.close_all, player_id, {
+        keep_frozen = is_participant == true,
+        reason = "tournament_started",
+      })
+    end
+  end
+end
+
+function TourneyUX.open_registered_players_menu(player_id, queue)
+  if not MenuAPI or not MenuAPI.push then
+    message_player_safe(player_id, "Tournament menu is unavailable.")
+    return false
+  end
+
+  local view = TourneyUX.menu_views[player_id]
+  if view then
+    view.view = "players"
+    view.last_signature = nil
+  end
+
+  local ok, err = pcall(MenuAPI.push, player_id, {
+    type = 1,
+    title = "Registered Players",
+    rows = TourneyUX.registered_player_rows(queue),
+    lock_input = true,
+
+    on_confirm = function(pid, row)
+      if row and row.id == "back" then
+        pcall(MenuAPI.close, pid, {
+          reason = "tournament_players_back",
+        })
+      end
+    end,
+
+    on_cancel = function()
+      return false
+    end,
+
+    on_close = function(pid)
+      local current = TourneyUX.menu_views[pid]
+      if current and current.queue_key == queue.key then
+        current.view = "lobby"
+        current.last_signature = nil
+        async(function()
+          await(Async.sleep(0))
+          TourneyUX.refresh_tournament_menu_view(pid, true)
+        end)
+      end
+    end,
+  })
+
+  if not ok then
+    if view then view.view = "lobby" end
+    print("[tournaments][menu] player list failed: " .. tostring(err))
+    return false
+  end
+
+  TourneyUX.refresh_tournament_menu_view(player_id, true)
+  return true
+end
+
+function TourneyUX.open_withdraw_confirmation(player_id, queue)
+  if not MenuAPI or not MenuAPI.push then return false end
+
+  local ok, err = pcall(MenuAPI.push, player_id, {
+    type = 4,
+    title = "Tournament",
+    lines = { "Withdraw?" },
+    yes_text = "Yes",
+    no_text = "No",
+    default_choice = "no",
+    lock_input = true,
+
+    on_confirm = function(pid, row)
+      local choice = tostring(row and (row.id or row.choice) or "no"):lower()
+      pcall(MenuAPI.close, pid, { reason = "withdraw_choice" })
+
+      if choice == "yes" then
+        remove_from_queue(pid)
+        message_player_safe(pid, "You left the tournament queue.")
+        TourneyUX.refresh_queue_menu_viewers(queue, true)
+      end
+    end,
+
+    on_cancel = function()
+      return false
+    end,
+  })
+
+  if not ok then
+    print("[tournaments][menu] withdraw confirmation failed: " .. tostring(err))
+    return false
+  end
+
+  return true
+end
+
+function TourneyUX.open_start_confirmation(player_id, queue)
+  if not MenuAPI or not MenuAPI.push then return false end
+
+  local ok, err = pcall(MenuAPI.push, player_id, {
+    type = 4,
+    title = "Tournament",
+    lines = { "Start tournament now?" },
+    yes_text = "Yes",
+    no_text = "No",
+    default_choice = "no",
+    lock_input = true,
+
+    on_confirm = function(pid, row)
+      local choice = tostring(row and (row.id or row.choice) or "no"):lower()
+      pcall(MenuAPI.close, pid, { reason = "start_choice" })
+      if choice == "yes" then
+        start_queue_tournament(queue, pid)
+      end
+    end,
+
+    on_cancel = function()
+      return false
+    end,
+  })
+
+  if not ok then
+    print("[tournaments][menu] start confirmation failed: " .. tostring(err))
+    return false
+  end
+
+  return true
+end
+
+function TourneyUX.open_tournament_menu(player_id, queue)
+  if not MenuAPI or not MenuAPI.open then
+    message_player_safe(player_id, "Tournament menu is unavailable.")
+    return false
+  end
+
+  TourneyUX.menu_views[player_id] = {
+    queue_key = queue.key,
+    view = "lobby",
+    last_signature = nil,
+  }
+
+  local ok, err = pcall(MenuAPI.open, player_id, {
+    type = 1,
+    title = queue.name,
+    rows = TourneyUX.lobby_rows_for_player(player_id, queue),
+    lock_input = true,
+
+    on_confirm = function(pid, row)
+      if not row then return end
+      local id = row.id
+
+      if id == "register" then
+        local joined, join_err = add_player_to_queue(queue, pid)
+        if not joined then
+          message_player_safe(pid, join_err or "Could not join tournament.")
+        else
+          TourneyUX.refresh_queue_menu_viewers(queue, true)
+
+          if SETTINGS.auto_start_when_full
+            and #queue.participants >= BRACKET_SIZE
+            and queue.host_player_id
+          then
+            start_queue_tournament(queue, queue.host_player_id)
+          end
+        end
+
+      elseif id == "view_players" then
+        TourneyUX.open_registered_players_menu(pid, queue)
+
+      elseif id == "withdraw" then
+        TourneyUX.open_withdraw_confirmation(pid, queue)
+
+      elseif id == "start" then
+        TourneyUX.open_start_confirmation(pid, queue)
+
+      elseif id == "spectate" then
+        local tournament = queue.active_tournament_id
+          and active_tournaments[queue.active_tournament_id]
+          or nil
+
+        pcall(MenuAPI.close_all, pid, {
+          keep_frozen = true,
+          reason = "tournament_spectate",
+        })
+        TourneyUX.menu_views[pid] = nil
+
+        local spectate_ok, spectate_err = add_player_as_spectator(tournament, pid)
+        if not spectate_ok then
+          set_player_tournament_input_locked(pid, false)
+          message_player_safe(pid, spectate_err or "Could not spectate tournament.")
+        end
+
+      elseif id == "exit" then
+        TourneyUX.menu_views[pid] = nil
+        pcall(MenuAPI.close_all, pid, {
+          reason = "tournament_exit",
+        })
+      end
+    end,
+
+    on_cancel = function(pid)
+      TourneyUX.menu_views[pid] = nil
+      return false
+    end,
+
+    on_close = function(pid)
+      local view = TourneyUX.menu_views[pid]
+      if view and view.queue_key == queue.key and view.view == "lobby" then
+        TourneyUX.menu_views[pid] = nil
+      end
+    end,
+  })
+
+  if not ok then
+    TourneyUX.menu_views[player_id] = nil
+    print("[tournaments][menu] lobby failed: " .. tostring(err))
+    message_player_safe(player_id, "Could not open tournament menu.")
+    return false
+  end
+
+  TourneyUX.refresh_tournament_menu_view(player_id, true)
+  return true
 end
 
 -- -----------------------------------------------------------------------------
 -- Public API / integration helpers
 -- -----------------------------------------------------------------------------
 function Tournaments.unregister_if_queued_for_battle(player_id, reason)
+  clear_tournament_notice(player_id)
+
   if player_to_queue[player_id] and not player_to_tournament[player_id] then
     return unregister_player_from_queue(
       player_id,
@@ -4263,8 +5200,17 @@ local function run_scheduled_tournament_start(queue)
   end
 
   prune_busy_queue_participants(queue)
+  if TourneyUX.refresh_queue_menu_viewers then
+    TourneyUX.refresh_queue_menu_viewers(queue, true)
+  end
 
   if #queue.participants > 0 then
+    return start_queue_tournament(queue, nil, true)
+  end
+
+  if SETTINGS.npc_only_tournaments_enabled == true then
+    sdebug("[tournaments] Scheduled tournament time reached for " ..
+      tostring(queue.key) .. "; nobody registered, starting NPC exhibition tournament.")
     return start_queue_tournament(queue, nil, true)
   end
 
@@ -4304,6 +5250,10 @@ local function update_tournament_scheduler(event)
         "Tournament " .. tostring(queue.name or "Tournament") .. " is now open for registration",
         { loops = 2 }
       )
+
+      if TourneyUX.refresh_queue_menu_viewers then
+        TourneyUX.refresh_queue_menu_viewers(queue, true)
+      end
     end
 
     -- 5-minute warning.
@@ -4331,37 +5281,84 @@ local function update_tournament_scheduler(event)
   end
 end
 
+function TourneyUX.update_open_tournament_menus()
+  -- Check once per second so countdown boundaries are noticed promptly.
+  -- refresh_tournament_menu_view() compares row signatures first, so the
+  -- client is only redrawn when the visible bucket changes: once per minute
+  -- above 1m, then once every 5s during the final minute.
+  local now_second = os.time()
+  if TourneyUX.menu_last_refresh_second == now_second then
+    return
+  end
+
+  TourneyUX.menu_last_refresh_second = now_second
+
+  for player_id in pairs(TourneyUX.menu_views) do
+    if MenuAPI and MenuAPI.is_open and MenuAPI.is_open(player_id) then
+      TourneyUX.refresh_tournament_menu_view(player_id, false)
+    else
+      TourneyUX.menu_views[player_id] = nil
+    end
+  end
+end
+
 -- -----------------------------------------------------------------------------
 -- Event handlers
 -- -----------------------------------------------------------------------------
 Net:on("tick", function(event)
   update_tournament_scheduler(event)
-  if not SETTINGS.spectator_cancel_enabled then
+  TourneyUX.update_open_tournament_menus()
+end)
+
+Net:on("virtual_input", function(event)
+  local player_id = event and event.player_id
+  if not player_id or not Net.is_player(player_id) then
     return
   end
 
-  if not Input or not Input.pop then
-    return
-  end
+  for _, button in next, event.events or {} do
+    if button and button.state == 1 then
+      if button.name == "Confirm" and standalone_tournament_notices[player_id] then
+        if Displayer and Displayer.Text and Displayer.Text.advanceTextBox then
+          pcall(Displayer.Text.advanceTextBox, player_id, TOURNAMENT_NOTICE_BOX_ID)
 
-  for player_id, tournament_id in pairs(player_to_tournament) do
-    local tournament = active_tournaments[tournament_id]
-    local participant = get_player_participant(tournament, player_id)
+          local completed = false
+          if Displayer.Text.getTextBoxState then
+            local ok, state = pcall(Displayer.Text.getTextBoxState, player_id, TOURNAMENT_NOTICE_BOX_ID)
+            completed = ok and state == "completed"
+          elseif Displayer.Text.isTextBoxCompleted then
+            local ok, value = pcall(Displayer.Text.isTextBoxCompleted, player_id, TOURNAMENT_NOTICE_BOX_ID)
+            completed = ok and value == true
+          end
 
-    if tournament
-      and participant
-      and participant.kind == "player"
-      and participant.eliminated
-      and participant.wants_updates ~= false
-      and not spectator_prompt_open[player_id]
-      and Net.is_player(player_id)
-      and Input.pop(player_id, "cancel")
-    then
-      ask_player_keep_watching_tournament(
-        tournament,
-        player_id,
-        "Keep watching the tournament?"
-      )
+          if completed then
+            clear_tournament_notice(player_id)
+          end
+        end
+        return
+      end
+
+      if button.name == "Cancel" and SETTINGS.spectator_cancel_enabled then
+        local tournament_id = player_to_tournament[player_id]
+        local tournament = tournament_id and active_tournaments[tournament_id] or nil
+        local participant = get_player_participant(tournament, player_id)
+        local guard_until = TourneyUX.spectator_cancel_guard_until[player_id] or 0
+
+        if os.clock() >= guard_until
+          and tournament
+          and participant
+          and participant.kind == "player"
+          and participant.eliminated
+          and participant.spectating == true
+          and participant.wants_updates ~= false
+          and TourneyUX.live_board_viewers[player_id] == tournament.id
+          and not spectator_prompt_open[player_id]
+          and not (MenuAPI and MenuAPI.is_open and MenuAPI.is_open(player_id))
+        then
+          TourneyUX.ask_player_stop_spectating(tournament, player_id)
+        end
+        return
+      end
     end
   end
 end)
@@ -4405,8 +5402,9 @@ Net:on("object_interaction", function(event)
       and participant
       and participant.kind == "player"
       and participant.eliminated
+      and participant.spectating ~= true
     then
-      open_tournament_menu(player_id, queue)
+      TourneyUX.open_tournament_menu(player_id, queue)
       return
     end
 
@@ -4414,26 +5412,55 @@ Net:on("object_interaction", function(event)
     return
   end
 
-  open_tournament_menu(player_id, queue)
+  TourneyUX.open_tournament_menu(player_id, queue)
 end)
 
 Net:on("player_area_transfer", function(event)
   local player_id = event.player_id
 
+  if TourneyUX.menu_views[player_id] then
+    TourneyUX.menu_views[player_id] = nil
+    if MenuAPI and MenuAPI.is_open and MenuAPI.is_open(player_id) then
+      pcall(MenuAPI.close_all, player_id, {
+        reason = "tournament_area_transfer",
+      })
+    end
+  end
+
   -- Leaving an area while merely queued should unregister the player.
   -- Active tournament players are allowed to transfer because battles do that naturally.
   if player_to_queue[player_id] and not player_to_tournament[player_id] then
+    local key = player_to_queue[player_id]
     remove_from_queue(player_id)
+    if board_queues[key] and TourneyUX.refresh_queue_menu_viewers then
+      TourneyUX.refresh_queue_menu_viewers(board_queues[key], true)
+    end
   end
 end)
 
 Net:on("player_disconnect", function(event)
   local player_id = event.player_id
+
+  -- Invalidate FIRST. Any board coroutine that wakes after this event will stop
+  -- before its next sprite/path/mug operation. Do not call visual/text removal APIs
+  -- here: the native player object is already gone.
+  invalidate_player_visual_jobs(player_id)
+  standalone_tournament_notices[player_id] = nil
+  player_visual_ids[player_id] = {}
+  tournament_input_locked[player_id] = nil
+
+  TourneyUX.spectator_cancel_guard_until[player_id] = nil
   disconnected_players[player_id] = true
   spectator_prompt_open[player_id] = nil
+  TourneyUX.menu_views[player_id] = nil
+  TourneyUX.live_board_viewers[player_id] = nil
 
   if player_to_queue[player_id] then
+    local key = player_to_queue[player_id]
     remove_from_queue(player_id, true)
+    if board_queues[key] and TourneyUX.refresh_queue_menu_viewers then
+      TourneyUX.refresh_queue_menu_viewers(board_queues[key], true)
+    end
   end
 
   local tournament_id = player_to_tournament[player_id]
