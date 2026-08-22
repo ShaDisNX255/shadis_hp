@@ -1052,6 +1052,7 @@ local TourneyUX = {
   menu_last_refresh_second = nil,
   live_board_viewers = {},
   spectator_cancel_guard_until = {},
+  player_to_waiting_spectator_queue = {},
 }
 
 -- -----------------------------------------------------------------------------
@@ -1390,6 +1391,7 @@ local function get_board_queue(area_id, object_id, object)
       status = "waiting",
       host_player_id = nil,
       participants = {},
+      waiting_spectators = {},
       active_tournament_id = nil,
     }
     board_queues[key] = queue
@@ -3107,6 +3109,93 @@ function TourneyUX.enter_spectator_mode(tournament, participant, show_notice)
   return true
 end
 
+local STOP_SPECTATING_TOAST_BOX_ID = "TOURNEY_STOP_SPECTATING_TOAST"
+local stop_spectating_toast_tokens = {}
+
+local function show_stop_spectating_toast(player_id)
+  if not player_id or not Net.is_player(player_id) then
+    return false
+  end
+
+  if not (Displayer and Displayer.Text and Displayer.Text.resetTextBox) then
+    print("[tournaments][spectator] stop-spectating toast unavailable for " .. tostring(player_id))
+    return false
+  end
+
+  -- Invalidate any older removal timer for this player before drawing a new toast.
+  local token = (stop_spectating_toast_tokens[player_id] or 0) + 1
+  stop_spectating_toast_tokens[player_id] = token
+
+  if Displayer.Text.removeTextBox then
+    pcall(
+      Displayer.Text.removeTextBox,
+      player_id,
+      STOP_SPECTATING_TOAST_BOX_ID
+    )
+  end
+
+  local opts = {
+    page_advance = "auto_advance",
+    auto_advance_seconds = 2.0,
+    confirm_during_typing = false,
+    open_seconds = TOURNEY_TEXT.backdrop.open_seconds,
+
+    wrap_opts = {
+      max_chars_for_line = function(line_idx_in_page, default_limit)
+        return math.max(default_limit, TOURNEY_TEXT.max_chars_per_line or default_limit)
+      end
+    }
+  }
+
+  local ok, err = pcall(
+    Displayer.Text.resetTextBox,
+    player_id,
+    STOP_SPECTATING_TOAST_BOX_ID,
+    "You stopped spectating the tournament.",
+    TOURNEY_TEXT.x,
+    TOURNEY_TEXT.y,
+    TOURNEY_TEXT.width,
+    TOURNEY_TEXT.height,
+    TOURNEY_TEXT.font,
+    TOURNEY_TEXT.scale,
+    TOURNEY_TEXT.z,
+    TOURNEY_TEXT.backdrop,
+    TOURNEY_TEXT.speed,
+    opts
+  )
+
+  if not ok then
+    print("[tournaments][spectator] stop-spectating toast failed: " .. tostring(err))
+    return false
+  end
+
+  -- This notice is intentionally not interactive. Input is already unlocked,
+  -- so remove it ourselves after two seconds instead of waiting for Confirm.
+  async(function()
+    await(Async.sleep(2.0))
+
+    if stop_spectating_toast_tokens[player_id] ~= token then
+      return
+    end
+
+    stop_spectating_toast_tokens[player_id] = nil
+
+    if not Net.is_player(player_id) then
+      return
+    end
+
+    if Displayer and Displayer.Text and Displayer.Text.removeTextBox then
+      pcall(
+        Displayer.Text.removeTextBox,
+        player_id,
+        STOP_SPECTATING_TOAST_BOX_ID
+      )
+    end
+  end)
+
+  return true
+end
+
 function TourneyUX.stop_watching_tournament(tournament, participant)
   if not tournament or not participant or participant.kind ~= "player" then
     return false
@@ -3132,7 +3221,7 @@ function TourneyUX.stop_watching_tournament(tournament, participant)
     end
   end
 
-  message_player_safe(player_id, "You stopped spectating the tournament.")
+  show_stop_spectating_toast(player_id)
   return true
 end
 
@@ -3517,6 +3606,107 @@ local function unregister_player_from_queue(player_id, reason, quiet)
   return was_removed
 end
 
+function TourneyUX.remove_waiting_spectator(player_id, quiet)
+  local key = TourneyUX.player_to_waiting_spectator_queue[player_id]
+  if not key then
+    return false
+  end
+
+  local queue = board_queues[key]
+  TourneyUX.player_to_waiting_spectator_queue[player_id] = nil
+
+  if queue and queue.waiting_spectators then
+    queue.waiting_spectators[player_id] = nil
+  end
+
+  if queue and TourneyUX.refresh_queue_menu_viewers then
+    TourneyUX.refresh_queue_menu_viewers(queue, true)
+  end
+
+  if not quiet and Net.is_player(player_id) then
+    message_player_safe(
+      player_id,
+      "You won't automatically spectate this tournament."
+    )
+  end
+
+  return true
+end
+
+function TourneyUX.add_waiting_spectator(queue, player_id)
+  if not queue or queue.status ~= "waiting" then
+    return false, "This tournament has already started."
+  end
+
+  if not Net.is_player(player_id) then
+    return false, "Player not found."
+  end
+
+  if Net.is_player_battling and Net.is_player_battling(player_id) then
+    return false, "You can't sign up to spectate while you're in battle."
+  end
+
+  if player_to_queue[player_id] then
+    return false, "You're registered to play. Withdraw first if you only want to watch."
+  end
+
+  if player_to_tournament[player_id] then
+    return false, "You're already in a tournament or spectating one."
+  end
+
+  local existing_key = TourneyUX.player_to_waiting_spectator_queue[player_id]
+  if existing_key then
+    if existing_key == queue.key then
+      return false, "You're already set to spectate this tournament."
+    end
+    return false, "You're already set to spectate another tournament."
+  end
+
+  queue.waiting_spectators = queue.waiting_spectators or {}
+  queue.waiting_spectators[player_id] = true
+  TourneyUX.player_to_waiting_spectator_queue[player_id] = queue.key
+
+  if TourneyUX.refresh_queue_menu_viewers then
+    TourneyUX.refresh_queue_menu_viewers(queue, true)
+  end
+
+  message_player_safe(
+    player_id,
+    "You'll automatically spectate when the tournament starts."
+  )
+
+  return true
+end
+
+function TourneyUX.prune_waiting_spectators(queue)
+  if not queue then return end
+
+  queue.waiting_spectators = queue.waiting_spectators or {}
+
+  local changed = false
+
+  for player_id in pairs(queue.waiting_spectators) do
+    local remove = not Net.is_player(player_id)
+
+    if not remove and Net.is_player_battling then
+      local ok, battling = pcall(Net.is_player_battling, player_id)
+      remove = ok and battling == true
+    end
+
+    if remove then
+      queue.waiting_spectators[player_id] = nil
+      if TourneyUX.player_to_waiting_spectator_queue[player_id] == queue.key then
+        TourneyUX.player_to_waiting_spectator_queue[player_id] = nil
+      end
+      changed = true
+    end
+  end
+
+  if changed and TourneyUX.refresh_queue_menu_viewers then
+    TourneyUX.refresh_queue_menu_viewers(queue, true)
+  end
+end
+
 local function prune_busy_queue_participants(queue)
   if not queue then return end
 
@@ -3579,6 +3769,10 @@ local function add_player_to_queue(queue, player_id)
 
   if player_to_tournament[player_id] then
     return false, "You're already in a tournament."
+  end
+
+  if TourneyUX.player_to_waiting_spectator_queue[player_id] then
+    return false, "You're set to spectate a tournament. Stop spectating first if you want to register."
   end
 
   if #queue.participants >= BRACKET_SIZE then
@@ -3717,6 +3911,27 @@ local function create_tournament_from_queue(queue)
       player_to_tournament[participant.player_id] = tournament_id
     end
   end
+
+  -- Players may opt into watching before the tournament exists. Convert those
+  -- queue-level watcher reservations into normal spectator participants now.
+  for player_id in pairs(queue.waiting_spectators or {}) do
+    if Net.is_player(player_id) then
+      local spectator = make_player_participant(player_id)
+      spectator.id = "spectator:" .. tostring(tournament_id) .. ":" .. tostring(player_id)
+      spectator.eliminated = true
+      spectator.spectating = true
+      spectator.wants_updates = true
+      spectator.is_spectator_only = true
+
+      tournament.spectators[player_id] = spectator
+      player_to_tournament[player_id] = tournament_id
+    end
+
+    if TourneyUX.player_to_waiting_spectator_queue[player_id] == queue.key then
+      TourneyUX.player_to_waiting_spectator_queue[player_id] = nil
+    end
+  end
+  queue.waiting_spectators = {}
 
   queue.status = "running"
   queue.active_tournament_id = tournament_id
@@ -4539,6 +4754,7 @@ start_queue_tournament = function(queue, starter_id, automatic)
   end
 
   prune_busy_queue_participants(queue)
+  TourneyUX.prune_waiting_spectators(queue)
 
   local npc_only_start =
     #queue.participants == 0
@@ -4579,6 +4795,17 @@ start_queue_tournament = function(queue, starter_id, automatic)
 
   if TourneyUX.close_queue_menu_viewers then
     TourneyUX.close_queue_menu_viewers(queue, tournament)
+  end
+
+  -- Pre-registered spectators become real spectators as soon as the tournament
+  -- starts. This works for human, mixed, and NPC-only brackets.
+  for player_id, spectator in pairs(tournament.spectators or {}) do
+    if not TourneyUX.enter_spectator_mode(tournament, spectator, true) then
+      tournament.spectators[player_id] = nil
+      if player_to_tournament[player_id] == tournament.id then
+        player_to_tournament[player_id] = nil
+      end
+    end
   end
 
   tournament_announce(
@@ -4736,6 +4963,11 @@ function TourneyUX.lobby_rows_for_player(player_id, queue)
   local registered_here = player_to_queue[player_id] == queue.key
   local registered_elsewhere = player_to_queue[player_id]
     and player_to_queue[player_id] ~= queue.key
+  local watching_here =
+    TourneyUX.player_to_waiting_spectator_queue[player_id] == queue.key
+  local watching_elsewhere =
+    TourneyUX.player_to_waiting_spectator_queue[player_id]
+    and TourneyUX.player_to_waiting_spectator_queue[player_id] ~= queue.key
   local registration_open = tournament_registration_is_open(queue)
   local queue_full = #(queue.participants or {}) >= BRACKET_SIZE
 
@@ -4743,6 +4975,10 @@ function TourneyUX.lobby_rows_for_player(player_id, queue)
     rows[#rows + 1] = TourneyUX.info_row("status", "Registered")
   elseif registered_elsewhere then
     rows[#rows + 1] = TourneyUX.info_row("status", "Registered Elsewhere")
+  elseif watching_here then
+    rows[#rows + 1] = TourneyUX.info_row("status", "Watching Next")
+  elseif watching_elsewhere then
+    rows[#rows + 1] = TourneyUX.info_row("status", "Watching Elsewhere")
   elseif registration_open and queue_full then
     rows[#rows + 1] = TourneyUX.info_row("status", "Signups: FULL")
   elseif registration_open then
@@ -4773,6 +5009,8 @@ function TourneyUX.lobby_rows_for_player(player_id, queue)
 
   if not registered_here
     and not registered_elsewhere
+    and not watching_here
+    and not watching_elsewhere
     and registration_open
     and not queue_full
   then
@@ -4786,6 +5024,11 @@ function TourneyUX.lobby_rows_for_player(player_id, queue)
       rows[#rows + 1] = TourneyUX.action_row("start", "Start Now")
     end
     rows[#rows + 1] = TourneyUX.action_row("withdraw", "Withdraw")
+  elseif watching_here then
+    rows[#rows + 1] = TourneyUX.action_row("stop_waiting_spectate", "Stop Spectating")
+  elseif not registered_elsewhere and not watching_elsewhere then
+    -- Spectating is available even while registration itself is closed/full.
+    rows[#rows + 1] = TourneyUX.action_row("spectate", "Spectate")
   end
 
   rows[#rows + 1] = TourneyUX.action_row("exit", "Exit")
@@ -5070,21 +5313,31 @@ function TourneyUX.open_tournament_menu(player_id, queue)
         TourneyUX.open_start_confirmation(pid, queue)
 
       elseif id == "spectate" then
-        local tournament = queue.active_tournament_id
-          and active_tournaments[queue.active_tournament_id]
-          or nil
+        if queue.status == "running" then
+          local tournament = queue.active_tournament_id
+            and active_tournaments[queue.active_tournament_id]
+            or nil
 
-        pcall(MenuAPI.close_all, pid, {
-          keep_frozen = true,
-          reason = "tournament_spectate",
-        })
-        TourneyUX.menu_views[pid] = nil
+          pcall(MenuAPI.close_all, pid, {
+            keep_frozen = true,
+            reason = "tournament_spectate",
+          })
+          TourneyUX.menu_views[pid] = nil
 
-        local spectate_ok, spectate_err = add_player_as_spectator(tournament, pid)
-        if not spectate_ok then
-          set_player_tournament_input_locked(pid, false)
-          message_player_safe(pid, spectate_err or "Could not spectate tournament.")
+          local spectate_ok, spectate_err = add_player_as_spectator(tournament, pid)
+          if not spectate_ok then
+            set_player_tournament_input_locked(pid, false)
+            message_player_safe(pid, spectate_err or "Could not spectate tournament.")
+          end
+        else
+          local spectate_ok, spectate_err = TourneyUX.add_waiting_spectator(queue, pid)
+          if not spectate_ok then
+            message_player_safe(pid, spectate_err or "Could not reserve spectator mode.")
+          end
         end
+
+      elseif id == "stop_waiting_spectate" then
+        TourneyUX.remove_waiting_spectator(pid, false)
 
       elseif id == "exit" then
         TourneyUX.menu_views[pid] = nil
@@ -5179,7 +5432,18 @@ end
 function Tournaments.debug_state()
   print("[tournaments] queues:")
   for key, queue in pairs(board_queues) do
-    print(string.format("  %s status=%s players=%d host=%s", key, tostring(queue.status), #queue.participants, tostring(queue.host_player_id)))
+    local watcher_count = 0
+    for _ in pairs(queue.waiting_spectators or {}) do
+      watcher_count = watcher_count + 1
+    end
+    print(string.format(
+      "  %s status=%s players=%d watchers=%d host=%s",
+      key,
+      tostring(queue.status),
+      #queue.participants,
+      watcher_count,
+      tostring(queue.host_player_id)
+    ))
   end
 
   print("[tournaments] active tournaments:")
@@ -5427,6 +5691,16 @@ Net:on("player_area_transfer", function(event)
     end
   end
 
+  -- Leaving the tournament area cancels a pre-start spectator reservation.
+  local waiting_spectator_key =
+    TourneyUX.player_to_waiting_spectator_queue[player_id]
+  if waiting_spectator_key then
+    TourneyUX.remove_waiting_spectator(player_id, true)
+    if board_queues[waiting_spectator_key] and TourneyUX.refresh_queue_menu_viewers then
+      TourneyUX.refresh_queue_menu_viewers(board_queues[waiting_spectator_key], true)
+    end
+  end
+
   -- Leaving an area while merely queued should unregister the player.
   -- Active tournament players are allowed to transfer because battles do that naturally.
   if player_to_queue[player_id] and not player_to_tournament[player_id] then
@@ -5450,6 +5724,7 @@ Net:on("player_disconnect", function(event)
   tournament_input_locked[player_id] = nil
 
   TourneyUX.spectator_cancel_guard_until[player_id] = nil
+  stop_spectating_toast_tokens[player_id] = nil
   disconnected_players[player_id] = true
   spectator_prompt_open[player_id] = nil
   TourneyUX.menu_views[player_id] = nil
@@ -5461,6 +5736,12 @@ Net:on("player_disconnect", function(event)
     if board_queues[key] and TourneyUX.refresh_queue_menu_viewers then
       TourneyUX.refresh_queue_menu_viewers(board_queues[key], true)
     end
+  end
+
+  local waiting_spectator_key =
+    TourneyUX.player_to_waiting_spectator_queue[player_id]
+  if waiting_spectator_key then
+    TourneyUX.remove_waiting_spectator(player_id, true)
   end
 
   local tournament_id = player_to_tournament[player_id]
