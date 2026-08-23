@@ -133,10 +133,28 @@ local function is_tour_active(pid)
   return type(s) == "table" and s.active == true
 end
 
+local function is_tournament_active(pid)
+  local Tournaments = rawget(_G, "Tournaments")
+
+  if type(Tournaments) ~= "table"
+    or type(Tournaments.get_player_tournament_id) ~= "function"
+  then
+    return false
+  end
+
+  local ok, tournament_id = pcall(
+    Tournaments.get_player_tournament_id,
+    pid
+  )
+
+  return ok and tournament_id ~= nil
+end
+
 local function is_modal_open(pid, opts)
   opts = opts or {}
 
   return is_tour_active(pid)
+      or is_tournament_active(pid)
       or is_slots_open(pid)
       or is_blackjack_open(pid)
       or is_duel_open(pid)

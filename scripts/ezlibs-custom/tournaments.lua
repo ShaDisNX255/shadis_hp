@@ -1051,6 +1051,7 @@ local TourneyUX = {
   menu_views = {},
   menu_last_refresh_second = nil,
   live_board_viewers = {},
+  transient_board_viewers = {},
   spectator_cancel_guard_until = {},
   player_to_waiting_spectator_queue = {},
 }
@@ -1589,6 +1590,20 @@ local function set_player_tournament_input_locked(player_id, locked)
   end
 
   if locked then
+    -- If LMenu was already open when the tournament took control, close it
+    -- without unlocking the player. LMenu.lua also blocks new opens while
+    -- get_player_tournament_id() is non-nil.
+    local LMenu = rawget(_G, "LMenu")
+    if type(LMenu) == "table"
+      and type(LMenu.is_open_for) == "function"
+      and type(LMenu.close) == "function"
+    then
+      local ok, open = pcall(LMenu.is_open_for, player_id)
+      if ok and open then
+        pcall(LMenu.close, player_id, { keep_frozen = true })
+      end
+    end
+
     tournament_input_locked[player_id] = true
     pcall(Net.lock_player_input, player_id)
   else
@@ -2032,6 +2047,53 @@ local function get_visual_positions(tournament, mode)
   return positions_after_round(tournament, math.max(0, (tournament.current_round or 1) - 1))
 end
 
+-- Reconstruct the LIVE bracket from the matches that are actually being played
+-- right now. This is deliberately more explicit than relying only on round_results:
+-- a spectator who joins late should immediately see surviving participants in the
+-- correct tier for the current round.
+function TourneyUX.live_visual_positions(tournament)
+  if not tournament then
+    return {}
+  end
+
+  local round_number = tonumber(tournament.current_round or 1) or 1
+  local positions = get_visual_positions(tournament, "before_round")
+  local round_slots = nil
+
+  if round_number <= 1 then
+    round_slots = mug_pos and mug_pos.initial or nil
+  elseif round_number == 2 then
+    round_slots = mug_pos and mug_pos.round1_winners or nil
+  elseif round_number >= 3 then
+    round_slots = mug_pos and mug_pos.round2_winners or nil
+  end
+
+  if not round_slots then
+    return positions
+  end
+
+  for match_index, match in ipairs(tournament.matches or {}) do
+    local slot1 = ((match_index - 1) * 2) + 1
+    local slot2 = slot1 + 1
+
+    if match.player1 and round_slots[slot1] then
+      local original_index = participant_original_index(tournament, match.player1)
+      if original_index then
+        positions[original_index] = round_slots[slot1]
+      end
+    end
+
+    if match.player2 and round_slots[slot2] then
+      local original_index = participant_original_index(tournament, match.player2)
+      if original_index then
+        positions[original_index] = round_slots[slot2]
+      end
+    end
+  end
+
+  return positions
+end
+
 local function positions_differ(a, b)
   if not a or not b then return false end
   return a.x ~= b.x or a.y ~= b.y or a.z ~= b.z
@@ -2434,6 +2496,9 @@ local function draw_tournament_board_for_player(player_id, tournament, mode)
       -- Do not attempt sprite/HUD/camera cleanup for a disconnected player.
       -- Forget local bookkeeping and release only area-level music state.
       player_visual_ids[player_id] = {}
+      if TourneyUX.transient_board_viewers[player_id] == tournament.id then
+        TourneyUX.transient_board_viewers[player_id] = nil
+      end
       release_tournament_music(music_area)
       return true
     end
@@ -2446,6 +2511,7 @@ local function draw_tournament_board_for_player(player_id, tournament, mode)
     if Net.toggle_player_hud then
       pcall(Net.toggle_player_hud, player_id)
     end
+    TourneyUX.transient_board_viewers[player_id] = tournament.id
 
     if VISUALS.music then
       pcall(Net.set_song, area_id, VISUALS.music)
@@ -2570,6 +2636,9 @@ local function draw_tournament_board_for_player(player_id, tournament, mode)
 
     if Net.toggle_player_hud then
       pcall(Net.toggle_player_hud, player_id)
+    end
+    if TourneyUX.transient_board_viewers[player_id] == tournament.id then
+      TourneyUX.transient_board_viewers[player_id] = nil
     end
 
     release_tournament_music(music_area)
@@ -2863,7 +2932,7 @@ function TourneyUX.draw_live_tournament_board_for_player(player_id, tournament)
   local first_open = TourneyUX.live_board_viewers[player_id] ~= tournament.id
   local bg_info = get_board_background(tournament)
   local pos = ui_data.unmoving_ui_pos or {}
-  local positions = get_visual_positions(tournament, "before_round")
+  local positions = TourneyUX.live_visual_positions(tournament)
   local completed_path_round = math.max(
     0,
     (tonumber(tournament.current_round or 1) or 1) - 1
@@ -3207,7 +3276,31 @@ function TourneyUX.stop_watching_tournament(tournament, participant)
   participant.spectating = false
 
   TourneyUX.cancel_spectator_prompt(player_id)
-  TourneyUX.close_live_board_for_player(player_id, tournament, false)
+
+  if TourneyUX.live_board_viewers[player_id] == tournament.id then
+    TourneyUX.close_live_board_for_player(player_id, tournament, false)
+  elseif TourneyUX.transient_board_viewers[player_id] == tournament.id then
+    -- B can now stop spectating during the animated/result presentations too.
+    -- Cancel that player's in-flight board coroutine before restoring their HUD.
+    invalidate_player_visual_jobs(player_id)
+    TourneyUX.transient_board_viewers[player_id] = nil
+    hide_tournament_text(player_id)
+    erase_tournament_board(player_id)
+
+    if Net.is_player(player_id) then
+      if Net.toggle_player_hud then
+        pcall(Net.toggle_player_hud, player_id)
+      end
+      if Net.fade_player_camera then
+        pcall(Net.fade_player_camera, player_id, { r = 0, g = 0, b = 0, a = 0 }, VISUALS.fade_seconds)
+      end
+    end
+  else
+    -- Text-only tournament phases have no persistent board ownership to close.
+    hide_tournament_text(player_id)
+    erase_tournament_board(player_id)
+  end
+
   hide_tournament_text(player_id)
   set_player_tournament_input_locked(player_id, false)
 
@@ -3265,10 +3358,13 @@ function TourneyUX.ask_player_stop_spectating(tournament, player_id)
       participant.spectating = true
       set_player_tournament_input_locked(player_id, true)
 
-      if TourneyUX.live_board_viewers[player_id] ~= tournament.id then
-        TourneyUX.draw_live_tournament_board_for_player(player_id, tournament)
-      else
+      if TourneyUX.live_board_viewers[player_id] == tournament.id then
         TourneyUX.update_live_board_frame_states_for_player(player_id, tournament)
+      elseif next(tournament.active_spectator_matches or {}) ~= nil then
+        -- If the player said No during a cinematic/result phase, leave that
+        -- presentation alone. The persistent board is only rebuilt while a round
+        -- is actively running.
+        TourneyUX.draw_live_tournament_board_for_player(player_id, tournament)
       end
     end
   end
@@ -3348,18 +3444,20 @@ function TourneyUX.start_eliminated_player_spectating(tournament, loser)
   return TourneyUX.enter_spectator_mode(tournament, loser, true)
 end
 
-local function show_tournament_text_to_players(tournament, message, hold_seconds)
+local function show_tournament_text_to_players(tournament, message, hold_seconds, exclude_player_id)
   return async(function()
     if not tournament then return false end
 
     local jobs = {}
 
     for_each_tournament_viewer(tournament, function(participant)
-      jobs[#jobs + 1] = show_tournament_text_for_player(
-        participant.player_id,
-        message,
-        hold_seconds
-      )
+      if participant.player_id ~= exclude_player_id then
+        jobs[#jobs + 1] = show_tournament_text_for_player(
+          participant.player_id,
+          message,
+          hold_seconds
+        )
+      end
     end)
 
     for _, job in ipairs(jobs) do
@@ -3955,6 +4053,7 @@ local function cleanup_tournament(tournament)
 
       spectator_prompt_open[player_id] = nil
       TourneyUX.live_board_viewers[player_id] = nil
+      TourneyUX.transient_board_viewers[player_id] = nil
       player_to_tournament[player_id] = nil
     end
   end
@@ -3966,6 +4065,7 @@ local function cleanup_tournament(tournament)
 
     spectator_prompt_open[player_id] = nil
     TourneyUX.live_board_viewers[player_id] = nil
+    TourneyUX.transient_board_viewers[player_id] = nil
     player_to_tournament[player_id] = nil
     set_player_tournament_input_locked(player_id, false)
   end
@@ -4569,6 +4669,20 @@ end
 -- -----------------------------------------------------------------------------
 -- Tournament runner
 -- -----------------------------------------------------------------------------
+local function message_player_native(player_id, message)
+  if not player_id or not Net.is_player(player_id) or not Net.message_player then
+    return false
+  end
+
+  local ok, err = pcall(Net.message_player, player_id, tostring(message or ""))
+  if not ok then
+    print("[tournaments][native_message] failed for " .. tostring(player_id) .. ": " .. tostring(err))
+    return false
+  end
+
+  return true
+end
+
 local function give_tournament_money_reward(player_id, amount, tournament)
   amount = math.floor(tonumber(amount) or 0)
   if amount <= 0 then
@@ -4588,7 +4702,7 @@ local function give_tournament_money_reward(player_id, amount, tournament)
   end
 
   if ok then
-    message_player_safe(player_id, ("Tournament prize: +%d$!"):format(amount))
+    message_player_native(player_id, ("Tournament prize: +%d$!"):format(amount))
     print(("[tournaments][reward] pid=%s tournament=%s money=+%d")
       :format(tostring(player_id), tostring(tournament and tournament.name or "Tournament"), amount))
     return amount
@@ -4624,7 +4738,7 @@ local function grant_tournament_winner_rewards(tournament)
       print(("[tournaments][reward] pid=%s tournament=%s gp_requested=%d gp_awarded=%d")
         :format(tostring(player_id), tostring(tournament.name or "Tournament"), gp_reward, awarded))
     else
-      message_player_safe(player_id, "Tournament GP reward is unavailable right now.")
+      message_player_native(player_id, "Tournament GP reward is unavailable right now.")
       print("[tournaments][reward] Teams.award_tournament_gp unavailable")
     end
   end
@@ -4640,7 +4754,7 @@ local function grant_tournament_winner_rewards(tournament)
       deducted = tonumber(deducted or 0) or 0
 
       if deducted > 0 then
-        message_player_safe(
+        message_player_native(
           player_id,
           ("Tournament stakes: %s lost %d GP!"):format(
             tostring(opposing_team_name or "the opposing team"),
@@ -4713,11 +4827,38 @@ local function run_tournament(tournament)
     TourneyUX.close_live_boards_for_tournament(tournament, true)
     await(show_tournament_board_to_players(tournament, "champion"))
 
-    await(show_tournament_text_to_players(tournament, string.format(
+    local winner_message = string.format(
       "%s winner:{end_line}%s!",
       tournament.name,
       participant_name(tournament.champion)
-    ), 3.0))
+    )
+
+    local champion_player_id = tournament.champion
+      and tournament.champion.kind == "player"
+      and tournament.champion.player_id
+      or nil
+
+    if champion_player_id and Net.is_player(champion_player_id) then
+      -- Everyone else keeps the tournament Sprite API presentation, but the
+      -- human winner uses the native client dialogue queue. Their winner notice,
+      -- GP/stakes messages, and money prize will therefore queue in order.
+      await(show_tournament_text_to_players(
+        tournament,
+        winner_message,
+        3.0,
+        champion_player_id
+      ))
+      message_player_native(
+        champion_player_id,
+        "You won " .. tostring(tournament.name or "the tournament") .. "!"
+      )
+    else
+      await(show_tournament_text_to_players(
+        tournament,
+        winner_message,
+        3.0
+      ))
+    end
 
     grant_tournament_winner_rewards(tournament)
 
@@ -5615,7 +5756,6 @@ Net:on("virtual_input", function(event)
           and participant.eliminated
           and participant.spectating == true
           and participant.wants_updates ~= false
-          and TourneyUX.live_board_viewers[player_id] == tournament.id
           and not spectator_prompt_open[player_id]
           and not (MenuAPI and MenuAPI.is_open and MenuAPI.is_open(player_id))
         then
@@ -5729,6 +5869,7 @@ Net:on("player_disconnect", function(event)
   spectator_prompt_open[player_id] = nil
   TourneyUX.menu_views[player_id] = nil
   TourneyUX.live_board_viewers[player_id] = nil
+  TourneyUX.transient_board_viewers[player_id] = nil
 
   if player_to_queue[player_id] then
     local key = player_to_queue[player_id]
