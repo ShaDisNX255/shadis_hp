@@ -1134,6 +1134,185 @@ local function launch_for_viewer(viewer_pid, opponent_pid, own_pet, opponent_pet
   return true
 end
 
+local function saved_pet_status(
+  viewer_pid,
+  opponent_owner_ref,
+  opponent_pet
+)
+  if not is_player(viewer_pid) then
+    return false,
+      "Pet Duel is not available."
+  end
+
+  if active_duels[viewer_pid] then
+    return false,
+      "Pet Duel is not available right now."
+  end
+
+  if
+    Net.is_player_battling
+    and Net.is_player_battling(viewer_pid)
+  then
+    return false,
+      "Pet Duel is not available right now."
+  end
+
+  local own_pet =
+    get_battle_pet(viewer_pid)
+
+  if not own_pet then
+    return false,
+      "You don't have a battle-ready pet equipped."
+  end
+
+  opponent_owner_ref =
+    tostring(opponent_owner_ref or "")
+
+  if opponent_owner_ref == "" then
+    return false,
+      "Couldn't identify that pet's owner."
+  end
+
+  if
+    type(opponent_pet) ~= "table"
+    or opponent_pet.can_fight ~= true
+    or tostring(opponent_pet.enemy_name or "") == ""
+    or tostring(opponent_pet.uid or "") == ""
+  then
+    return false,
+      "That pet isn't battle-ready."
+  end
+
+  if
+    not Pets
+    or type(
+      Pets.is_hp_battle_enabled
+    ) ~= "function"
+  then
+    return false,
+      "This pet is not accepting Pet Duels."
+  end
+
+  local ok_enabled, enabled =
+    pcall(
+      Pets.is_hp_battle_enabled,
+      opponent_owner_ref,
+      opponent_pet.uid
+    )
+
+  if
+    not ok_enabled
+    or enabled ~= true
+  then
+    return false,
+      "This pet is not accepting Pet Duels."
+  end
+
+  return true, nil, own_pet
+end
+
+function petduels.can_start_against_saved_pet(
+  viewer_pid,
+  opponent_owner_ref,
+  opponent_pet
+)
+  local ok, reason =
+    saved_pet_status(
+      viewer_pid,
+      opponent_owner_ref,
+      opponent_pet
+    )
+
+  return ok, reason
+end
+
+function petduels.start_against_saved_pet(
+  viewer_pid,
+  opponent_owner_ref,
+  opponent_pet
+)
+  local ok,
+        reason,
+        own_pet =
+    saved_pet_status(
+      viewer_pid,
+      opponent_owner_ref,
+      opponent_pet
+    )
+
+  if not ok then
+    message(
+      viewer_pid,
+      reason
+      or "Pet Duel is not available."
+    )
+
+    return false
+  end
+
+  opponent_owner_ref =
+    tostring(opponent_owner_ref or "")
+
+  -- For a normal Pet Duel, resolve_prebattle receives
+  -- two player IDs.
+  --
+  -- Here the second value is the offline owner's safe
+  -- memory secret. LPets can use that value directly to
+  -- retrieve pet_customizers_v1 for this pet UID.
+  local prebattle =
+    resolve_prebattle(
+      viewer_pid,
+      opponent_owner_ref,
+      own_pet,
+      opponent_pet
+    )
+
+  if not prebattle then
+    message(
+      viewer_pid,
+      "Pet Duel setup failed."
+    )
+
+    return false
+  end
+
+  own_pet =
+    prebattle.pets[1]
+
+  opponent_pet =
+    prebattle.pets[2]
+
+  print(
+    "[petduels] PREP STEP",
+    "4",
+    "Combat"
+  )
+
+  -- Only the visitor needs an encounter.
+  --
+  -- Unlike normal player-vs-player Pet Duels, there is
+  -- no second online viewer whose simulation must start.
+  active_duels[viewer_pid] =
+    "hp:"
+    .. opponent_owner_ref
+    .. ":"
+    .. tostring(opponent_pet.uid or "")
+
+  local started =
+    launch_for_viewer(
+      viewer_pid,
+      nil,
+      own_pet,
+      opponent_pet
+    )
+
+  if not started then
+    active_duels[viewer_pid] = nil
+  end
+
+  return started
+end
+
 function petduels.start(p1, p2)
   local ok, reason, pet1, pet2 = pair_status(p1, p2)
 

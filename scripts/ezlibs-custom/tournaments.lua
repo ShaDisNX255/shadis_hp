@@ -4359,6 +4359,7 @@ local function build_npc_encounter_payload(npc)
   data._tournament = true
   data._no_pets = true
   data._no_area_rewards = true
+  data.no_results = true
 
   return data
 end

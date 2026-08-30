@@ -291,7 +291,8 @@ local function _pet_chip_id_from_item_name(item_name)
   return nil
 end
 
--- Stored in PLAYER memory (we clear it on disconnect/join)
+-- Stored in PLAYER memory.
+-- The equipped selection persists across disconnects.
 local PLAYER_ARMED_PET_KEY = "armed_pet_v1"
 local OWNED_PETS_MEM_KEY   = "owned_pet_instances_v1"
 local LEGACY_PET_COUNT_KEYS = { "oncehub_decor_inventory_v1", "decor_inventory" }
@@ -2386,20 +2387,121 @@ local function _get_companion_spawn_target(pid)
   return area_id, px, py, pz, dir
 end
 
-local function clear_armed_pet_for_player(pid)
-  local secret = helpers.get_safe_player_secret(pid)
-  if not secret or secret == "" then return end
-  return_armed_pet_for_replacement(secret)
+local function cleanup_armed_pet_runtime(pid)
+  local secret =
+    helpers.get_safe_player_secret(pid)
+
+  if not secret or secret == "" then
+    return
+  end
+
+  local pmem =
+    _safe_get_player_memory(secret)
+
+  if type(pmem) ~= "table" then
+    return
+  end
+
+  local armed =
+    pmem[PLAYER_ARMED_PET_KEY]
+
+  if type(armed) ~= "table" then
+    return
+  end
+
+  -- The pet remains equipped across disconnects.
+  --
+  -- We only need to clean up a companion that was
+  -- physically summoned into the overworld.
+  if armed.summoned ~= true then
+    return
+  end
+
+  local uid =
+    tostring(armed.uid or "")
+
+  local bucket_area_id =
+    tostring(
+      armed.bucket_area_id or ""
+    )
+
+  if uid ~= "" then
+    _clear_companion_runtime(
+      uid,
+      false
+    )
+  end
+
+  -- HP-based companion:
+  -- restore its persistent HP-side entry to the same
+  -- "with owner, but not currently summoned" state
+  -- used by call_back_companion().
+  if
+    uid ~= ""
+    and bucket_area_id ~= ""
+  then
+    local e =
+      find_entry(
+        bucket_area_id,
+        uid
+      )
+
+    if e then
+      e.companion_summoned = nil
+      e.with_owner = true
+
+      e.area_id = e.home_area_id
+      e.x = e.home_x
+      e.y = e.home_y
+      e.z = e.home_z or 0
+
+      e.bot_id = nil
+
+      save_bucket(
+        bucket_area_id
+      )
+    end
+  end
+
+  armed.summoned = false
+  armed.summoned_area_id = ""
+
+  pmem[PLAYER_ARMED_PET_KEY] =
+    armed
+
+  _safe_save_player_memory(
+    secret,
+    pmem
+  )
 end
 
 local function _on_disconnect_or_join(event)
-  local pid = (type(event) == "table") and event.player_id or event
-  if pid then clear_armed_pet_for_player(pid) end
+  local pid =
+    type(event) == "table"
+    and event.player_id
+    or event
+
+  if pid then
+    cleanup_armed_pet_runtime(pid)
+  end
 end
 
-Net:on("player_disconnect", _on_disconnect_or_join)
-Net:on("handle_player_disconnect", _on_disconnect_or_join)
-Net:on("handle_player_join", _on_disconnect_or_join) -- cleanup if server crashed while armed
+Net:on(
+  "player_disconnect",
+  _on_disconnect_or_join
+)
+
+Net:on(
+  "handle_player_disconnect",
+  _on_disconnect_or_join
+)
+
+-- Keep the join cleanup for stale summoned state after
+-- a server crash/restart, but do not unequip the pet.
+Net:on(
+  "handle_player_join",
+  _on_disconnect_or_join
+)
 
 local function update_entry_runtime_fields(e, rec)
   if not e or not rec then return end
@@ -3647,6 +3749,148 @@ local function feed_pet(pid, e, bucket_area_id)
 end
 
 -- ====================== Public API ======================
+local HP_BATTLES_FIELD = "hp_battles_enabled"
+
+function pets.is_hp_battle_enabled(owner_or_pid, uid)
+  local owner_secret = _resolve_pet_owner_secret(owner_or_pid)
+  uid = tostring(uid or "")
+
+  if owner_secret == "" or uid == "" then
+    return false
+  end
+
+  local owned = _get_owned_pet(owner_secret, uid)
+  if type(owned) ~= "table" then
+    return false
+  end
+
+  return owned[HP_BATTLES_FIELD] == true
+end
+
+function pets.set_hp_battle_enabled(owner_or_pid, uid, enabled)
+  local owner_secret = _resolve_pet_owner_secret(owner_or_pid)
+  uid = tostring(uid or "")
+
+  if owner_secret == "" or uid == "" then
+    return false, false
+  end
+
+  local store, pmem = _get_player_pets_store(owner_secret)
+  if not store or type(pmem) ~= "table" then
+    return false, false
+  end
+
+  local owned = _normalize_owned_pet(store.pets[uid])
+  if type(owned) ~= "table" then
+    return false, false
+  end
+
+  owned[HP_BATTLES_FIELD] = enabled == true
+
+  store.pets[uid] = owned
+  pmem[OWNED_PETS_MEM_KEY] = store
+
+  _safe_save_player_memory(owner_secret, pmem)
+
+  return true, owned[HP_BATTLES_FIELD]
+end
+
+function pets.get_hp_battle_pet_info(owner_or_pid, uid)
+  local owner_secret = _resolve_pet_owner_secret(owner_or_pid)
+  uid = tostring(uid or "")
+
+  if owner_secret == "" or uid == "" then
+    return nil
+  end
+
+  local owned = _get_owned_pet(owner_secret, uid)
+  if type(owned) ~= "table" then
+    return nil
+  end
+
+  local kind = tostring(owned.kind or ""):lower()
+  local battle_def = BATTLE_PETS[kind]
+
+  if not battle_def then
+    return nil
+  end
+
+  local enemy_name = tostring(battle_def.enemy_name or "")
+  if enemy_name == "" then
+    return nil
+  end
+
+  local pet_def = PET_DEFS[kind] or {}
+
+  local base_name = tostring(
+    pet_def.name
+    or kind:gsub("^%l", string.upper)
+  )
+
+  local nickname = _sanitize_nickname(owned.nickname)
+
+  local display_name =
+    nickname ~= ""
+    and nickname
+    or base_name
+
+  local rank = clamp_pet_battle_rank(
+    owned.stat_attack
+    or battle_def.rank
+    or 1
+  )
+
+  local hp = math.max(
+    1,
+    math.floor(
+      tonumber(
+        owned.stat_hp
+        or battle_def.default_starting_hp
+        or 40
+      ) or 40
+    )
+  )
+
+  local chip_id = tonumber(
+    owned.pet_chip_id
+    or battle_def.test_pet_chip_id
+    or nil
+  )
+
+  local chip_amount = math.max(
+    1,
+    math.floor(
+      tonumber(
+        owned.pet_chip_amount
+        or battle_def.test_pet_chip_amount
+        or 1
+      ) or 1
+    )
+  )
+
+  return {
+    uid = uid,
+    kind = kind,
+
+    base_name = base_name,
+    nickname = nickname,
+    display_name = display_name,
+
+    mood = _pet_mood_from_fatigue(owned.fatigue),
+
+    can_fight = true,
+
+    hp = hp,
+    rank = rank,
+    attack = rank * 5,
+
+    pet_chip_id = chip_id,
+    pet_chip_amount = chip_amount,
+
+    enemy_name = enemy_name,
+  }
+end
+
 function pets.list_pets(bucket_area_id, oncehub_key)
   local list = load_pet_list(bucket_area_id, oncehub_key)
   local out = {}
@@ -3981,12 +4225,14 @@ local function open_pet_action_menu(pid, e, bucket_area_id)
     return
   end
 
-  -- If reward is pending, claim it now (owner only).
-  if e.exp and e.exp.reward_pending and e.exp.reward then
-    if secret ~= (e.owner_secret or "") then
-      Net.message_player(pid, "This pet doesn't seem interested in showing you anything.")
-      return
-    end
+  -- If reward is pending, only the owner may claim it.
+  -- Visitors continue to the normal pet menu.
+  if
+    e.exp
+    and e.exp.reward_pending
+    and e.exp.reward
+    and is_owner
+  then
 
     if not e.owner_name or e.owner_name == "" then
       e.owner_name = Net.get_player_name(pid)
@@ -4043,73 +4289,123 @@ local function open_pet_action_menu(pid, e, bucket_area_id)
   local frags = _get_player_bugfrags(pid)
   local title = ("%s - %d BugFrags"):format(display, frags)
 
-  local can_take, take_disabled_msg = true, nil
+  local can_take = is_owner
+  local take_disabled_msg = nil
   local has_armed_pet = false
 
   -- Build menu options
   local opts = {}
 
-  if not is_owner then
-    can_take = false
-    take_disabled_msg = "Only the owner can take this pet with them."
-  end
-
   if can_take then
     local cur_area = Net.get_player_area(pid)
-    if tostring(cur_area or "") ~= tostring(e.home_area_id or "") then
+
+    if
+      tostring(cur_area or "")
+      ~= tostring(e.home_area_id or "")
+    then
       can_take = false
-      take_disabled_msg = "Only available from this pet's home HP."
+      take_disabled_msg =
+        "Only available from this pet's home HP."
     end
   end
 
   if can_take then
     local pmem = _safe_get_player_memory(secret)
-    has_armed_pet = pmem and pmem[PLAYER_ARMED_PET_KEY] ~= nil
+
+    has_armed_pet =
+      pmem
+      and pmem[PLAYER_ARMED_PET_KEY] ~= nil
   end
 
-  if can_take then
-    table.insert(opts, helpers.create_bbs_option("Take With You"))
-  else
-    table.insert(opts, helpers.create_bbs_option("Take With You ("..tostring(take_disabled_msg or "unavailable")..")"))
-  end
-  local can_send, send_disabled_msg = true, nil
+  local can_send = is_owner
+  local send_disabled_msg = nil
 
   if is_on_cooldown(e) then
     can_send = false
-    send_disabled_msg = "Cooldown: ".._fmt_time_left(cooldown_left(e))
+    send_disabled_msg =
+      "Cooldown: "
+      .. _fmt_time_left(cooldown_left(e))
   end
 
-  if not is_owner then
-    can_send = false
-    send_disabled_msg = "Only the owner can send expeditions."
-  end
-
-  -- Block all owner actions if the pet is currently in a training session
+  -- Block owner actions while the pet is training.
   if e.in_training then
     can_take = false
-    take_disabled_msg = "This pet is in training."
+    take_disabled_msg =
+      "This pet is in training."
+
     can_send = false
-    send_disabled_msg = "This pet is in training."
+    send_disabled_msg =
+      "This pet is in training."
   end
 
-  if can_send then
-    table.insert(opts, helpers.create_bbs_option("Send on expedition"))
-  else
-    table.insert(opts, helpers.create_bbs_option("Send on expedition ("..tostring(send_disabled_msg or "unavailable")..")"))
-  end
-
-  -- Feed only for owner (avoid confusing non-owners)
-  if is_owner and mood ~= "happy" then
-    table.insert(opts, helpers.create_bbs_option("Feed 1 BugFrag"))
-  end
-
-  table.insert(opts, helpers.create_bbs_option("Pet it"))
+  local battles_enabled =
+    battle_def ~= nil
+    and pets.is_hp_battle_enabled(
+      e.owner_secret,
+      e.uid
+    )
 
   if is_owner then
-    table.insert(opts, helpers.create_bbs_option("Set/Clear Nickname"))
+    -- Keep these BBS titles short.
+    -- The selection handlers below still display
+    -- the full unavailable reason when necessary.
+    table.insert(
+      opts,
+      helpers.create_bbs_option("Take With You")
+    )
+
+    table.insert(
+      opts,
+      helpers.create_bbs_option("Send on expedition")
+    )
+
+    -- Preserve the existing owner-only feeding option.
+    if mood ~= "happy" then
+      table.insert(
+        opts,
+        helpers.create_bbs_option("Feed 1 BugFrag")
+      )
+    end
   end
 
-  table.insert(opts, helpers.create_bbs_option("Nevermind"))
+  table.insert(
+    opts,
+    helpers.create_bbs_option("Pet it")
+  )
+
+  if is_owner then
+    table.insert(
+      opts,
+      helpers.create_bbs_option("Set/Clear Nickname")
+    )
+
+    local battle_option =
+      helpers.create_bbs_option("Battles")
+
+    battle_option.author =
+      battles_enabled
+      and "Allowed"
+      or "Disabled"
+
+    table.insert(
+      opts,
+      battle_option
+    )
+
+  elseif
+    battles_enabled
+    and not e.in_training
+  then
+    table.insert(
+      opts,
+      helpers.create_bbs_option("Battle")
+    )
+  end
+
+  table.insert(
+    opts,
+    helpers.create_bbs_option("Nevermind")
+  )
 
   -- IMPORTANT: use the correct helper name
   local board = _open_menu_ignoring_custom(pid, title, {r=255,g=230,b=160}, opts, "pets:act")
@@ -4173,6 +4469,161 @@ local function open_pet_action_menu(pid, e, bucket_area_id)
 
   if sel == "Pet it" then
     Net.message_player(pid, _pet_it_text(mood))
+    return
+  end
+
+  if sel == "Battles" then
+    if not is_owner then
+      return
+    end
+
+    if not battle_def then
+      Net.message_player(
+        pid,
+        "This pet can't participate in Pet Duels."
+      )
+      return
+    end
+
+    local currently_enabled =
+      pets.is_hp_battle_enabled(
+        e.owner_secret,
+        e.uid
+      )
+
+    local ok, enabled =
+      pets.set_hp_battle_enabled(
+        e.owner_secret,
+        e.uid,
+        not currently_enabled
+      )
+
+    if not ok then
+      Net.message_player(
+        pid,
+        "Couldn't change the pet's battle setting."
+      )
+      return
+    end
+
+    if enabled then
+      Net.message_player(
+        pid,
+        "Pet battles are now allowed."
+      )
+    else
+      Net.message_player(
+        pid,
+        "Pet battles are now disabled."
+      )
+    end
+
+    return
+  end
+
+  if sel == "Battle" then
+    if is_owner then
+      return
+    end
+
+    -- Re-check permission because the owner may have
+    -- changed the setting after this visitor opened the BBS.
+    if not pets.is_hp_battle_enabled(
+      e.owner_secret,
+      e.uid
+    ) then
+      Net.message_player(
+        pid,
+        "This pet is not accepting Pet Duels."
+      )
+      return
+    end
+
+    -- The pet may have become unavailable after
+    -- the visitor originally opened the BBS.
+    if e.with_owner == true then
+      Net.message_player(
+        pid,
+        "This pet is no longer available for a Pet Duel."
+      )
+      return
+    end
+
+    if expedition_active(e) then
+      Net.message_player(
+        pid,
+        "This pet is currently on an expedition."
+      )
+      return
+    end
+
+    if e.in_training then
+      Net.message_player(
+        pid,
+        "This pet is currently in training."
+      )
+      return
+    end
+
+    local opponent_pet =
+      pets.get_hp_battle_pet_info(
+        e.owner_secret,
+        e.uid
+      )
+
+    if not opponent_pet then
+      Net.message_player(
+        pid,
+        "This pet isn't battle-ready."
+      )
+      return
+    end
+
+    -- petduels.lua already requires pets.lua, so require
+    -- PetDuels lazily here rather than creating a top-level
+    -- circular dependency.
+    local ok_duels, PetDuels =
+      pcall(
+        require,
+        "scripts/ezlibs-custom/petduels"
+      )
+
+    if
+      not ok_duels
+      or type(PetDuels) ~= "table"
+      or type(
+        PetDuels.start_against_saved_pet
+      ) ~= "function"
+    then
+      Net.message_player(
+        pid,
+        "Pet Duel system is not available."
+      )
+      return
+    end
+
+    local can_start, reason =
+      PetDuels.can_start_against_saved_pet(
+        pid,
+        e.owner_secret,
+        opponent_pet
+      )
+
+    if not can_start then
+      Net.message_player(
+        pid,
+        reason
+        or "Pet Duel is not available right now."
+      )
+      return
+    end
+
+    PetDuels.start_against_saved_pet(
+      pid,
+      e.owner_secret,
+      opponent_pet
+    )
+
     return
   end
 
