@@ -28,3 +28,4 @@ nul
 advertise_relay.log
 advertise_relay.pid
 scripts/advertise_server/relay.py
+scripts/bbs/bridge_config.lua
