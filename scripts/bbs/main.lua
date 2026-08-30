@@ -17,6 +17,18 @@
 --   json.lua by rxi (store as scripts/libs/json.lua)
 local json                   = require("scripts/libs/json")
 local admin_manager           = require("scripts/bbs/admin_manager")
+local bridge_config = nil
+
+local bridge_config_ok, bridge_config_result = pcall(
+    require,
+    "scripts/bbs/bridge_config"
+)
+
+if bridge_config_ok and type(bridge_config_result) == "table" then
+    bridge_config = bridge_config_result
+else
+    print("[BBS Bridge] Disabled: bridge_config.lua missing or invalid")
+end
 
 local BBS_BOARD_DATA         = "scripts/bbs/data.json"
 
@@ -30,6 +42,16 @@ local saving                 = false
 local pending_save           = false
 local posts                  = {}
 local color                  = { r = 0, g = 0, b = 0 }
+local BRIDGE_POLL_INTERVAL   = 15.0
+local bridge_poll_elapsed    = 0
+local bridge_poll_in_flight  = false
+local function bbs_bridge_enabled()
+    return bridge_config ~= nil
+        and type(bridge_config.notify_url) == "string"
+        and type(bridge_config.commands_next_url) == "string"
+        and type(bridge_config.commands_ack_url) == "string"
+        and type(bridge_config.shared_secret) == "string"
+end
 
 function async(p)
     local co = coroutine.create(p)
@@ -206,6 +228,195 @@ function bbs_display_order_ids(board_data)
     return ids, pinned, unpinned
 end
 
+function bridge_pin_bbs_post(board_name, post_id)
+    local board_data = save_data[board_name]
+
+    if not board_data then
+        return false, "board_not_found"
+    end
+
+    local posts_table = board_data.posts or {}
+    local post = nil
+
+    for _, p in ipairs(posts_table) do
+        if p.id == post_id then
+            post = p
+            break
+        end
+    end
+
+    if not post then
+        return false, "post_not_found"
+    end
+
+    -- Explicitly pin rather than toggle.
+    -- This makes Telegram commands safe to retry.
+    if post.pin then
+        return true, "already_pinned"
+    end
+
+    post.pin = true
+    post.pin_time = os.time()
+
+    save()
+
+    -- Figure out where this post belongs now that it is pinned.
+    local ordered_ids = bbs_display_order_ids(board_data)
+    local anchor_id = "POST"
+
+    for i, id in ipairs(ordered_ids) do
+        if id == post_id then
+            anchor_id = (i == 1) and "POST" or ordered_ids[i - 1]
+            break
+        end
+    end
+
+    local base_display = shallow_copy(post)
+
+    base_display.title =
+        "PIN: "
+        .. string.sub(
+            base_display.title,
+            1,
+            TITLE_LIMIT - 5
+        )
+
+    -- Update anyone currently viewing this board.
+    for pid, state in pairs(player_states) do
+        if state.board_name == board_name then
+            local display_post = shallow_copy(base_display)
+
+            local last_time_for_viewer = last_read_time[pid]
+            local t = tonumber(post.time) or 0
+
+            if last_time_for_viewer == nil or t < last_time_for_viewer then
+                display_post.read = true
+            end
+
+            Net.remove_post(pid, post_id)
+
+            Net.append_posts(
+                pid,
+                { display_post },
+                anchor_id
+            )
+        end
+    end
+
+    return true, "pinned"
+end
+
+function bridge_unpin_bbs_post(board_name, post_id)
+    local board_data = save_data[board_name]
+
+    if not board_data then
+        return false, "board_not_found"
+    end
+
+    local posts_table = board_data.posts or {}
+    local post = nil
+
+    for _, p in ipairs(posts_table) do
+        if p.id == post_id then
+            post = p
+            break
+        end
+    end
+
+    if not post then
+        return false, "post_not_found"
+    end
+
+    if not post.pin then
+        return true, "already_unpinned"
+    end
+
+    post.pin = false
+    post.pin_time = nil
+
+    save()
+
+    -- Determine the post's new position among unpinned posts.
+    local ordered_ids = bbs_display_order_ids(board_data)
+    local anchor_id = "POST"
+
+    for i, id in ipairs(ordered_ids) do
+        if id == post_id then
+            anchor_id = (i == 1) and "POST" or ordered_ids[i - 1]
+            break
+        end
+    end
+
+    local base_display = shallow_copy(post)
+
+    base_display.title =
+        string.sub(
+            base_display.title,
+            1,
+            TITLE_LIMIT
+        )
+
+    -- Update anyone currently viewing this board.
+    for pid, state in pairs(player_states) do
+        if state.board_name == board_name then
+            local display_post = shallow_copy(base_display)
+
+            local last_time_for_viewer = last_read_time[pid]
+            local t = tonumber(post.time) or 0
+
+            if last_time_for_viewer == nil or t < last_time_for_viewer then
+                display_post.read = true
+            end
+
+            Net.remove_post(pid, post_id)
+
+            Net.append_posts(
+                pid,
+                { display_post },
+                anchor_id
+            )
+        end
+    end
+
+    return true, "unpinned"
+end
+
+function bridge_delete_bbs_post(board_name, post_id)
+    local board_data = save_data[board_name]
+
+    if not board_data then
+        return false, "board_not_found"
+    end
+
+    local posts_table = board_data.posts or {}
+    local found = false
+
+    for i, post in ipairs(posts_table) do
+        if post.id == post_id then
+            table.remove(posts_table, i)
+            found = true
+            break
+        end
+    end
+
+    if not found then
+        -- Treat an already-deleted post as successful.
+        -- This makes Delete safe to retry.
+        return true, "already_deleted"
+    end
+
+    save()
+
+    -- Remove it from anyone currently viewing the board.
+    for pid, state in pairs(player_states) do
+        if state.board_name == board_name then
+            Net.remove_post(pid, post_id)
+        end
+    end
+
+    return true, "deleted"
+end
+
 function handle_post_selection(player_id, post_id)
     if not player_states[player_id] then
         return
@@ -370,6 +581,204 @@ function handle_textbox_response(player_id, response)
     player_state.status = "READING"
 end
 
+function notify_bbs_bridge(board_name, post)
+    if not bbs_bridge_enabled() then
+        return
+    end
+    local body = json.encode({
+        board = board_name,
+        post_id = post.id,
+        author = post.author,
+        title = post.title,
+        body = post.body
+    })
+
+    Async.request(bridge_config.notify_url, {
+        method = "POST",
+        headers = {
+            ["Content-Type"] = "application/json",
+            ["X-BBS-Secret"] = bridge_config.shared_secret
+        },
+        body = body
+    }).and_then(function(response)
+        if not response then
+            print(
+                "[BBS Bridge] Failed to notify bridge for "
+                .. board_name
+                .. " #"
+                .. post.id
+            )
+            return
+        end
+
+        if response.status < 200 or response.status >= 300 then
+            print(
+                "[BBS Bridge] Bridge returned HTTP "
+                .. tostring(response.status)
+                .. " for "
+                .. board_name
+                .. " #"
+                .. post.id
+            )
+            return
+        end
+
+        print(
+            "[BBS Bridge] Notification sent for "
+            .. board_name
+            .. " #"
+            .. post.id
+        )
+    end)
+end
+
+function acknowledge_bbs_bridge_command(command_id)
+    Async.request(bridge_config.commands_ack_url, {
+        method = "POST",
+        headers = {
+            ["Content-Type"] = "application/json",
+            ["X-BBS-Secret"] = bridge_config.shared_secret
+        },
+        body = json.encode({
+            command_id = command_id
+        })
+    }).and_then(function(response)
+        if not response then
+            print(
+                "[BBS Bridge] Failed to acknowledge command #"
+                .. tostring(command_id)
+            )
+            return
+        end
+
+        if response.status < 200 or response.status >= 300 then
+            print(
+                "[BBS Bridge] Command acknowledgement returned HTTP "
+                .. tostring(response.status)
+                .. " for #"
+                .. tostring(command_id)
+            )
+            return
+        end
+
+        print(
+            "[BBS Bridge] Acknowledged command #"
+            .. tostring(command_id)
+        )
+    end)
+end
+
+
+function poll_bbs_bridge_commands()
+    if not bbs_bridge_enabled() then
+        return
+    end
+    if bridge_poll_in_flight then
+        return
+    end
+
+    bridge_poll_in_flight = true
+
+    Async.request(bridge_config.commands_next_url, {
+        method = "GET",
+        headers = {
+            ["X-BBS-Secret"] = bridge_config.shared_secret
+        }
+    }).and_then(function(response)
+        bridge_poll_in_flight = false
+
+        if not response then
+            print("[BBS Bridge] Failed to poll command queue")
+            return
+        end
+
+        if response.status < 200 or response.status >= 300 then
+            print(
+                "[BBS Bridge] Command poll returned HTTP "
+                .. tostring(response.status)
+            )
+            return
+        end
+
+        local ok, payload = pcall(
+            json.decode,
+            response.body
+        )
+
+        if not ok then
+            print("[BBS Bridge] Failed to decode command response")
+            return
+        end
+
+        if not payload or not payload.command then
+            return
+        end
+
+        local command = payload.command
+
+        if (
+            command.id == nil
+            or command.action == nil
+            or command.board == nil
+            or command.post_id == nil
+        ) then
+            print("[BBS Bridge] Received malformed command")
+            return
+        end
+
+        print(
+            "[BBS Bridge] Received command #"
+            .. tostring(command.id)
+            .. ": "
+            .. tostring(command.action)
+            .. " "
+            .. tostring(command.board)
+            .. " #"
+            .. tostring(command.post_id)
+        )
+
+        local success = false
+        local result = "unsupported_action"
+
+        if command.action == "pin" then
+            success, result = bridge_pin_bbs_post(
+                command.board,
+                command.post_id
+            )
+        elseif command.action == "unpin" then
+            success, result = bridge_unpin_bbs_post(
+                command.board,
+                command.post_id
+            )
+        elseif command.action == "delete" then
+            success, result = bridge_delete_bbs_post(
+                command.board,
+                command.post_id
+            )
+        end
+
+        if success then
+            print(
+                "[BBS Bridge] Command #"
+                .. tostring(command.id)
+                .. " completed: "
+                .. tostring(result)
+            )
+        else
+            print(
+                "[BBS Bridge] Command #"
+                .. tostring(command.id)
+                .. " failed: "
+                .. tostring(result)
+            )
+        end
+
+        -- Acknowledge even failed/unsupported commands so a bad command
+        -- cannot permanently block the FIFO queue.
+        acknowledge_bbs_bridge_command(command.id)
+    end)
+end
+
 function create_post(player_id, player_state, pinned)
     local board = Net.get_object_by_id(player_state.area_id, player_state.board_id)
     local board_data = save_data[player_state.board_name]
@@ -418,6 +827,8 @@ function create_post(player_id, player_state, pinned)
     board_data.posts[#board_data.posts + 1] = post
     save_data[player_state.board_name] = board_data
     save()
+
+    notify_bbs_bridge(player_state.board_name, post)
 end
 
 function contains_only_whitespace(text)
@@ -478,3 +889,16 @@ function save()
         end
     end)
 end
+
+Net:on("tick", function(event)
+    bridge_poll_elapsed =
+        bridge_poll_elapsed + event.delta_time
+
+    if bridge_poll_elapsed < BRIDGE_POLL_INTERVAL then
+        return
+    end
+
+    bridge_poll_elapsed = 0
+
+    poll_bbs_bridge_commands()
+end)
