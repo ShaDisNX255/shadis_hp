@@ -1541,15 +1541,18 @@
     <property name="3 Area" value="85.215.186.121:3333,acdc1,MainTrain"/>
     <property name="3 Name" value="BN3 ACDC Station"/>
     <property name="3 Type" value="Server"/>
-    <property name="4 Area" value="server.keristero.com:8769,default,MainTrain"/>
+    <property name="4 Area" value="server.keristero.com:8769,default,train"/>
     <property name="4 Name" value="Gravy Yum Server"/>
     <property name="4 Type" value="Server"/>
-    <property name="5 Area" value="96.60.137.203:8768,default,orange line"/>
-    <property name="5 Name" value="Central Station"/>
-    <property name="5 Type" value="Server"/>
+    <property name="7 Area" value="96.60.137.203:8768,default,orange line"/>
+    <property name="7 Name" value="Central Station"/>
+    <property name="7 Type" value="Server"/>
     <property name="6 Area" value="96.60.137.203:8767,UnderSquare,Undersquare Train"/>
     <property name="6 Name" value="Undernet Server"/>
     <property name="6 Type" value="Server"/>
+    <property name="5 Area" value="ONB.clewis.dad:3000,default,CLTrain1"/>
+    <property name="5 Name" value="CL_Net1"/>
+    <property name="5 Type" value="Server"/>
     <property name="Train" value="ShaDisHP"/>
    </properties>
    <point/>
