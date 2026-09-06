@@ -2099,6 +2099,19 @@ local function fragshop_type(raw_type, item_id)
   return typ
 end
 
+local function oncehub_catalog_name_for(id)
+  id = tostring(id or "")
+  local cat = rawget(_G, "ONCEHUB_CATALOG") or ONCEHUB_CATALOG
+  if type(cat) == "table" then
+    for _, e in ipairs(cat) do
+      if tostring(e.id) == id then
+        return e.name or e.label or e.title or id
+      end
+    end
+  end
+  return id
+end
+
 local function fragshop_pet_kind(item_id)
   return tostring(item_id or ""):gsub("^pet_", ""):lower()
 end
@@ -2148,6 +2161,16 @@ local function fragshop_is_sold_out(pid, offer)
 
   -- Pets remain repeatable. Each purchase creates a new pet UID.
   return false
+end
+
+local function oncehub_count_owned(pid, id)
+  id = tostring(id or "")
+  if id == "" then return 0 end
+  local secret = (helpers and helpers.get_safe_player_secret) and helpers.get_safe_player_secret(pid) or pid
+  local pmem = ezmemory.get_player_memory(secret) or {}
+  local inv = pmem[DECOR_MEM_KEY__ONCEHUB]
+  if type(inv) ~= "table" then return 0 end
+  return tonumber(inv[id] or 0) or 0
 end
 
 local function fragshop_clear_previews(pid)

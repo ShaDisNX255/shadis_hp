@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.12.2" orientation="isometric" renderorder="right-down" width="30" height="30" tilewidth="64" tileheight="32" infinite="0" nextlayerid="3" nextobjectid="113">
+<map version="1.10" tiledversion="1.12.2" orientation="isometric" renderorder="right-down" width="30" height="30" tilewidth="64" tileheight="32" infinite="0" nextlayerid="3" nextobjectid="114">
  <properties>
   <property name="Background" value="custom"/>
   <property name="Background Animation" value="/server/assets/custom/backgrounds/wcity/01-generic1.animation"/>
@@ -172,7 +172,7 @@
     <property name="Dialogue Type" value="first"/>
     <property name="Direction" value="Down Right"/>
     <property name="Next 1" type="object" value="77"/>
-    <property name="Text 1" value="Welcome, I echange tokens for prizes"/>
+    <property name="Text 1" value="Welcome, I exchange tokens for prizes"/>
    </properties>
    <point/>
   </object>
@@ -286,7 +286,6 @@
    </properties>
    <point/>
   </object>
-  <object id="111" name="UNO" type="UNO Table" gid="2147484077" x="411" y="481" width="66" height="58"/>
   <object id="112" name="Dealer Prog" type="NPC" x="399.5" y="464.5">
    <properties>
     <property name="Asset Name" value="ProgDealer"/>
@@ -296,5 +295,6 @@
    </properties>
    <point/>
   </object>
+  <object id="113" type="UNO Table" gid="429" x="408" y="484" width="66" height="58"/>
  </objectgroup>
 </map>
