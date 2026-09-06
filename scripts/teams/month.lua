@@ -156,8 +156,8 @@ Month.MONTHS = {
       },
     },
   },
-  -- July 2026
-  ["2026-07"] = {
+  -- August 2026
+  ["2026-08"] = {
     team_win = {
       pack_name = "Pet Chip Drops!",
       pack_rolls = 10,   -- how many random cards to give from pack_pool
