@@ -182,3 +182,4 @@ fa18fdf941e8f785faf457978492af28 com.orphin.navi.kit
 efb70c5b5aa670d030f3ff26acca7128 com.discord.neohgo.player.HackerMan
 fcafb24114f3fecd9aa1d6d02b13b6c9 com.D3str0y3d.player.Quickman
 380e0d9efeec1213a1444a7786566730 com.d3str0y3d255.navi.burnermanpvp
+7131c61746ba88b412f390961d9bfb56 com.AuraC.player.CopyAura
