@@ -10,6 +10,7 @@ d3bf619937ed1b05977effd8741f39e5 com.OFC.card.EXEPoN-001-Cannon
 29211b7981416b4bf524b77bb14c30aa com.alrysc.card.BusterUp
 a262213f7337daee32e1aa38c158f820 com.keristero.card.Vulcan1
 c81aaf22631981e586578c8d9b308e22 com.keristero.k1rbyat1na.card.EXE6-058-MiniBomb
+
 16bdaa2872b00a25116bd8bde50d60f0 com.Dawn.k1rbyat1na.card.EXE6-088-CrackShoot
 6021b0c3147bbf6f5a8c03ba87a19385 com.OFC.card.EXE6-004-AirShoot
 92e19baff1be8b640a10f91a2b6eaf08 com.OFC.card.EXE6-156-Recovery10
@@ -21,6 +22,11 @@ af691b89c59cfefa83f6f4f925df1dac com.OFC.card.EXE6-196-Attack+10
 e98589a9c8188c8d65b76ea72ef80e9e com.alrysc.card.BusterUp
 1f0e3af298b2bc2785c3f565adbcf136 com.keristero.card.Vulcan1
 f966e76688d0103206c99ed9f0830216 com.keristero.k1rbyat1na.card.EXE6-058-MiniBomb
+
+e5bb2855bba17ce155b81ec79ebe076e com.OFC.card.EXEPoN-001-Cannon
+8f7dba9ea2aca7053a25d761a22c2e70 com.OFC.card.EXEPoN-038-Sword
+591c7713c7f109cc205f92e1df8f5466 com.OFC.card.EXEPoN-039-WideSword
+a3c8a78f332dacdb3cf4e496463c4e54 com.keristero.k1rbyat1na.card.EXE6-058-MiniBomb
 
 7351d90aaf0c807f373a2b424c90d6cb Barr10.wcity.Library.92
 1ea2339e8b3e8ce1d21b0dfb9f4df8ee com.OFC.card.EXE6-009-SpreadGun1
@@ -132,6 +138,35 @@ f7a0936aa9c20e853f2d3718d14f7d28 com.wcity.Thor.card.SwapAqua
 8d3e6b1a08636e95d56b2f720adddd08 com.wcity.Thor.card.SwapFire
 297245e95a29d6150a33e3b155efd0b3 com.wcity.Thor.card.SwapWood
 
+bb093ac4b9b60401e26148eb967bc122 Barr10.wcity.Library.92
+e8d6270b20691870fa074f13416bba57 com.OFC.card.EXE4-132-DarkHole
+0b3b912cdb2adba06e7d2de6523b2003 com.OFC.card.EXE6-134-Toppuu
+423882c17fa951aff442de4dd7a680bd com.OFC.card.EXE6-138-StoneCube
+81927ddab43c3a7473e48315005b317d com.darkware.card.PKMN024
+1019b7cac2b258b326e0cdd263a92802 com.wcity.OFC.card.EXE6-116-KillerSensor1
+022cb26256dbeb1e57e78f2e92567800 com.wcity.OFC.card.EXE6-117-KillerSensor2
+19f5d2bbedb3d9fd6ca8a5bf64db570b com.wcity.OFC.card.EXE6-153-WaraNingyou
+a5ebd0d2fb8b3222ac022f9c512d45e1 com.wcity.OFC.card.EXEPoN-002-HighCannon
+42741636f6b427d59622ef4faae7dbca com.wcity.OFC.card.EXEPoN-014-HeatShot
+dfc811352bbe377ddf5d98b0f3016e31 com.wcity.OFC.card.EXEPoN-017-RabiRing1
+b9b1b93eb4b8a9f099166da70d02361c com.wcity.OFC.card.EXEPoN-018-RabiRing2
+4eb23c54a306c6bfbe1f5ca351191b1b com.wcity.OFC.card.EXEPoN-031-Ratton1
+393b58d192df57d53f818a240361a57d com.wcity.OFC.card.EXEPoN-032-Ratton2
+484f9f1ffb02e922fd341625efbb7e14 com.wcity.OFC.card.EXEPoN-040-LongSword
+3612fcb57a90adcbc9017efe3ca5fcd7 com.wcity.OFC.card.EXEPoN-047-FlameBlade
+778886e206dc65b937e92c302e624b07 com.wcity.OFC.card.EXEPoN-048-AquaBlade
+2060787b6bd8328ca663f10f4c956b21 com.wcity.OFC.card.EXEPoN-049-ElecBlade
+d29664796faf5622226c4e05e140c43c com.wcity.OFC.card.EXEPoN-050-BambooBlade
+eea380e6c00a3d9deca34935cd7717cc com.wcity.OFC.card.EXEPoN-051-ShockWave
+c1dace174fcf23b404cabf88d3aed946 com.wcity.OFC.card.EXEPoN-052-SonicWave
+a309c593046a3382c07325e5c5e76035 com.wcity.OFC.card.EXEPoN-066-Boomerang1
+7d536f13985cb855395faf970c0b39aa com.wcity.OFC.card.EXEPoN-067-Boomerang2
+ac3449a5223af4446417b11581ba6ce4 com.wcity.OFC.card.EXEPoN-121-Attack+20
+04354ecb3b96eb1180a6ec64f8d01222 com.wcity.k1rbyat1na.card.EXE6-222-Roll
+97e843f28f1c770149b04bfe7f8fd413 com.wcity.rune.k1rbyat1na.card.EXE6-060-EnergyBomb
+5d370afbaae42d72df3f9de72613df89 com.wcity.rune.k1rbyat1na.card.EXE6-061-MegaEnergyBomb
+b9ee953e362488f63480ec9528e31dde rune.wcity.legacy.bubbler
+
 ............................class BlockPackageManager............................
 2e6bd07f5f9614f8fce403bdea369392 com.OFC.block.EXE6-013-UnderShirt
 f7fdaa7ff00df8719942580daf4c7581 com.shadishp.block.duov2.blue
@@ -183,3 +218,9 @@ efb70c5b5aa670d030f3ff26acca7128 com.discord.neohgo.player.HackerMan
 fcafb24114f3fecd9aa1d6d02b13b6c9 com.D3str0y3d.player.Quickman
 380e0d9efeec1213a1444a7786566730 com.d3str0y3d255.navi.burnermanpvp
 7131c61746ba88b412f390961d9bfb56 com.AuraC.player.CopyAura
+
+e39d00932d6ccb6804c47cad2c5fcc5a 61.Mannerek.Unified.Library
+02afef87625622eaaee709b6e4ec9849 com.darkware.navi.djangopvp
+6f6b65e0e78fe8beabde8a6386905a25 com.darkware.navi.sabatapvp
+066990bfc9d5b2a397bb607bbf76b30d com.scilabs.cossack.player.fortepvp.basic
+48217f928f1f3c1342651e95b9fa8f07 com.shadis.navi.shockdos.basic
