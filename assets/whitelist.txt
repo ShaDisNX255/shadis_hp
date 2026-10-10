@@ -224,3 +224,5 @@ e39d00932d6ccb6804c47cad2c5fcc5a 61.Mannerek.Unified.Library
 6f6b65e0e78fe8beabde8a6386905a25 com.darkware.navi.sabatapvp
 066990bfc9d5b2a397bb607bbf76b30d com.scilabs.cossack.player.fortepvp.basic
 48217f928f1f3c1342651e95b9fa8f07 com.shadis.navi.shockdos.basic
+0cb084ef8c9d898d51db69e409f5aaf5 com.silva&tressa.navi.neozarypvp
+c88d1572a2e29b6ddcbd6a04a5b40104 com.silva&tressa.navi.neozarypvp
