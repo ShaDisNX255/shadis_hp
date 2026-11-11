@@ -49,15 +49,17 @@ end
 
 -- Helper: create directory for a given file path (if it doesn't exist)
 local function ensure_directory(filepath)
-    -- Extract directory part (supports both / and \)
     local dir = filepath:match("^(.*[/\\])")
-    if dir then
-        -- Remove trailing slash/backslash
-        dir = dir:sub(1, -2)
-        -- Attempt to create directory; ignore errors if it already exists
-        -- Using os.execute is a simple synchronous approach; adjust if your environment provides a better API
-        os.execute('mkdir "' .. dir .. '" 2>nul')  -- Windows
-        -- For Linux/macOS: os.execute('mkdir -p "' .. dir .. '"')
+    if not dir then return end
+
+    dir = dir:sub(1, -2)
+
+    local is_windows = package.config:sub(1, 1) == "\\"
+
+    if is_windows then
+        os.execute('mkdir "' .. dir .. '" 2>nul')
+    else
+        os.execute('mkdir -p "' .. dir .. '"')
     end
 end
 

@@ -15,6 +15,7 @@ scripts/octo-ranking/player_id_ranks.txt
 scripts/ezlibs-scripts/announcements_feed.lua
 logs.txt
 assets/displayer/*
+assets/avatar/*
 scripts/displayer/*
 run.sh
 players.txt
